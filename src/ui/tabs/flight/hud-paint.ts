@@ -26,8 +26,12 @@ const DIM = 'rgba(255, 255, 255, 0.62)'
 const AMBER = '#F7941D'
 const GREEN = '#35D07F'
 const RED = '#FF453A'
-const PANEL = 'rgba(14, 17, 22, 0.42)'
-const PANEL_EDGE = 'rgba(255, 255, 255, 0.22)'
+// Light enough that the horizon reads through all three bars. The heading
+// ribbon uses the same value and now has the horizon drawn behind it, which
+// is what actually makes it match: the same alpha over the dark panel
+// background rather than over sky came out much heavier.
+const PANEL = 'rgba(14, 17, 22, 0.26)'
+const PANEL_EDGE = 'rgba(255, 255, 255, 0.18)'
 const MONO = '"Roboto Mono", ui-monospace, monospace'
 const SANS = '"Work Sans", system-ui, sans-serif'
 
@@ -62,6 +66,8 @@ interface Text {
   font?: string
   spacing?: number
   align?: CanvasTextAlign
+  /** Shadow blur in scale units. Enough to separate, not enough to glow. */
+  shadow?: number
 }
 
 /** Gradients are per-height, so building them every frame is pure waste. */
@@ -89,7 +95,6 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   const ribbonH = 24 * s
   const tapeW = 50 * s
   const gap = 6 * s
-  const bottom = 46 * s
   const cx = w / 2
   const cy = ribbonH + (h - ribbonH) / 2
   const pxPerDeg = (h - ribbonH) / 70
@@ -103,9 +108,11 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     ctx.textBaseline = 'alphabetic'
     if (CAN_LETTER_SPACE && o.spacing) ctx.letterSpacing = `${o.spacing}px`
     // A soft shadow rather than an outline: legible over sky, ground or
-    // video, without the thickness a stroke adds at these sizes.
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
-    ctx.shadowBlur = 5 * s
+    // video, without the thickness a stroke adds at these sizes. Kept light
+    // -- a heavy one reads as a glow, which is worst on the coloured state
+    // text where the dark halo muddies the colour it surrounds.
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)'
+    ctx.shadowBlur = (o.shadow ?? 2.6) * s
     ctx.shadowOffsetY = 1
     ctx.fillStyle = o.color ?? INK
     ctx.fillText(str, x, y)
@@ -161,42 +168,42 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
 
   paintRibbon(ctx, w, ribbonH, st.headingDeg, s, write)
 
-  const tapeTop = ribbonH + gap
-  const tapeH = h - tapeTop - bottom
-  if (tapeH > 40) {
-    paintTape(ctx, gap, tapeTop, tapeW, tapeH, st.airspeedMs, 5, s, 'left', write)
-    paintTape(ctx, w - tapeW - gap, tapeTop, tapeW, tapeH, st.relAltM, 10, s, 'right', write)
-  }
+  // Short tapes centred on the horizon, as Mission Planner has them. The
+  // height that frees up is what the speeds and the vertical speed sit in,
+  // directly under the bar each belongs to.
+  const tapeH = Math.max(80, (h - ribbonH) * 0.52)
+  const tapeTop = Math.max(ribbonH + gap, cy - tapeH / 2)
+  const tapeBottom = tapeTop + tapeH
+  paintTape(ctx, gap, tapeTop, tapeW, tapeH, st.airspeedMs, 5, s, 'left', write)
+  paintTape(ctx, w - tapeW - gap, tapeTop, tapeW, tapeH, st.relAltM, 10, s, 'right', write)
 
   paintAircraft(ctx, cx, cy, s)
 
-  // Bottom band: what you read without moving your eyes off the horizon.
-  const y1 = h - bottom + 16 * s
-  const y2 = y1 + 15 * s
-  const left = tapeW + gap * 2.5
-  const right = w - tapeW - gap * 2.5
-  pair('AS', st.airspeedMs.toFixed(1), left, y1, 'left')
-  pair('GS', st.groundspeedMs.toFixed(1), left, y2, 'left')
-  write(st.batteryText, left, h - 6 * s, { size: 10 * s, color: DIM, font: SANS })
+  // Under the speed bar: the two speeds. Under the altitude bar: vertical
+  // speed and throttle. Same two lines each way, so the panel reads as a
+  // pair rather than as a left side and a right side.
+  const u1 = tapeBottom + 17 * s
+  const u2 = u1 + 15 * s
+  const left = gap
+  const right = w - gap
+  pair('AS', st.airspeedMs.toFixed(1), left, u1, 'left')
+  pair('GS', st.groundspeedMs.toFixed(1), left, u2, 'left')
+  const vs = st.climbMs
+  pair('V/S', `${vs >= 0 ? '+' : ''}${vs.toFixed(1)}`, right, u1, 'right')
+  pair('THR', `${st.throttlePct.toFixed(0)}%`, right, u2, 'right')
 
-  write(st.modeName || '—', right, y1, {
-    size: 15 * s,
+  // The corners: battery bottom left, mode bottom right, link top right,
+  // all at the same weight as the readouts above them.
+  const corner = 13 * s
+  write(st.batteryText, left, h - 8 * s, { size: corner })
+  write(st.modeName || '—', right, h - 8 * s, {
+    size: corner,
     weight: '600',
     font: SANS,
-    spacing: 0.6,
+    spacing: 0.5,
     align: 'right',
   })
-  pair('THR', `${st.throttlePct.toFixed(0)}%`, right, y2, 'right')
-  const vs = st.climbMs
-  pair('V/S', `${vs >= 0 ? '+' : ''}${vs.toFixed(1)}`, right, h - 6 * s, 'right', 11 * s)
-
-  write(st.linkText, right, ribbonH + 16 * s, {
-    size: 10 * s,
-    color: DIM,
-    font: SANS,
-    align: 'right',
-    spacing: 0.4,
-  })
+  write(st.linkText, right, ribbonH + 18 * s, { size: corner, align: 'right' })
 
   // State, centred and unmissable. Sits above the horizon centre so the
   // aircraft symbol stays readable underneath it.
@@ -233,7 +240,26 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
 
   if (st.readiness === 'ready' || st.readiness === 'notReady') {
     const ready = st.readiness === 'ready'
-    write(ready ? 'READY TO ARM' : 'NOT READY TO ARM', cx, h - 6 * s, {
+    const label = ready ? 'READY TO ARM' : 'NOT READY TO ARM'
+    const y = h - 25 * s
+    // On its own chip: it sits over the bottom of the pitch ladder, and a
+    // rung running through the middle of the words is exactly the sort of
+    // thing you do not want to squint past before a flight.
+    ctx.save()
+    ctx.font = `600 ${Math.round(11 * s)}px ${SANS}`
+    // measureText does not know about the letter-spacing the text is drawn
+    // with, so the chip has to allow for it or it comes out too narrow.
+    const tw = ctx.measureText(label).width + label.length * 1.1 * s + 20 * s
+    ctx.restore()
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(cx - tw / 2, y - 12 * s, tw, 17 * s, 8 * s)
+    ctx.fillStyle = 'rgba(14, 17, 22, 0.5)'
+    ctx.fill()
+    ctx.restore()
+    // Its own line above the corners, so it never runs into the battery on
+    // one side or the mode on the other.
+    write(label, cx, y, {
       size: 11 * s,
       weight: '600',
       font: SANS,
@@ -256,14 +282,20 @@ function paintHorizon(
   s: number,
 ) {
   const g = gradients(ctx, h * 2)
+  const place = () => {
+    ctx.translate(cx, cy)
+    ctx.rotate(-st.roll)
+    ctx.translate(0, ((st.pitch * 180) / Math.PI) * pxPerDeg)
+  }
+
+  // Sky and ground run the full height, behind the heading ribbon included:
+  // the ribbon is then a translucent panel over the horizon exactly as the
+  // tapes are, which is what makes the three read as one instrument.
   ctx.save()
   ctx.beginPath()
-  ctx.rect(0, top, w, h - top)
+  ctx.rect(0, 0, w, h)
   ctx.clip()
-  ctx.translate(cx, cy)
-  ctx.rotate(-st.roll)
-  ctx.translate(0, ((st.pitch * 180) / Math.PI) * pxPerDeg)
-
+  place()
   const reach = Math.max(w, h) * 2
   ctx.fillStyle = g.sky
   ctx.fillRect(-reach, -h * 2, reach * 2, h * 2)
@@ -275,6 +307,15 @@ function paintHorizon(
   ctx.moveTo(-reach, 0)
   ctx.lineTo(reach, 0)
   ctx.stroke()
+  ctx.restore()
+
+  // The ladder stops at the ribbon, though. Letting it run on behind a panel
+  // that thin means its rungs and numbers show through the heading scale.
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(0, top, w, h - top)
+  ctx.clip()
+  place()
 
   // Pitch ladder. Finely graduated near the horizon and coarsely further
   // out, as a PFD is; dashed below the horizon so the sign of the pitch

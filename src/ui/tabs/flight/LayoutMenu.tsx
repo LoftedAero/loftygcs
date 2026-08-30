@@ -7,9 +7,13 @@ import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 // visual weight as flying the aircraft. They are set once and then left
 // alone, so they belong behind a menu; the commands get the space.
 
+/** Roughly how tall the panel is, for deciding which way it opens. */
+const PANEL_H = 300
+
 export default function LayoutMenu() {
   const layout = useFlightLayoutStore()
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -32,6 +36,22 @@ export default function LayoutMenu() {
     }
   }, [open])
 
+  // Placed against the viewport rather than anchored above the button.
+  // Anchored, it opened upward and went off the top of the window whenever
+  // the controls sat at the top of the column -- which is exactly what
+  // happens with the HUD switched off.
+  const place = () => {
+    // The wrapper is just the button until the panel opens, so its box is
+    // the button box.
+    const r = boxRef.current?.getBoundingClientRect()
+    if (!r) return
+    const above = r.top - 8 - PANEL_H
+    setPos({
+      left: Math.max(8, Math.min(r.right - 210, window.innerWidth - 218)),
+      top: above >= 8 ? above : Math.min(r.bottom + 8, window.innerHeight - PANEL_H - 8),
+    })
+  }
+
   return (
     <div className="layout-menu" ref={boxRef}>
       <LaButton
@@ -39,12 +59,15 @@ export default function LayoutMenu() {
         size="sm"
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) place()
+          setOpen((o) => !o)
+        }}
       >
         View ▾
       </LaButton>
-      {open && (
-        <div className="layout-menu__panel" role="menu">
+      {open && pos && (
+        <div className="layout-menu__panel" role="menu" style={{ left: pos.left, top: pos.top }}>
           <p className="layout-menu__heading">Panels</p>
           <LaSwitch label="Map" checked={layout.showMap} onChange={() => layout.toggle('showMap')} />
           <LaSwitch label="HUD" checked={layout.showHud} onChange={() => layout.toggle('showHud')} />

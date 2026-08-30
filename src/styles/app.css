@@ -1401,10 +1401,12 @@ body.is-splitting .flight-map {
 .layout-menu {
   position: relative;
 }
+/* Positioned against the viewport by the component, not anchored to the
+   button: anchored above it, the panel went off the top of the window
+   whenever the controls sat at the top of the column -- which is what
+   happens with the HUD switched off. */
 .layout-menu__panel {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + var(--la-space-2));
+  position: fixed;
   z-index: 900;
   width: 210px;
   display: flex;
@@ -1426,6 +1428,12 @@ body.is-splitting .flight-map {
 }
 .layout-menu__heading + * {
   margin-top: calc(var(--la-space-1) * -1);
+}
+/* Toggles pinned to the right edge. Left to sit after their labels they
+   land at a different x on every row, which reads as sloppy in a list and
+   makes the on/off state harder to scan down. */
+.layout-menu__panel .la-switch {
+  justify-content: space-between;
 }
 .layout-menu__actions {
   display: flex;
