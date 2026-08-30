@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, net, shell, session } from 'electron'
 import path from 'node:path'
 import { registerLinkIpc } from './ipc-links'
 import { registerSitlIpc, stopSim } from './sitl'
+import { registerVideoHandlers, stopVideo } from './video'
 
 // The renderer is the same build the browser gets; Electron's job is the
 // window, the privileged link sockets (ipc-links.ts), and the Web Serial
@@ -123,6 +124,7 @@ app.whenReady().then(() => {
 
   registerLinkIpc(() => mainWindow)
   registerSitlIpc(() => mainWindow)
+  registerVideoHandlers(() => mainWindow)
 
   createWindow()
 
@@ -133,5 +135,6 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   stopSim()
+  stopVideo()
   if (process.platform !== 'darwin') app.quit()
 })

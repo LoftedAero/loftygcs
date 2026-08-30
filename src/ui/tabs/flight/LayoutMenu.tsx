@@ -10,7 +10,12 @@ import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 /** Roughly how tall the panel is, for deciding which way it opens. */
 const PANEL_H = 300
 
-export default function LayoutMenu() {
+export interface LayoutMenuProps {
+  /** Opens the video source dialog; it lives outside this menu. */
+  onVideo: () => void
+}
+
+export default function LayoutMenu({ onVideo }: LayoutMenuProps) {
   const layout = useFlightLayoutStore()
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
@@ -102,6 +107,18 @@ export default function LayoutMenu() {
             </LaButton>
             <LaButton variant="ghost" size="sm" onClick={layout.reset}>
               Reset
+            </LaButton>
+          </div>
+          <div className="layout-menu__actions">
+            <LaButton
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setOpen(false)
+                onVideo()
+              }}
+            >
+              HUD video…
             </LaButton>
           </div>
         </div>

@@ -60,4 +60,31 @@ contextBridge.exposeInMainWorld('loftgcs', {
     openExternal: (url: string) => ipcRenderer.send('app:open-external', url),
     fetchFirmware: (url: string) => ipcRenderer.invoke('app:fetch-firmware', url),
   },
+
+  // Video arrives here as a compressed H.264 bitstream and is decoded in the
+  // renderer: decoded frames are two orders of magnitude larger and would
+  // never survive the crossing.
+  video: {
+    open: (url: string) => ipcRenderer.invoke('video:open', url),
+    close: () => ipcRenderer.invoke('video:close'),
+    onReady: (cb: (info: { codec: string }) => void) => {
+      const handler = (_e: unknown, info: { codec: string }) => cb(info)
+      ipcRenderer.on('video:ready', handler)
+      return () => ipcRenderer.removeListener('video:ready', handler)
+    },
+    onUnit: (cb: (u: { data: Uint8Array; keyframe: boolean; timestamp: number }) => void) => {
+      const handler = (
+        _e: unknown,
+        u: { data: Uint8Array; keyframe: boolean; timestamp: number },
+      ) => cb(u)
+      ipcRenderer.on('video:unit', handler)
+      return () => ipcRenderer.removeListener('video:unit', handler)
+    },
+    onStatus: (cb: (s: { text: string; error?: boolean; closed?: boolean }) => void) => {
+      const handler = (_e: unknown, s: { text: string; error?: boolean; closed?: boolean }) =>
+        cb(s)
+      ipcRenderer.on('video:status', handler)
+      return () => ipcRenderer.removeListener('video:status', handler)
+    },
+  },
 })

@@ -35,6 +35,8 @@ export interface FlightLayoutState {
   showPlot: boolean
   /** Which telemetry fields the plot is drawing. */
   plotFields: string[]
+  /** Last HUD video source, so it does not have to be retyped. */
+  videoUrl: string
   /** Which plotted series the Y axis numbers belong to. */
   plotAxisField: string | null
   /** Whether the lower pane shows messages or the telemetry field list. */
@@ -50,6 +52,7 @@ export interface FlightLayoutState {
   togglePlotField: (name: string) => void
   setLogPane: (pane: 'messages' | 'status') => void
   setPlotAxisField: (name: string) => void
+  setVideoUrl: (url: string) => void
   reset: () => void
 }
 
@@ -64,6 +67,7 @@ interface Persisted {
   plotFields: string[]
   logPane: 'messages' | 'status'
   plotAxisField: string | null
+  videoUrl: string
   hudHorizon: boolean
   hudOverlays: boolean
 }
@@ -80,6 +84,7 @@ const DEFAULTS: Persisted = {
   plotFields: [],
   logPane: 'messages',
   plotAxisField: null,
+  videoUrl: '',
   hudHorizon: true,
   hudOverlays: true,
 }
@@ -125,6 +130,7 @@ function snapshot(s: FlightLayoutState): Persisted {
     plotFields: s.plotFields,
     logPane: s.logPane,
     plotAxisField: s.plotAxisField,
+    videoUrl: s.videoUrl,
     hudHorizon: s.hudHorizon,
     hudOverlays: s.hudOverlays,
   }
@@ -168,6 +174,10 @@ export const useFlightLayoutStore = create<FlightLayoutState>((set, get) => {
     },
     setPlotAxisField: (plotAxisField) => {
       set({ plotAxisField })
+      save()
+    },
+    setVideoUrl: (videoUrl) => {
+      set({ videoUrl })
       save()
     },
     reset: () => {

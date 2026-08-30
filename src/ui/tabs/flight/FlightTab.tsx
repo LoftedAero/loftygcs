@@ -12,6 +12,7 @@ import MapContextMenu, { type MapMenuPoint } from './MapContextMenu'
 import PlotPanel from './PlotPanel'
 import FieldPicker from './FieldPicker'
 import StatusList from './StatusList'
+import VideoSourceModal from './VideoSourceModal'
 
 // The flight screen, arranged as Mission Planner arranges it: one panel
 // pinned left at a fixed aspect ratio, the controls and messages filling the
@@ -28,6 +29,7 @@ export default function FlightTab() {
   const [target, setTarget] = useState<{ lat: number; lon: number } | null>(null)
   const [home, setHomePin] = useState<{ lat: number; lon: number } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [videoOpen, setVideoOpen] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
   const layout = useFlightLayoutStore()
 
@@ -82,7 +84,7 @@ export default function FlightTab() {
       {/* Always present: it carries the controls even when the panel above
           them is switched off. */}
       <div className="flight-grid__below">
-        <FlightControls />
+        <FlightControls onVideo={() => setVideoOpen(true)} />
         {layout.showMessages && (
           <LogPane
             pane={layout.logPane}
@@ -110,6 +112,13 @@ export default function FlightTab() {
   return (
     <div className="flight-screen">
       <div className="flight-panels">{grid}</div>
+
+      <VideoSourceModal
+        open={videoOpen}
+        url={layout.videoUrl}
+        onUrl={layout.setVideoUrl}
+        onClose={() => setVideoOpen(false)}
+      />
 
       <FieldPicker
         open={pickerOpen}

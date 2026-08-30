@@ -52,6 +52,21 @@ export interface LoftGcsBridge {
     /** Main-process fetch, restricted to firmware.ardupilot.org (no CORS there). */
     fetchFirmware(url: string): Promise<ArrayBuffer>
   }
+
+  /**
+   * HUD video. The main process speaks RTSP or listens for RTP and passes
+   * the compressed H.264 bitstream over; the renderer decodes it with
+   * WebCodecs. Decoded frames are far too large to cross a process boundary.
+   */
+  video: {
+    open(url: string): Promise<{ ok: true } | { ok: false; error: string }>
+    close(): Promise<{ ok: true }>
+    onReady(cb: (info: { codec: string }) => void): () => void
+    onUnit(
+      cb: (u: { data: Uint8Array; keyframe: boolean; timestamp: number }) => void,
+    ): () => void
+    onStatus(cb: (s: { text: string; error?: boolean; closed?: boolean }) => void): () => void
+  }
 }
 
 declare global {

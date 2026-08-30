@@ -5,6 +5,7 @@ import { useConnectionStore } from '../../../stores/connection-store'
 import { SENSOR_BITS } from '../../../protocol/sensors'
 import { armReadiness, batteryLabel, isFailsafe, linkLabel } from './hud-draw'
 import { paintHud } from './hud-paint'
+import VideoLayer from './VideoLayer'
 
 // The HUD as a stack of layers rather than one canvas:
 //
@@ -92,9 +93,10 @@ export default function Hud({ horizon, overlays }: HudProps) {
 
   return (
     <div className="flight-hud">
-      {/* The background layer. Empty until a video source is configured; see
-          video.ts for what is meant to land here. */}
-      <div className="flight-hud__background" />
+      {/* The background layer: decoded video, behind the instruments. */}
+      <div className="flight-hud__background">
+        <VideoLayer />
+      </div>
       <canvas ref={canvasRef} className="flight-hud__canvas" />
     </div>
   )

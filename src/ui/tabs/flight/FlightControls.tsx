@@ -60,7 +60,11 @@ const DO_ACTIONS: DoAction[] = [
 
 const TAKEOFF_ALT_M = 20
 
-export default function FlightControls() {
+export interface FlightControlsProps {
+  onVideo: () => void
+}
+
+export default function FlightControls({ onVideo }: FlightControlsProps) {
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const vehicleType = useVehicleStore((s) => s.vehicleType)
   const customMode = useVehicleStore((s) => s.customMode)
@@ -233,7 +237,7 @@ export default function FlightControls() {
         <span className="flight-controls__sep" />
         {/* Arranging the window is not a command at all, so it sits at the
             quiet end of the quiet row. */}
-        <LayoutMenu />
+        <LayoutMenu onVideo={onVideo} />
       </div>
 
       {status && <p className="la-hint flight-controls__status">{status}</p>}
