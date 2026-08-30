@@ -904,6 +904,232 @@
   }
 }
 
+/* --- OSD screen layout ----------------------------------------------- */
+
+/* The preview depicts a video frame with the OSD drawn over it, so it is
+   dark where the rest of the app is light. That is representation, not a
+   theme: charcoal stands in for the video and --la-surface is the OSD's own
+   white text. The character cell -- not the pixel -- is the unit throughout,
+   which is why sizes are expressed against --osd-cols / --osd-rows. */
+.osd-screen {
+  container-type: size;
+  width: 100%;
+  background: var(--la-charcoal);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+}
+
+.osd-screen__stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* One faint rule per character cell, so a panel's footprint is countable
+     rather than guessed at. */
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: calc(100% / var(--osd-cols)) calc(100% / var(--osd-rows));
+}
+
+/* Rows an NTSC frame never shows. PAL gets all sixteen; NTSC stops at
+   thirteen, and a panel parked below the line is simply invisible on half
+   the analog gear in the world. */
+.osd-screen__ntsc {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--la-gold);
+  pointer-events: none;
+}
+/* Above the line and on its own chip. The right edge is where the flight
+   timer sits and the row below is the flight mode, so both the obvious
+   placements landed on a panel; the row above the cut is reliably clear. */
+.osd-screen__ntsc-label {
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  padding: 1px var(--la-space-1);
+  border-radius: 0 var(--la-radius-sm) var(--la-radius-sm) 0;
+  background: var(--la-charcoal);
+  color: var(--la-gold);
+  font-family: var(--la-font);
+  font-size: var(--la-size-xs);
+  white-space: nowrap;
+}
+
+.osd-screen__empty {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--la-space-5);
+  text-align: center;
+  color: var(--la-surface);
+  opacity: 0.55;
+  font-size: var(--la-size-md);
+  pointer-events: none;
+}
+
+.osd-panel {
+  position: absolute;
+  display: flex;
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: none;
+  color: var(--la-surface);
+  font-family: var(--la-font-mono);
+  /* Sized off cell *width*, because a monospace advance is about 0.6em and
+     sizing off the row instead left every glyph floating in a third of a
+     cell of empty space. The cell is locked to 2:3 by the stage's aspect
+     ratio, so a width-derived size can never overflow the row. */
+  font-size: calc(100cqw / var(--osd-cols) * 1.4);
+  line-height: 1;
+  white-space: pre;
+  cursor: grab;
+  /* Subpixel antialiasing fringes thin white strokes on a dark ground with
+     visible orange and cyan; grayscale keeps the text neutral. */
+  -webkit-font-smoothing: antialiased;
+  /* The OSD's own black outline; without it white text over pale video is
+     unreadable, which is exactly why the firmware draws it. */
+  text-shadow:
+    1px 0 0 rgba(0, 0, 0, 0.9),
+    -1px 0 0 rgba(0, 0, 0, 0.9),
+    0 1px 0 rgba(0, 0, 0, 0.9),
+    0 -1px 0 rgba(0, 0, 0, 0.9);
+}
+.osd-panel__cell {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* Panels that draw a graphic rather than a string: named outlines, since a
+   fake horizon drawn to scale would suggest a precision the footprint does
+   not have. */
+.osd-panel--graphic {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-style: dashed;
+  align-items: center;
+  justify-content: center;
+}
+.osd-panel__graphic {
+  font-family: var(--la-font);
+  font-size: var(--la-size-xs);
+  color: var(--la-surface);
+  opacity: 0.75;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 2px;
+}
+
+.osd-panel:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.osd-panel:focus-visible {
+  outline: none;
+  border-color: var(--la-blue);
+  box-shadow: var(--la-ring);
+}
+.osd-panel.is-selected {
+  border-color: var(--la-blue);
+  background: rgba(70, 132, 197, 0.25);
+}
+/* Overlap is a fault in the layout, so it is flagged in status red -- and
+   with a solid border, because color alone is never the signal. */
+.osd-panel.is-overlapping {
+  border-color: var(--la-bad);
+  border-style: solid;
+  background: rgba(214, 48, 49, 0.25);
+}
+.osd-panel.is-dragging {
+  cursor: grabbing;
+  z-index: 2;
+  border-color: var(--la-blue);
+}
+
+/* Preview and panel list side by side. The preview is sized by its aspect
+   ratio, so widening it also makes it taller -- past about 900px it stops
+   being more legible and starts needing to be scrolled. Capping the left
+   column and putting the list in the space that frees is what keeps the
+   whole editor on one screen. */
+.osd-columns {
+  display: grid;
+  /* The preview is capped by the grid rather than by a max-width on the card,
+     so the panel list takes every pixel that frees up and lays its switches
+     out in as many columns as fit. */
+  grid-template-columns: minmax(0, 900px) minmax(300px, 1fr);
+  gap: var(--la-space-3);
+  align-items: start;
+}
+.osd-columns > .la-card {
+  max-width: none;
+}
+.osd-columns__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-3);
+  min-width: 0;
+}
+.osd-columns__side > .la-card {
+  max-width: none;
+}
+
+/* One column below the width where the list would be squeezed thinner than
+   its own labels. */
+@media (max-width: 1180px) {
+  .osd-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.osd-toolbar {
+  margin-bottom: var(--la-space-3);
+}
+.osd-toolbar__right {
+  gap: var(--la-space-4);
+}
+
+.osd-selection {
+  margin-top: var(--la-space-3);
+  padding-top: var(--la-space-3);
+  border-top: 1px solid var(--la-line);
+}
+.osd-selection--empty {
+  margin-top: var(--la-space-3);
+}
+.osd-selection__name {
+  font-size: var(--la-size-md);
+}
+.osd-selection__coord {
+  width: 84px;
+}
+
+.osd-palette__group + .osd-palette__group {
+  margin-top: var(--la-space-4);
+}
+.osd-palette__heading {
+  margin: 0 0 var(--la-space-2);
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+}
+.osd-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--la-space-2) var(--la-space-4);
+}
+
 /* Narrow tier: the rail gives up its width before anything clips. */
 @media (max-width: 820px) {
   .app-main {

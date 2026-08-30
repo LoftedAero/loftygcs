@@ -126,6 +126,36 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
         const restored = await engine.setParam(loit!.name, loit!.value, loit!.mavType)
         expect(restored).toBeCloseTo(loit!.value, 3)
 
+        // --- OSD: the screen editor's assumption, checked against real
+        // firmware. The editor is built on every panel being an
+        // OSD{screen}_{PANEL}_{EN,X,Y} triplet, so a panel with a missing
+        // coordinate would be a control that writes a parameter the vehicle
+        // does not have. The OSD is a compile-time option, hence the guard --
+        // a build without it is a legitimate configuration, not a failure.
+        const names = new Set(result.params.map((p) => p.name))
+        const enables = [...names].filter((n) => /^OSD1_.+_EN$/.test(n))
+        if (enables.length === 0) {
+          console.warn('SITL build has no OSD compiled in; skipping the OSD layout checks')
+        } else {
+          expect(enables.length).toBeGreaterThan(20) // real firmware carries ~65
+          const brokenTriplets = enables
+            .map((n) => n.replace(/^OSD1_/, '').replace(/_EN$/, ''))
+            .filter((stem) => !names.has(`OSD1_${stem}_X`) || !names.has(`OSD1_${stem}_Y`))
+          expect(brokenTriplets).toEqual([])
+
+          // Four layout screens, as the screen picker offers.
+          for (const n of [1, 2, 3, 4]) expect(names.has(`OSD${n}_ENABLE`)).toBe(true)
+
+          // And a coordinate really is writable: this is what dragging a
+          // panel and hitting Write Params comes down to.
+          const altX = result.params.find((p) => p.name === 'OSD1_ALTITUDE_X')
+          expect(altX).toBeDefined()
+          const moved = await engine.setParam(altX!.name, altX!.value + 1, altX!.mavType)
+          expect(moved).toBeCloseTo(altX!.value + 1, 3)
+          const putBack = await engine.setParam(altX!.name, altX!.value, altX!.mavType)
+          expect(putBack).toBeCloseTo(altX!.value, 3)
+        }
+
         // --- Commands: the Phase 3 gate. Start a compass calibration on the
         // real firmware, see MAG_CAL_PROGRESS stream, then cancel it.
         const startResult = await engine.runCommand(42424, [0, 0, 0, 0, 0, 0, 0], 5000)

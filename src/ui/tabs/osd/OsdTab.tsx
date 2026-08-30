@@ -1,11 +1,11 @@
-import { LaCard } from '../../components/La'
+import { LaCard, LaHint } from '../../components/La'
 import ParamCard, { NeedsVehicle } from '../../components/ParamCard'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useParamStore } from '../../../stores/param-store'
+import OsdLayoutEditor from './OsdLayoutEditor'
 
-// On-screen display settings. The panel-placement editor (dragging elements
-// onto a screen preview) is a later phase; what is here configures the OSD
-// itself and its warning thresholds.
+// On-screen display: the OSD's own settings and warning thresholds, then the
+// screen layout editor.
 export default function OsdTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const entries = useParamStore((s) => s.entries)
@@ -29,6 +29,10 @@ export default function OsdTab() {
   }
   return (
     <>
+      {/* The layout comes first: it is what the tab is for, and burying the
+          screen preview under two cards of settings put it below the fold on
+          a 1080p window. */}
+      <OsdLayoutEditor />
       <ParamCard
         title="Display"
         fields={[
@@ -38,7 +42,14 @@ export default function OsdTab() {
           { param: 'OSD_SW_METHOD', label: 'Screen switch method' },
           { param: 'OSD_OPTIONS', label: 'Options' },
         ]}
-      />
+      >
+        {entries.get('OSD_TYPE')?.value === 0 && (
+          <LaHint>
+            The OSD is off, so nothing is drawn on the video feed. Screens can still be laid out,
+            and take effect once a type is set — which needs a reboot.
+          </LaHint>
+        )}
+      </ParamCard>
       <ParamCard
         title="Warnings"
         note="These drive the OSD's own warning highlights, separately from the vehicle's failsafes."
@@ -50,12 +61,6 @@ export default function OsdTab() {
           { param: 'OSD_W_AVGCELLV', label: 'Average cell voltage', unit: 'V' },
         ]}
       />
-      <LaCard title="Screen layout" note="Panel placement arrives in a later release.">
-        <p className="app-placeholder">
-          Element positions are set today through the OSD1_* parameters on the Parameters tab; a
-          drag-and-drop screen editor is planned.
-        </p>
-      </LaCard>
     </>
   )
 }

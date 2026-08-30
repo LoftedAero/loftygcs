@@ -10,6 +10,83 @@ import { SENSOR_BITS } from '../protocol/sensors'
 import type { FieldValue } from '../protocol/types'
 import type { Transport, TransportOptions } from './Transport'
 
+// The OSD panels this simulated firmware "implements", with screen 1's
+// default layout: id, column, row, and whether screen 1 shows it.
+//
+// Deliberately not all sixty-five panels ArduPilot can compile in, because a
+// real build never has all of them either -- which also means demo mode
+// exercises the layout editor's habit of dropping panels the vehicle lacks.
+// The enabled positions are collision-free on the 30x16 analog grid, so the
+// editor opens on a layout that is actually valid.
+export const OSD_PANELS: [string, number, number, boolean][] = [
+  ['RSSI', 1, 1, true],
+  ['HOME', 14, 1, true],
+  ['BAT_VOLT', 24, 1, true],
+  ['HEADING', 13, 2, true],
+  ['CURRENT', 24, 2, true],
+  ['SATS', 1, 3, true],
+  ['COMPASS', 9, 3, true],
+  ['BATUSED', 23, 3, true],
+  ['HORIZON', 7, 5, true],
+  ['ALTITUDE', 24, 8, true],
+  ['WIND', 1, 9, true],
+  ['VSPEED', 24, 9, true],
+  ['ASPEED', 2, 10, true],
+  ['GSPEED', 2, 11, true],
+  ['THROTTLE', 24, 11, true],
+  ['FLTMODE', 2, 13, true],
+  ['FLTIME', 24, 13, true],
+  ['MESSAGE', 2, 14, true],
+  // Present but off, with the positions ArduPilot would ship them at.
+  ['SIDEBARS', 4, 5, false],
+  ['CRSSHAIR', 14, 8, false],
+  ['ROLL', 1, 5, false],
+  ['PITCH', 1, 6, false],
+  ['XTRACK', 1, 7, false],
+  ['DIST', 22, 4, false],
+  ['GPSLAT', 9, 15, false],
+  ['GPSLONG', 9, 14, false],
+  ['HDOP', 1, 4, false],
+  ['WAYPOINT', 22, 5, false],
+  ['TER_HGT', 22, 6, false],
+  ['RNGF', 22, 7, false],
+  ['FENCE', 6, 3, false],
+  ['CLK', 24, 15, false],
+  ['CALLSIGN', 1, 15, false],
+  ['TEMP', 22, 12, false],
+  ['BAT2_VLT', 19, 1, false],
+  ['BAT2USED', 16, 3, false],
+  ['RESTVOLT', 19, 2, false],
+  ['AVGCELLV', 19, 3, false],
+  ['CURRENT2', 16, 2, false],
+  ['ESCRPM', 1, 12, false],
+  ['ESCTEMP', 1, 13, false],
+  ['EFF', 21, 10, false],
+  ['CLIMBEFF', 21, 11, false],
+  ['STATS', 8, 5, false],
+  ['LINK_Q', 5, 1, false],
+  ['RSSIDBM', 5, 2, false],
+  ['VTX_PWR', 22, 13, false],
+  ['RPM', 1, 10, false],
+]
+
+// Four screens, as ArduPilot exposes them, switched by an RC channel. Only
+// the first is on: the others exist so the editor's screen picker has
+// somewhere to go, which is exactly how a fresh vehicle arrives.
+const OSD_SCREEN_PARAMS = [1, 2, 3, 4].flatMap((s) => [
+  [`OSD${s}_ENABLE`, s === 1 ? 1 : 0, 2],
+  [`OSD${s}_CHAN_MIN`, 900 + (s - 1) * 300, 4],
+  [`OSD${s}_CHAN_MAX`, 1200 + (s - 1) * 300, 4],
+  [`OSD${s}_TXT_RES`, 0, 2],
+  [`OSD${s}_FONT`, 0, 2],
+  [`OSD${s}_ESC_IDX`, 0, 2],
+  ...OSD_PANELS.flatMap(([id, x, y, on]) => [
+    [`OSD${s}_${id}_EN`, s === 1 && on ? 1 : 0, 2],
+    [`OSD${s}_${id}_X`, x, 2],
+    [`OSD${s}_${id}_Y`, y, 2],
+  ]),
+]) as [string, number, number][]
+
 // A representative slice of an ArduCopter parameter set (name, value,
 // MAV_PARAM_TYPE) so every configuration tab has real content in demo mode.
 // Values are ArduCopter defaults where one exists. This is deliberately
@@ -182,12 +259,15 @@ const SIM_PARAMS: [string, number, number][] = [
   ['AUTOTUNE_MIN_D', 0.001, 9],
 
   // OSD
-  ['OSD_TYPE', 0, 2],
+  ['OSD_TYPE', 1, 2], // MAX7456: an analog 30x16 screen, as most boards have
   ['OSD_UNITS', 0, 2],
   ['OSD_MSG_TIME', 10, 2],
+  ['OSD_SW_METHOD', 0, 2],
+  ['OSD_OPTIONS', 0, 4],
   ['OSD_W_BATVOLT', 14.4, 9],
   ['OSD_W_RSSI', 30, 2],
   ['OSD_W_NSAT', 9, 2],
+  ...OSD_SCREEN_PARAMS,
 ]
 
 // What a healthy simulated copter reports as fitted, enabled and well.
