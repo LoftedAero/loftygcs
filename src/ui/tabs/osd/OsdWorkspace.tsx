@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
-import { LaButton, LaCard, LaHint, LaSwitch } from '../../components/La'
+import { LaButton, LaCard, LaHint, LaLinkButton, LaSelect, LaSwitch } from '../../components/La'
 import ParamCard from '../../components/ParamCard'
 import { useParamStore } from '../../../stores/param-store'
 import OsdScreen from './OsdScreen'
 import { OSD_GROUP_LABELS, OSD_ITEMS, type OsdGroup } from './osd-items'
 import {
   OSD_SCREENS,
+  TEXT_RESOLUTIONS,
+  TYPE_MSP_DISPLAYPORT,
   clampPlacement,
+  findOffGrid,
   findOverlaps,
   paramName,
   readPlacements,
@@ -41,11 +44,14 @@ export default function OsdWorkspace() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const osdType = entries.get('OSD_TYPE')?.value
-  const txtRes = entries.get(`OSD${screen}_TXT_RES`)?.value
+  const txtResParam = `OSD${screen}_TXT_RES`
+  const txtRes = entries.get(txtResParam)?.value
   const grid = screenGrid(osdType, txtRes)
+  const hdWanted = txtRes !== undefined && txtRes > 0
 
   const placements = useMemo(() => readPlacements(entries, screen), [entries, screen])
   const overlaps = useMemo(() => findOverlaps(placements), [placements])
+  const offGrid = useMemo(() => findOffGrid(placements, grid), [placements, grid])
   const selected = placements.find((p) => p.item.id === selectedId) ?? null
 
   const screenEnableParam = `OSD${screen}_ENABLE`
@@ -74,11 +80,17 @@ export default function OsdWorkspace() {
     )
   }
 
+  // Alphabetical inside each group. The catalog is written in a rough
+  // reading order, which is fine for a spec and useless for finding one
+  // panel among sixty-five.
   const byGroup = new Map<OsdGroup, typeof placements>()
   for (const p of placements) {
     const list = byGroup.get(p.item.group) ?? []
     list.push(p)
     byGroup.set(p.item.group, list)
+  }
+  for (const list of byGroup.values()) {
+    list.sort((a, b) => a.item.label.localeCompare(b.item.label))
   }
 
   return (
@@ -135,7 +147,24 @@ export default function OsdWorkspace() {
             })}
           </div>
           <div className="la-row osd-toolbar__right">
-            <span className="la-field__unit">{grid.label}</span>
+            {entries.has(txtResParam) ? (
+              <label className="la-row osd-toolbar__res">
+                <span className="la-field__unit">Grid</span>
+                <LaSelect
+                  value={String(txtRes ?? 0)}
+                  className={entries.get(txtResParam)?.dirty ? 'is-dirty' : ''}
+                  onChange={(e) => edit(txtResParam, Number(e.target.value))}
+                >
+                  {TEXT_RESOLUTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.grid.label}
+                    </option>
+                  ))}
+                </LaSelect>
+              </label>
+            ) : (
+              <span className="la-field__unit">{grid.label}</span>
+            )}
             {entries.has(screenEnableParam) && (
               <LaSwitch
                 label="Screen enabled"
@@ -146,12 +175,29 @@ export default function OsdWorkspace() {
           </div>
         </div>
 
+        {/* Picking an HD grid does nothing on its own: ArduPilot only draws
+            the wider grids over MSP DisplayPort, and ignores TXT_RES on every
+            other backend. Rather than let the selection look broken, say so
+            and offer the one parameter change that makes it real. */}
+        {hdWanted && osdType !== TYPE_MSP_DISPLAYPORT && (
+          <LaHint>
+            The vehicle draws 30×16 until its OSD type is MSP DisplayPort — HD text resolution
+            is ignored on every other backend.{' '}
+            {entries.has('OSD_TYPE') && (
+              <LaLinkButton onClick={() => edit('OSD_TYPE', TYPE_MSP_DISPLAYPORT)}>
+                Set OSD type to MSP DisplayPort
+              </LaLinkButton>
+            )}
+          </LaHint>
+        )}
+
         <OsdScreen
           grid={grid}
           placements={placements}
           selectedId={selectedId}
           overlaps={overlaps}
-          showNtscGuide={osdType !== 5}
+          offGrid={offGrid}
+          showNtscGuide={osdType !== TYPE_MSP_DISPLAYPORT}
           onSelect={setSelectedId}
           onMove={move}
         />
@@ -167,6 +213,23 @@ export default function OsdWorkspace() {
             setSelectedId(null)
           }}
         />
+
+        {offGrid.size > 0 && (
+          <LaHint error>
+            {offGrid.size} panel{offGrid.size === 1 ? ' sits' : 's sit'} outside {grid.label} and
+            will not be drawn.{' '}
+            <LaLinkButton
+              onClick={() => {
+                for (const id of offGrid) {
+                  const p = placements.find((q) => q.item.id === id)
+                  if (p) move(id, p.x, p.y)
+                }
+              }}
+            >
+              Bring {offGrid.size === 1 ? 'it' : 'them'} back on screen
+            </LaLinkButton>
+          </LaHint>
+        )}
 
         {overlaps.size > 0 && (
           <LaHint error>
@@ -198,11 +261,10 @@ export default function OsdWorkspace() {
         <ParamCard
           title={`Screen ${screen} settings`}
           fields={[
-            ...(osdType === 5
-              ? [
-                  { param: `OSD${screen}_TXT_RES`, label: 'Text resolution' },
-                  { param: `OSD${screen}_FONT`, label: 'Font index' },
-                ]
+            // Text resolution lives in the layout toolbar instead, beside the
+            // grid it changes.
+            ...(osdType === TYPE_MSP_DISPLAYPORT
+              ? [{ param: `OSD${screen}_FONT`, label: 'Font index' }]
               : []),
             { param: `OSD${screen}_CHAN_MIN`, label: 'Switch PWM minimum', unit: 'µs' },
             { param: `OSD${screen}_CHAN_MAX`, label: 'Switch PWM maximum', unit: 'µs' },

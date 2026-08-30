@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  TEXT_RESOLUTIONS,
+  TYPE_MSP_DISPLAYPORT,
   clamp,
   clampPlacement,
   coordLimit,
+  findOffGrid,
   findOverlaps,
   paramName,
   readPlacements,
@@ -155,6 +158,54 @@ describe('findOverlaps', () => {
   it('detects overlap across the rows of a multi-row panel', () => {
     const hit = findOverlaps([place('HORIZON', 0, 0), place('ALTITUDE', 2, 5)])
     expect([...hit].sort()).toEqual(['ALTITUDE', 'HORIZON'])
+  })
+})
+
+describe('findOffGrid', () => {
+  const sd = screenGrid(1, 0) // 30x16
+  const hd = screenGrid(5, 2) // 60x22
+  const place = (id: string, x: number, y: number, enabled = true): Placement => ({
+    item: item(id),
+    x,
+    y,
+    enabled,
+  })
+
+  it('accepts a layout that fits', () => {
+    expect(findOffGrid([place('ALTITUDE', 0, 0), place('BAT_VOLT', 20, 15)], sd).size).toBe(0)
+  })
+
+  it('catches panels stranded by a switch from HD back to SD', () => {
+    // Column 45 is legal on a 60-column screen and simply never drawn on a
+    // 30-column one -- the parameter keeps its value and nothing complains.
+    const layout = [place('ALTITUDE', 45, 3), place('BAT_VOLT', 2, 2)]
+    expect(findOffGrid(layout, hd).size).toBe(0)
+    expect([...findOffGrid(layout, sd)]).toEqual(['ALTITUDE'])
+  })
+
+  it('counts a panel that only partly overhangs the edge', () => {
+    // ALTITUDE is four cells wide, so column 27 puts its last cell past 30.
+    expect([...findOffGrid([place('ALTITUDE', 27, 0)], sd)]).toEqual(['ALTITUDE'])
+    expect(findOffGrid([place('ALTITUDE', 26, 0)], sd).size).toBe(0)
+  })
+
+  it('measures the full height of a multi-row panel', () => {
+    expect([...findOffGrid([place('HORIZON', 0, 10)], sd)]).toEqual(['HORIZON'])
+  })
+
+  it('ignores panels that are switched off', () => {
+    expect(findOffGrid([place('ALTITUDE', 45, 3, false)], sd).size).toBe(0)
+  })
+})
+
+describe('TEXT_RESOLUTIONS', () => {
+  it('covers every grid the screen picker offers', () => {
+    expect(TEXT_RESOLUTIONS.map((r) => r.value)).toEqual([0, 1, 2])
+    // The selector writes these values straight to OSD{n}_TXT_RES, so each
+    // must be the grid screenGrid resolves that value to on DisplayPort.
+    for (const r of TEXT_RESOLUTIONS) {
+      expect(screenGrid(TYPE_MSP_DISPLAYPORT, r.value)).toEqual(r.grid)
+    }
   })
 })
 

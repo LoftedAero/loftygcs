@@ -19,6 +19,8 @@ export interface OsdScreenProps {
   placements: readonly Placement[]
   selectedId: string | null
   overlaps: ReadonlySet<string>
+  /** Panels the current grid is too small for; clipped rather than drawn. */
+  offGrid: ReadonlySet<string>
   /** Highlight the rows an NTSC frame cuts off. Analog grids only. */
   showNtscGuide: boolean
   onSelect: (id: string) => void
@@ -46,6 +48,7 @@ export default function OsdScreen({
   placements,
   selectedId,
   overlaps,
+  offGrid,
   showNtscGuide,
   onSelect,
   onMove,
@@ -140,6 +143,7 @@ export default function OsdScreen({
               graphic ? 'osd-panel--graphic' : '',
               selectedId === p.item.id ? 'is-selected' : '',
               overlaps.has(p.item.id) ? 'is-overlapping' : '',
+              offGrid.has(p.item.id) ? 'is-offgrid' : '',
               live ? 'is-dragging' : '',
             ]
               .filter(Boolean)

@@ -16,30 +16,31 @@ export interface Grid {
   label: string
 }
 
-const SD: Grid = { cols: 30, rows: 16, label: 'SD 30×16' }
+/** OSD{n}_TXT_RES values, and the grid each one selects. */
+export const TEXT_RESOLUTIONS: readonly { value: number; grid: Grid }[] = [
+  { value: 0, grid: { cols: 30, rows: 16, label: 'SD 30×16' } },
+  { value: 1, grid: { cols: 50, rows: 18, label: 'HD 50×18' } },
+  { value: 2, grid: { cols: 60, rows: 22, label: 'HD 60×22' } },
+]
 
-// OSD_TYPE values, from the firmware's own parameter metadata.
-const TYPE_MSP_DISPLAYPORT = 5
+const SD: Grid = TEXT_RESOLUTIONS[0]!.grid
+
+/** OSD_TYPE value for MSP DisplayPort -- the only backend that draws HD. */
+export const TYPE_MSP_DISPLAYPORT = 5
 
 /**
  * The character grid for a screen.
  *
  * Only MSP DisplayPort has a selectable text resolution; every other backend
  * (MAX7456, SITL, plain MSP, TXONLY) draws the classic 30x16 analog grid, and
- * OSD{n}_TXT_RES is ignored on those. NTSC actually shows 13 visible rows
+ * OSD{n}_TXT_RES is ignored on those -- so a stale HD value left in the
+ * parameters must not widen the grid. NTSC actually shows 13 visible rows
  * rather than 16, but the parameters accept 16 and ArduPilot lays out against
  * 16, so the grid stays 16 and the editor marks the rows NTSC will cut.
  */
 export function screenGrid(osdType: number | undefined, txtRes: number | undefined): Grid {
   if (osdType !== TYPE_MSP_DISPLAYPORT) return SD
-  switch (txtRes) {
-    case 1:
-      return { cols: 50, rows: 18, label: 'HD 50×18' }
-    case 2:
-      return { cols: 60, rows: 22, label: 'HD 60×22' }
-    default:
-      return SD
-  }
+  return TEXT_RESOLUTIONS.find((r) => r.value === txtRes)?.grid ?? SD
 }
 
 /** Rows beyond an NTSC frame's 13 visible lines, on the classic analog grid. */
@@ -120,6 +121,24 @@ export function clampPlacement(
     x: clamp(Math.round(x), 0, Math.max(0, maxX)),
     y: clamp(Math.round(y), 0, Math.max(0, maxY)),
   }
+}
+
+/**
+ * Ids of enabled panels that do not fit on the grid.
+ *
+ * Switching a screen from HD back to SD is the way this happens: a panel
+ * parked at column 45 is perfectly legal on a 60-column screen and simply
+ * never drawn on a 30-column one. The parameter keeps its value, so nothing
+ * complains -- the panel just silently stops appearing.
+ */
+export function findOffGrid(placements: readonly Placement[], grid: Grid): Set<string> {
+  const out = new Set<string>()
+  for (const p of placements) {
+    if (!p.enabled) continue
+    const extent = itemExtent(p.item)
+    if (p.x + extent.width > grid.cols || p.y + extent.height > grid.rows) out.add(p.item.id)
+  }
+  return out
 }
 
 /**
