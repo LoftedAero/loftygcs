@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 
-// How the Fly screen is arranged. Mission Planner lets you resize and swap
-// the HUD and map; this is that, plus the ability to turn either off so one
-// of them can fill the window -- which is what makes a video-only HUD work
-// without being a special case.
+// How the Fly screen is arranged, following Mission Planner's shape: one
+// panel pinned to the left at a fixed aspect ratio with the controls and
+// messages filling the space beneath it, and the other panel taking the
+// whole height on the right. Dragging the divider resizes the left column,
+// which changes the fixed-aspect panel's height, which is what the stack
+// below it grows or shrinks to absorb.
 //
 // Persisted, because a layout you have to rebuild every session is worse
 // than not being able to change it at all.
@@ -12,13 +14,20 @@ const STORAGE_KEY = 'loftgcs.flight.layout'
 
 export type FlightPanel = 'map' | 'hud'
 
+/**
+ * Width and height of the fixed-aspect panel, as a ratio.
+ *
+ * 4:3 is what Mission Planner uses and what analog video is. A digital HD
+ * feed would want 16:9, so this is likely to become a setting once the HUD
+ * has a video source to letterbox.
+ */
+export const PANEL_ASPECT = 4 / 3
+
 export interface FlightLayoutState {
-  /** Fraction of the split taken by the first slot, 0.15..0.85. */
+  /** Fraction of the width taken by the fixed-aspect column. */
   ratio: number
-  /** 'row' puts the panels side by side; 'column' stacks them. */
-  orientation: 'row' | 'column'
-  /** Which panel is in the first slot. The other takes the second. */
-  first: FlightPanel
+  /** Which panel is pinned left at a fixed aspect ratio. */
+  aspectPanel: FlightPanel
   showMap: boolean
   showHud: boolean
   showMessages: boolean
@@ -28,7 +37,6 @@ export interface FlightLayoutState {
   hudOverlays: boolean
 
   setRatio: (r: number) => void
-  setOrientation: (o: 'row' | 'column') => void
   swap: () => void
   toggle: (key: 'showMap' | 'showHud' | 'showMessages' | 'hudHorizon' | 'hudOverlays') => void
   reset: () => void
@@ -37,8 +45,7 @@ export interface FlightLayoutState {
 /** The part of the layout that survives a reload. */
 interface Persisted {
   ratio: number
-  orientation: 'row' | 'column'
-  first: FlightPanel
+  aspectPanel: FlightPanel
   showMap: boolean
   showHud: boolean
   showMessages: boolean
@@ -47,9 +54,10 @@ interface Persisted {
 }
 
 const DEFAULTS: Persisted = {
-  ratio: 0.62,
-  orientation: 'row',
-  first: 'map',
+  // Narrower than an even split: at 4:3 the left panel gets tall quickly,
+  // and the controls beneath it need room.
+  ratio: 0.38,
+  aspectPanel: 'hud',
   showMap: true,
   showHud: true,
   showMessages: true,
@@ -82,16 +90,15 @@ function persist(state: Persisted) {
   }
 }
 
-/** Keeps both panels usable however hard the divider is dragged. */
+/** Keeps both columns usable however hard the divider is dragged. */
 export function clampRatio(r: number): number {
-  return Math.min(0.85, Math.max(0.15, r))
+  return Math.min(0.7, Math.max(0.2, r))
 }
 
 function snapshot(s: FlightLayoutState): Persisted {
   return {
     ratio: s.ratio,
-    orientation: s.orientation,
-    first: s.first,
+    aspectPanel: s.aspectPanel,
     showMap: s.showMap,
     showHud: s.showHud,
     showMessages: s.showMessages,
@@ -109,12 +116,8 @@ export const useFlightLayoutStore = create<FlightLayoutState>((set, get) => {
       set({ ratio: clampRatio(r) })
       save()
     },
-    setOrientation: (orientation) => {
-      set({ orientation })
-      save()
-    },
     swap: () => {
-      set({ first: get().first === 'map' ? 'hud' : 'map' })
+      set({ aspectPanel: get().aspectPanel === 'map' ? 'hud' : 'map' })
       save()
     },
     toggle: (key) => {

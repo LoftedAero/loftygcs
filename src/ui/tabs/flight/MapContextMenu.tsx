@@ -120,7 +120,6 @@ export default function MapContextMenu({
         Set home here
       </LaButton>
 
-      {!guided && <LaHint>Flying to a point needs Guided mode.</LaHint>}
       {guided && !armed && <LaHint>The vehicle is not armed.</LaHint>}
     </div>
   )

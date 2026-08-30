@@ -1,32 +1,25 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-// A two-slot resizable split. Hand-rolled rather than pulled from a library:
-// it is about eighty lines, and a library's divider would arrive with its own
-// colors and hit areas to override back into the design system.
+// The draggable divider between the two flight columns. Hand-rolled rather
+// than pulled from a library: it is about seventy lines, and a library's
+// divider would arrive with its own colors and hit areas to override back
+// into the design system.
 //
 // The drag is tracked on the window rather than through setPointerCapture --
 // this screen re-renders at telemetry rate, and re-binding a captured pointer
 // on every one of those renders wedges the input pipeline.
 
 export interface SplitPaneProps {
-  orientation: 'row' | 'column'
-  /** Fraction taken by the first slot. */
+  /** Fraction of the width taken by the first column. */
   ratio: number
   onRatio: (r: number) => void
   first: ReactNode
   second: ReactNode
-  /** With one slot hidden the survivor fills, and no divider is drawn. */
+  /** With one column hidden the survivor fills, and no divider is drawn. */
   only?: 'first' | 'second' | undefined
 }
 
-export default function SplitPane({
-  orientation,
-  ratio,
-  onRatio,
-  first,
-  second,
-  only,
-}: SplitPaneProps) {
+export default function SplitPane({ ratio, onRatio, first, second, only }: SplitPaneProps) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
   const onRatioRef = useRef(onRatio)
@@ -36,11 +29,8 @@ export default function SplitPane({
     if (!dragging) return
     const move = (e: PointerEvent) => {
       const box = boxRef.current?.getBoundingClientRect()
-      if (!box) return
-      const f =
-        orientation === 'row'
-          ? (e.clientX - box.left) / box.width
-          : (e.clientY - box.top) / box.height
+      if (!box || !box.width) return
+      const f = (e.clientX - box.left) / box.width
       if (Number.isFinite(f)) onRatioRef.current(f)
     }
     const stop = () => setDragging(false)
@@ -55,7 +45,7 @@ export default function SplitPane({
       window.removeEventListener('pointercancel', stop)
       document.body.classList.remove('is-splitting')
     }
-  }, [dragging, orientation])
+  }, [dragging])
 
   if (only) {
     return (
@@ -65,16 +55,15 @@ export default function SplitPane({
     )
   }
 
-  const pct = `${(ratio * 100).toFixed(2)}%`
   return (
-    <div className={`split split--${orientation}`} ref={boxRef}>
-      <div className="split__slot" style={orientation === 'row' ? { width: pct } : { height: pct }}>
+    <div className="split" ref={boxRef}>
+      <div className="split__slot" style={{ width: `${(ratio * 100).toFixed(2)}%` }}>
         {first}
       </div>
       <div
         className={`split__divider${dragging ? ' is-dragging' : ''}`}
         role="separator"
-        aria-orientation={orientation === 'row' ? 'vertical' : 'horizontal'}
+        aria-orientation="vertical"
         aria-valuenow={Math.round(ratio * 100)}
         aria-label="Resize panels"
         tabIndex={0}
@@ -86,10 +75,8 @@ export default function SplitPane({
           // Keyboard resize, because a pointer-only divider is unusable to
           // anyone driving the app from the keyboard.
           const step = e.shiftKey ? 0.1 : 0.02
-          const back = orientation === 'row' ? 'ArrowLeft' : 'ArrowUp'
-          const fwd = orientation === 'row' ? 'ArrowRight' : 'ArrowDown'
-          if (e.key === back) onRatio(ratio - step)
-          else if (e.key === fwd) onRatio(ratio + step)
+          if (e.key === 'ArrowLeft') onRatio(ratio - step)
+          else if (e.key === 'ArrowRight') onRatio(ratio + step)
           else return
           e.preventDefault()
         }}

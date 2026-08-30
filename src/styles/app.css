@@ -1118,15 +1118,10 @@
 
 .split {
   display: flex;
+  flex-direction: row;
   width: 100%;
   height: 100%;
   min-height: 0;
-}
-.split--row {
-  flex-direction: row;
-}
-.split--column {
-  flex-direction: column;
 }
 .split--single .split__slot {
   flex: 1;
@@ -1152,40 +1147,85 @@
   padding: 0;
   background: var(--la-bg);
   position: relative;
-}
-.split--row > .split__divider {
   width: var(--la-space-2);
   cursor: col-resize;
-}
-.split--column > .split__divider {
-  height: var(--la-space-2);
-  cursor: row-resize;
 }
 /* A grip line, so the divider reads as something you can grab. */
 .split__divider::after {
   content: '';
   position: absolute;
-  background: var(--la-line-strong);
-  border-radius: var(--la-radius-pill);
-  transition: background var(--la-ease);
-}
-.split--row > .split__divider::after {
   top: 50%;
   left: 50%;
   width: 2px;
   height: 28px;
   transform: translate(-50%, -50%);
-}
-.split--column > .split__divider::after {
-  left: 50%;
-  top: 50%;
-  height: 2px;
-  width: 28px;
-  transform: translate(-50%, -50%);
+  background: var(--la-line-strong);
+  border-radius: var(--la-radius-pill);
+  transition: background var(--la-ease);
 }
 .split__divider:hover::after,
 .split__divider.is-dragging::after {
   background: var(--la-blue);
+}
+
+/* --- The two flight columns ------------------------------------------ */
+
+.flight-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-width: 0;
+  min-height: 0;
+}
+
+/*
+ * The fixed-aspect panel. Its height follows the column's width, which is
+ * what makes dragging the divider trade panel size against the controls
+ * below -- exactly the behaviour Mission Planner has.
+ *
+ * Two rules keep that honest at the extremes. The max-height reserves room
+ * for the controls however wide the column is dragged, and the child sizes
+ * itself from the *height* with an aspect ratio of its own, so when that cap
+ * bites the panel letterboxes horizontally instead of stretching. Sizing the
+ * child from the parent's width instead would silently break the aspect the
+ * moment the cap applied.
+ */
+.flight-aspect {
+  flex: none;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: calc(100% - 172px);
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+}
+.flight-aspect > * {
+  flex: none;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  min-height: 0;
+}
+
+/* Controls and messages take whatever the panel above them leaves. */
+.flight-below {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+
+.flight-fill {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.flight-fill > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 .split__divider:focus-visible {
   outline: none;
@@ -1335,10 +1375,12 @@ body.is-splitting .flight-map {
   width: 72px;
 }
 
+/* The log takes the rest of the stack under the panel, so it is what
+   absorbs the height the fixed-aspect panel gives up or takes. */
 .flight-log {
-  flex: none;
-  height: 108px;
-  resize: vertical;
+  flex: 1;
+  min-height: 56px;
+  resize: none;
 }
 
 .vehicle-marker {
@@ -1347,19 +1389,27 @@ body.is-splitting .flight-map {
   border: none;
 }
 
-/* Narrow: stack the panels whatever the saved orientation says, since side
-   by side stops being readable well before the rail gives up its width. */
+/* Narrow: stack the columns, since side by side stops being readable well
+   before the rail gives up its width. The divider turns horizontal, and the
+   fixed-aspect panel stops competing with the controls for height. */
 @media (max-width: 900px) {
-  .split--row {
+  .split {
     flex-direction: column;
   }
-  .split--row > .split__slot {
+  .split > .split__slot {
     width: auto !important;
   }
-  .split--row > .split__divider {
+  .split > .split__divider {
     width: auto;
     height: var(--la-space-2);
     cursor: row-resize;
+  }
+  .split > .split__divider::after {
+    width: 28px;
+    height: 2px;
+  }
+  .flight-aspect {
+    max-height: none;
   }
 }
 

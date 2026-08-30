@@ -10,9 +10,14 @@ import SplitPane from './SplitPane'
 import FlightActionsBar from './FlightActionsBar'
 import MapContextMenu, { type MapMenuPoint } from './MapContextMenu'
 
-// The flight screen. Two panels the user arranges -- resize, swap, or turn
-// either off so the survivor fills the window -- with the commands that get
-// used in the air along the top and the messages log along the bottom.
+// The flight screen, arranged as Mission Planner arranges it: one panel
+// pinned left at a fixed aspect ratio, the controls and messages filling the
+// space beneath it, and the other panel taking the full height on the right.
+//
+// The two columns are the same height by construction, so dragging the
+// divider widens the left one, which makes its fixed-aspect panel taller,
+// which the stack underneath absorbs. Swap exchanges which panel is pinned;
+// whichever lands on the left inherits the aspect rule.
 export default function FlightTab() {
   const phase = useConnectionStore((s) => s.phase)
   const [follow, setFollow] = useState(true)
@@ -32,40 +37,33 @@ export default function FlightTab() {
     )
   }
 
-  const mapPanel = (
-    <MapView
-      follow={follow}
-      onContextMenu={setMenu}
-      target={target}
-      home={home}
-    />
-  )
+  const mapPanel = <MapView follow={follow} onContextMenu={setMenu} target={target} home={home} />
   const hudPanel = <Hud horizon={layout.hudHorizon} overlays={layout.hudOverlays} />
 
-  const first = layout.first === 'map' ? mapPanel : hudPanel
-  const second = layout.first === 'map' ? hudPanel : mapPanel
-  // Which slot survives when the other panel is switched off.
-  const only =
-    layout.showMap && layout.showHud
-      ? undefined
-      : layout.showMap
-        ? layout.first === 'map'
-          ? ('first' as const)
-          : ('second' as const)
-        : layout.first === 'hud'
-          ? ('first' as const)
-          : ('second' as const)
+  const aspectIsHud = layout.aspectPanel === 'hud'
+  const aspectVisible = aspectIsHud ? layout.showHud : layout.showMap
+  const fillVisible = aspectIsHud ? layout.showMap : layout.showHud
+
+  // The left column always exists -- it carries the controls and messages
+  // even when the panel above them is switched off.
+  const leftColumn = (
+    <div className="flight-col">
+      {aspectVisible && (
+        <div className="flight-aspect">{aspectIsHud ? hudPanel : mapPanel}</div>
+      )}
+      <div className="flight-below">
+        <FlightActionsBar />
+        {layout.showMessages && <FlightMessages />}
+      </div>
+    </div>
+  )
+
+  const rightColumn = <div className="flight-fill">{aspectIsHud ? mapPanel : hudPanel}</div>
 
   return (
     <div className="flight-screen">
-      <FlightActionsBar />
-
       <div className="flight-toolbar la-row la-row--wrap">
-        <LaSwitch
-          label="Follow"
-          checked={follow}
-          onChange={(e) => setFollow(e.target.checked)}
-        />
+        <LaSwitch label="Follow" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
         <span className="flight-toolbar__sep" />
         <LaSwitch label="Map" checked={layout.showMap} onChange={() => layout.toggle('showMap')} />
         <LaSwitch label="HUD" checked={layout.showHud} onChange={() => layout.toggle('showHud')} />
@@ -87,18 +85,8 @@ export default function FlightTab() {
           onChange={() => layout.toggle('showMessages')}
         />
         <span className="la-grow" />
-        <LaButton variant="ghost" size="sm" onClick={layout.swap} disabled={only !== undefined}>
+        <LaButton variant="ghost" size="sm" onClick={layout.swap}>
           Swap
-        </LaButton>
-        <LaButton
-          variant="ghost"
-          size="sm"
-          onClick={() =>
-            layout.setOrientation(layout.orientation === 'row' ? 'column' : 'row')
-          }
-          disabled={only !== undefined}
-        >
-          {layout.orientation === 'row' ? 'Stack' : 'Side by side'}
         </LaButton>
         <LaButton variant="ghost" size="sm" onClick={layout.reset}>
           Reset layout
@@ -107,16 +95,13 @@ export default function FlightTab() {
 
       <div className="flight-panels">
         <SplitPane
-          orientation={layout.orientation}
           ratio={layout.ratio}
           onRatio={layout.setRatio}
-          first={first}
-          second={second}
-          only={only}
+          first={leftColumn}
+          second={rightColumn}
+          only={fillVisible ? undefined : 'first'}
         />
       </div>
-
-      {layout.showMessages && <FlightMessages />}
 
       {menu && (
         <MapContextMenu

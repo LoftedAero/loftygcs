@@ -62,7 +62,7 @@ export default function Hud({ horizon, overlays }: HudProps) {
       // is visible at any size; the rest is clamped so the markings stay
       // legible without becoming billboards.
       const pxPerDeg = h / 80
-      const s = Math.min(1.8, Math.max(0.85, Math.min(w, h) / 260))
+      const s = Math.min(1.4, Math.max(0.85, Math.min(w, h) / 300))
 
       if (flags.current.horizon) {
         const pitchPx = ((pitch * 180) / Math.PI) * pxPerDeg
