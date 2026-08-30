@@ -1,0 +1,15 @@
+# LF everywhere, in the repo and in the working copy on every platform.
+#
+# Not just a tidiness preference: Prettier's default endOfLine is "lf", and CI
+# runs on Linux and macOS as well as Windows. Left to Git's native checkout,
+# a Windows clone would get CRLF working files that Prettier then wants to
+# rewrite, and the next commit from that machine would rewrite every line of
+# every file it touched.
+* text=auto eol=lf
+
+# Generated, and not worth reading in a diff or counting as authored code.
+package-lock.json -diff linguist-generated
+
+# glTF is JSON, so Git will happily diff it -- 700 KB of mesh coordinates that
+# no reviewer wants inline. Treat the models as the assets they are.
+*.gltf -diff linguist-vendored
