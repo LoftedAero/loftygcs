@@ -85,8 +85,11 @@ export default function FlightTab() {
       {layout.showPlot && (
         <PlotPanel
           fields={layout.plotFields}
+          axisField={layout.plotAxisField}
+          onAxisField={layout.setPlotAxisField}
           onRemove={layout.togglePlotField}
           onPick={() => setPickerOpen(true)}
+          onClose={() => layout.toggle('showPlot')}
         />
       )}
       <div className="flight-fill__main">{aspectIsHud ? mapPanel : hudPanel}</div>

@@ -35,6 +35,8 @@ export interface FlightLayoutState {
   showPlot: boolean
   /** Which telemetry fields the plot is drawing. */
   plotFields: string[]
+  /** Which plotted series the Y axis numbers belong to. */
+  plotAxisField: string | null
   /** Whether the lower pane shows messages or the telemetry field list. */
   logPane: 'messages' | 'status'
   /** The artificial horizon. Off leaves the background layer showing. */
@@ -47,6 +49,7 @@ export interface FlightLayoutState {
   toggle: (key: 'showMap' | 'showHud' | 'showMessages' | 'showPlot' | 'hudHorizon' | 'hudOverlays') => void
   togglePlotField: (name: string) => void
   setLogPane: (pane: 'messages' | 'status') => void
+  setPlotAxisField: (name: string) => void
   reset: () => void
 }
 
@@ -60,6 +63,7 @@ interface Persisted {
   showPlot: boolean
   plotFields: string[]
   logPane: 'messages' | 'status'
+  plotAxisField: string | null
   hudHorizon: boolean
   hudOverlays: boolean
 }
@@ -75,6 +79,7 @@ const DEFAULTS: Persisted = {
   showPlot: false,
   plotFields: [],
   logPane: 'messages',
+  plotAxisField: null,
   hudHorizon: true,
   hudOverlays: true,
 }
@@ -119,6 +124,7 @@ function snapshot(s: FlightLayoutState): Persisted {
     showPlot: s.showPlot,
     plotFields: s.plotFields,
     logPane: s.logPane,
+    plotAxisField: s.plotAxisField,
     hudHorizon: s.hudHorizon,
     hudOverlays: s.hudOverlays,
   }
@@ -158,6 +164,10 @@ export const useFlightLayoutStore = create<FlightLayoutState>((set, get) => {
     },
     setLogPane: (logPane) => {
       set({ logPane })
+      save()
+    },
+    setPlotAxisField: (plotAxisField) => {
+      set({ plotAxisField })
       save()
     },
     reset: () => {

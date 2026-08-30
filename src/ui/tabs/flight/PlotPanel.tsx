@@ -25,18 +25,39 @@ export const PLOT_COLORS = [
   '#4BC5C5',
 ] as const
 
+/** Room for the value labels down the left and the times along the bottom. */
+const GUTTER_L = 52
+const GUTTER_B = 18
+const PAD_T = 8
+const PAD_R = 10
+
 export interface PlotPanelProps {
   fields: readonly string[]
+  /** Which series the Y axis numbers belong to. */
+  axisField: string | null
+  onAxisField: (name: string) => void
   onRemove: (name: string) => void
   onPick: () => void
+  onClose: () => void
 }
 
-export default function PlotPanel({ fields, onRemove, onPick }: PlotPanelProps) {
+export default function PlotPanel({
+  fields,
+  axisField,
+  onAxisField,
+  onRemove,
+  onPick,
+  onClose,
+}: PlotPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const legendRef = useRef<HTMLDivElement>(null)
   const axisRef = useRef<HTMLParagraphElement>(null)
   const fieldsRef = useRef(fields)
   fieldsRef.current = fields
+  // Which series the Y numbers are for. Every series is scaled to its own
+  // range, so exactly one of them can own the axis; the legend says which.
+  const axisRefName = useRef(axisField)
+  axisRefName.current = axisField
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -70,26 +91,45 @@ export default function PlotPanel({ fields, onRemove, onPick }: PlotPanelProps) 
       }
       const span = Math.max(5000, Math.min(WINDOW_MS, now - earliest))
       const from = now - span
-      const pad = 6
 
-      // Grid: a few horizontal rules and a mark every ten seconds, enough to
-      // judge rate of change without turning the panel into graph paper.
+      // The plotting area, with gutters for the labels so no line ever runs
+      // underneath a number.
+      const px = GUTTER_L
+      const py = PAD_T
+      const pw = Math.max(10, w - GUTTER_L - PAD_R)
+      const ph = Math.max(10, h - PAD_T - GUTTER_B)
+      const xAt = (t: number) => px + ((t - from) / span) * pw
+
+      ctx.font = '10px "Roboto Mono", ui-monospace, monospace'
       ctx.strokeStyle = 'rgba(45, 45, 47, 0.10)'
       ctx.lineWidth = 1
-      for (let i = 1; i < 4; i++) {
-        const y = Math.round((h / 4) * i) + 0.5
+
+      // Y grid. The labels belong to whichever series owns the axis, so its
+      // range is needed before they can be written -- found below, then the
+      // labels are drawn once it is known.
+      const yRows = 4
+      for (let i = 0; i <= yRows; i++) {
+        const y = Math.round(py + (ph / yRows) * i) + 0.5
         ctx.beginPath()
-        ctx.moveTo(0, y)
-        ctx.lineTo(w, y)
+        ctx.moveTo(px, y)
+        ctx.lineTo(px + pw, y)
         ctx.stroke()
       }
-      const gridStep = span > 30000 ? 10 : 5
-      for (let sec = gridStep; sec < span / 1000; sec += gridStep) {
-        const x = Math.round(w - (sec / (span / 1000)) * w) + 0.5
+
+      // X grid and its time labels: seconds back from now, which is what a
+      // strip chart's horizontal axis actually means.
+      const step = span > 40000 ? 15 : span > 20000 ? 10 : 5
+      ctx.fillStyle = 'rgba(85, 85, 91, 0.9)'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      for (let sec = 0; sec <= span / 1000; sec += step) {
+        const x = Math.round(xAt(now - sec * 1000)) + 0.5
+        if (x < px - 1) continue
         ctx.beginPath()
-        ctx.moveTo(x, 0)
-        ctx.lineTo(x, h)
+        ctx.moveTo(x, py)
+        ctx.lineTo(x, py + ph)
         ctx.stroke()
+        ctx.fillText(sec === 0 ? 'now' : `-${sec}s`, x, py + ph + 4)
       }
 
       // Written here rather than through React: it changes every frame while
@@ -123,6 +163,10 @@ export default function PlotPanel({ fields, onRemove, onPick }: PlotPanelProps) 
           hi += 0.5
         }
 
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(px, py, pw, ph)
+        ctx.clip()
         ctx.strokeStyle = color
         ctx.lineWidth = 1.6
         ctx.lineJoin = 'round'
@@ -131,8 +175,8 @@ export default function PlotPanel({ fields, onRemove, onPick }: PlotPanelProps) 
         for (let k = 0; k < s.t.length; k++) {
           const tk = s.t[k]!
           if (tk < from) continue
-          const x = w - ((now - tk) / span) * w
-          const y = pad + (1 - (s.v[k]! - lo) / (hi - lo)) * (h - pad * 2)
+          const x = xAt(tk)
+          const y = py + (1 - (s.v[k]! - lo) / (hi - lo)) * ph
           if (started) ctx.lineTo(x, y)
           else {
             ctx.moveTo(x, y)
@@ -140,8 +184,24 @@ export default function PlotPanel({ fields, onRemove, onPick }: PlotPanelProps) 
           }
         }
         ctx.stroke()
+        ctx.restore()
         legend.push({ name, color, value: s.v[s.t.length - 1] ?? 0, lo, hi })
       })
+
+      // Y labels last, now that the owning series' range is known. Drawn in
+      // its colour, because with every series on its own scale the numbers
+      // would otherwise be anyone's guess.
+      const owner = legend.find((e) => e.name === axisRefName.current) ?? legend[0]
+      if (owner) {
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = owner.color
+        for (let i = 0; i <= yRows; i++) {
+          const y = py + (ph / yRows) * i
+          const value = owner.hi - ((owner.hi - owner.lo) / yRows) * i
+          ctx.fillText(fmt(value), px - 6, y)
+        }
+      }
 
       // The legend is DOM rather than canvas so the remove buttons are real
       // controls; it is updated here to stay in step with the lines.
@@ -164,26 +224,40 @@ export default function PlotPanel({ fields, onRemove, onPick }: PlotPanelProps) 
     <div className="plot-panel">
       <div className="plot-panel__head">
         <div className="plot-legend" ref={legendRef}>
-          {fields.map((name, i) => (
-            <span
-              key={name}
-              className="plot-chip"
-              data-field={name}
-              style={{ borderLeftColor: PLOT_COLORS[i % PLOT_COLORS.length] }}
-            >
-              <span className="plot-chip__name">{name}</span>
-              <span className="plot-chip__value">—</span>
-              <span className="plot-chip__range">—</span>
-              <button
-                type="button"
-                className="plot-chip__remove"
-                aria-label={`Stop plotting ${name}`}
-                onClick={() => onRemove(name)}
+          {fields.map((name, i) => {
+            const owns = (axisField ?? fields[0]) === name
+            return (
+              <span
+                key={name}
+                className={`plot-chip${owns ? ' is-axis' : ''}`}
+                data-field={name}
+                style={{ borderLeftColor: PLOT_COLORS[i % PLOT_COLORS.length] }}
               >
-                ×
-              </button>
-            </span>
-          ))}
+                {/* Clicking a chip hands it the Y axis. With every series on
+                    its own scale only one set of numbers can be shown, so
+                    which one has to be the reader's choice. */}
+                <button
+                  type="button"
+                  className="plot-chip__pick"
+                  aria-pressed={owns}
+                  title={owns ? 'The Y axis shows this series' : 'Show this series on the Y axis'}
+                  onClick={() => onAxisField(name)}
+                >
+                  <span className="plot-chip__name">{name}</span>
+                  <span className="plot-chip__value">—</span>
+                  <span className="plot-chip__range">—</span>
+                </button>
+                <button
+                  type="button"
+                  className="plot-chip__remove"
+                  aria-label={`Stop plotting ${name}`}
+                  onClick={() => onRemove(name)}
+                >
+                  ×
+                </button>
+              </span>
+            )
+          })}
           {fields.length === 0 && (
             <span className="plot-panel__empty">
               Nothing plotted. Pick a field, or click one in the Status list.
@@ -193,6 +267,15 @@ export default function PlotPanel({ fields, onRemove, onPick }: PlotPanelProps) 
         <LaButton variant="secondary" size="sm" onClick={onPick}>
           Add field…
         </LaButton>
+        <button
+          type="button"
+          className="plot-panel__close"
+          aria-label="Close the plot"
+          title="Close the plot"
+          onClick={onClose}
+        >
+          ×
+        </button>
       </div>
       <canvas ref={canvasRef} className="plot-panel__canvas" />
       <p className="plot-panel__axis" ref={axisRef}>each series scaled to its own range</p>

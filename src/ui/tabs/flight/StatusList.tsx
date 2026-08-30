@@ -59,10 +59,13 @@ export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
         onChange={(e) => setFilter(e.target.value)}
         aria-label="Filter telemetry fields"
       />
+      {namesRef.current.length === 0 && <p className="app-placeholder">Waiting for telemetry…</p>}
+      {needle && shown.length === 0 && (
+        <p className="app-placeholder">No field matches “{filter}”.</p>
+      )}
+      {/* Kept out of the grid: inside it a message would be squeezed into one
+          250px column and a single row's height. */}
       <div className="status-list__rows">
-        {namesRef.current.length === 0 && (
-          <p className="app-placeholder">Waiting for telemetry…</p>
-        )}
         {shown.map((name) => {
           const v = fieldRegistry.latest(name)
           const on = plottedSet.has(name)
@@ -74,17 +77,32 @@ export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
               onClick={() => onTogglePlot(name)}
               title={on ? 'Remove from the plot' : 'Add to the plot'}
             >
-              <span className="status-row__name">{name}</span>
+              {/* The message prefix repeats down a whole column, so it is
+                  dimmed and the field name carries the weight -- otherwise
+                  the eye reads "GLOBAL_POSITION_INT" eight times before it
+                  gets to the word that differs. */}
+              <span className="status-row__name" title={name}>
+                <span className="status-row__msg">{prefixOf(name)}</span>
+                {leafOf(name)}
+              </span>
               <span className="status-row__value">{format(v)}</span>
             </button>
           )
         })}
-        {needle && shown.length === 0 && (
-          <p className="app-placeholder">No field matches “{filter}”.</p>
-        )}
       </div>
     </div>
   )
+}
+
+/** `GLOBAL_POSITION_INT.` from `GLOBAL_POSITION_INT.relativeAlt`. */
+function prefixOf(name: string): string {
+  const dot = name.indexOf('.')
+  return dot > 0 ? name.slice(0, dot + 1) : ''
+}
+
+function leafOf(name: string): string {
+  const dot = name.indexOf('.')
+  return dot > 0 ? name.slice(dot + 1) : name
 }
 
 /** Enough digits to be useful, few enough that the column stays readable. */
