@@ -1,19 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
-import { LaButton, LaCard, LaModal, LaSwitch } from '../../components/La'
+import { LaButton, LaCard, LaSwitch } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
-import { gotoGuided } from '../../../services/flight'
+import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
+import { gotoGuided, setHome, setRoi } from '../../../services/flight'
 import MapView from './MapView'
 import Hud from './Hud'
+import SplitPane from './SplitPane'
+import FlightActionsBar from './FlightActionsBar'
+import MapContextMenu, { type MapMenuPoint } from './MapContextMenu'
 
-// The flight screen: map left, HUD + messages right. Arm/mode/takeoff live
-// in the action bar (FlightActions) so they never scroll out of reach.
+// The flight screen. Two panels the user arranges -- resize, swap, or turn
+// either off so the survivor fills the window -- with the commands that get
+// used in the air along the top and the messages log along the bottom.
 export default function FlightTab() {
   const phase = useConnectionStore((s) => s.phase)
   const [follow, setFollow] = useState(true)
-  const [pendingGoto, setPendingGoto] = useState<{ lat: number; lon: number } | null>(null)
-  const modeName = useVehicleStore((s) => s.modeName)
-  const armed = useVehicleStore((s) => s.armed)
+  const [menu, setMenu] = useState<MapMenuPoint | null>(null)
+  const [target, setTarget] = useState<{ lat: number; lon: number } | null>(null)
+  const [home, setHomePin] = useState<{ lat: number; lon: number } | null>(null)
+  const layout = useFlightLayoutStore()
 
   if (phase !== 'connected' && phase !== 'linkLost') {
     return (
@@ -26,53 +32,106 @@ export default function FlightTab() {
     )
   }
 
+  const mapPanel = (
+    <MapView
+      follow={follow}
+      onContextMenu={setMenu}
+      target={target}
+      home={home}
+    />
+  )
+  const hudPanel = <Hud horizon={layout.hudHorizon} overlays={layout.hudOverlays} />
+
+  const first = layout.first === 'map' ? mapPanel : hudPanel
+  const second = layout.first === 'map' ? hudPanel : mapPanel
+  // Which slot survives when the other panel is switched off.
+  const only =
+    layout.showMap && layout.showHud
+      ? undefined
+      : layout.showMap
+        ? layout.first === 'map'
+          ? ('first' as const)
+          : ('second' as const)
+        : layout.first === 'hud'
+          ? ('first' as const)
+          : ('second' as const)
+
   return (
-    <div className="flight-layout">
-      <LaCard title="Map" className="flight-map-card">
-        <div className="la-row">
-          <LaSwitch label="Follow vehicle" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
-        </div>
-        <MapView follow={follow} onMapClick={(lat, lon) => setPendingGoto({ lat, lon })} />
-        <p className="la-card__note">
-          {modeName === 'Guided'
-            ? 'Click the map to fly there.'
-            : 'Click-to-go needs Guided mode (set it in the action bar).'}
-        </p>
-      </LaCard>
-      <div className="flight-side">
-        <LaCard title="Horizon" className="flight-hud-card">
-          <Hud />
-        </LaCard>
-        <FlightMessages />
-      </div>
-      {pendingGoto && (
-        <LaModal
-          open
-          title="Fly here?"
-          actions={
-            <>
-              <LaButton variant="ghost" onClick={() => setPendingGoto(null)}>
-                Cancel
-              </LaButton>
-              <LaButton
-                variant="primary"
-                disabled={modeName !== 'Guided' || !armed}
-                onClick={() => {
-                  gotoGuided(pendingGoto.lat, pendingGoto.lon)
-                  setPendingGoto(null)
-                }}
-              >
-                Fly to point
-              </LaButton>
-            </>
+    <div className="flight-screen">
+      <FlightActionsBar />
+
+      <div className="flight-toolbar la-row la-row--wrap">
+        <LaSwitch
+          label="Follow"
+          checked={follow}
+          onChange={(e) => setFollow(e.target.checked)}
+        />
+        <span className="flight-toolbar__sep" />
+        <LaSwitch label="Map" checked={layout.showMap} onChange={() => layout.toggle('showMap')} />
+        <LaSwitch label="HUD" checked={layout.showHud} onChange={() => layout.toggle('showHud')} />
+        <LaSwitch
+          label="Horizon"
+          checked={layout.hudHorizon}
+          disabled={!layout.showHud}
+          onChange={() => layout.toggle('hudHorizon')}
+        />
+        <LaSwitch
+          label="Overlays"
+          checked={layout.hudOverlays}
+          disabled={!layout.showHud}
+          onChange={() => layout.toggle('hudOverlays')}
+        />
+        <LaSwitch
+          label="Messages"
+          checked={layout.showMessages}
+          onChange={() => layout.toggle('showMessages')}
+        />
+        <span className="la-grow" />
+        <LaButton variant="ghost" size="sm" onClick={layout.swap} disabled={only !== undefined}>
+          Swap
+        </LaButton>
+        <LaButton
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            layout.setOrientation(layout.orientation === 'row' ? 'column' : 'row')
           }
+          disabled={only !== undefined}
         >
-          <p>
-            {pendingGoto.lat.toFixed(6)}, {pendingGoto.lon.toFixed(6)} at the current altitude.
-            {modeName !== 'Guided' && ' The vehicle is not in Guided mode.'}
-            {!armed && ' The vehicle is not armed.'}
-          </p>
-        </LaModal>
+          {layout.orientation === 'row' ? 'Stack' : 'Side by side'}
+        </LaButton>
+        <LaButton variant="ghost" size="sm" onClick={layout.reset}>
+          Reset layout
+        </LaButton>
+      </div>
+
+      <div className="flight-panels">
+        <SplitPane
+          orientation={layout.orientation}
+          ratio={layout.ratio}
+          onRatio={layout.setRatio}
+          first={first}
+          second={second}
+          only={only}
+        />
+      </div>
+
+      {layout.showMessages && <FlightMessages />}
+
+      {menu && (
+        <MapContextMenu
+          point={menu}
+          onClose={() => setMenu(null)}
+          onFlyHere={(alt) => {
+            gotoGuided(menu.lat, menu.lon, alt)
+            setTarget({ lat: menu.lat, lon: menu.lon })
+          }}
+          onPointCamera={() => void setRoi(menu.lat, menu.lon)}
+          onSetHome={() => {
+            void setHome(menu.lat, menu.lon)
+            setHomePin({ lat: menu.lat, lon: menu.lon })
+          }}
+        />
       )}
     </div>
   )
@@ -86,13 +145,12 @@ function FlightMessages() {
     if (el) el.scrollTop = el.scrollHeight
   }, [statusTexts])
   return (
-    <LaCard title="Messages" className="flight-messages-card">
-      <textarea
-        ref={logRef}
-        className="la-log flight-log"
-        readOnly
-        value={statusTexts.map((s) => s.text).join('\n')}
-      />
-    </LaCard>
+    <textarea
+      ref={logRef}
+      className="la-log flight-log"
+      readOnly
+      aria-label="Status messages"
+      value={statusTexts.map((s) => s.text).join('\n')}
+    />
   )
 }

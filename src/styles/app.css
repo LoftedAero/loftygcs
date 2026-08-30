@@ -1088,26 +1088,131 @@
 
 /* --- Flight tab ------------------------------------------------------ */
 
-/* Map left, HUD + messages right. The layout fills the content pane; the
-   map is the element that grows. */
-.flight-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: var(--la-space-4);
+/* Actions along the top, the arranged panels in the middle, messages along
+   the bottom. Cards are deliberately absent: on a screen you fly from, card
+   chrome is padding between you and the picture. */
+.flight-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
   flex: 1;
   min-height: 0;
 }
 
-.flight-map-card {
-  display: flex;
-  flex-direction: column;
+.flight-panels {
+  flex: 1;
   min-height: 0;
-  max-width: none;
+}
+
+.flight-toolbar {
+  gap: var(--la-space-4);
+  padding: 0 var(--la-space-1);
+}
+.flight-toolbar__sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--la-line);
+}
+
+/* --- The resizable split --------------------------------------------- */
+
+.split {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.split--row {
+  flex-direction: row;
+}
+.split--column {
+  flex-direction: column;
+}
+.split--single .split__slot {
+  flex: 1;
+}
+.split__slot {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.split__slot > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+/* The second slot takes whatever the first and the divider leave. */
+.split__slot--rest {
+  flex: 1;
+}
+
+.split__divider {
+  flex: none;
+  border: none;
+  padding: 0;
+  background: var(--la-bg);
+  position: relative;
+}
+.split--row > .split__divider {
+  width: var(--la-space-2);
+  cursor: col-resize;
+}
+.split--column > .split__divider {
+  height: var(--la-space-2);
+  cursor: row-resize;
+}
+/* A grip line, so the divider reads as something you can grab. */
+.split__divider::after {
+  content: '';
+  position: absolute;
+  background: var(--la-line-strong);
+  border-radius: var(--la-radius-pill);
+  transition: background var(--la-ease);
+}
+.split--row > .split__divider::after {
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+}
+.split--column > .split__divider::after {
+  left: 50%;
+  top: 50%;
+  height: 2px;
+  width: 28px;
+  transform: translate(-50%, -50%);
+}
+.split__divider:hover::after,
+.split__divider.is-dragging::after {
+  background: var(--la-blue);
+}
+.split__divider:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+/* While a divider is being dragged the pointer must not also reach Leaflet,
+   or the map pans out from under the resize. */
+body.is-splitting {
+  cursor: col-resize;
+  user-select: none;
+}
+body.is-splitting .flight-map {
+  pointer-events: none;
+}
+
+/* --- Map -------------------------------------------------------------- */
+
+.flight-map-wrap {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
 }
 
 .flight-map {
   flex: 1;
-  min-height: 320px;
+  min-height: 240px;
   border-radius: var(--la-radius-sm);
   border: 1px solid var(--la-line);
   /* Leaflet needs an explicit stacking context or its panes float over
@@ -1116,35 +1221,124 @@
   z-index: 0;
 }
 
-.flight-side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-4);
-  min-height: 0;
+/* Satellite/street toggle, over the map's top-right corner. */
+.map-layer-switch {
+  position: absolute;
+  top: var(--la-space-2);
+  right: var(--la-space-2);
+  z-index: 500;
+  gap: 0;
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+  box-shadow: var(--la-shadow-1);
+}
+.map-layer-switch__btn {
+  border: 1px solid var(--la-line-strong);
+  background: var(--la-surface);
+  color: var(--la-ink-2);
+  font: 500 var(--la-size-sm) / 1 var(--la-font);
+  padding: var(--la-space-2) var(--la-space-3);
+  cursor: pointer;
+}
+.map-layer-switch__btn + .map-layer-switch__btn {
+  border-left: none;
+}
+.map-layer-switch__btn.is-active {
+  background: var(--la-blue);
+  border-color: var(--la-blue-deep);
+  color: var(--la-surface);
 }
 
-.flight-side > .la-card {
-  max-width: none;
+/* --- The right-click menu -------------------------------------------- */
+
+.map-menu {
+  position: fixed;
+  z-index: 1200;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  padding: var(--la-space-3);
+  background: var(--la-surface);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius);
+  box-shadow: var(--la-shadow-2);
 }
+.map-menu__coords {
+  margin: 0;
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+.map-menu__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-space-2);
+}
+.map-menu__alt {
+  width: 84px;
+}
+
+/* --- HUD layers ------------------------------------------------------- */
 
 .flight-hud {
-  width: 100%;
-  height: 220px;
+  position: relative;
+  min-width: 0;
+  min-height: 200px;
   border-radius: var(--la-radius-sm);
+  border: 1px solid var(--la-line);
+  background: var(--la-charcoal);
+  overflow: hidden;
+}
+/* Where video lands. Empty for now, but it owns the space so the canvas
+   above it never has to be re-plumbed. */
+.flight-hud__background {
+  position: absolute;
+  inset: 0;
+}
+.flight-hud__background > video,
+.flight-hud__background > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   background: var(--la-charcoal);
 }
+.flight-hud__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
 
-.flight-messages-card {
+/* --- Actions ---------------------------------------------------------- */
+
+.flight-actions {
   display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--la-space-2) var(--la-space-4);
+  padding: var(--la-space-2) var(--la-space-3);
+  background: var(--la-surface);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius);
+}
+.flight-actions__group {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.flight-actions__group--do {
+  margin-left: auto;
+}
+.flight-actions__num {
+  width: 72px;
 }
 
 .flight-log {
-  flex: 1;
-  min-height: 120px;
-  resize: none;
+  flex: none;
+  height: 108px;
+  resize: vertical;
 }
 
 .vehicle-marker {
@@ -1153,9 +1347,19 @@
   border: none;
 }
 
-@media (max-width: 1100px) {
-  .flight-layout {
-    grid-template-columns: minmax(0, 1fr);
+/* Narrow: stack the panels whatever the saved orientation says, since side
+   by side stops being readable well before the rail gives up its width. */
+@media (max-width: 900px) {
+  .split--row {
+    flex-direction: column;
+  }
+  .split--row > .split__slot {
+    width: auto !important;
+  }
+  .split--row > .split__divider {
+    width: auto;
+    height: var(--la-space-2);
+    cursor: row-resize;
   }
 }
 

@@ -98,6 +98,21 @@ export function modeTable(mavType: number): Record<number, string> {
   return {}
 }
 
+/**
+ * The custom-mode number a named mode has on this vehicle, or undefined.
+ *
+ * Needed because the numbers are not shared: Auto is 3 on Copter and 10 on
+ * Plane, RTL is 6 and 11. A dedicated "RTL" button that hardcoded a number
+ * would fly the wrong mode on half the vehicles this app supports.
+ */
+export function modeNumberByName(mavType: number, name: string): number | undefined {
+  const wanted = name.toLowerCase()
+  for (const [num, label] of Object.entries(modeTable(mavType))) {
+    if (label.toLowerCase() === wanted) return Number(num)
+  }
+  return undefined
+}
+
 export function modeName(mavType: number, customMode: number): string {
   return modeTable(mavType)[customMode] ?? `Mode ${customMode}`
 }
