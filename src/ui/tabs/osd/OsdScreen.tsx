@@ -92,13 +92,15 @@ export default function OsdScreen({
     setDrag(null)
   }
 
+  // MAX7456 character cells are 12x18 px, so a cell is two units wide by
+  // three tall: a 30x16 screen comes out 5:4, as analog video actually is,
+  // and the HD grids land near 16:9. Handed to CSS as a bare number so the
+  // stylesheet can derive a width from a capped height and keep the cells
+  // square-ish -- clamping height alone would squash the grid.
   const stageStyle = {
     '--osd-cols': grid.cols,
     '--osd-rows': grid.rows,
-    // MAX7456 character cells are 12x18 px, so a cell is two units wide by
-    // three tall: a 30x16 screen comes out 5:4, as analog video actually is,
-    // and the HD grids land near 16:9.
-    aspectRatio: `${grid.cols * 2} / ${grid.rows * 3}`,
+    '--osd-aspect': (grid.cols * 2) / (grid.rows * 3),
   } as CSSProperties
 
   return (

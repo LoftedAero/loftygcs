@@ -913,7 +913,15 @@
    which is why sizes are expressed against --osd-cols / --osd-rows. */
 .osd-screen {
   container-type: size;
-  width: 100%;
+  /* Width derived from the height cap and the grid's own aspect, so the
+     preview shrinks as a whole instead of being squashed: clamping height
+     alone would leave the character cells the wrong shape. Falls back to the
+     column width when that is the tighter of the two. */
+  aspect-ratio: var(--osd-aspect);
+  width: min(100%, calc(var(--osd-max-h, 58vh) * var(--osd-aspect)));
+  /* Centred in the card by auto margins rather than by centring the card's
+     items, which would shrink the toolbar and the selection row with it. */
+  margin-inline: auto;
   background: var(--la-charcoal);
   border: 1px solid var(--la-line-strong);
   border-radius: var(--la-radius-sm);
@@ -1056,38 +1064,70 @@
   border-color: var(--la-blue);
 }
 
-/* Preview and panel list side by side. The preview is sized by its aspect
-   ratio, so widening it also makes it taller -- past about 900px it stops
-   being more legible and starts needing to be scrolled. Capping the left
-   column and putting the list in the space that frees is what keeps the
-   whole editor on one screen. */
-.osd-columns {
+/* Panel toggles left, preview centre, global settings right. The point of
+   the arrangement is that the whole tab fits without scrolling: the panel
+   list scrolls inside its own pane, and the preview is capped by viewport
+   height rather than allowed to grow with the column. */
+.osd-workspace {
   display: grid;
-  /* The preview is capped by the grid rather than by a max-width on the card,
-     so the panel list takes every pixel that frees up and lays its switches
-     out in as many columns as fit. */
-  grid-template-columns: minmax(0, 900px) minmax(300px, 1fr);
+  grid-template-columns: 262px minmax(0, 1fr) 340px;
   gap: var(--la-space-3);
   align-items: start;
+  /* How tall the preview may get -- one knob, since the panel list is sized
+     to match it. Two terms because the chrome around the preview (app bar,
+     action bar, card title, screen picker, selection row) is a fixed ~400px
+     that does not shrink with the window: a plain vh fraction fits a tall
+     window and overflows a short one by exactly that difference. */
+  --osd-max-h: min(66vh, calc(100vh - 415px));
 }
-.osd-columns > .la-card {
+.osd-workspace > .la-card,
+.osd-workspace__side > .la-card {
   max-width: none;
 }
-.osd-columns__side {
+.osd-workspace__side {
   display: flex;
   flex-direction: column;
-  gap: var(--la-space-3);
+  /* Tighter than the workspace gap: on a short window this column, not the
+     preview, is what decides whether the tab scrolls, and the card borders
+     already separate the three well enough. */
+  gap: var(--la-space-1);
   min-width: 0;
 }
-.osd-columns__side > .la-card {
-  max-width: none;
+
+/* The list is the one thing here that cannot fit: sixty-five panels will
+   always be taller than a screen, so it gets its own scroll rather than
+   pushing the preview down the page. */
+.osd-palette-scroll {
+  max-height: var(--osd-max-h);
+  overflow-y: auto;
+  /* Room for the scrollbar so it never lands on top of a switch. */
+  padding-right: var(--la-space-2);
 }
 
-/* One column below the width where the list would be squeezed thinner than
-   its own labels. */
-@media (max-width: 1180px) {
-  .osd-columns {
+/* Two tiers down. First the settings column folds under the other two and
+   spreads out sideways; then everything stacks and the list stops scrolling
+   inside itself, because on a narrow window the page scrolls anyway. */
+@media (max-width: 1360px) {
+  .osd-workspace {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .osd-workspace__side {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .osd-workspace__side > .la-card {
+    flex: 1 1 300px;
+  }
+}
+@media (max-width: 980px) {
+  .osd-workspace {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .osd-palette-scroll {
+    max-height: none;
+    padding-right: 0;
   }
 }
 
@@ -1124,10 +1164,18 @@
   text-transform: uppercase;
   color: var(--la-ink-3);
 }
+/* One switch per row in the side column; wider only when the workspace has
+   stacked and the card spans the pane. */
 .osd-palette {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: var(--la-space-2) var(--la-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--la-space-1) var(--la-space-4);
+}
+/* Toggles pinned to the right edge. Left to sit after their labels they
+   land at a different x on every row, which reads as sloppy in a list this
+   long and makes the on/off state harder to scan down. */
+.osd-palette .la-switch {
+  justify-content: space-between;
 }
 
 /* Narrow tier: the rail gives up its width before anything clips. */

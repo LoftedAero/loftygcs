@@ -13,20 +13,26 @@ import {
   screenGrid,
 } from './osd-layout'
 
-// The screen layout editor. Mission Planner's OSD tool is the reference for
-// *what* is configurable -- four screens, the same sixty-five panels, the
-// same parameters underneath -- but not for how it is edited: it offers a
-// table of X/Y spinners beside a preview. Betaflight has the better idea, so
-// panels are dragged on the preview itself and the spinners are kept for the
-// selected panel, where they are useful for exact placement rather than being
-// the only way to move anything.
+// The whole OSD tab: panel toggles left, screen preview centre, global
+// settings right -- Betaflight's arrangement, which exists to put everything
+// on one screen without scrolling. The list scrolls inside its own pane and
+// the preview is capped by viewport height so the rest never moves.
+//
+// Mission Planner's OSD tool is the reference for *what* is configurable --
+// four screens, the same sixty-five panels, the same parameters underneath --
+// but not for how it is edited: it offers a table of X/Y spinners beside a
+// preview. Panels are dragged on the preview itself here, and the spinners
+// are kept for the selected panel, where they are useful for exact placement
+// rather than being the only way to move anything. The one thing not taken
+// from Betaflight is its per-screen checkbox columns: ArduPilot's four
+// screens are whole layouts, so they are picked one at a time.
 //
 // Everything here stages through the parameter store, so an edit is a dirty
 // parameter like any other and the action bar's Write is what sends it.
 
 const MSP_TYPES = new Set([3, 5]) // MSP and MSP_DISPLAYPORT
 
-export default function OsdLayoutEditor() {
+export default function OsdWorkspace() {
   const entries = useParamStore((s) => s.entries)
   const metadata = useParamStore((s) => s.metadata)
   const edit = useParamStore((s) => s.edit)
@@ -76,11 +82,32 @@ export default function OsdLayoutEditor() {
   }
 
   return (
-    // Preview left, panel list right, as Betaflight arranges it -- stacked,
-    // the preview left half a 1080p pane empty and pushed the list a full
-    // screen below the thing it acts on.
-    <div className="osd-columns">
-      <LaCard title="Screen layout">
+    <div className="osd-workspace">
+      <LaCard
+        title="Panels"
+        note="Panels this firmware does not support are not listed. Positions are per screen."
+        className="osd-workspace__panels"
+      >
+        <div className="osd-palette-scroll">
+          {[...byGroup.entries()].map(([group, list]) => (
+            <div key={group} className="osd-palette__group">
+              <h3 className="osd-palette__heading">{OSD_GROUP_LABELS[group]}</h3>
+              <div className="osd-palette">
+                {list.map((p) => (
+                  <LaSwitch
+                    key={p.item.id}
+                    label={p.item.label}
+                    checked={p.enabled}
+                    onChange={(e) => setEnabled(p.item.id, e.target.checked)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </LaCard>
+
+      <LaCard title="Screen layout" className="osd-workspace__screen">
         <div className="la-row la-row--between la-row--wrap osd-toolbar">
           <div className="la-radio-group" role="radiogroup" aria-label="OSD screen">
             {OSD_SCREENS.map((n) => {
@@ -149,7 +176,25 @@ export default function OsdLayoutEditor() {
         )}
       </LaCard>
 
-      <div className="osd-columns__side">
+      <div className="osd-workspace__side">
+        <ParamCard
+          title="Display"
+          fields={[
+            { param: 'OSD_TYPE', label: 'OSD type' },
+            { param: 'OSD_UNITS', label: 'Units' },
+            { param: 'OSD_MSG_TIME', label: 'Message time', unit: 's' },
+            { param: 'OSD_SW_METHOD', label: 'Switch method' },
+            { param: 'OSD_OPTIONS', label: 'Options' },
+          ]}
+        >
+          {osdType === 0 && (
+            <LaHint>
+              The OSD is off, so nothing is drawn on the video feed. Screens can still be laid
+              out, and take effect once a type is set — which needs a reboot.
+            </LaHint>
+          )}
+        </ParamCard>
+
         <ParamCard
           title={`Screen ${screen} settings`}
           fields={[
@@ -165,26 +210,17 @@ export default function OsdLayoutEditor() {
           ]}
         />
 
-        <LaCard
-          title="Panels"
-          note="Panels the connected firmware does not support are not listed. Positions are per screen."
-        >
-          {[...byGroup.entries()].map(([group, list]) => (
-            <div key={group} className="osd-palette__group">
-              <h3 className="osd-palette__heading">{OSD_GROUP_LABELS[group]}</h3>
-              <div className="osd-palette">
-                {list.map((p) => (
-                  <LaSwitch
-                    key={p.item.id}
-                    label={p.item.label}
-                    checked={p.enabled}
-                    onChange={(e) => setEnabled(p.item.id, e.target.checked)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </LaCard>
+        <ParamCard
+          title="Warnings"
+          note="OSD highlights only, separate from the vehicle's failsafes."
+          fields={[
+            { param: 'OSD_W_BATVOLT', label: 'Battery voltage', unit: 'V' },
+            { param: 'OSD_W_RSSI', label: 'RSSI' },
+            { param: 'OSD_W_NSAT', label: 'Satellite count' },
+            { param: 'OSD_W_TERR', label: 'Terrain altitude', unit: 'm' },
+            { param: 'OSD_W_AVGCELLV', label: 'Average cell voltage', unit: 'V' },
+          ]}
+        />
       </div>
     </div>
   )
