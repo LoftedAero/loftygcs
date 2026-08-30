@@ -10,6 +10,26 @@ import { SENSOR_BITS } from '../protocol/sensors'
 import type { FieldValue } from '../protocol/types'
 import type { Transport, TransportOptions } from './Transport'
 
+/**
+ * The on-screen transmitter for demo mode.
+ *
+ * Radio calibration is the one flow that cannot be exercised without a
+ * transmitter in your hands, which would leave it unreviewable in the browser
+ * demo. Shared mutable state rather than a method on the transport because
+ * the alternative is threading a setter through the connection service for
+ * something only the simulated vehicle will ever honor. Axes are -1..1;
+ * `active` stays false until the demo UI takes the sticks, so an untouched
+ * demo still shows the idle wiggle.
+ */
+export const demoSticks = {
+  active: false,
+  roll: 0,
+  pitch: 0,
+  throttle: -1,
+  yaw: 0,
+  aux: 0.75,
+}
+
 // The OSD panels this simulated firmware "implements", with screen 1's
 // default layout: id, column, row, and whether screen 1 shows it.
 //
@@ -134,16 +154,16 @@ const SIM_PARAMS: [string, number, number][] = [
   ['INS_GYRO_FILTER', 20, 9],
   ['GPS_TYPE', 1, 2],
 
-  // Radio
-  ['RC1_MIN', 1100, 4],
-  ['RC1_MAX', 1900, 4],
-  ['RC1_TRIM', 1500, 4],
-  ['RC2_MIN', 1100, 4],
-  ['RC2_MAX', 1900, 4],
-  ['RC3_MIN', 1100, 4],
-  ['RC3_MAX', 1900, 4],
-  ['RC4_MIN', 1100, 4],
-  ['RC4_MAX', 1900, 4],
+  // Radio. Every channel carries the full set the firmware does -- a
+  // calibration writes MIN, MAX, TRIM and REVERSED for each one, and a
+  // simulated vehicle missing half of them just looks like failed writes.
+  ...([1, 2, 3, 4, 5, 6, 7, 8].flatMap((n) => [
+    [`RC${n}_MIN`, 1100, 4],
+    [`RC${n}_MAX`, 1900, 4],
+    [`RC${n}_TRIM`, n === 3 ? 1100 : 1500, 4],
+    [`RC${n}_REVERSED`, 0, 2],
+    [`RC${n}_DZ`, n === 3 ? 30 : 20, 4],
+  ]) as [string, number, number][]),
   ['RCMAP_ROLL', 1, 2],
   ['RCMAP_PITCH', 2, 2],
   ['RCMAP_THROTTLE', 3, 2],
@@ -469,14 +489,22 @@ export class VirtualFcTransport implements Transport {
   private sendRcChannels() {
     const t = this.t()
     const wiggle = (base: number, amp: number, f: number) => Math.round(base + amp * Math.sin(t * f))
+    // With the on-screen transmitter in use, the sticks drive the channels
+    // instead of the idle wiggle -- a wandering channel would defeat the
+    // radio calibration's whole job of spotting which one the user moved.
+    const s = demoSticks.active ? demoSticks : null
+    const stick = (axis: number, reversed = false) =>
+      Math.round(1500 + (reversed ? -1 : 1) * 400 * axis)
     this.emit('RC_CHANNELS', {
       timeBootMs: Math.round(t * 1000),
       chancount: 8,
-      chan1Raw: wiggle(1500, 60, 0.7),
-      chan2Raw: wiggle(1500, 40, 0.9),
-      chan3Raw: this.flying() ? wiggle(1550, 30, 0.5) : 1100,
-      chan4Raw: wiggle(1500, 20, 1.1),
-      chan5Raw: 1800,
+      chan1Raw: s ? stick(s.roll) : wiggle(1500, 60, 0.7),
+      // Pitch wired backwards on purpose: it is the usual real-world case,
+      // and it gives the calibration a reversal to actually find.
+      chan2Raw: s ? stick(s.pitch, true) : wiggle(1500, 40, 0.9),
+      chan3Raw: s ? stick(s.throttle) : this.flying() ? wiggle(1550, 30, 0.5) : 1100,
+      chan4Raw: s ? stick(s.yaw) : wiggle(1500, 20, 1.1),
+      chan5Raw: s ? stick(s.aux) : 1800,
       chan6Raw: 1100,
       chan7Raw: 1500,
       chan8Raw: 1500,

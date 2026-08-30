@@ -145,12 +145,15 @@ export function LaHint({ error, children }: { error?: boolean; children?: ReactN
 export function LaModal({
   open,
   toast,
+  wide,
   title,
   children,
   actions,
 }: {
   open: boolean
   toast?: boolean
+  /** The wider card DESIGN.md defines, for dialogs with a diagram or a table. */
+  wide?: boolean
   title: string
   children?: ReactNode
   actions?: ReactNode
@@ -160,7 +163,7 @@ export function LaModal({
     .join(' ')
   return (
     <div className={cls}>
-      <div className="la-modal__card">
+      <div className={wide ? 'la-modal__card la-modal__card--wide' : 'la-modal__card'}>
         <h2 className="la-modal__title">{title}</h2>
         <div className="la-modal__body">{children}</div>
         {actions && <div className="la-modal__actions">{actions}</div>}

@@ -316,13 +316,268 @@
   transition: width var(--la-ease);
 }
 
-.rc-channel {
-  flex: 1;
+/* --- Radio: channel monitor and guided calibration -------------------- */
+
+.rc-monitor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.rc-monitor__row {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: var(--la-space-3);
+  padding: 2px var(--la-space-1);
+  border-radius: var(--la-radius-sm);
+  font-size: var(--la-size-sm);
+}
+/* The channel the wizard is reading right now, so the answer to "did it see
+   that?" is on the bar itself and not only in the button. */
+.rc-monitor__row.is-watched {
+  background: var(--la-blue-soft);
+}
+.rc-monitor__name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-2);
+  color: var(--la-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.rc-monitor__fn {
+  color: var(--la-ink);
+  font-weight: 600;
+}
+.rc-monitor__rev {
+  color: var(--la-orange-deep);
+  font-size: var(--la-size-xs);
+}
+.rc-monitor__profile {
+  color: var(--la-ink-3);
+  font-size: var(--la-size-xs);
+}
+.rc-monitor__track {
+  position: relative;
+  height: 10px;
+  border-radius: var(--la-radius-pill);
+  background: var(--la-surface-2);
+  border: 1px solid var(--la-line);
+  overflow: hidden;
+}
+/* Travel recorded so far, behind the live value: the pair shows both where
+   the stick is and how much of its range has been captured. */
+.rc-monitor__range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--la-blue-soft);
+}
+.rc-monitor__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--la-blue);
+  border-radius: var(--la-radius-pill);
+}
+.rc-monitor__value {
+  text-align: right;
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-ink-2);
 }
 
-.rc-channel__value {
-  min-width: 56px;
-  text-align: right;
+/* The system's widest dialog is 640px, which wraps the review table and
+   squeezes the channel monitor once the diagram is beside them. Widened
+   here rather than in lofted-aero.css, which is copied verbatim into three
+   other apps and must stay byte-identical. */
+.la-modal__card:has(.rc-wizard) {
+  width: min(920px, 100%);
+}
+
+.rc-wizard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--la-space-5);
+  align-items: start;
+}
+.rc-wizard__main {
+  min-width: 0;
+}
+.rc-wizard__side {
+  min-width: 0;
+}
+.rc-wizard__step {
+  margin: 0 0 var(--la-space-2);
+  font-size: var(--la-size-lg);
+}
+.rc-wizard__lead {
+  margin: 0 0 var(--la-space-3);
+  color: var(--la-ink-2);
+  font-size: var(--la-size-md);
+  max-width: 52ch;
+}
+.rc-wizard__checklist {
+  margin: 0 0 var(--la-space-3);
+  padding-left: var(--la-space-5);
+  color: var(--la-ink-2);
+  font-size: var(--la-size-md);
+}
+.rc-wizard__checklist li {
+  margin: var(--la-space-1) 0;
+}
+.rc-wizard__progress {
+  margin: var(--la-space-3) 0 0;
+  color: var(--la-ink-3);
+  font-size: var(--la-size-sm);
+}
+
+.stick-diagram {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+}
+.stick-diagram__body {
+  fill: var(--la-surface-2);
+  stroke: var(--la-line-strong);
+}
+.stick-diagram__antenna {
+  stroke: var(--la-line-strong);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.stick-diagram__gate {
+  fill: var(--la-surface);
+  stroke: var(--la-line-strong);
+}
+.stick-diagram__gate.is-active {
+  stroke: var(--la-blue);
+}
+.stick-diagram__cross {
+  stroke: var(--la-line);
+}
+.stick-diagram__knob {
+  fill: var(--la-ink-3);
+  transition: cx var(--la-ease), cy var(--la-ease);
+}
+.stick-diagram__knob.is-active {
+  fill: var(--la-blue);
+}
+.stick-diagram__arrow line {
+  stroke: var(--la-blue);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.stick-diagram__arrow polygon {
+  fill: var(--la-blue);
+}
+@media (prefers-reduced-motion: reduce) {
+  .stick-diagram__knob {
+    transition: none;
+  }
+}
+
+.rc-review {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-md);
+  margin-bottom: var(--la-space-3);
+}
+.rc-review th {
+  text-align: left;
+  padding: var(--la-space-1) var(--la-space-2);
+  border-bottom: 1px solid var(--la-line-strong);
+  color: var(--la-ink-3);
+  font-size: var(--la-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rc-review td {
+  padding: var(--la-space-2);
+  border-bottom: 1px solid var(--la-line);
+  font-variant-numeric: tabular-nums;
+  /* A range broken across two lines reads as two numbers. */
+  white-space: nowrap;
+}
+/* A clash is a fault, so it is named in the row as well as coloured. */
+.rc-review tr.is-bad td {
+  color: var(--la-bad);
+  font-weight: 600;
+}
+
+.demo-tx {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  align-items: flex-start;
+  margin-bottom: var(--la-space-4);
+  padding-bottom: var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+}
+.demo-tx__note {
+  margin: 0;
+  color: var(--la-ink-3);
+  font-size: var(--la-size-xs);
+}
+.demo-tx__pads {
+  display: flex;
+  gap: var(--la-space-3);
+}
+.demo-tx__pad-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+  align-items: center;
+}
+.demo-tx__pad {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  border: 1px solid var(--la-line-strong);
+  border-radius: 50%;
+  background: var(--la-surface-2);
+  cursor: grab;
+  touch-action: none;
+}
+.demo-tx__pad:active {
+  cursor: grabbing;
+}
+.demo-tx__cross {
+  position: absolute;
+  background: var(--la-line);
+}
+.demo-tx__cross--h {
+  left: 20%;
+  right: 20%;
+  top: 50%;
+  height: 1px;
+}
+.demo-tx__cross--v {
+  top: 20%;
+  bottom: 20%;
+  left: 50%;
+  width: 1px;
+}
+.demo-tx__knob {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: 50%;
+  background: var(--la-blue);
+  pointer-events: none;
+}
+.demo-tx__label {
+  color: var(--la-ink-3);
+  font-size: var(--la-size-xs);
+}
+
+@media (max-width: 900px) {
+  .rc-wizard {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* --- Overview: live vehicle panel ------------------------------------ */
