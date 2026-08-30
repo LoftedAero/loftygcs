@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Placeholder Loft GCS badge: blue ring, orange climb arrow. Same visual
+       grammar as the Lofted Aero badge (round, white field, orange+blue) but
+       its own mark. Replace with real art before release. -->
+  <circle cx="32" cy="32" r="29" fill="#FFFFFF" stroke="#4684C5" stroke-width="4"/>
+  <path d="M32 14 L46 42 L32 35 L18 42 Z" fill="#F7941D"/>
+  <rect x="20" y="46" width="24" height="4" rx="2" fill="#2D2D2F"/>
+</svg>

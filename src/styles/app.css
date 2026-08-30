@@ -1,0 +1,915 @@
+/* Loft GCS window layout. Everything here is specific to this app and built
+   from the lofted-aero.css tokens; anything general belongs in the system
+   sheet (DESIGN.md §8). */
+
+/* App-local tokens. The system sheet has no on-charcoal surfaces, and it is
+   frozen (copied byte-identical between projects), so the app bar's own
+   translucent chrome is named here rather than written as raw values at
+   each use. */
+:root {
+  --app-onbar-well: rgb(255 255 255 / 8%);
+  --app-onbar-hover: rgb(255 255 255 / 12%);
+  --app-onbar-text: rgb(255 255 255 / 72%);
+}
+
+/* Top-level mode switch, in the app bar. Not orange: the bar already has
+   one primary action (Connect), and two competing oranges would make
+   neither read as the action. The active segment inverts instead. */
+.app-modes {
+  display: flex;
+  gap: 2px;
+  margin-left: var(--la-space-4);
+  padding: 2px;
+  background: var(--app-onbar-well);
+  border-radius: var(--la-radius-sm);
+  flex: none;
+}
+
+.app-modes__item {
+  appearance: none;
+  border: none;
+  background: none;
+  font: 600 var(--la-size-sm) / 1 var(--la-font);
+  color: var(--app-onbar-text);
+  padding: var(--la-space-2) var(--la-space-4);
+  border-radius: var(--la-radius-sm);
+  cursor: default;
+  transition: background var(--la-ease), color var(--la-ease);
+}
+
+.app-modes__item:hover {
+  background: var(--app-onbar-hover);
+  color: var(--la-surface);
+}
+
+.app-modes__item:focus-visible {
+  box-shadow: var(--la-ring);
+}
+
+.app-modes__item--active,
+.app-modes__item--active:hover {
+  background: var(--la-surface);
+  color: var(--la-ink);
+}
+
+/* The main region splits into a fixed nav rail and a scrolling content pane.
+   Only the content scrolls -- the rail, like the app bar and action bar,
+   never moves out from under the user. minmax(0, 1fr) because an auto column
+   would size itself to the widest card and push the window sideways. */
+.app-main {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Fly, Mission, and a running guide take the whole window. */
+.app-main--full {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+  padding: var(--la-space-4) var(--la-space-3);
+  background: var(--la-surface);
+  border-right: 1px solid var(--la-line);
+  overflow-y: auto;
+}
+
+/* Nav items read as places, not actions, so they take neither the button
+   chrome nor the button colors: quiet ink, with the brand-orange accent
+   bar marking the active one the way .la-card__title carries its rule. */
+.app-nav__item {
+  appearance: none;
+  border: none;
+  background: none;
+  font: 600 var(--la-size-md) / 1.2 var(--la-font);
+  color: var(--la-ink-2);
+  text-align: left;
+  padding: var(--la-space-2) var(--la-space-3);
+  border-left: 3px solid transparent;
+  border-radius: var(--la-radius-sm);
+  cursor: default;
+  transition: background var(--la-ease), color var(--la-ease);
+}
+
+.app-nav__item:hover {
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+}
+
+.app-nav__item:focus-visible {
+  box-shadow: var(--la-ring);
+}
+
+.app-nav__item--active {
+  color: var(--la-ink);
+  border-left-color: var(--la-orange);
+  background: var(--la-surface-2);
+}
+
+/* The content pane owns the scrolling and the card rhythm. Cards cap at a
+   readable width; a GCS grows wide screens fast and 100%-wide prose cards
+   are unreadable on them. */
+.app-content {
+  overflow-y: auto;
+  padding: var(--la-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
+}
+
+.app-content > .la-card {
+  max-width: 860px;
+}
+
+/* Fly and Mission own their own layout; the pane just holds them. */
+.app-content--flush {
+  padding: var(--la-space-4);
+}
+
+.mission-empty {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--la-space-6);
+}
+
+.mission-empty > .la-card {
+  max-width: 640px;
+}
+
+.app-placeholder {
+  margin: 0 0 var(--la-space-3);
+  font-size: var(--la-size-md);
+  color: var(--la-ink-2);
+  max-width: 64ch;
+}
+
+/* --- Parameters tab ------------------------------------------------- */
+
+/* The params card owns the remaining height and scrolls internally: the
+   virtualizer needs a bounded scroll container, and the ~1400-row table
+   should never drive the page's own scrollbar. */
+.params-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+}
+
+.params-toolbar {
+  margin-bottom: var(--la-space-3);
+}
+
+.params-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+}
+
+/* One row: name | control | unit | (bits) | range hint. Names are
+   monospace so columns of values read as a table without being one. */
+.param-row {
+  display: grid;
+  grid-template-columns: 220px 140px 64px auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--la-space-3);
+  padding: var(--la-space-1) var(--la-space-3);
+  min-height: 36px;
+  border-bottom: 1px solid var(--la-line);
+}
+
+/* The staged-change highlight uses the brand highlight fill, same as the
+   sequencers' .is-lit rows: orange means "this is what Write will send". */
+.param-row--dirty,
+.is-dirty {
+  background: var(--la-orange-soft);
+}
+
+.param-row__name {
+  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
+  color: var(--la-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.param-row__unit,
+.param-row__hint {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bitmask-row {
+  display: flex;
+  margin-bottom: var(--la-space-2);
+}
+
+/* --- Ports, aux functions, flight modes: label + control tables ------ */
+
+.ports-grid {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1.4fr) 110px 110px;
+  gap: var(--la-space-3);
+  align-items: center;
+  padding: var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+
+.aux-grid {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: var(--la-space-3);
+  align-items: center;
+  padding: var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+
+.modes-grid {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) 110px;
+  gap: var(--la-space-3);
+  align-items: center;
+  padding: var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+
+.ports-grid--head,
+.aux-grid--head,
+.outputs-grid--head,
+.modes-grid--head {
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  color: var(--la-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ports-grid__label,
+.aux-grid__label,
+.modes-grid__label {
+  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+}
+
+.ports-grid__hint {
+  font-family: var(--la-font);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+
+.aux-grid__product,
+.outputs-grid__product {
+  display: block;
+  font: 400 var(--la-size-xs) / 1.2 var(--la-font);
+  color: var(--la-orange-deep);
+}
+
+.modes-grid__range {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* The live switch position. A filled dot plus a tinted row, because color
+   alone is not a readable signal. */
+.modes-grid--active {
+  background: var(--la-blue-soft);
+}
+
+.modes-grid__marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--la-blue);
+  flex: none;
+}
+
+/* --- Setup tab ------------------------------------------------------- */
+
+/* Compass calibration coverage bar. The blue of working controls, not
+   green: progress is activity, not a status verdict. */
+.cal-progress {
+  height: 10px;
+  border-radius: var(--la-radius-pill);
+  background: var(--la-surface-2);
+  border: 1px solid var(--la-line);
+  overflow: hidden;
+  margin-bottom: var(--la-space-2);
+}
+
+.cal-progress__fill {
+  height: 100%;
+  background: var(--la-blue);
+  transition: width var(--la-ease);
+}
+
+.rc-channel {
+  flex: 1;
+}
+
+.rc-channel__value {
+  min-width: 56px;
+  text-align: right;
+}
+
+/* --- Overview: live vehicle panel ------------------------------------ */
+
+/* Model on the left, instruments and vital signs stacked at the right --
+   the arrangement Betaflight's setup tab uses. */
+/* Both columns share a row, so the model card stretches to whatever height
+   the vital-signs stack needs -- the model gets all the space going spare
+   rather than sitting in a short box above dead ground. */
+.live-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 292px;
+  gap: var(--la-space-3);
+  align-items: stretch;
+  /* Fill exactly the space the window has, so the whole panel is visible on
+     a 16:9 screen with no scrollbar and the model gets whatever is spare. */
+  flex: 1;
+  min-height: 0;
+}
+
+.live-panel__model {
+  max-width: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.live-panel__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
+  min-height: 0;
+}
+
+/* The vitals column is a dense readout, not prose: tighter than a normal
+   card so all four panels fit one screen without scrolling.
+   gap: 0 is the important one -- .la-card spaces every child by 12px, which
+   on a card that is twelve one-line rows is 130px of pure gap. The rows
+   carry their own rhythm through line-height instead. */
+.live-panel__side > .la-card {
+  max-width: none;
+  padding: var(--la-space-4);
+  gap: 0;
+}
+
+.live-panel__side .la-card__title {
+  font-size: var(--la-size-md);
+  margin-bottom: var(--la-space-3);
+  padding-bottom: var(--la-space-1);
+}
+
+.vehicle-view {
+  width: 100%;
+  /* Fills the card; the card's height comes from the column beside it. */
+  flex: 1;
+  min-height: 260px;
+  /* The model sits on the inset well tone, so a light airframe still has
+     something to read against. */
+  background: var(--la-surface-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+/* The canvas is taken out of flow and pinned to the box. In normal flow its
+   own height counts toward the container's content height, so sizing it from
+   that height feeds back on itself and the panel creeps taller every frame. */
+.vehicle-view canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Angles float over the model's top-left corner, as in the reference. */
+.attitude-readout {
+  position: absolute;
+  top: 52px;
+  left: var(--la-space-5);
+  z-index: 1;
+  margin: 0;
+  padding: var(--la-space-2) var(--la-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.attitude-readout > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-3);
+  font-size: var(--la-size-sm);
+  /* Explicit line box and no wrapping: the degree marks were losing their
+     tops to the default line height, and a long value must not fold. */
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.attitude-readout dt {
+  min-width: 34px;
+  color: var(--la-ink-3);
+}
+
+.attitude-readout dd {
+  margin: 0;
+  min-width: 62px;
+  text-align: right;
+  font-family: var(--la-font-mono);
+  color: var(--la-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.model-credit {
+  font-size: var(--la-size-xs);
+}
+
+.model-credit a {
+  color: var(--la-blue-deep);
+}
+
+.instrument-row {
+  display: flex;
+  gap: var(--la-space-3);
+  justify-content: center;
+}
+
+.instrument {
+  width: 104px;
+  height: 104px;
+  flex: none;
+}
+
+/* Label/value lines for the vital-sign cards. Set for comfortable reading
+   rather than maximum density: the column has height to spare on a 16:9
+   screen once .la-card's per-child gap is out of the way. */
+.stat-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--la-space-3);
+  padding: 1px 0;
+  font-size: var(--la-size-sm);
+  line-height: 1.55;
+}
+
+.stat-row__label {
+  color: var(--la-ink-3);
+}
+
+.stat-row__value {
+  color: var(--la-ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status colors, used only for genuine good/bad states -- never as accent. */
+.stat-row__value--ok {
+  color: var(--la-ok);
+}
+
+.stat-row__value--bad {
+  color: var(--la-bad);
+}
+
+@media (max-width: 1080px) {
+  .live-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- Accelerometer calibration --------------------------------------- */
+
+/* The six sides as a progress rail: captured, being held now, or still to
+   come. The check mark carries the state as well as the color. */
+.accel-rail {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--la-space-2);
+  margin: 0 0 var(--la-space-4);
+  padding: 0;
+}
+
+.accel-rail__item {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-pill);
+  padding: var(--la-space-1) var(--la-space-3);
+}
+
+.accel-rail__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--la-line-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.accel-rail__item--done {
+  color: var(--la-ink-2);
+}
+
+.accel-rail__item--done .accel-rail__dot {
+  background: var(--la-ok);
+  border-color: var(--la-ok);
+  color: var(--la-surface);
+}
+
+.accel-rail__item--active {
+  color: var(--la-ink);
+  font-weight: 600;
+  border-color: var(--la-blue);
+  background: var(--la-blue-soft);
+}
+
+.accel-rail__item--active .accel-rail__dot {
+  border-color: var(--la-blue);
+  background: var(--la-blue);
+}
+
+/* Guidance in the pre-calibration dialog: advice about getting the setup
+   right, distinct from the step instructions that come after. */
+.accel-note {
+  margin: 0 0 var(--la-space-3);
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-2);
+  max-width: 58ch;
+}
+
+.accel-switch {
+  display: flex;
+  margin-bottom: var(--la-space-4);
+}
+
+.accel-stage {
+  display: grid;
+  /* Wide enough for the 3D model to be seen at a useful size; squeezed into
+     a narrow column it rendered as a tall slice of an airframe. */
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: var(--la-space-5);
+  align-items: center;
+}
+
+.vehicle-view--cal {
+  height: 230px;
+}
+
+.accel-stage__instruction {
+  margin: 0 0 var(--la-space-2);
+  font-size: var(--la-size-lg);
+  line-height: 1.3;
+}
+
+/* What the vehicle itself said, quoted rather than paraphrased, so the
+   words on screen match the words in the message log. */
+.accel-stage__prompt {
+  margin: 0 0 var(--la-space-2);
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+}
+
+/* The airframe model: 3D polygons projected to SVG, shaded by which way
+   each face ends up pointing. Tones come from the ink ramp so the drawing
+   reads as line art rather than a render. */
+.vmodel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+
+.vmodel__svg {
+  width: 176px;
+  height: 150px;
+}
+
+.vmodel__face {
+  stroke: var(--la-line-strong);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.vmodel__face--light {
+  fill: var(--la-surface);
+}
+
+.vmodel__face--mid {
+  fill: var(--la-surface-2);
+}
+
+.vmodel__face--dark {
+  fill: var(--la-line-strong);
+}
+
+/* Propeller discs: a flat gray disc, as on ArduPilot's motor diagram. They
+   sit at the arm plane so the arms and hubs draw over them. */
+.vmodel__face--prop {
+  fill: var(--la-line);
+  stroke: var(--la-line-strong);
+}
+
+/* Arms read as drawn lines, not lit surfaces: one dark tone, no shading. */
+.vmodel__face--arm {
+  fill: var(--la-ink-2);
+  stroke: var(--la-ink-2);
+}
+
+/* The front of the airframe: nose flash and the two front motor hubs, in
+   solid blue so "which way is forward" survives any rotation. Blue, not
+   orange -- the window's one orange action is the Next button. */
+.vmodel__face--accent {
+  fill: var(--la-blue);
+  stroke: var(--la-blue-deep);
+}
+
+.vmodel__ground {
+  width: 132px;
+  height: 1px;
+  background: var(--la-line-strong);
+}
+
+/* --- Motors & Outputs ------------------------------------------------ */
+
+.outputs-grid {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) 90px 90px 90px 80px;
+  gap: var(--la-space-2);
+  align-items: center;
+  padding: var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+
+.outputs-grid--head {
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  color: var(--la-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.outputs-grid__label {
+  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
+}
+
+/* --- Guided setups --------------------------------------------------- */
+
+.setup-toolbar {
+  /* Deliberately quiet: one ghost button, right-aligned, no card. */
+  margin-bottom: calc(-1 * var(--la-space-2));
+}
+
+.guide-card {
+  max-width: 1000px;
+}
+
+.guide-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--la-space-5);
+}
+
+.guide-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-right: 1px solid var(--la-line);
+}
+
+.guide-rail__item {
+  appearance: none;
+  border: none;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  width: 100%;
+  text-align: left;
+  font: 400 var(--la-size-sm) / 1.3 var(--la-font);
+  color: var(--la-ink-2);
+  padding: var(--la-space-2) var(--la-space-2);
+  cursor: default;
+  border-radius: var(--la-radius-sm);
+}
+
+.guide-rail__item:focus-visible {
+  box-shadow: var(--la-ring);
+}
+
+.guide-rail__item--active {
+  color: var(--la-ink);
+  font-weight: 600;
+  background: var(--la-surface-2);
+}
+
+.guide-rail__num {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--la-size-xs);
+  border: 1px solid var(--la-line-strong);
+  background: var(--la-surface);
+}
+
+/* Done markers use status green in the DOT only -- status, not action. */
+.guide-rail__item--done .guide-rail__num {
+  background: var(--la-ok);
+  border-color: var(--la-ok);
+  color: var(--la-surface);
+}
+
+.guide-rail__item--skipped .guide-rail__num {
+  color: var(--la-ink-3);
+}
+
+.guide-step__title {
+  margin: 0 0 var(--la-space-3);
+  font-size: var(--la-size-lg);
+}
+
+.guide-step__body {
+  margin: 0 0 var(--la-space-4);
+  font-size: var(--la-size-md);
+  color: var(--la-ink-2);
+  max-width: 60ch;
+}
+
+.guide-step__actions {
+  margin-top: var(--la-space-5);
+  border-top: 1px solid var(--la-line);
+  padding-top: var(--la-space-4);
+}
+
+.guide-paramset {
+  margin-bottom: var(--la-space-4);
+}
+
+.guide-paramset__row {
+  display: grid;
+  grid-template-columns: 180px 80px 24px 80px minmax(0, 1fr);
+  gap: var(--la-space-2);
+  padding: var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+  font-size: var(--la-size-sm);
+}
+
+.guide-paramset__name {
+  font-family: var(--la-font-mono);
+}
+
+.guide-paramset__arrow {
+  color: var(--la-ink-3);
+  text-align: center;
+}
+
+.guide-browser__section {
+  margin-bottom: var(--la-space-4);
+}
+
+.guide-browser__heading {
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--la-ink-3);
+  margin: 0 0 var(--la-space-2);
+}
+
+.guide-browser__row {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+  padding: var(--la-space-2) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+
+.guide-browser__row--guide {
+  padding-left: var(--la-space-5);
+}
+
+.guide-browser__summary {
+  margin: var(--la-space-1) 0 0;
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-2);
+}
+
+.outputs-grid__product {
+  display: block;
+  font: 400 var(--la-size-xs) / 1.2 var(--la-font);
+  color: var(--la-orange-deep);
+}
+
+/* --- Flight tab ------------------------------------------------------ */
+
+/* Map left, HUD + messages right. The layout fills the content pane; the
+   map is the element that grows. */
+.flight-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--la-space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+.flight-map-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: none;
+}
+
+.flight-map {
+  flex: 1;
+  min-height: 320px;
+  border-radius: var(--la-radius-sm);
+  border: 1px solid var(--la-line);
+  /* Leaflet needs an explicit stacking context or its panes float over
+     modals and the app bar. */
+  isolation: isolate;
+  z-index: 0;
+}
+
+.flight-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
+  min-height: 0;
+}
+
+.flight-side > .la-card {
+  max-width: none;
+}
+
+.flight-hud {
+  width: 100%;
+  height: 220px;
+  border-radius: var(--la-radius-sm);
+  background: var(--la-charcoal);
+}
+
+.flight-messages-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.flight-log {
+  flex: 1;
+  min-height: 120px;
+  resize: none;
+}
+
+.vehicle-marker {
+  /* Leaflet's default divIcon chrome off; the SVG is the marker. */
+  background: none;
+  border: none;
+}
+
+@media (max-width: 1100px) {
+  .flight-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Narrow tier: the rail gives up its width before anything clips. */
+@media (max-width: 820px) {
+  .app-main {
+    grid-template-columns: 140px minmax(0, 1fr);
+  }
+  .param-row {
+    grid-template-columns: 180px 120px 48px auto minmax(0, 1fr);
+  }
+}

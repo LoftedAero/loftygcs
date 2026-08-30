@@ -1,0 +1,103 @@
+{
+  "name": "loftgcs",
+  "version": "0.1.0",
+  "author": "Eric Maglio",
+  "description": "Loft GCS — a modern cross-platform ground control station for ArduPilot",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/LoftedAero/loftgcs.git"
+  },
+  "main": "dist-electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "node scripts/dev-electron.mjs",
+    "build:web": "vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build:demo": "node scripts/build-artifact.mjs",
+    "dist": "npm run build:electron && electron-builder --publish never",
+    "test": "vitest run",
+    "sitl": "node scripts/sitl.mjs run",
+    "sitl:fetch": "node scripts/sitl.mjs fetch",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.14.10",
+    "leaflet": "^1.9.4",
+    "mavlink-mappings": "^1.0.22-20260311",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-leaflet": "^5.0.0",
+    "three": "^0.185.1",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.0.0",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.185.4",
+    "@types/w3c-web-serial": "^1.0.8",
+    "@types/w3c-web-usb": "^1.0.14",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.0.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-import": "^2.32.0",
+    "jsdom": "^26.0.0",
+    "node-mavlink": "^2.3.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.0.0",
+    "vite": "^7.0.0",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^3.0.0"
+  },
+  "build": {
+    "appId": "com.loftgcs.app",
+    "productName": "Loft GCS",
+    "files": [
+      "dist-electron/**/*",
+      "dist-web/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "menuCategory": "Loft GCS",
+      "uninstallDisplayName": "Loft GCS",
+      "artifactName": "LoftGCS_setup_${version}.${ext}"
+    },
+    "mac": {
+      "identity": "-",
+      "hardenedRuntime": false,
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    }
+  }
+}

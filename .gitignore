@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-web/
+dist-electron/
+dist-demo/
+*.local
+.DS_Store
+
+# Local SITL binaries + their eeprom/log state (npm run sitl:fetch)
+sitl/

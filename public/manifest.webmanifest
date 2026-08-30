@@ -1,0 +1,17 @@
+{
+  "name": "Loft GCS",
+  "short_name": "Loft GCS",
+  "description": "A modern cross-platform ground control station for ArduPilot",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F1F2F5",
+  "theme_color": "#2D2D2F",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
