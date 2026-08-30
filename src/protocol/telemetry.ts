@@ -71,7 +71,11 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
       const count = Math.min((f.chancount as number) || 16, 16)
       const channels: number[] = []
       for (let i = 1; i <= count; i++) channels.push((f[`chan${i}Raw`] as number) ?? 0)
-      return [{ k: 'rc', channels }]
+      // 255 is MAVLink's "receiver does not report RSSI"; -1 keeps that
+      // distinct from a genuine reading of zero, which means no signal.
+      const raw = f.rssi as number | undefined
+      const rssi = raw === undefined || raw === 255 ? -1 : raw
+      return [{ k: 'rc', channels, rssi }]
     }
     default:
       return []

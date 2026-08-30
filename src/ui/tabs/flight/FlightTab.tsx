@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { LaButton, LaCard, LaSwitch } from '../../components/La'
+import { LaCard } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
@@ -7,7 +7,7 @@ import { gotoGuided, setHome, setRoi } from '../../../services/flight'
 import MapView from './MapView'
 import Hud from './Hud'
 import SplitPane from './SplitPane'
-import FlightActionsBar from './FlightActionsBar'
+import FlightControls from './FlightControls'
 import MapContextMenu, { type MapMenuPoint } from './MapContextMenu'
 
 // The flight screen, arranged as Mission Planner arranges it: one panel
@@ -37,7 +37,15 @@ export default function FlightTab() {
     )
   }
 
-  const mapPanel = <MapView follow={follow} onContextMenu={setMenu} target={target} home={home} />
+  const mapPanel = (
+    <MapView
+      follow={follow}
+      onFollowChange={setFollow}
+      onContextMenu={setMenu}
+      target={target}
+      home={home}
+    />
+  )
   const hudPanel = <Hud horizon={layout.hudHorizon} overlays={layout.hudOverlays} />
 
   const aspectIsHud = layout.aspectPanel === 'hud'
@@ -52,7 +60,7 @@ export default function FlightTab() {
         <div className="flight-aspect">{aspectIsHud ? hudPanel : mapPanel}</div>
       )}
       <div className="flight-below">
-        <FlightActionsBar />
+        <FlightControls />
         {layout.showMessages && <FlightMessages />}
       </div>
     </div>
@@ -62,37 +70,6 @@ export default function FlightTab() {
 
   return (
     <div className="flight-screen">
-      <div className="flight-toolbar la-row la-row--wrap">
-        <LaSwitch label="Follow" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
-        <span className="flight-toolbar__sep" />
-        <LaSwitch label="Map" checked={layout.showMap} onChange={() => layout.toggle('showMap')} />
-        <LaSwitch label="HUD" checked={layout.showHud} onChange={() => layout.toggle('showHud')} />
-        <LaSwitch
-          label="Horizon"
-          checked={layout.hudHorizon}
-          disabled={!layout.showHud}
-          onChange={() => layout.toggle('hudHorizon')}
-        />
-        <LaSwitch
-          label="Overlays"
-          checked={layout.hudOverlays}
-          disabled={!layout.showHud}
-          onChange={() => layout.toggle('hudOverlays')}
-        />
-        <LaSwitch
-          label="Messages"
-          checked={layout.showMessages}
-          onChange={() => layout.toggle('showMessages')}
-        />
-        <span className="la-grow" />
-        <LaButton variant="ghost" size="sm" onClick={layout.swap}>
-          Swap
-        </LaButton>
-        <LaButton variant="ghost" size="sm" onClick={layout.reset}>
-          Reset layout
-        </LaButton>
-      </div>
-
       <div className="flight-panels">
         <SplitPane
           ratio={layout.ratio}

@@ -112,6 +112,7 @@ class ConnectionService {
         this.pending.modeName = modeName(evt.vehicleType, evt.customMode)
         this.pending.customMode = evt.customMode
         this.pending.armed = (evt.baseMode & 128) !== 0
+        this.pending.systemStatus = evt.systemStatus
         this.pendingDirty = true
         return
       }
@@ -188,6 +189,7 @@ class ConnectionService {
         break
       case 'rc':
         p.rcChannels = d.channels
+        p.rcRssi = d.rssi
         break
       case 'sensors':
         p.sensorsPresent = d.present

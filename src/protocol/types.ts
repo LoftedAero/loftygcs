@@ -70,7 +70,7 @@ export type TelemetryDelta =
     }
   | { k: 'battery'; voltageV: number; currentA: number; remainingPct: number }
   | { k: 'gps'; fixType: number; satellites: number; hdop: number }
-  | { k: 'rc'; channels: number[] }
+  | { k: 'rc'; channels: number[]; rssi: number }
   | { k: 'sensors'; present: number; enabled: number; health: number }
 
 export interface LinkStats {

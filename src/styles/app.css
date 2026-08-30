@@ -1261,12 +1261,21 @@ body.is-splitting .flight-map {
   z-index: 0;
 }
 
-/* Satellite/street toggle, over the map's top-right corner. */
-.map-layer-switch {
+/* Map controls, over its top-right corner: base layer and follow, which are
+   about the map and so belong on it rather than in a strip elsewhere. */
+.map-controls {
   position: absolute;
   top: var(--la-space-2);
   right: var(--la-space-2);
   z-index: 500;
+  display: flex;
+  gap: var(--la-space-2);
+}
+.map-follow {
+  border-radius: var(--la-radius-sm);
+  box-shadow: var(--la-shadow-1);
+}
+.map-layer-switch {
   gap: 0;
   border-radius: var(--la-radius-sm);
   overflow: hidden;
@@ -1353,26 +1362,76 @@ body.is-splitting .flight-map {
 
 /* --- Actions ---------------------------------------------------------- */
 
-.flight-actions {
+/* One control surface: flying on the first row, adjusting on the second. */
+.flight-controls {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--la-space-2) var(--la-space-4);
+  flex-direction: column;
+  gap: var(--la-space-2);
   padding: var(--la-space-2) var(--la-space-3);
   background: var(--la-surface);
   border: 1px solid var(--la-line);
   border-radius: var(--la-radius);
 }
-.flight-actions__group {
+.flight-controls__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.flight-controls__mode {
+  width: 132px;
+}
+.flight-controls__sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 var(--la-space-1);
+  background: var(--la-line);
+}
+.flight-controls__field {
   display: flex;
   align-items: center;
   gap: var(--la-space-2);
 }
-.flight-actions__group--do {
-  margin-left: auto;
+.flight-controls__num {
+  width: 68px;
 }
-.flight-actions__num {
-  width: 72px;
+
+/* View switches, behind a button so arranging the window does not carry the
+   same weight as flying the aircraft. */
+.layout-menu {
+  position: relative;
+}
+.layout-menu__panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--la-space-2));
+  z-index: 900;
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  padding: var(--la-space-3);
+  background: var(--la-surface);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius);
+  box-shadow: var(--la-shadow-2);
+}
+.layout-menu__heading {
+  margin: 0;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+}
+.layout-menu__heading + * {
+  margin-top: calc(var(--la-space-1) * -1);
+}
+.layout-menu__actions {
+  display: flex;
+  gap: var(--la-space-2);
+  padding-top: var(--la-space-2);
+  border-top: 1px solid var(--la-line);
 }
 
 /* The log takes the rest of the stack under the panel, so it is what

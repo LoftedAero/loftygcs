@@ -18,6 +18,8 @@ export interface VehicleSnapshot {
   modeName: string
   customMode: number
   armed: boolean
+  /** MAV_STATE from the heartbeat; CRITICAL/EMERGENCY mean failsafe. */
+  systemStatus: number
   rollRad: number
   pitchRad: number
   yawRad: number
@@ -37,6 +39,8 @@ export interface VehicleSnapshot {
   gpsSats: number
   gpsHdop: number
   rcChannels: number[]
+  /** RC receiver RSSI, 0-254. 255 (or -1 here) means the link does not report it. */
+  rcRssi: number
   /** Raw SYS_STATUS masks; decoded for display by protocol/sensors.ts. */
   sensorsPresent: number
   sensorsEnabled: number
@@ -52,6 +56,7 @@ const EMPTY: VehicleSnapshot = {
   modeName: '',
   customMode: 0,
   armed: false,
+  systemStatus: 0,
   rollRad: 0,
   pitchRad: 0,
   yawRad: 0,
@@ -71,6 +76,7 @@ const EMPTY: VehicleSnapshot = {
   gpsSats: 0,
   gpsHdop: 0,
   rcChannels: [],
+  rcRssi: -1,
   sensorsPresent: 0,
   sensorsEnabled: 0,
   sensorsHealth: 0,

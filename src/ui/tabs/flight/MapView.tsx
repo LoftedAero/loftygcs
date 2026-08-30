@@ -50,6 +50,7 @@ function homeIcon(): L.DivIcon {
 
 export interface MapViewProps {
   follow: boolean
+  onFollowChange: (v: boolean) => void
   /** Screen position and coordinates of a right-click on the map. */
   onContextMenu: (p: { lat: number; lon: number; x: number; y: number }) => void
   /** Marker for the last guided target, or null to clear it. */
@@ -57,7 +58,13 @@ export interface MapViewProps {
   home?: { lat: number; lon: number } | null
 }
 
-export default function MapView({ follow, onContextMenu, target, home }: MapViewProps) {
+export default function MapView({
+  follow,
+  onFollowChange,
+  onContextMenu,
+  target,
+  home,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const markerRef = useRef<L.Marker | null>(null)
@@ -174,17 +181,28 @@ export default function MapView({ follow, onContextMenu, target, home }: MapView
   return (
     <div className="flight-map-wrap">
       <div ref={containerRef} className="flight-map" />
-      <div className="map-layer-switch la-row" role="group" aria-label="Base map">
-        {BASE_LAYERS.map((l) => (
-          <button
-            key={l.id}
-            type="button"
-            className={`map-layer-switch__btn${base === l.id ? ' is-active' : ''}`}
-            onClick={() => setBase(l.id)}
-          >
-            {l.label}
-          </button>
-        ))}
+      {/* Map controls belong on the map, not in a strip somewhere else. */}
+      <div className="map-controls">
+        <div className="map-layer-switch la-row" role="group" aria-label="Base map">
+          {BASE_LAYERS.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              className={`map-layer-switch__btn${base === l.id ? ' is-active' : ''}`}
+              onClick={() => setBase(l.id)}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={`map-layer-switch__btn map-follow${follow ? ' is-active' : ''}`}
+          aria-pressed={follow}
+          onClick={() => onFollowChange(!follow)}
+        >
+          Follow
+        </button>
       </div>
     </div>
   )

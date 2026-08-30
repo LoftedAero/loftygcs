@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import { LaButton, LaLinkButton, LaModal, LaSelect } from '../components/La'
+import { LaButton, LaLinkButton } from '../components/La'
 import { BRAND } from '../../brand'
 import { useUiStore, type TabId } from '../../stores/ui-store'
 import { useParamStore } from '../../stores/param-store'
-import { useVehicleStore } from '../../stores/vehicle-store'
-import { useConnectionStore } from '../../stores/connection-store'
 import { connectionService } from '../../services/connection'
-import { arm, disarm, setMode, takeoff } from '../../services/flight'
-import { modeTable } from '../../protocol/modes'
-import { MAV_RESULT } from '../../protocol/commands'
+
+// Flight commands used to live here as well. They moved onto the Fly screen
+// itself, next to the HUD they act on: the justification for keeping them in
+// the footer was that it never scrolls away, and nothing on that screen
+// scrolls, so the split only made the pilot look in two places.
 
 // Setup sections with no parameters to edit: showing them a Write button
 // would be offering an action the page cannot produce work for.
@@ -57,100 +57,6 @@ function ParamActions({ tab }: { tab: TabId }) {
   )
 }
 
-function FlightActions() {
-  const connected = useConnectionStore((s) => s.phase === 'connected')
-  const vehicleType = useVehicleStore((s) => s.vehicleType)
-  const customMode = useVehicleStore((s) => s.customMode)
-  const armed = useVehicleStore((s) => s.armed)
-  const modeNameNow = useVehicleStore((s) => s.modeName)
-  const [status, setStatus] = useState('')
-  const [confirmForce, setConfirmForce] = useState(false)
-  const modes = modeTable(vehicleType)
-
-  const report = (what: string) => (result: number) =>
-    setStatus(result === 0 ? '' : `${what}: ${MAV_RESULT[result] ?? result}`)
-  const fail = (what: string) => (err: unknown) =>
-    setStatus(`${what}: ${err instanceof Error ? err.message : 'no answer'}`)
-
-  const onArmClick = () => {
-    if (armed) {
-      void disarm().then(report('Disarm')).catch(fail('Disarm'))
-    } else {
-      void arm()
-        .then((result) => {
-          if (result === 0) setStatus('')
-          else {
-            // Refused: offer force-arm behind an explicit danger confirm.
-            setStatus(`Arm: ${MAV_RESULT[result] ?? result}`)
-            setConfirmForce(true)
-          }
-        })
-        .catch(fail('Arm'))
-    }
-  }
-
-  return (
-    <>
-      <LaSelect
-        value={String(customMode)}
-        disabled={!connected}
-        title="Flight mode"
-        onChange={(e) => void setMode(Number(e.target.value)).then(report('Mode')).catch(fail('Mode'))}
-      >
-        {Object.entries(modes).map(([num, name]) => (
-          <option key={num} value={num}>
-            {name}
-          </option>
-        ))}
-        {modes[customMode] === undefined && <option value={String(customMode)}>{modeNameNow}</option>}
-      </LaSelect>
-      <LaButton
-        variant={armed ? 'danger' : 'primary'}
-        size="lg"
-        disabled={!connected}
-        onClick={onArmClick}
-      >
-        {armed ? 'Disarm' : 'Arm'}
-      </LaButton>
-      <LaButton
-        variant="secondary"
-        disabled={!connected || !armed}
-        onClick={() => void takeoff(20).then(report('Takeoff')).catch(fail('Takeoff'))}
-      >
-        Takeoff 20 m
-      </LaButton>
-      {status && <span className="la-readout">{status}</span>}
-      {confirmForce && (
-        <LaModal
-          open
-          title="Vehicle refused to arm"
-          actions={
-            <>
-              <LaButton variant="ghost" onClick={() => setConfirmForce(false)}>
-                Cancel
-              </LaButton>
-              <LaButton
-                variant="danger"
-                onClick={() => {
-                  setConfirmForce(false)
-                  void arm(true).then(report('Force arm')).catch(fail('Force arm'))
-                }}
-              >
-                Force arm anyway
-              </LaButton>
-            </>
-          }
-        >
-          <p>
-            The vehicle's arming checks refused ({status || 'see messages'}). Forcing past them
-            skips the safeguards that keep a misconfigured vehicle on the ground.
-          </p>
-        </LaModal>
-      )}
-    </>
-  )
-}
-
 export default function ActionBar() {
   const [version, setVersion] = useState(__APP_VERSION__)
   const mode = useUiStore((s) => s.mode)
@@ -167,7 +73,6 @@ export default function ActionBar() {
       {/* Staged parameter edits are global, so Write lives in one place for
           every Setup tab rather than appearing and vanishing per screen. */}
       {mode === 'setup' && <ParamActions tab={activeTab} />}
-      {mode === 'fly' && <FlightActions />}
       <span className="la-actionbar__spacer"></span>
       <LaLinkButton
         onClick={() => {
