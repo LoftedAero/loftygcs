@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LaButton, LaHint, LaModal, LaSelect } from '../../components/La'
+import { LaButton, LaModal, LaSelect } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { MAV_RESULT } from '../../../protocol/commands'
@@ -116,8 +116,9 @@ export default function FlightControls() {
 
   return (
     <div className="flight-controls">
-      {/* Fly: the controls a hand reaches for without looking. */}
-      <div className="flight-controls__row">
+      {/* Tier one: what mode it is in and whether it is armed. Full size and
+          first, because everything else is an adjustment to these two. */}
+      <div className="flight-controls__primary">
         <LaSelect
           className="flight-controls__mode"
           value={String(customMode)}
@@ -138,15 +139,19 @@ export default function FlightControls() {
         </LaSelect>
         <LaButton
           variant={armed ? 'danger' : 'primary'}
-          size="sm"
+          size="lg"
           disabled={!connected}
           onClick={onArmClick}
         >
           {armed ? 'Disarm' : 'Arm'}
         </LaButton>
+
+        <span className="flight-controls__sep" />
+
+        {/* Tier two: one-touch jumps that are really mode changes, so they
+            sit beside the mode picker but a step down in size. */}
         <LaButton
           variant="secondary"
-          size="sm"
           disabled={!connected || !armed}
           onClick={() =>
             void takeoff(TAKEOFF_ALT_M).then(report('Takeoff')).catch(fail('Takeoff'))
@@ -154,33 +159,18 @@ export default function FlightControls() {
         >
           Takeoff {TAKEOFF_ALT_M} m
         </LaButton>
-        <span className="flight-controls__sep" />
-        <LaButton variant="secondary" size="sm" disabled={!connected} onClick={() => jump('Auto')}>
+        <LaButton variant="secondary" disabled={!connected} onClick={() => jump('Auto')}>
           Auto
         </LaButton>
-        <LaButton variant="secondary" size="sm" disabled={!connected} onClick={() => jump('RTL')}>
+        <LaButton variant="secondary" disabled={!connected} onClick={() => jump('RTL')}>
           RTL
         </LaButton>
-        <span className="la-grow" />
-        {/* Arranging the window sits here too, but as a menu rather than a
-            row of switches: it shares the one control surface without taking
-            the same visual weight as the commands. */}
-        <LayoutMenu />
       </div>
 
-      {/* Adjust: numbers you change while it is up there. */}
-      <div className="flight-controls__row">
-        <Field
-          id="fc-wp"
-          label="Item"
-          value={wp}
-          placeholder="#"
-          onChange={setWp}
-          disabled={!connected}
-          onSet={() =>
-            void setCurrentMissionItem(Number(wp)).then(report('Set item')).catch(fail('Set item'))
-          }
-        />
+      {/* Tier three, on a recessed strip: numbers you nudge while it is up
+          there, then the occasional command, then arranging the window.
+          Ordered by how often a hand goes to them. */}
+      <div className="flight-controls__secondary">
         <Field
           id="fc-speed"
           label="Speed"
@@ -204,8 +194,20 @@ export default function FlightControls() {
             setStatus('Altitude: sent')
           }}
         />
+        <Field
+          id="fc-wp"
+          label="Item"
+          value={wp}
+          placeholder="#"
+          onChange={setWp}
+          disabled={!connected}
+          onSet={() =>
+            void setCurrentMissionItem(Number(wp)).then(report('Set item')).catch(fail('Set item'))
+          }
+        />
         <span className="la-grow" />
         <LaSelect
+          className="flight-controls__action"
           value={action}
           disabled={!connected}
           aria-label="Action to run"
@@ -228,9 +230,13 @@ export default function FlightControls() {
         >
           Run
         </LaButton>
+        <span className="flight-controls__sep" />
+        {/* Arranging the window is not a command at all, so it sits at the
+            quiet end of the quiet row. */}
+        <LayoutMenu />
       </div>
 
-      {status && <LaHint>{status}</LaHint>}
+      {status && <p className="la-hint flight-controls__status">{status}</p>}
 
       <LaModal
         open={pending !== null}

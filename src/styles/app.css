@@ -1194,7 +1194,10 @@
   flex: none;
   width: 100%;
   aspect-ratio: 4 / 3;
-  max-height: calc(100% - 172px);
+  /* Enough for the controls at their tallest (three wrapped lines, ~140px)
+     plus a usable message log. Reserving only the controls' height left the
+     log squeezed to nothing whenever the divider was dragged wide. */
+  max-height: calc(100% - 210px);
   min-height: 0;
   display: flex;
   justify-content: center;
@@ -1362,30 +1365,67 @@ body.is-splitting .flight-map {
 
 /* --- Actions ---------------------------------------------------------- */
 
-/* One control surface: flying on the first row, adjusting on the second. */
+/* One control surface, in three tiers of prominence. Mode and arm are what
+   everything else adjusts, so they are full size on the plain surface; the
+   nudges and the occasional command sit on a recessed strip below, at the
+   design system's smaller sizes. The size steps are the system's own --
+   38px, 30px, 26px -- so the hierarchy is one you can see without reading
+   the labels. */
 .flight-controls {
   display: flex;
   flex-direction: column;
-  gap: var(--la-space-2);
-  padding: var(--la-space-2) var(--la-space-3);
   background: var(--la-surface);
   border: 1px solid var(--la-line);
   border-radius: var(--la-radius);
+  /* So the recessed strip's background reaches the rounded corners. */
+  overflow: hidden;
 }
-.flight-controls__row {
+
+.flight-controls__primary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--la-space-2);
+  padding: var(--la-space-3);
 }
+/* Matched to .la-btn--lg so the mode picker and Arm sit on one line rather
+   than stepping. */
 .flight-controls__mode {
-  width: 132px;
+  height: 38px;
+  min-width: 150px;
+  font-weight: 600;
 }
+
+.flight-controls__secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--la-space-2) var(--la-space-3);
+  padding: var(--la-space-2) var(--la-space-3);
+  background: var(--la-surface-2);
+  border-top: 1px solid var(--la-line);
+}
+.flight-controls__secondary .la-select {
+  height: 26px;
+  min-width: 0;
+  font-size: var(--la-size-sm);
+}
+.flight-controls__secondary .la-input {
+  height: 26px;
+  font-size: var(--la-size-sm);
+}
+.flight-controls__secondary .la-field__label {
+  font-size: var(--la-size-xs);
+}
+.flight-controls__action {
+  max-width: 170px;
+}
+
 .flight-controls__sep {
   width: 1px;
   align-self: stretch;
   margin: 0 var(--la-space-1);
-  background: var(--la-line);
+  background: var(--la-line-strong);
 }
 .flight-controls__field {
   display: flex;
@@ -1393,7 +1433,11 @@ body.is-splitting .flight-map {
   gap: var(--la-space-2);
 }
 .flight-controls__num {
-  width: 68px;
+  width: 62px;
+}
+.flight-controls__status {
+  margin: 0;
+  padding: 0 var(--la-space-3) var(--la-space-2);
 }
 
 /* View switches, behind a button so arranging the window does not carry the
