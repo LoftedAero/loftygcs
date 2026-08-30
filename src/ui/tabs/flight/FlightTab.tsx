@@ -6,7 +6,7 @@ import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 import { gotoGuided, setHome, setRoi } from '../../../services/flight'
 import MapView from './MapView'
 import Hud from './Hud'
-import SplitPane from './SplitPane'
+import Divider from './Divider'
 import FlightControls from './FlightControls'
 import MapContextMenu, { type MapMenuPoint } from './MapContextMenu'
 import PlotPanel from './PlotPanel'
@@ -28,6 +28,7 @@ export default function FlightTab() {
   const [target, setTarget] = useState<{ lat: number; lon: number } | null>(null)
   const [home, setHomePin] = useState<{ lat: number; lon: number } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const gridRef = useRef<HTMLDivElement>(null)
   const layout = useFlightLayoutStore()
 
   if (phase !== 'connected' && phase !== 'linkLost') {
@@ -56,14 +57,31 @@ export default function FlightTab() {
   const aspectVisible = aspectIsHud ? layout.showHud : layout.showMap
   const fillVisible = aspectIsHud ? layout.showMap : layout.showHud
 
-  // The left column always exists -- it carries the controls and messages
-  // even when the panel above them is switched off.
-  const leftColumn = (
-    <div className="flight-col">
+  // One grid rather than two independent columns. The top row is sized by
+  // the fixed-aspect panel and the bottom row takes the rest, so the
+  // controls on the left and the plot on the right are the same height by
+  // construction -- there is no way to express "as tall as the other
+  // column's remainder" between siblings.
+  const grid = (
+    <div
+      className={`flight-grid${fillVisible ? '' : ' flight-grid--single'}`}
+      ref={gridRef}
+      style={{ '--split': `${(layout.ratio * 100).toFixed(2)}%` } as React.CSSProperties}
+    >
       {aspectVisible && (
-        <div className="flight-aspect">{aspectIsHud ? hudPanel : mapPanel}</div>
+        <div className="flight-grid__aspect">{aspectIsHud ? hudPanel : mapPanel}</div>
       )}
-      <div className="flight-below">
+      {fillVisible && (
+        <Divider containerRef={gridRef} ratio={layout.ratio} onRatio={layout.setRatio} />
+      )}
+      {fillVisible && (
+        <div className={`flight-grid__fill${layout.showPlot ? '' : ' is-tall'}`}>
+          {aspectIsHud ? mapPanel : hudPanel}
+        </div>
+      )}
+      {/* Always present: it carries the controls even when the panel above
+          them is switched off. */}
+      <div className="flight-grid__below">
         <FlightControls />
         {layout.showMessages && (
           <LogPane
@@ -74,39 +92,24 @@ export default function FlightTab() {
           />
         )}
       </div>
-    </div>
-  )
-
-  // The plot takes the top of the map column, as Mission Planner's tuning
-  // graph does -- it is the half of the screen with width to spare, and a
-  // strip chart needs width far more than the instruments do.
-  const rightColumn = (
-    <div className="flight-fill">
-      {layout.showPlot && (
-        <PlotPanel
-          fields={layout.plotFields}
-          axisField={layout.plotAxisField}
-          onAxisField={layout.setPlotAxisField}
-          onRemove={layout.togglePlotField}
-          onPick={() => setPickerOpen(true)}
-          onClose={() => layout.toggle('showPlot')}
-        />
+      {fillVisible && layout.showPlot && (
+        <div className="flight-grid__plot">
+          <PlotPanel
+            fields={layout.plotFields}
+            axisField={layout.plotAxisField}
+            onAxisField={layout.setPlotAxisField}
+            onRemove={layout.togglePlotField}
+            onPick={() => setPickerOpen(true)}
+            onClose={() => layout.toggle('showPlot')}
+          />
+        </div>
       )}
-      <div className="flight-fill__main">{aspectIsHud ? mapPanel : hudPanel}</div>
     </div>
   )
 
   return (
     <div className="flight-screen">
-      <div className="flight-panels">
-        <SplitPane
-          ratio={layout.ratio}
-          onRatio={layout.setRatio}
-          first={leftColumn}
-          second={rightColumn}
-          only={fillVisible ? undefined : 'first'}
-        />
-      </div>
+      <div className="flight-panels">{grid}</div>
 
       <FieldPicker
         open={pickerOpen}

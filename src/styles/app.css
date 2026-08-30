@@ -1116,32 +1116,102 @@
 
 /* --- The resizable split --------------------------------------------- */
 
-.split {
-  display: flex;
-  flex-direction: row;
+/*
+ * One grid for the whole screen rather than two independent columns:
+ *
+ *   fixed-aspect panel │ the other panel
+ *   controls + log     │ plot
+ *
+ * The top row is sized by the fixed-aspect panel and the bottom row takes
+ * what is left, so the controls and the plot come out the same height by
+ * construction. As two sibling columns there is no way to say "as tall as
+ * the other one's remainder".
+ *
+ * The bottom row's minimum is what keeps the controls usable however far the
+ * divider is dragged; when that bites, the aspect panel's row shrinks and the
+ * panel letterboxes rather than stretching.
+ */
+.flight-grid {
+  display: grid;
+  grid-template-columns: var(--split) var(--la-space-2) minmax(0, 1fr);
+  grid-template-rows: minmax(0, auto) minmax(210px, 1fr);
   width: 100%;
   height: 100%;
   min-height: 0;
+  gap: 0 0;
 }
-.split--single .split__slot {
-  flex: 1;
+.flight-grid--single {
+  grid-template-columns: minmax(0, 1fr);
 }
-.split__slot {
+
+.flight-grid__aspect {
+  grid-column: 1;
+  grid-row: 1;
   min-width: 0;
   min-height: 0;
   display: flex;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
 }
-.split__slot > * {
+/* Sized from the row's height with an aspect of its own, so when the row is
+   capped it letterboxes horizontally instead of stretching. */
+.flight-grid__aspect > * {
+  flex: none;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+}
+
+.flight-grid__fill {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+/* With no plot beneath it, the map takes both rows. */
+.flight-grid__fill.is-tall {
+  grid-row: 1 / -1;
+}
+.flight-grid__fill > * {
   flex: 1;
   min-width: 0;
   min-height: 0;
 }
-/* The second slot takes whatever the first and the divider leave. */
-.split__slot--rest {
+
+.flight-grid__below {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-width: 0;
+  min-height: 0;
+  padding-top: var(--la-space-2);
+}
+.flight-grid--single .flight-grid__below {
+  grid-column: 1;
+}
+
+.flight-grid__plot {
+  grid-column: 3;
+  grid-row: 2;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  padding-top: var(--la-space-2);
+}
+.flight-grid__plot > * {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 .split__divider {
+  grid-column: 2;
+  grid-row: 1 / -1;
   flex: none;
   border: none;
   padding: 0;
@@ -1168,77 +1238,6 @@
   background: var(--la-blue);
 }
 
-/* --- The two flight columns ------------------------------------------ */
-
-.flight-col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-  min-width: 0;
-  min-height: 0;
-}
-
-/*
- * The fixed-aspect panel. Its height follows the column's width, which is
- * what makes dragging the divider trade panel size against the controls
- * below -- exactly the behaviour Mission Planner has.
- *
- * Two rules keep that honest at the extremes. The max-height reserves room
- * for the controls however wide the column is dragged, and the child sizes
- * itself from the *height* with an aspect ratio of its own, so when that cap
- * bites the panel letterboxes horizontally instead of stretching. Sizing the
- * child from the parent's width instead would silently break the aspect the
- * moment the cap applied.
- */
-.flight-aspect {
-  flex: none;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  /* Enough for the controls at their tallest (three wrapped lines, ~140px)
-     plus a usable message log. Reserving only the controls' height left the
-     log squeezed to nothing whenever the divider was dragged wide. */
-  max-height: calc(100% - 210px);
-  min-height: 0;
-  display: flex;
-  justify-content: center;
-}
-.flight-aspect > * {
-  flex: none;
-  height: 100%;
-  width: auto;
-  max-width: 100%;
-  aspect-ratio: 4 / 3;
-  min-height: 0;
-}
-
-/* Controls and messages take whatever the panel above them leaves. */
-.flight-below {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-}
-
-/* The map column, with the plot strip optionally above it. */
-.flight-fill {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-  min-width: 0;
-  min-height: 0;
-}
-.flight-fill__main {
-  flex: 1;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-}
-.flight-fill__main > * {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-}
 
 /* --- The lower pane: messages or the field list ---------------------- */
 
@@ -1358,9 +1357,8 @@
 /* --- The plot -------------------------------------------------------- */
 
 .plot-panel {
-  flex: none;
-  height: 38%;
-  min-height: 150px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--la-surface);
