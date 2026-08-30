@@ -31,6 +31,12 @@ export interface FlightLayoutState {
   showMap: boolean
   showHud: boolean
   showMessages: boolean
+  /** The plot strip above the map. */
+  showPlot: boolean
+  /** Which telemetry fields the plot is drawing. */
+  plotFields: string[]
+  /** Whether the lower pane shows messages or the telemetry field list. */
+  logPane: 'messages' | 'status'
   /** The artificial horizon. Off leaves the background layer showing. */
   hudHorizon: boolean
   /** Overlay elements drawn on the HUD, so they can be turned off for video. */
@@ -38,7 +44,9 @@ export interface FlightLayoutState {
 
   setRatio: (r: number) => void
   swap: () => void
-  toggle: (key: 'showMap' | 'showHud' | 'showMessages' | 'hudHorizon' | 'hudOverlays') => void
+  toggle: (key: 'showMap' | 'showHud' | 'showMessages' | 'showPlot' | 'hudHorizon' | 'hudOverlays') => void
+  togglePlotField: (name: string) => void
+  setLogPane: (pane: 'messages' | 'status') => void
   reset: () => void
 }
 
@@ -49,6 +57,9 @@ interface Persisted {
   showMap: boolean
   showHud: boolean
   showMessages: boolean
+  showPlot: boolean
+  plotFields: string[]
+  logPane: 'messages' | 'status'
   hudHorizon: boolean
   hudOverlays: boolean
 }
@@ -61,6 +72,9 @@ const DEFAULTS: Persisted = {
   showMap: true,
   showHud: true,
   showMessages: true,
+  showPlot: false,
+  plotFields: [],
+  logPane: 'messages',
   hudHorizon: true,
   hudOverlays: true,
 }
@@ -102,6 +116,9 @@ function snapshot(s: FlightLayoutState): Persisted {
     showMap: s.showMap,
     showHud: s.showHud,
     showMessages: s.showMessages,
+    showPlot: s.showPlot,
+    plotFields: s.plotFields,
+    logPane: s.logPane,
     hudHorizon: s.hudHorizon,
     hudOverlays: s.hudOverlays,
   }
@@ -127,6 +144,20 @@ export const useFlightLayoutStore = create<FlightLayoutState>((set, get) => {
       if (!next && key === 'showMap' && !get().showHud) return
       if (!next && key === 'showHud' && !get().showMap) return
       set({ [key]: next } as Pick<FlightLayoutState, typeof key>)
+      save()
+    },
+    togglePlotField: (name) => {
+      const current = get().plotFields
+      const next = current.includes(name)
+        ? current.filter((f) => f !== name)
+        : [...current, name]
+      // Adding the first field is always meant to show the plot; nobody picks
+      // a field in order to look at a panel that is switched off.
+      set({ plotFields: next, showPlot: next.length > 0 ? true : get().showPlot })
+      save()
+    },
+    setLogPane: (logPane) => {
+      set({ logPane })
       save()
     },
     reset: () => {

@@ -36,6 +36,15 @@ export type ProtocolEvent =
       systemStatus: number
     }
   | { t: 'telemetry'; batch: TelemetryDelta[] }
+  /**
+   * Every numeric field the vehicle has sent, by `MESSAGE.field`, sampled at
+   * a fixed rate. This is the generic path that feeds the status list and the
+   * plots -- as opposed to `telemetry`, which is the curated set the flight
+   * instruments read. Every value is resent each tick rather than only the
+   * changed ones, so the samples are evenly spaced and a plot can draw them
+   * without having to guess at the gaps.
+   */
+  | { t: 'fields'; at: number; values: Record<string, number> }
   | { t: 'statustext'; severity: number; text: string }
   | { t: 'commandAck'; command: number; result: number }
   | { t: 'linkStats'; stats: LinkStats }

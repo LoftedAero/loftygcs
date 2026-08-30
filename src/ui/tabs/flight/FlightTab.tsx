@@ -9,6 +9,9 @@ import Hud from './Hud'
 import SplitPane from './SplitPane'
 import FlightControls from './FlightControls'
 import MapContextMenu, { type MapMenuPoint } from './MapContextMenu'
+import PlotPanel from './PlotPanel'
+import FieldPicker from './FieldPicker'
+import StatusList from './StatusList'
 
 // The flight screen, arranged as Mission Planner arranges it: one panel
 // pinned left at a fixed aspect ratio, the controls and messages filling the
@@ -24,6 +27,7 @@ export default function FlightTab() {
   const [menu, setMenu] = useState<MapMenuPoint | null>(null)
   const [target, setTarget] = useState<{ lat: number; lon: number } | null>(null)
   const [home, setHomePin] = useState<{ lat: number; lon: number } | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const layout = useFlightLayoutStore()
 
   if (phase !== 'connected' && phase !== 'linkLost') {
@@ -61,12 +65,33 @@ export default function FlightTab() {
       )}
       <div className="flight-below">
         <FlightControls />
-        {layout.showMessages && <FlightMessages />}
+        {layout.showMessages && (
+          <LogPane
+            pane={layout.logPane}
+            onPane={layout.setLogPane}
+            plotted={layout.plotFields}
+            onTogglePlot={layout.togglePlotField}
+          />
+        )}
       </div>
     </div>
   )
 
-  const rightColumn = <div className="flight-fill">{aspectIsHud ? mapPanel : hudPanel}</div>
+  // The plot takes the top of the map column, as Mission Planner's tuning
+  // graph does -- it is the half of the screen with width to spare, and a
+  // strip chart needs width far more than the instruments do.
+  const rightColumn = (
+    <div className="flight-fill">
+      {layout.showPlot && (
+        <PlotPanel
+          fields={layout.plotFields}
+          onRemove={layout.togglePlotField}
+          onPick={() => setPickerOpen(true)}
+        />
+      )}
+      <div className="flight-fill__main">{aspectIsHud ? mapPanel : hudPanel}</div>
+    </div>
+  )
 
   return (
     <div className="flight-screen">
@@ -79,6 +104,13 @@ export default function FlightTab() {
           only={fillVisible ? undefined : 'first'}
         />
       </div>
+
+      <FieldPicker
+        open={pickerOpen}
+        selected={layout.plotFields}
+        onToggle={layout.togglePlotField}
+        onClose={() => setPickerOpen(false)}
+      />
 
       {menu && (
         <MapContextMenu
@@ -94,6 +126,53 @@ export default function FlightTab() {
             setHomePin({ lat: menu.lat, lon: menu.lon })
           }}
         />
+      )}
+    </div>
+  )
+}
+
+/**
+ * The lower pane: the vehicle's own messages, or every telemetry field it is
+ * sending. Two views of "what is it telling me", so they share one space and
+ * a header rather than competing for the screen.
+ */
+function LogPane({
+  pane,
+  onPane,
+  plotted,
+  onTogglePlot,
+}: {
+  pane: 'messages' | 'status'
+  onPane: (p: 'messages' | 'status') => void
+  plotted: readonly string[]
+  onTogglePlot: (name: string) => void
+}) {
+  return (
+    <div className="log-pane">
+      <div className="log-pane__head" role="tablist" aria-label="Lower pane">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pane === 'messages'}
+          className={`log-pane__tab${pane === 'messages' ? ' is-active' : ''}`}
+          onClick={() => onPane('messages')}
+        >
+          Messages
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pane === 'status'}
+          className={`log-pane__tab${pane === 'status' ? ' is-active' : ''}`}
+          onClick={() => onPane('status')}
+        >
+          Status
+        </button>
+      </div>
+      {pane === 'messages' ? (
+        <FlightMessages />
+      ) : (
+        <StatusList plotted={plotted} onTogglePlot={onTogglePlot} />
       )}
     </div>
   )

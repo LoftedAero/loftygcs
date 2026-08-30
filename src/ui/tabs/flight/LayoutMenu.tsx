@@ -76,6 +76,11 @@ export default function LayoutMenu() {
             checked={layout.showMessages}
             onChange={() => layout.toggle('showMessages')}
           />
+          <LaSwitch
+            label="Plot"
+            checked={layout.showPlot}
+            onChange={() => layout.toggle('showPlot')}
+          />
 
           <p className="layout-menu__heading">HUD layers</p>
           <LaSwitch

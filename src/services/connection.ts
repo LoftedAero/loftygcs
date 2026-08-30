@@ -12,6 +12,7 @@ import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { useCalStore } from '../stores/cal-store'
 import { telemetryRings } from './telemetry-ring'
+import { fieldRegistry } from './telemetry-fields'
 import { fetchParamMetadata } from './param-metadata'
 
 const HANDSHAKE_TIMEOUT_MS = 5000
@@ -69,6 +70,9 @@ class ConnectionService {
     this.pendingDirty = false
     useVehicleStore.getState().reset()
     useParamStore.getState().reset()
+    // Otherwise the next vehicle inherits the last one's field list, and a
+    // plot keeps drawing a line that belongs to an aircraft that is gone.
+    fieldRegistry.clear()
     useCalStore.getState().magCalReset()
     setConnectionState(
       error
@@ -123,6 +127,9 @@ class ConnectionService {
         useVehicleStore
           .getState()
           .appendStatusText({ severity: evt.severity, text: evt.text, at: Date.now() })
+        return
+      case 'fields':
+        fieldRegistry.apply(evt.at, evt.values)
         return
       case 'linkStats':
         setConnectionState({ linkStats: evt.stats })

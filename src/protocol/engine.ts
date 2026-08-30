@@ -4,6 +4,7 @@
 // integration runs.
 import { MavFramer, encodeFrame } from './frames'
 import { decodeFrameFields } from './serializer'
+import { collectFields } from './fields'
 import { messageToDeltas } from './telemetry'
 import { MavFtpClient } from './ftp/mavftp'
 import { decodeParamPck } from './params/pck'
@@ -24,6 +25,10 @@ const GCS_COMPID = 190
 
 const HEARTBEAT_INTERVAL_MS = 1000
 const TELEMETRY_FLUSH_MS = 50
+// Slower than the instrument path: a status list and a plot do not need
+// twenty updates a second, and this one carries every field the vehicle has
+// ever sent rather than a handful.
+const FIELDS_FLUSH_MS = 100
 const LINKSTATS_INTERVAL_MS = 1000
 // 4 Hz for every stream: plenty for readouts, gentle on telemetry radios.
 const STREAM_RATE_HZ = 4
@@ -34,6 +39,7 @@ export class ProtocolEngine {
   private running = false
   private timers: ReturnType<typeof setInterval>[] = []
   private pendingDeltas: TelemetryDelta[] = []
+  private fieldValues = new Map<string, number>()
   private lastHeartbeatAt = -1
   private vehicleSysid: number | null = null
   private vehicleCompid = 1
@@ -62,6 +68,7 @@ export class ProtocolEngine {
     // loss, and some firmware won't stream to a silent peer.
     this.timers.push(setInterval(() => this.sendHeartbeat(), HEARTBEAT_INTERVAL_MS))
     this.timers.push(setInterval(() => this.flushTelemetry(), TELEMETRY_FLUSH_MS))
+    this.timers.push(setInterval(() => this.flushFields(), FIELDS_FLUSH_MS))
     this.timers.push(setInterval(() => this.reportLinkStats(), LINKSTATS_INTERVAL_MS))
     this.sendHeartbeat()
   }
@@ -100,6 +107,9 @@ export class ProtocolEngine {
   }
 
   private handleMessage(msg: DecodedMessage) {
+    // Before the switch: every message contributes to the generic field set,
+    // including the ones handled specially below.
+    collectFields(msg, this.fieldValues)
     // Ignore our own reflected traffic (UDP loops and some bridges echo).
     if (msg.sysid === GCS_SYSID) return
 
@@ -247,6 +257,14 @@ export class ProtocolEngine {
 
   runCommand(command: number, params: number[], timeoutMs?: number): Promise<number> {
     return this.commands.run(command, params, timeoutMs !== undefined ? { timeoutMs } : {})
+  }
+
+  private flushFields() {
+    if (this.fieldValues.size === 0) return
+    this.emit({
+      t: 'evt',
+      evt: { t: 'fields', at: Date.now(), values: Object.fromEntries(this.fieldValues) },
+    })
   }
 
   private flushTelemetry() {
