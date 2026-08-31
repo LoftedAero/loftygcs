@@ -101,22 +101,36 @@ export default function ParamCompareModal({
           onChange={(e) => setFilter(e.target.value)}
           className="la-grow"
         />
+        {/* Two buttons, not one that changes label: which one is available
+            tells you nothing useful, and a control whose meaning flips as you
+            tick rows is one you have to read every time before pressing. */}
         <LaButton
           variant="ghost"
           size="sm"
-          disabled={selectable.length === 0}
+          disabled={selectable.length === 0 || allShown}
           onClick={() =>
             setSelected((prev) => {
               const next = new Set(prev)
-              for (const r of selectable) {
-                if (allShown) next.delete(r.name)
-                else next.add(r.name)
-              }
+              for (const r of selectable) next.add(r.name)
               return next
             })
           }
         >
-          {allShown ? 'Select none' : 'Select all'}
+          Select all
+        </LaButton>
+        <LaButton
+          variant="ghost"
+          size="sm"
+          disabled={selectable.every((r) => !selected.has(r.name))}
+          onClick={() =>
+            setSelected((prev) => {
+              const next = new Set(prev)
+              for (const r of selectable) next.delete(r.name)
+              return next
+            })
+          }
+        >
+          Select none
         </LaButton>
         <label className="la-switch param-compare__toggle">
           <span className="la-field__unit">Show identical</span>
