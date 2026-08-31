@@ -10,10 +10,12 @@ import { MavFtpClient } from './ftp/mavftp'
 import { decodeParamPck } from './params/pck'
 import { ParamStreamClient } from './params/param-client'
 import { CommandClient } from './commands'
+import { MissionClient } from './mission'
 import type {
   DecodedMessage,
   EngineOutput,
   FieldValue,
+  MissionItem,
   ParamDownloadResult,
   TelemetryDelta,
 } from './types'
@@ -58,6 +60,10 @@ export class ProtocolEngine {
     (msgName, fields) => this.send(msgName, fields),
     () => ({ sysid: this.vehicleSysid ?? 1, compid: this.vehicleCompid }),
   )
+  private mission = new MissionClient(
+    (msgName, fields) => this.send(msgName, fields),
+    () => ({ sysid: this.vehicleSysid ?? 1, compid: this.vehicleCompid }),
+  )
 
   constructor(private emit: (out: EngineOutput) => void) {}
 
@@ -84,6 +90,7 @@ export class ProtocolEngine {
     this.ftp.abort('link closed')
     this.paramStream.abort('link closed')
     this.commands.abort('link closed')
+    this.mission.abort('link closed')
   }
 
   pushBytes(bytes: Uint8Array) {
@@ -157,6 +164,13 @@ export class ProtocolEngine {
         return
       case 'FILE_TRANSFER_PROTOCOL':
         this.ftp.handlePayload(msg.fields.payload as number[])
+        return
+      case 'MISSION_COUNT':
+      case 'MISSION_ITEM_INT':
+      case 'MISSION_REQUEST':
+      case 'MISSION_REQUEST_INT':
+      case 'MISSION_ACK':
+        this.mission.handleMessage(msg.msgName, msg.fields)
         return
       case 'COMMAND_ACK':
         this.commands.handleAck(msg.fields)
@@ -257,6 +271,22 @@ export class ProtocolEngine {
 
   runCommand(command: number, params: number[], timeoutMs?: number): Promise<number> {
     return this.commands.run(command, params, timeoutMs !== undefined ? { timeoutMs } : {})
+  }
+
+  downloadMission(missionType: number): Promise<MissionItem[]> {
+    return this.mission.download(missionType, (got, total) =>
+      this.emit({ t: 'evt', evt: { t: 'missionProgress', got, total, dir: 'read' } }),
+    )
+  }
+
+  uploadMission(items: MissionItem[], missionType: number): Promise<void> {
+    return this.mission.upload(items, missionType, (got, total) =>
+      this.emit({ t: 'evt', evt: { t: 'missionProgress', got, total, dir: 'write' } }),
+    )
+  }
+
+  clearMission(missionType: number): Promise<void> {
+    return this.mission.clearAll(missionType)
   }
 
   private flushFields() {

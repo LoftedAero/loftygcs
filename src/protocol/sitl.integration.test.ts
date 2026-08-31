@@ -172,6 +172,63 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
         // motor test while disarmed on the bench answers deterministically.
         const motorResult = await engine.runCommand(209, [1, 0, 5, 1, 0, 0, 0], 5000)
         expect([0, 1, 2, 3, 4]).toContain(motorResult)
+
+        // --- Missions: the Phase 6 gate. Upload against the real storage
+        // and read back what it kept -- the virtual FC agreeing with us
+        // proves nothing about ArduPilot's mission validation.
+        const home = await engine.downloadMission(0).then((m) => m[0])
+        const wp = (seq: number, lat: number, lon: number, alt: number) => ({
+          seq,
+          frame: 3, // relative to home
+          command: 16, // NAV_WAYPOINT
+          current: 0,
+          autocontinue: 1,
+          param1: 0,
+          param2: 0,
+          param3: 0,
+          param4: 0,
+          x: Math.round(lat * 1e7),
+          y: Math.round(lon * 1e7),
+          z: alt,
+        })
+        const plan = [
+          // Seq 0 is home; SITL replaces its content with its own home, so
+          // send the one it reported and compare positions loosely below.
+          { ...(home ?? wp(0, -35.363262, 149.165237, 584)), seq: 0, current: 1 },
+          { ...wp(1, 0, 0, 30), command: 22 }, // NAV_TAKEOFF
+          wp(2, -35.3625, 149.1642, 45),
+          wp(3, -35.3618, 149.1655, 55),
+          { ...wp(4, 0, 0, 0), command: 20 }, // NAV_RETURN_TO_LAUNCH
+        ]
+        await engine.uploadMission(plan, 0)
+        const readBack = await engine.downloadMission(0)
+        expect(readBack).toHaveLength(plan.length)
+        // Items after home must survive byte-exact in the fields that matter.
+        // Except the frame on commands that carry no coordinates: ArduPilot
+        // stores those without one and reports frame 0 on read-back (our RTL
+        // went up as frame 3 and came home as 0 -- found here, first contact).
+        // The mission store must not read that as a difference either.
+        for (let i = 1; i < plan.length; i++) {
+          expect(readBack[i]).toMatchObject({
+            seq: i,
+            command: plan[i]!.command,
+            x: plan[i]!.x,
+            y: plan[i]!.y,
+          })
+          if (plan[i]!.command === 16) expect(readBack[i]!.frame).toBe(plan[i]!.frame)
+          expect(readBack[i]!.z).toBeCloseTo(plan[i]!.z, 3)
+        }
+
+        // And a bad mission must be refused with a code, not accepted or
+        // hung: a DO_JUMP to a sequence that does not exist.
+        const broken = [
+          plan[0]!,
+          { ...wp(1, 0, 0, 0), command: 177, param1: 99, param2: 1 }, // DO_JUMP -> 99
+        ]
+        await expect(engine.uploadMission(broken, 0)).rejects.toThrow(/refused/i)
+
+        // Leave SITL holding the good mission, restored for whoever's next.
+        await engine.uploadMission(plan, 0)
       } finally {
         engine.stop()
         socket?.destroy()

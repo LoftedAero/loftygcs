@@ -11,6 +11,7 @@ import type {
   EngineOutput,
   EngineRequest,
   FieldValue,
+  MissionItem,
   ParamDownloadResult,
   ProtocolEvent,
 } from '../protocol/types'
@@ -67,6 +68,18 @@ export class WorkerClient {
       params,
       ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     }) as Promise<number>
+  }
+
+  downloadMission(missionType = 0): Promise<MissionItem[]> {
+    return this.request({ op: 'downloadMission', missionType }) as Promise<MissionItem[]>
+  }
+
+  uploadMission(items: MissionItem[], missionType = 0): Promise<void> {
+    return this.request({ op: 'uploadMission', items, missionType }) as Promise<void>
+  }
+
+  clearMission(missionType = 0): Promise<void> {
+    return this.request({ op: 'clearMission', missionType }) as Promise<void>
   }
 
   start() {

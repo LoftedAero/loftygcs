@@ -319,6 +319,43 @@ const HOME_LAT = -35.363262
 const HOME_LON = 149.165237
 const HOME_ALT_M = 584
 
+/** Home, takeoff, a small box of waypoints, and RTL -- wire-shaped fields. */
+function demoMission(): Record<string, FieldValue>[] {
+  const wp = (
+    seq: number,
+    command: number,
+    lat: number,
+    lon: number,
+    alt: number,
+    over: Record<string, FieldValue> = {},
+  ): Record<string, FieldValue> => ({
+    seq,
+    frame: seq === 0 ? 0 : 3,
+    command,
+    current: seq === 0 ? 1 : 0,
+    autocontinue: 1,
+    param1: 0,
+    param2: 0,
+    param3: 0,
+    param4: 0,
+    x: Math.round(lat * 1e7),
+    y: Math.round(lon * 1e7),
+    z: alt,
+    missionType: 0,
+    ...over,
+  })
+  const d = 0.0012
+  return [
+    wp(0, 16, HOME_LAT, HOME_LON, HOME_ALT_M),
+    wp(1, 22, 0, 0, 40), // NAV_TAKEOFF
+    wp(2, 16, HOME_LAT + d, HOME_LON - d, 50),
+    wp(3, 16, HOME_LAT + d, HOME_LON + d, 60),
+    wp(4, 16, HOME_LAT - d, HOME_LON + d, 60),
+    wp(5, 16, HOME_LAT - d, HOME_LON - d, 50),
+    wp(6, 20, 0, 0, 0), // NAV_RETURN_TO_LAUNCH
+  ]
+}
+
 export class VirtualFcTransport implements Transport {
   readonly kind = 'virtual' as const
   private dataCb: ((bytes: Uint8Array) => void) | null = null
@@ -332,6 +369,12 @@ export class VirtualFcTransport implements Transport {
   private magCalTimer: ReturnType<typeof setInterval> | null = null
   private accelCalPositions = 0
   private airborne = false
+  // A stored mission (item 0 = home), so Mission mode has something real to
+  // read in demo mode and the transfer machinery gets exercised end to end
+  // -- count, per-item requests, ack -- not just against scripted fixtures.
+  private missionItems = demoMission()
+  /** Non-null while a GCS upload is in progress: items land here first. */
+  private missionRx: { total: number; items: Record<string, FieldValue>[] } | null = null
 
   async open(_opts: TransportOptions): Promise<void> {
     this.t0 = Date.now()
@@ -387,8 +430,80 @@ export class VirtualFcTransport implements Transport {
           decoded.fields._param2 as number,
           decoded.fields._param5 as number,
         )
+      } else if (
+        decoded.msgName === 'MISSION_REQUEST_LIST' ||
+        decoded.msgName === 'MISSION_REQUEST_INT' ||
+        decoded.msgName === 'MISSION_COUNT' ||
+        decoded.msgName === 'MISSION_ITEM_INT' ||
+        decoded.msgName === 'MISSION_CLEAR_ALL' ||
+        decoded.msgName === 'MISSION_ACK'
+      ) {
+        this.handleMission(decoded.msgName, decoded.fields)
       }
     }
+  }
+
+  /**
+   * The vehicle side of mission transfer -- for the primary mission only,
+   * which is all the demo vehicle stores. Fences and rally requests get a
+   * clean "unsupported" ack instead of silence.
+   */
+  private handleMission(msgName: string, fields: Record<string, FieldValue>) {
+    const missionType = (fields.missionType as number) ?? 0
+    const ack = (type: number) =>
+      this.emit('MISSION_ACK', {
+        targetSystem: 255,
+        targetComponent: 190,
+        type,
+        missionType,
+      })
+    if (missionType !== 0) {
+      if (msgName !== 'MISSION_ACK') ack(3) // MAV_MISSION_UNSUPPORTED
+      return
+    }
+
+    if (msgName === 'MISSION_REQUEST_LIST') {
+      this.emit('MISSION_COUNT', {
+        targetSystem: 255,
+        targetComponent: 190,
+        count: this.missionItems.length,
+        missionType: 0,
+      })
+    } else if (msgName === 'MISSION_REQUEST_INT') {
+      const item = this.missionItems[fields.seq as number]
+      if (item) this.emit('MISSION_ITEM_INT', { ...item, targetSystem: 255, targetComponent: 190 })
+      else ack(13) // MAV_MISSION_INVALID_SEQUENCE
+    } else if (msgName === 'MISSION_COUNT') {
+      const total = fields.count as number
+      if (total === 0) {
+        this.missionItems = []
+        ack(0)
+        return
+      }
+      this.missionRx = { total, items: [] }
+      this.emit('MISSION_REQUEST_INT', { targetSystem: 255, targetComponent: 190, seq: 0, missionType: 0 })
+    } else if (msgName === 'MISSION_ITEM_INT') {
+      const rx = this.missionRx
+      if (!rx) return
+      if ((fields.seq as number) === rx.items.length) rx.items.push(fields)
+      if (rx.items.length >= rx.total) {
+        // The upload replaces the stored mission wholesale, as ArduPilot's does.
+        this.missionItems = rx.items
+        this.missionRx = null
+        ack(0)
+      } else {
+        this.emit('MISSION_REQUEST_INT', {
+          targetSystem: 255,
+          targetComponent: 190,
+          seq: rx.items.length,
+          missionType: 0,
+        })
+      }
+    } else if (msgName === 'MISSION_CLEAR_ALL') {
+      this.missionItems = []
+      ack(0)
+    }
+    // MISSION_ACK from the GCS ends a download; nothing to do.
   }
 
   private handleCommand(command: number, param1: number, param2: number, param5: number) {

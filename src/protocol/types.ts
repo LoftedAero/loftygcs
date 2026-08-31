@@ -49,6 +49,7 @@ export type ProtocolEvent =
   | { t: 'commandAck'; command: number; result: number }
   | { t: 'linkStats'; stats: LinkStats }
   | { t: 'paramProgress'; got: number; total: number; source: 'ftp' | 'stream' }
+  | { t: 'missionProgress'; got: number; total: number; dir: 'read' | 'write' }
   | {
       t: 'magCalProgress'
       compassId: number
@@ -100,6 +101,31 @@ export interface ParamRecord {
   mavType: number
 }
 
+/**
+ * One mission item, in wire terms: x and y are latitude and longitude in
+ * degrees * 1e7 (MISSION_ITEM_INT's fixed-point form -- floats lose meters of
+ * precision at earth scale, which is why the float message is deprecated).
+ * Sequence 0 is home by ArduPilot convention; the vehicle replaces its
+ * content with the real home at arming, so what a plan carries there is the
+ * *planned* home, a reference point rather than a command.
+ */
+export interface MissionItem {
+  seq: number
+  /** MAV_FRAME: 0 abs MSL, 3 relative to home, 10 terrain-relative. */
+  frame: number
+  /** MAV_CMD. */
+  command: number
+  current: number
+  autocontinue: number
+  param1: number
+  param2: number
+  param3: number
+  param4: number
+  x: number
+  y: number
+  z: number
+}
+
 export interface ParamDownloadResult {
   source: 'ftp' | 'stream'
   params: ParamRecord[]
@@ -110,6 +136,9 @@ export type EngineRequest =
   | { op: 'downloadParams' }
   | { op: 'setParam'; name: string; value: number; mavType: number }
   | { op: 'command'; command: number; params: number[]; timeoutMs?: number }
+  | { op: 'downloadMission'; missionType: number }
+  | { op: 'uploadMission'; items: MissionItem[]; missionType: number }
+  | { op: 'clearMission'; missionType: number }
 
 /** Messages into the protocol worker. */
 export type EngineCommand =
