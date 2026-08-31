@@ -131,13 +131,19 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
                     type="button"
                     role="menuitem"
                     className="mission-palette__item"
-                    title={c.summary}
+                    title={`${c.name} — ${c.summary}`}
                     onClick={() => {
                       setMoreOpen(false)
                       pick(c.id)
                     }}
                   >
-                    {c.name}
+                    {/* ArduPilot's own command names here, not our friendlier
+                        ones: anyone reaching past the five common items is
+                        working from the ArduPilot mission docs or a Mission
+                        Planner habit, and a translation only makes them guess
+                        which of ours is the one they read about. The plain
+                        name still shows on hover and in the table. */}
+                    {c.mavName}
                   </button>
                 ))}
               </div>

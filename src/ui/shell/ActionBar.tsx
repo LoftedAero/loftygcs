@@ -4,6 +4,7 @@ import { BRAND } from '../../brand'
 import { useUiStore, type TabId } from '../../stores/ui-store'
 import { useParamStore } from '../../stores/param-store'
 import { connectionService } from '../../services/connection'
+import WriteParamsModal from './WriteParamsModal'
 
 // Flight commands used to live here as well. They moved onto the Fly screen
 // itself, next to the HUD they act on: the justification for keeping them in
@@ -21,21 +22,35 @@ function ParamActions({ tab }: { tab: TabId }) {
   const dirtyCount = useParamStore((s) => s.dirtyCount)
   const writeBusy = useParamStore((s) => s.writeBusy)
   const loadState = useParamStore((s) => s.loadState)
+  const [confirming, setConfirming] = useState(false)
   if (loadState !== 'ready') return null
   // ...but if edits are staged on another tab, keep the bar: quietly losing
   // sight of unsaved vehicle changes is the worse of the two outcomes.
   if (PARAMLESS_TABS.has(tab) && dirtyCount === 0) return null
+
+  const write = () => {
+    setConfirming(false)
+    void connectionService.writeDirtyParams().then((result) => {
+      useParamStore.getState().setLastWrite(result)
+    })
+  }
+
   return (
     <>
+      {/* The confirmation lives here rather than on the Parameters tab
+          because edits stage from anywhere -- a curated Setup card, the
+          compare tool, the table -- and this button is what sends all of
+          them. One list, wherever they came from. */}
+      <WriteParamsModal
+        open={confirming}
+        onConfirm={write}
+        onCancel={() => setConfirming(false)}
+      />
       <LaButton
         variant="primary"
         size="lg"
         disabled={dirtyCount === 0 || writeBusy}
-        onClick={() => {
-          void connectionService.writeDirtyParams().then((result) => {
-            useParamStore.getState().setLastWrite(result)
-          })
-        }}
+        onClick={() => setConfirming(true)}
       >
         {writeBusy ? 'Writing…' : `Write Params${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
       </LaButton>

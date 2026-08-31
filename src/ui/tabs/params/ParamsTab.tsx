@@ -2,6 +2,12 @@ import { useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { LaButton, LaCard, LaHint, LaInput } from '../../components/La'
 import { useParamStore } from '../../../stores/param-store'
+import ParamCompareModal from './ParamCompareModal'
+import {
+  compareParams,
+  parseParamFile,
+  type CompareRow,
+} from '../../../protocol/param-file'
 import { useConnectionStore } from '../../../stores/connection-store'
 import ParamRow from './ParamRow'
 
@@ -78,7 +84,7 @@ export default function ParamsTab() {
           className="la-grow"
         />
         <ExportButton />
-        <ImportButton />
+        <CompareButton />
       </div>
       {lastWrite && (
         <LaHint error={lastWrite.failed.length > 0}>
@@ -147,24 +153,32 @@ function ExportButton() {
   )
 }
 
-function ImportButton() {
+/**
+ * Load a file and show what it would change, rather than changing it.
+ *
+ * This replaced a plain Import that applied every difference the moment the
+ * file was chosen. That is safe only when the file came off this aircraft;
+ * from a similar one it quietly rewrites the parts that differ *because the
+ * aircraft differ*, and nothing on screen distinguishes those from the edits
+ * that were wanted.
+ */
+function CompareButton() {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [state, setState] = useState<{
+    name: string
+    rows: CompareRow[]
+    skipped: { line: number; text: string }[]
+  } | null>(null)
+
   const onFile = async (file: File) => {
-    const text = await file.text()
-    const { entries, edit } = useParamStore.getState()
-    // Mission Planner .param format: NAME,VALUE per line; # comments.
-    for (const line of text.split(/\r?\n/)) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const [name, valueStr] = trimmed.split(/[,\t]/)
-      if (!name || valueStr === undefined) continue
-      const value = Number(valueStr)
-      const entry = entries.get(name.trim().toUpperCase())
-      if (entry && Number.isFinite(value) && value !== entry.value) {
-        edit(name.trim().toUpperCase(), value)
-      }
-    }
+    const { entries, skipped } = parseParamFile(await file.text())
+    setState({
+      name: file.name,
+      rows: compareParams(entries, useParamStore.getState().entries),
+      skipped,
+    })
   }
+
   return (
     <>
       <input
@@ -179,8 +193,15 @@ function ImportButton() {
         }}
       />
       <LaButton variant="ghost" onClick={() => fileRef.current?.click()}>
-        Import
+        Compare…
       </LaButton>
+      <ParamCompareModal
+        open={state !== null}
+        fileName={state?.name ?? ''}
+        rows={state?.rows ?? []}
+        skipped={state?.skipped ?? []}
+        onClose={() => setState(null)}
+      />
     </>
   )
 }

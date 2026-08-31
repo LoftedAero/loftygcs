@@ -49,6 +49,87 @@
   width: 100%;
 }
 
+/* --- Parameter compare, and the write confirmation -------------------- */
+
+.param-compare__tools {
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.param-compare__toggle {
+  flex: none;
+  white-space: nowrap;
+}
+.param-compare__summary {
+  margin: 0;
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-2);
+}
+.param-compare__summary strong {
+  color: var(--la-ink);
+}
+.param-compare__missing {
+  color: var(--la-warn);
+}
+
+/* Capped so a forty-row diff scrolls inside the dialog rather than growing
+   it past the window and taking its own buttons off screen. */
+.param-compare__scroll {
+  max-height: 46vh;
+  overflow: auto;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+}
+.param-compare__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-sm);
+}
+.param-compare__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  background: var(--la-surface-2);
+  padding: var(--la-space-2);
+  border-bottom: 1px solid var(--la-line-strong);
+  white-space: nowrap;
+}
+.param-compare__table td {
+  padding: var(--la-space-1) var(--la-space-2);
+  border-bottom: 1px solid var(--la-line);
+  vertical-align: middle;
+}
+.param-compare__name {
+  font-family: var(--la-font-mono);
+  color: var(--la-ink);
+}
+.param-compare__desc {
+  display: block;
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+.param-compare__new {
+  font-weight: 600;
+  color: var(--la-ink);
+}
+.param-compare__absent {
+  color: var(--la-ink-3);
+  font-style: italic;
+}
+/* A row the vehicle cannot take is dimmed rather than hidden: the file said
+   something about it, and that is worth seeing. */
+.param-compare__row.is-missing {
+  opacity: 0.55;
+}
+.param-compare__row.is-selected {
+  background: var(--la-blue-soft);
+}
+
 /* --- Dark theme ------------------------------------------------------- */
 
 /* The one place in this file where raw hex belongs: these lines *define*

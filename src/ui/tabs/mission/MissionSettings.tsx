@@ -10,17 +10,20 @@ import { MAV_FRAMES } from '../../../protocol/mission-commands'
 // The settings column, QGroundControl's idea: the handful of things that
 // apply to the whole mission, beside the map instead of buried in a row.
 //
-// The honest complication is that they do not all live in the same place.
-// Default altitude and altitude frame are *editor* settings -- they decide
-// what a newly placed item gets, and the vehicle has never heard of them.
-// Waypoint and loiter radius are *vehicle parameters*, so they persist on
-// the aircraft and are written the way every other parameter is: ack
-// verified, one at a time. Mission speed is neither: it is a DO_CHANGE_SPEED
-// item in the mission itself, which is why it is a button that adds one.
+// The honest complication is that they do not all live in the same place,
+// and the column is ordered so that shows.
 //
-// Pretending all four were the same thing would be tidier and wrong -- a
-// user who set "speed" here and never saw it in the item list would have no
-// idea why the aircraft ignored it.
+// Home comes first because it is the origin every relative altitude is
+// measured from -- it should be read before the altitudes are set, not after.
+// Default altitude and altitude frame are *editor* settings: they decide what
+// a newly placed item gets, and the vehicle has never heard of them. Waypoint
+// and loiter radius are *vehicle parameters*, so they persist on the aircraft
+// and are written the way every other parameter is, ack-verified.
+//
+// Mission speed used to sit here as a button that added a DO_CHANGE_SPEED
+// item. It is out for now; when it returns it belongs in the item list, not
+// in a settings panel, because a "speed" that never appeared among the items
+// leaves nobody able to explain why the aircraft ignored it.
 
 /** Radius parameters worth surfacing, by the vehicle that has them. */
 const RADIUS_PARAMS = [
@@ -34,62 +37,13 @@ export default function MissionSettings() {
   const setDefaults = useMissionStore((s) => s.setDefaults)
   const home = useMissionStore((s) => s.plan.home)
   const setHome = useMissionStore((s) => s.setHome)
-  const addItem = useMissionStore((s) => s.addItem)
-  const updateItem = useMissionStore((s) => s.updateItem)
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const [homeNote, setHomeNote] = useState<string | null>(null)
 
   return (
     <div className="mission-settings">
       <section className="mission-settings__group">
-        <h3 className="mission-settings__head">New items</h3>
-        <LaField label="Default altitude" unit="m" htmlFor="mission-alt" stacked>
-          <LaInput
-            num
-            id="mission-alt"
-            type="number"
-            min={0}
-            value={defaults.altM}
-            onChange={(e) => setDefaults({ altM: Number(e.target.value) })}
-          />
-        </LaField>
-        <LaField label="Altitude mode" htmlFor="mission-frame" stacked>
-          <LaSelect
-            id="mission-frame"
-            value={defaults.frame}
-            onChange={(e) => setDefaults({ frame: Number(e.target.value) })}
-          >
-            {MAV_FRAMES.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </LaSelect>
-        </LaField>
-        <LaHint>Applies to items you add next, not to ones already placed.</LaHint>
-      </section>
-
-      <section className="mission-settings__group">
-        <h3 className="mission-settings__head">Speed</h3>
-        <LaHint>
-          Mission speed is an item, not a setting: it takes effect where it sits in the list.
-        </LaHint>
-        <LaButton
-          variant="secondary"
-          size="block"
-          onClick={() => {
-            const uid = addItem(178)
-            // Groundspeed, and no throttle change: the pair of defaults that
-            // makes the item do the one thing its name promises.
-            updateItem(uid, { param1: 1, param2: 5, param3: -1 })
-          }}
-        >
-          Add a speed change
-        </LaButton>
-      </section>
-
-      <section className="mission-settings__group">
-        <h3 className="mission-settings__head">Planned home</h3>
+        <h3 className="mission-settings__head">Home location</h3>
         {home ? (
           <>
             <div className="mission-settings__coords">
@@ -125,6 +79,34 @@ export default function MissionSettings() {
           Relative altitudes are measured from here. The vehicle replaces it with its own
           position when it arms, so this is a planning reference.
         </LaHint>
+      </section>
+
+      <section className="mission-settings__group">
+        <h3 className="mission-settings__head">General settings</h3>
+        <LaField label="Default altitude" unit="m" htmlFor="mission-alt" stacked>
+          <LaInput
+            num
+            id="mission-alt"
+            type="number"
+            min={0}
+            value={defaults.altM}
+            onChange={(e) => setDefaults({ altM: Number(e.target.value) })}
+          />
+        </LaField>
+        <LaField label="Altitude mode" htmlFor="mission-frame" stacked>
+          <LaSelect
+            id="mission-frame"
+            value={defaults.frame}
+            onChange={(e) => setDefaults({ frame: Number(e.target.value) })}
+          >
+            {MAV_FRAMES.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </LaSelect>
+        </LaField>
+        <LaHint>Applies to items you add next, not to ones already placed.</LaHint>
       </section>
 
       <RadiusParams />

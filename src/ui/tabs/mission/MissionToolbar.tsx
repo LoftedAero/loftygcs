@@ -53,7 +53,7 @@ export default function MissionToolbar() {
         disabled={working || !connected}
         onClick={() => void run(readFromVehicle)}
       >
-        Read vehicle
+        Read from vehicle
       </LaButton>
       <LaButton
         variant="primary"
@@ -61,7 +61,7 @@ export default function MissionToolbar() {
         disabled={working || !connected || items === 0}
         onClick={() => void run(writeToVehicle)}
       >
-        Write vehicle
+        Write to vehicle
       </LaButton>
       {!connected && <LaHint>Connect a vehicle to read or write.</LaHint>}
 
@@ -71,7 +71,7 @@ export default function MissionToolbar() {
         disabled={working}
         onClick={() => void run(openFromFile)}
       >
-        Open file…
+        Open from file
       </LaButton>
       <LaButton
         variant="secondary"
@@ -79,7 +79,7 @@ export default function MissionToolbar() {
         disabled={working || items === 0}
         onClick={() => saveToFile(fileName(sourceName))}
       >
-        Save file
+        Save to file
       </LaButton>
 
       <LaButton
