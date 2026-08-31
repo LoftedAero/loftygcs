@@ -53,10 +53,7 @@ export default memo(function ParamRow({ name }: { name: string }) {
 
   return (
     <div className={entry.dirty ? 'param-row param-row--dirty' : 'param-row'}>
-      <div className="param-row__ident">
-        <span className="param-row__name la-selectable">{name}</span>
-        {meta?.displayName && <span className="param-row__display">{meta.displayName}</span>}
-      </div>
+      <span className="param-row__name la-selectable">{name}</span>
 
       {/* Every row has the same cells in the same places, empty where they do
           not apply. A grid whose columns move depending on the parameter is
@@ -73,6 +70,11 @@ export default memo(function ParamRow({ name }: { name: string }) {
           if (Number.isFinite(v)) edit(name, v)
         }}
       />
+
+      {/* Units sit with the number they qualify, not after the dropdown --
+          "rad" belongs to 0.0175, and a column between them made it read as
+          a unit for the option list. */}
+      <span className="param-row__unit">{meta?.units ?? ''}</span>
 
       {/* The number and the dropdown are separate fields rather than one
           control that changes shape: the number is what the vehicle stores
@@ -107,15 +109,16 @@ export default memo(function ParamRow({ name }: { name: string }) {
         <span className="param-row__options" />
       )}
 
-      <span className="param-row__unit">{meta?.units ?? ''}</span>
-
       <div className="param-row__meta">
         {/* The decoded value first: on a bitmask row it is the only readable
             form of the number sitting next to it. */}
         {decoded && <span className="param-row__decoded">{decoded}</span>}
-        {meta?.description && (
-          <span className="param-row__desc" title={meta.description}>
-            {meta.description}
+        {/* Falls back to the display name: this column is now the only place
+            a parameter says what it is, and a handful have the short name
+            without the paragraph. */}
+        {(meta?.description ?? meta?.displayName) && (
+          <span className="param-row__desc" title={meta?.description ?? meta?.displayName}>
+            {meta?.description ?? meta?.displayName}
           </span>
         )}
         {(meta?.range || meta?.rebootRequired) && (

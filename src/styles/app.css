@@ -881,31 +881,16 @@
 .param-row {
   display: grid;
   grid-template-columns:
-    minmax(180px, 260px)   /* name over display name */
-    104px                  /* the number, always present */
+    minmax(180px, 250px)   /* parameter name */
+    112px                  /* the number, always present */
+    52px                   /* its unit, beside the number it qualifies */
     minmax(150px, 230px)   /* options dropdown, or the bits button */
-    46px                   /* unit */
     minmax(0, 1fr);        /* decoded value, description, range */
   align-items: center;
   gap: var(--la-space-3);
   padding: var(--la-space-1) var(--la-space-3);
   min-height: 52px;
   border-bottom: 1px solid var(--la-line);
-}
-
-/* Name over ArduPilot's short display name. The name is what the vehicle and
-   every .param file call it; the display name is what it means. */
-.param-row__ident {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.param-row__display {
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* The value column is right-aligned and monospaced: a column of numbers is
@@ -927,7 +912,7 @@
   justify-self: start;
 }
 .param-row__unit {
-  font-size: var(--la-size-xs);
+  font-size: var(--la-size-sm);
   color: var(--la-ink-3);
   overflow: hidden;
   white-space: nowrap;
@@ -941,7 +926,7 @@
 /* What the number means when only the metadata can say -- the bits that are
    set. Named values say it in their own dropdown instead. */
 .param-row__decoded {
-  font-size: var(--la-size-xs);
+  font-size: var(--la-size-sm);
   color: var(--la-blue-deep);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -951,14 +936,14 @@
    wrapped would make every row a different height and the virtualizer's
    estimate a fiction. */
 .param-row__desc {
-  font-size: var(--la-size-xs);
+  font-size: var(--la-size-md);
   color: var(--la-ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .param-row__hint {
-  font-size: var(--la-size-xs);
+  font-size: var(--la-size-sm);
   color: var(--la-ink-3);
   font-family: var(--la-font-mono);
   white-space: nowrap;
@@ -972,7 +957,7 @@
 }
 
 .param-row__name {
-  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
+  font: 400 var(--la-size-md) / 1.2 var(--la-font-mono);
   color: var(--la-ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1011,7 +996,7 @@
 }
 
 .param-row__name {
-  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
+  font: 400 var(--la-size-md) / 1.2 var(--la-font-mono);
   color: var(--la-ink);
   overflow: hidden;
   text-overflow: ellipsis;
