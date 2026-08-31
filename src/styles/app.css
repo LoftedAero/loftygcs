@@ -130,6 +130,24 @@
   background: var(--la-blue-soft);
 }
 
+/* The OSD column reuses the parameter column's stack, minus its outer card:
+   it already sits inside .osd-workspace__side, which has the border. */
+.osd-actions {
+  padding: 0;
+  gap: var(--la-space-4);
+}
+/* The one place on this page where turning the OSD on is offered by name;
+   marked out so it does not read as another settings card. */
+.osd-actions__off {
+  padding: var(--la-space-3);
+  border: 1px solid var(--la-warn);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-orange-soft);
+}
+.osd-actions__off .app-placeholder {
+  margin-bottom: 0;
+}
+
 /* --- Dark theme ------------------------------------------------------- */
 
 /* The one place in this file where raw hex belongs: these lines *define*

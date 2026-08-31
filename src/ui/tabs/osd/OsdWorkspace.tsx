@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { LaButton, LaCard, LaHint, LaLinkButton, LaSelect, LaSwitch } from '../../components/La'
+import OsdActions, { OsdTypePrompt } from './OsdActions'
 import ParamCard from '../../components/ParamCard'
 import { useParamStore } from '../../../stores/param-store'
 import OsdScreen from './OsdScreen'
@@ -240,6 +241,11 @@ export default function OsdWorkspace() {
       </LaCard>
 
       <div className="osd-workspace__side">
+        {/* Actions first: what you do to the vehicle, above the settings you
+            are doing it to. Same shape as the Parameters and Mission
+            columns. */}
+        <OsdActions />
+        <OsdTypePrompt />
         <ParamCard
           title="Display"
           fields={[
