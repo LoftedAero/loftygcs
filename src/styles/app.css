@@ -16,6 +16,11 @@
      white by coincidence -- and went dark the moment the theme did, taking
      the whole OSD preview with it. Named, it stays put. */
   --app-on-dark: #ffffff;
+
+  /* The width of a screen's actions/settings column. Mission, Parameters and
+     OSD all grew one independently and all picked a different number; this is
+     the one they share. Change it here and every screen moves together. */
+  --app-col-w: 280px;
 }
 
 /* The system sheet puts modals at z-index 10, which is plenty for a window
@@ -130,11 +135,16 @@
   background: var(--la-blue-soft);
 }
 
-/* The OSD column reuses the parameter column's stack, minus its outer card:
-   it already sits inside .osd-workspace__side, which has the border. */
+/* The OSD column is a stack of cards rather than one bordered panel, so the
+   actions get their own border to sit among them -- which also makes their
+   buttons the same width as the other two screens', since all three then
+   inset by the same border plus padding. Two pixels is invisible; a rule
+   that only holds on two screens out of three is not. */
 .osd-actions {
-  padding: 0;
   gap: var(--la-space-4);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
 }
 /* The one place on this page where turning the OSD on is offered by name;
    marked out so it does not read as another settings card. */
@@ -146,6 +156,111 @@
 }
 .osd-actions__off .app-placeholder {
   margin-bottom: 0;
+}
+
+.app-col__note {
+  margin: 0;
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-3);
+}
+.app-col__note.is-error {
+  color: var(--la-bad);
+}
+
+/* A port is three lines: what to select it by, what it says it is, and what
+   tells two identical boards apart. */
+.serial-port {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.serial-port__name {
+  font-family: var(--la-font-mono);
+  color: var(--la-ink);
+}
+.serial-port__desc {
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-2);
+}
+.serial-port__ids {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+
+/* --- The actions column ----------------------------------------------
+   Every screen that edits something has one: a fixed-width column on the
+   right holding what you *do*, beside the thing you are doing it to. Mission,
+   Parameters and OSD all use these classes, so they cannot drift apart again.
+
+   The conventions, so a new screen inherits them without deciding anything:
+
+     - The column is var(--app-col-w) wide. Never a bespoke number.
+     - Buttons in it are always size="block": full width, one per row. A row
+       of two only fits by shortening labels past the point of saying anything.
+     - Groups are <section class="app-col__group"> with an <h3
+       class="app-col__head">. Uppercase, extra-small, muted -- a label, not a
+       title competing with the card headings beside it.
+     - Order is what-you-do first, what-you-set after. Vehicle actions above
+       file actions above settings.
+     - One primary (orange) action per column, and it is the one that changes
+       the aircraft: Write, or Upload. Everything else is secondary or ghost.
+   ------------------------------------------------------------------- */
+.app-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
+  padding: var(--la-space-3);
+  min-width: 0;
+}
+.app-col__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-width: 0;
+}
+.app-col__head {
+  margin: 0;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  padding-bottom: var(--la-space-1);
+  border-bottom: 1px solid var(--la-line);
+}
+/* A heading with something beside it -- a badge, a count. */
+.app-col__headrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-space-2);
+  padding-bottom: var(--la-space-1);
+  border-bottom: 1px solid var(--la-line);
+}
+.app-col__headrow .app-col__head {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+/* The outer shell: the border and scrolling belong to the container, so a
+   column can also sit inside a card that already has one. */
+.app-col-shell {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  display: flex;
+  flex-direction: column;
+}
+.app-col-shell > .app-col {
+  flex: 1;
+}
+.app-col__mono {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+  overflow-wrap: anywhere;
 }
 
 /* --- Dark theme ------------------------------------------------------- */
@@ -472,36 +587,6 @@
   gap: var(--la-space-2);
 }
 
-/* Actions in the right column, as Mission Planner has them -- and the column
-   had room the map did not. */
-.mission-toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-  padding: var(--la-space-3);
-  border-bottom: 1px solid var(--la-line);
-}
-.mission-toolbar__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--la-space-2);
-  padding-bottom: var(--la-space-1);
-  border-bottom: 1px solid var(--la-line);
-}
-.mission-toolbar__head .mission-settings__head {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.mission-toolbar__note {
-  margin: 0;
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-3);
-}
-.mission-toolbar__note.is-error {
-  color: var(--la-bad);
-}
-
 /* Status, never an action: green and red here mean "the vehicle agrees" and
    "it does not", which is exactly what the palette reserves them for. */
 .mission-badge {
@@ -526,7 +611,7 @@
 
 .mission-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr) var(--app-col-w);
   /* An explicit row, not the implicit `auto` one: without it the children
      have no definite height to size themselves against, and a grid inside
      that tries to divide it grows without bound instead. */
@@ -804,7 +889,9 @@
   background: var(--la-orange-soft);
 }
 
-.mission-side {
+/* Both screens' columns are the shared shell; see .app-col-shell. */
+.mission-side,
+.params-aside {
   min-height: 0;
   overflow: auto;
   border: 1px solid var(--la-line);
@@ -813,33 +900,6 @@
   display: flex;
   flex-direction: column;
 }
-.mission-settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-4);
-  padding: var(--la-space-3);
-}
-.mission-settings__group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-}
-.mission-settings__head {
-  margin: 0;
-  font-size: var(--la-size-xs);
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--la-ink-3);
-  padding-bottom: var(--la-space-1);
-  border-bottom: 1px solid var(--la-line);
-}
-.mission-settings__coords {
-  font-family: var(--la-font-mono);
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-2);
-}
-
 @media (max-width: 1100px) {
   /* Below this the settings column starves the map; it goes under the
      table rather than being squeezed to nothing. */
@@ -881,7 +941,7 @@
    and the same 260px, so the two screens read as one app. */
 .params-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr) var(--app-col-w);
   grid-template-rows: minmax(0, 1fr);
   gap: var(--la-space-3);
   flex: 1;
@@ -893,35 +953,6 @@
   min-height: 0;
   min-width: 0;
 }
-.params-aside {
-  min-height: 0;
-  overflow: auto;
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  background: var(--la-surface);
-}
-.params-side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-4);
-  padding: var(--la-space-3);
-}
-.params-side__group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-}
-.params-side__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--la-space-2);
-}
-.params-side__head .mission-settings__head {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
 .params-toolbar {
   margin-bottom: var(--la-space-3);
 }
@@ -1455,7 +1486,7 @@
    rather than sitting in a short box above dead ground. */
 .live-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 292px;
+  grid-template-columns: minmax(0, 1fr) var(--app-col-w);
   gap: var(--la-space-3);
   align-items: stretch;
   /* Fill exactly the space the window has, so the whole panel is visible on
@@ -2919,7 +2950,7 @@ body.is-splitting .flight-map {
    height rather than allowed to grow with the column. */
 .osd-workspace {
   display: grid;
-  grid-template-columns: 262px minmax(0, 1fr) 340px;
+  grid-template-columns: 262px minmax(0, 1fr) var(--app-col-w);
   gap: var(--la-space-3);
   /* Grid items stretch by default, so the panel list and the preview end up
      the same height whichever is naturally taller. The settings column opts

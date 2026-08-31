@@ -23,11 +23,11 @@ import {
 
 export default function ParamSidebar() {
   return (
-    <div className="params-side">
+    <div className="app-col">
       <VehicleParamActions />
 
-      <section className="params-side__group">
-        <h3 className="mission-settings__head">File</h3>
+      <section className="app-col__group">
+        <h3 className="app-col__head">File</h3>
         <CompareButton />
         <ImportButton />
         <ExportButton />

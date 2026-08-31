@@ -36,6 +36,19 @@ design decisions are recorded there and in code comments.
   (plus a running guide) take the whole window. The rail order is the bring-up sequence, and Ports
   deliberately precedes Sensors because SERIALn_PROTOCOL gates compass/GPS detection.
   The mode switch is never orange: Connect owns the app bar's one primary action.
+- **The actions column** (`.app-col` in `app.css`): every screen that edits something has a
+  fixed-width column on the right holding what you *do*, beside the thing you are doing it to.
+  Mission, Parameters and OSD share one set of classes so they cannot drift — they each grew a
+  private copy first and each picked a different width, which is what the convention exists to
+  stop. The rules: width is `var(--app-col-w)`, never a bespoke number; buttons are always
+  `size="block"`, one per row (two to a row only fits by shortening labels past the point of
+  saying anything); groups are `<section class="app-col__group">` with an `<h3
+  class="app-col__head">`; order is what-you-do before what-you-set (vehicle actions, then file
+  actions, then settings); and one orange action per column — the one that changes the
+  aircraft. Write/Revert/Reload come from `VehicleParamActions`, never re-implemented.
+- **Staged parameter edits belong to the page that made them.** Leaving a page with unwritten
+  edits prompts (`ui-store`'s `pendingNav`), so a screen's column can own its own Write. The
+  global action bar still carries Write for Setup tabs that have no column.
 - **Curated tabs** are declarations, not code: `ParamCard` takes a field list, drops params
   the vehicle lacks, and hides itself when empty — so one definition serves Copter, Plane,
   and Rover. `ParamField`'s `bare` prop drops the label for table layouts.

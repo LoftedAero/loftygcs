@@ -35,9 +35,9 @@ export default function MissionToolbar() {
   const working = busy || transfer.kind === 'busy'
 
   return (
-    <div className="mission-toolbar">
-      <div className="mission-toolbar__head">
-        <h3 className="mission-settings__head">Mission</h3>
+    <div className="app-col__group">
+      <div className="app-col__headrow">
+        <h3 className="app-col__head">Mission</h3>
         <span className={`mission-badge${dirty ? ' is-dirty' : synced ? ' is-synced' : ''}`}>
           {!synced ? 'Not on vehicle' : dirty ? 'Modified' : 'Matches vehicle'}
         </span>
@@ -92,14 +92,14 @@ export default function MissionToolbar() {
       </LaButton>
 
       {transfer.kind === 'busy' ? (
-        <p className="mission-toolbar__note">
+        <p className="app-col__note">
           {transfer.dir === 'read' ? 'Reading' : 'Writing'} {transfer.got}
           {transfer.total ? ` of ${transfer.total}` : ''}…
         </p>
       ) : transfer.kind === 'error' ? (
-        <p className="mission-toolbar__note is-error">{transfer.text}</p>
+        <p className="app-col__note is-error">{transfer.text}</p>
       ) : transfer.kind === 'done' ? (
-        <p className="mission-toolbar__note">{transfer.text}</p>
+        <p className="app-col__note">{transfer.text}</p>
       ) : null}
     </div>
   )

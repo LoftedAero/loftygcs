@@ -38,9 +38,20 @@ function createWindow() {
   mainWindow.webContents.session.on('select-serial-port', (event, portList, _wc, callback) => {
     event.preventDefault()
     pendingPortCallback = callback
+    // The descriptors travel with the port, because a list of COM7 / COM12 is
+    // not a choice anyone can make. The OS product string is the honest
+    // source for "which board is this"; the ids are what identifies it when
+    // the string is missing or generic, which is most CH340-style adapters.
     mainWindow?.webContents.send(
       'serial:ports',
-      portList.map((p) => ({ portId: p.portId, portName: p.portName })),
+      portList.map((p) => ({
+        portId: p.portId,
+        portName: p.portName,
+        displayName: p.displayName,
+        vendorId: p.vendorId,
+        productId: p.productId,
+        serialNumber: p.serialNumber,
+      })),
     )
   })
 

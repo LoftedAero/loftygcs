@@ -33,14 +33,14 @@ export default function VehicleParamActions({ title = 'Vehicle' }: VehicleParamA
   }
 
   return (
-    <section className="params-side__group">
+    <section className="app-col__group">
       <WriteParamsModal
         open={confirming}
         onConfirm={write}
         onCancel={() => setConfirming(false)}
       />
-      <div className="params-side__head">
-        <h3 className="mission-settings__head">{title}</h3>
+      <div className="app-col__headrow">
+        <h3 className="app-col__head">{title}</h3>
         {dirtyCount > 0 && <span className="mission-badge is-dirty">{dirtyCount} staged</span>}
       </div>
       <LaButton

@@ -4,6 +4,18 @@ import { contextBridge, ipcRenderer } from 'electron'
 // mirrored by the LoftGcsBridge type in src/types/loftgcs.d.ts -- change
 // them together.
 
+/** One candidate from Electron's select-serial-port list. */
+interface SerialPortChoice {
+  portId: string
+  portName: string
+  /** The OS product string, when the device supplies one. */
+  displayName?: string
+  /** USB ids, as the platform reports them. */
+  vendorId?: string
+  productId?: string
+  serialNumber?: string
+}
+
 contextBridge.exposeInMainWorld('loftgcs', {
   platform: process.platform,
 
@@ -24,8 +36,8 @@ contextBridge.exposeInMainWorld('loftgcs', {
   },
 
   serialPicker: {
-    onPortsAvailable: (cb: (ports: { portId: string; portName: string }[]) => void) => {
-      const handler = (_e: unknown, ports: { portId: string; portName: string }[]) => cb(ports)
+    onPortsAvailable: (cb: (ports: SerialPortChoice[]) => void) => {
+      const handler = (_e: unknown, ports: SerialPortChoice[]) => cb(ports)
       ipcRenderer.on('serial:ports', handler)
       return () => ipcRenderer.removeListener('serial:ports', handler)
     },

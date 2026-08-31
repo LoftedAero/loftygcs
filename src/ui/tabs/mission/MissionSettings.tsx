@@ -41,12 +41,12 @@ export default function MissionSettings() {
   const [homeNote, setHomeNote] = useState<string | null>(null)
 
   return (
-    <div className="mission-settings">
-      <section className="mission-settings__group">
-        <h3 className="mission-settings__head">Home location</h3>
+    <div className="app-col">
+      <section className="app-col__group">
+        <h3 className="app-col__head">Home location</h3>
         {home ? (
           <>
-            <div className="mission-settings__coords">
+            <div className="app-col__mono">
               {(home.x / 1e7).toFixed(7)}, {(home.y / 1e7).toFixed(7)}
             </div>
             <LaField label="Altitude" unit="m AMSL" htmlFor="mission-home-alt" stacked>
@@ -81,8 +81,8 @@ export default function MissionSettings() {
         </LaHint>
       </section>
 
-      <section className="mission-settings__group">
-        <h3 className="mission-settings__head">General settings</h3>
+      <section className="app-col__group">
+        <h3 className="app-col__head">General settings</h3>
         <LaField label="Default altitude" unit="m" htmlFor="mission-alt" stacked>
           <LaInput
             num
@@ -126,8 +126,8 @@ function RadiusParams() {
   if (present.length === 0) return null
 
   return (
-    <section className="mission-settings__group">
-      <h3 className="mission-settings__head">Vehicle</h3>
+    <section className="app-col__group">
+      <h3 className="app-col__head">Vehicle</h3>
       {present.map((p) => (
         <RadiusField key={p.name} name={p.name} label={p.label} unit={p.unit} enabled={connected} />
       ))}

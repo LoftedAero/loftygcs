@@ -26,10 +26,10 @@ export function isOsdParam(name: string): boolean {
 
 export default function OsdActions() {
   return (
-    <div className="params-side osd-actions">
+    <div className="app-col osd-actions">
       <VehicleParamActions title="OSD" />
-      <section className="params-side__group">
-        <h3 className="mission-settings__head">Layout file</h3>
+      <section className="app-col__group">
+        <h3 className="app-col__head">Layout file</h3>
         <SaveLayout />
         <LoadLayout />
         <LaHint>Only the OSD parameters — the rest of the vehicle is untouched.</LaHint>
@@ -178,8 +178,8 @@ export function OsdTypePrompt() {
   if (!type || type.value !== 0) return null
 
   return (
-    <section className="params-side__group osd-actions__off">
-      <h3 className="mission-settings__head">The OSD is off</h3>
+    <section className="app-col__group osd-actions__off">
+      <h3 className="app-col__head">The OSD is off</h3>
       <p className="app-placeholder">
         Nothing is drawn on the video feed. Screens can still be laid out, and take effect once a
         type is set.

@@ -30,7 +30,7 @@ export interface LoftGcsBridge {
   serialPicker: {
     // Electron's select-serial-port flow: main forwards the candidate list,
     // the renderer shows its own chooser and answers with a portId (or '').
-    onPortsAvailable(cb: (ports: { portId: string; portName: string }[]) => void): () => void
+    onPortsAvailable(cb: (ports: SerialPortChoice[]) => void): () => void
     choose(portId: string): void
     cancel(): void
   }
@@ -70,6 +70,22 @@ export interface LoftGcsBridge {
 }
 
 declare global {
+  /**
+   * One candidate from Electron's select-serial-port list. Deliberately not
+   * `SerialPortInfo`: that name is taken by the Web Serial DOM type, which
+   * carries only usbVendorId/usbProductId and is a different thing.
+   */
+  interface SerialPortChoice {
+    portId: string
+    portName: string
+    /** The OS product string, when the device supplies one. */
+    displayName?: string
+    /** USB ids, as the platform reports them. */
+    vendorId?: string
+    productId?: string
+    serialNumber?: string
+  }
+
   interface Window {
     loftgcs?: LoftGcsBridge
   }
