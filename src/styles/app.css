@@ -10,6 +10,159 @@
   --app-onbar-well: rgb(255 255 255 / 8%);
   --app-onbar-hover: rgb(255 255 255 / 12%);
   --app-onbar-text: rgb(255 255 255 / 72%);
+  /* Ink for things sitting on a ground that is dark whatever the theme is:
+     the charcoal app bar, a saturated chip, the simulated OSD screen, a
+     caption over video. These used to say var(--la-surface), which was
+     white by coincidence -- and went dark the moment the theme did, taking
+     the whole OSD preview with it. Named, it stays put. */
+  --app-on-dark: #ffffff;
+}
+
+/* --- Dark theme ------------------------------------------------------- */
+
+/* The one place in this file where raw hex belongs: these lines *define*
+   the tokens rather than use them, and a token cannot be defined in terms
+   of itself. Everything downstream still goes through --la-*.
+
+   This lives here and not in lofted-aero.css because that sheet is copied
+   byte-identical between four apps and is not ours to fork. If dark mode
+   proves out here it should graduate into the canonical sheet and be
+   propagated to all four together -- until then this is an app-local
+   override, and the system sheet stays untouched.
+
+   The ramp is inverted rather than merely darkened: surfaces get lighter as
+   they get closer to the reader, which is how depth reads without shadows
+   (a shadow on a dark ground is nearly invisible). The brand hues shift
+   too -- #F7941D and #4684C5 are tuned for contrast against white, and the
+   deep variants exist to be legible ON white, so on a dark ground they are
+   the wrong way round: the soft tints become dim washes and the deep tints
+   become the readable text colors. */
+:root[data-theme='dark'] {
+  /* Brand, lifted for a dark ground. Orange keeps its hue and gains a
+     little lightness; the "deep" and "soft" roles swap purpose. */
+  --la-orange: #F7A343;
+  --la-orange-deep: #FFB863; /* now the *lighter* one: legible on dark */
+  --la-orange-soft: #3A2A14; /* a wash to sit behind text, not a tint */
+  --la-gold: #FFD166;
+  --la-blue: #5B9BD9;
+  --la-blue-deep: #8FC0EE;
+  --la-blue-soft: #17293A;
+  /* The app bar. Lighter than the window behind it, because on a dark
+     theme elevation reads as lightness. */
+  --la-charcoal: #26272B;
+
+  /* Neutrals, the ramp inverted. */
+  --la-ink: #E8E9ED;
+  --la-ink-2: #B4B6BE;
+  --la-ink-3: #8A8D96;
+  --la-line: #303238;
+  --la-line-strong: #43464E;
+  --la-surface: #1C1D21;
+  --la-surface-2: #232429;
+  --la-bg: #131417;
+
+  /* Semantic. Both are lifted: the light-mode green and red are chosen to
+     be legible on white and go muddy on black. */
+  --la-ok: #4ECB71;
+  --la-bad: #FF6B6B;
+
+  /* Shadows do almost nothing on a dark ground, so they carry less of the
+     work and a border carries more. Kept, deepened, for the modal and the
+     menus where a hard edge alone would look pasted on. */
+  --la-shadow-1: 0 1px 2px rgb(0 0 0 / 40%), 0 1px 3px rgb(0 0 0 / 30%);
+  --la-shadow-2: 0 4px 14px rgb(0 0 0 / 50%);
+  --la-shadow-3: 0 18px 48px rgb(0 0 0 / 65%);
+  --la-ring: 0 0 0 3px rgb(91 155 217 / 40%);
+}
+
+/* The handful of places the system sheet hardcodes a light value. Each is
+   a colour it could not express as a token, so each has to be repeated
+   here -- and each is a line that would disappear if dark mode graduated
+   into the canonical sheet. */
+:root[data-theme='dark'] {
+  /* --la-charcoal does two jobs in the system sheet: it is the app bar's
+     background and it is heading ink. Dark mode needs those to go opposite
+     ways, and a token cannot -- so charcoal stays a dark surface (the bar,
+     the HUD panel, the OSD screen all read correctly) and the two places it
+     is used as text are pointed at the ink ramp instead. Without this every
+     card and modal title is near-black on near-black. */
+  & .la-card__title,
+  & .la-modal__title {
+    color: var(--la-ink);
+  }
+
+  /* Status chips: pale pill with dark text is unreadable inverted. */
+  & .la-led--ok .la-led__dot {
+    background: #14301C;
+    color: #79E098;
+  }
+  & .la-led--bad .la-led__dot {
+    background: #3A1A1A;
+    color: #FF8F88;
+  }
+  /* The scrim needs to be darker than the window it covers, and the window
+     is already nearly black. */
+  & .la-modal__backdrop {
+    background: rgb(0 0 0 / 66%);
+  }
+  /* Leaflet draws its own controls and attribution in white. */
+  & .leaflet-control-zoom a,
+  & .leaflet-bar a {
+    background: var(--la-surface);
+    color: var(--la-ink);
+    border-bottom-color: var(--la-line);
+  }
+  & .leaflet-control-zoom a:hover,
+  & .leaflet-bar a:hover {
+    background: var(--la-surface-2);
+    color: var(--la-ink);
+  }
+  & .leaflet-control-attribution {
+    background: rgb(28 29 33 / 80%) !important;
+    color: var(--la-ink-3);
+  }
+  & .leaflet-control-attribution a {
+    color: var(--la-blue-deep);
+  }
+}
+
+/* Theme toggle. Chrome, not a control the mission depends on, so it is the
+   quietest thing in the bar until pointed at. */
+.app-theme-toggle {
+  position: relative;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--la-radius-sm);
+  background: transparent;
+  color: var(--app-onbar-text);
+  cursor: pointer;
+  transition: background var(--la-ease), color var(--la-ease);
+}
+.app-theme-toggle:hover {
+  background: var(--app-onbar-hover);
+  color: #fff;
+}
+.app-theme-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+/* A dot when the theme is following the machine rather than a choice --
+   otherwise "system" and "the same theme, chosen" look identical. */
+.app-theme-toggle__auto {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--la-blue);
 }
 
 /* Top-level mode switch, in the app bar. Not orange: the bar already has
@@ -39,7 +192,7 @@
 
 .app-modes__item:hover {
   background: var(--app-onbar-hover);
-  color: var(--la-surface);
+  color: var(--app-on-dark);
 }
 
 .app-modes__item:focus-visible {
@@ -1121,7 +1274,7 @@
 .accel-rail__item--done .accel-rail__dot {
   background: var(--la-ok);
   border-color: var(--la-ok);
-  color: var(--la-surface);
+  color: var(--app-on-dark);
 }
 
 .accel-rail__item--active {
@@ -1328,7 +1481,7 @@
 .guide-rail__item--done .guide-rail__num {
   background: var(--la-ok);
   border-color: var(--la-ok);
-  color: var(--la-surface);
+  color: var(--app-on-dark);
 }
 
 .guide-rail__item--skipped .guide-rail__num {
@@ -1921,7 +2074,7 @@ body.is-splitting .flight-map {
 .map-layer-switch__btn.is-active {
   background: var(--la-blue);
   border-color: var(--la-blue-deep);
-  color: var(--la-surface);
+  color: var(--app-on-dark);
 }
 
 /* --- The right-click menu -------------------------------------------- */
@@ -2013,7 +2166,7 @@ body.is-splitting .flight-map {
   padding: var(--la-space-1) var(--la-space-3);
   border-radius: var(--la-radius-pill);
   background: rgba(14, 17, 22, 0.66);
-  color: var(--la-surface);
+  color: var(--app-on-dark);
   font-size: var(--la-size-sm);
   text-align: center;
 }
@@ -2264,7 +2417,7 @@ body.is-splitting .flight-map {
   justify-content: center;
   padding: 0 var(--la-space-5);
   text-align: center;
-  color: var(--la-surface);
+  color: var(--app-on-dark);
   opacity: 0.55;
   font-size: var(--la-size-md);
   pointer-events: none;
@@ -2279,7 +2432,7 @@ body.is-splitting .flight-map {
   border: 1px solid transparent;
   border-radius: 2px;
   background: none;
-  color: var(--la-surface);
+  color: var(--app-on-dark);
   font-family: var(--la-font-mono);
   /* Sized off cell *width*, because a monospace advance is about 0.6em and
      sizing off the row instead left every glyph floating in a third of a
@@ -2320,7 +2473,7 @@ body.is-splitting .flight-map {
 .osd-panel__graphic {
   font-family: var(--la-font);
   font-size: var(--la-size-xs);
-  color: var(--la-surface);
+  color: var(--app-on-dark);
   opacity: 0.75;
   text-align: center;
   overflow: hidden;

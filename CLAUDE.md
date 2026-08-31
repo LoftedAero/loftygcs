@@ -16,7 +16,16 @@ design decisions are recorded there and in code comments.
   byte-identical — md5 `2f96f253a92dda2da2023d7330c4ea37`. It is shared with 3BSM Config and
   the two sequencer apps, so any change goes into that canonical copy and is propagated to
   all four together, never edited here. (Its DESIGN.md governs usage.) App styles go in `src/styles/app.css`, built
-  only from `--la-*` tokens — never a raw hex or pixel gap. Orange = the one primary action
+  only from `--la-*` tokens — never a raw hex or pixel gap. The two exceptions are
+  *definitions*: the app-local `--app-*` tokens, and the dark palette under
+  `:root[data-theme='dark']`, which cannot express a token in terms of itself. **Dark mode is
+  an app-local override precisely because the system sheet is frozen** — if it proves out here
+  it should graduate into the canonical copy and propagate to all four apps together. Two
+  traps it exposed, both worth knowing before touching colors: `--la-charcoal` is both the app
+  bar's *background* and heading *ink*, which dark mode needs to send opposite ways (so the
+  two text uses are overridden); and anything sitting on a permanently dark ground — the OSD
+  preview, a caption over video, white-on-green chips — must use `--app-on-dark`, never
+  `--la-surface`, which is only white by coincidence in the light theme. Orange = the one primary action
   per region; blue = working controls; green/red = status only, never actions. Units go in
   `.la-field__unit`; validation goes in `.la-hint` beside the control.
 - **Electron security**: contextIsolation + sandbox stay on. The whole privileged surface is

@@ -4,6 +4,7 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { useVehicleStore } from '../../stores/vehicle-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
+import ThemeToggle from './ThemeToggle'
 import type { TransportKind } from '../../transport/Transport'
 
 // Top-level mode switch. Deliberately NOT orange: the bar already has one
@@ -81,6 +82,7 @@ export default function AppBar() {
       <span className="la-appbar__title">{BRAND.name}</span>
       <ModeSwitch />
       <span className="la-appbar__spacer"></span>
+      <ThemeToggle />
       <LaReadout wide placeholder="Not connected" value={status} />
       <LaSelect
         value={selectedKind}

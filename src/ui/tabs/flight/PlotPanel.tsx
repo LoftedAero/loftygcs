@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { LaButton } from '../../components/La'
 import { fieldRegistry } from '../../../services/telemetry-fields'
+import { token } from '../../theme-tokens'
 
 // A live strip chart of whatever fields are selected.
 //
@@ -100,8 +101,14 @@ export default function PlotPanel({
       const ph = Math.max(10, h - PAD_T - GUTTER_B)
       const xAt = (t: number) => px + ((t - from) / span) * pw
 
+      // Grid and labels come from the theme rather than being fixed: a
+      // near-black grid line is invisible on a dark ground, and the series
+      // colours below are chosen to read on both.
+      const gridColor = token('--la-line', '#E1E2E6')
+      const labelColor = token('--la-ink-3', '#82828A')
+
       ctx.font = '10px "Roboto Mono", ui-monospace, monospace'
-      ctx.strokeStyle = 'rgba(45, 45, 47, 0.10)'
+      ctx.strokeStyle = gridColor
       ctx.lineWidth = 1
 
       // Y grid. The labels belong to whichever series owns the axis, so its
@@ -119,7 +126,7 @@ export default function PlotPanel({
       // X grid and its time labels: seconds back from now, which is what a
       // strip chart's horizontal axis actually means.
       const step = span > 40000 ? 15 : span > 20000 ? 10 : 5
-      ctx.fillStyle = 'rgba(85, 85, 91, 0.9)'
+      ctx.fillStyle = labelColor
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
       for (let sec = 0; sec <= span / 1000; sec += step) {

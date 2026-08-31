@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useMissionStore } from '../../../stores/mission-store'
 import { legStats, hasCoords } from '../../../protocol/mission-plan'
 import { commandSpec } from '../../../protocol/mission-commands'
+import { token } from '../../theme-tokens'
 
 // QGroundControl's altitude profile: the mission seen from the side, with
 // distance along the bottom and height up the left.
@@ -46,11 +47,10 @@ export default function AltitudeProfile() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, w, h)
 
-      const style = getComputedStyle(canvas)
-      const ink = style.getPropertyValue('--la-ink-2').trim() || '#5b5f66'
-      const line = style.getPropertyValue('--la-line').trim() || '#d8dade'
-      const accent = style.getPropertyValue('--la-orange').trim() || '#F7941D'
-      const blue = style.getPropertyValue('--la-blue').trim() || '#4684C5'
+      const ink = token('--la-ink-2', '#55555B')
+      const line = token('--la-line', '#E1E2E6')
+      const accent = token('--la-orange', '#F7941D')
+      const blue = token('--la-blue', '#4684C5')
 
       const stats = legStats(plan)
       const pts = plan.items

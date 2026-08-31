@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { telemetryRings } from '../../services/telemetry-ring'
+import { token } from '../theme-tokens'
 
 // Two round instruments, drawn on canvas and driven straight from the
 // telemetry rings on requestAnimationFrame -- the same reason the flight
@@ -53,6 +54,9 @@ export function AttitudeIndicator() {
     // 1.7 px per degree keeps roughly +-35 degrees of pitch in the dial.
     ctx.translate(0, ((pitch * 180) / Math.PI) * 1.7)
 
+    // Sky and ground keep their colours in both themes: an attitude
+    // indicator that went dark would stop reading as one. Only the face,
+    // bezel and lettering follow the window.
     ctx.fillStyle = '#7FB2E5'
     ctx.fillRect(-size, -size * 2, size * 2, size * 2)
     ctx.fillStyle = '#9B7B4F'
@@ -89,7 +93,7 @@ export function AttitudeIndicator() {
     ctx.fillStyle = '#F7941D'
     ctx.fill()
 
-    ctx.strokeStyle = '#C9CAD0'
+    ctx.strokeStyle = token('--la-line-strong', '#C9CAD0')
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.arc(r, r, r - 1, 0, Math.PI * 2)
@@ -103,11 +107,11 @@ export function HeadingDial() {
     const r = size / 2
     const heading = telemetryRings.headingDeg.latest()
 
-    ctx.fillStyle = '#F7F8FA'
+    ctx.fillStyle = token('--la-surface-2', '#F7F8FA')
     ctx.beginPath()
     ctx.arc(r, r, r - 1, 0, Math.PI * 2)
     ctx.fill()
-    ctx.strokeStyle = '#C9CAD0'
+    ctx.strokeStyle = token('--la-line-strong', '#C9CAD0')
     ctx.lineWidth = 1
     ctx.stroke()
 
@@ -115,8 +119,8 @@ export function HeadingDial() {
     ctx.translate(r, r)
     // The card turns under a fixed lubber line, as a real compass does.
     ctx.rotate((-heading * Math.PI) / 180)
-    ctx.strokeStyle = '#82828A'
-    ctx.fillStyle = '#2D2D2F'
+    ctx.strokeStyle = token('--la-ink-3', '#82828A')
+    ctx.fillStyle = token('--la-ink', '#2D2D2F')
     ctx.font = `600 ${Math.round(size * 0.13)}px "Work Sans", sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -151,7 +155,7 @@ export function HeadingDial() {
 
     // The number goes in the middle, the one part of the face the rotating
     // card leaves empty -- at the bottom it collided with the S and W marks.
-    ctx.fillStyle = '#2D2D2F'
+    ctx.fillStyle = token('--la-ink', '#2D2D2F')
     ctx.font = `600 ${Math.round(size * 0.19)}px "Roboto Mono", monospace`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
