@@ -137,8 +137,6 @@ function FirstItemPrompt({
   onWaypoint: (at: { x: number; y: number }) => void
   onTakeoff: (at: { x: number; y: number }) => void
 }) {
-  const altM = useMissionStore((s) => s.defaults.altM)
-
   // Escape closes it, as it closes every other menu here. Without this the
   // only ways out were the two buttons, and a dialog you cannot dismiss the
   // habitual way reads as a stuck app rather than a question.
@@ -155,30 +153,21 @@ function FirstItemPrompt({
   return (
     <LaModal
       open
+      narrow
       title="Start with a takeoff?"
       actions={
-        <>
-          <LaButton variant="ghost" onClick={onClose}>
+        <div className="la-prompt-actions">
+          <LaButton variant="primary" size="block" onClick={() => onTakeoff(at)}>
+            Takeoff
+          </LaButton>
+          <LaButton variant="secondary" size="block" onClick={() => onWaypoint(at)}>
+            Waypoint
+          </LaButton>
+          <LaButton variant="ghost" size="block" onClick={onClose}>
             Cancel
           </LaButton>
-          <LaButton variant="secondary" onClick={() => onWaypoint(at)}>
-            Just a waypoint
-          </LaButton>
-          <LaButton variant="primary" onClick={() => onTakeoff(at)}>
-            Takeoff, then waypoint
-          </LaButton>
-        </>
+        </div>
       }
-    >
-      <p className="app-placeholder">
-        A mission that does not begin with a takeoff will not start in Auto — the vehicle
-        refuses it rather than climbing on its own.
-      </p>
-      <p className="app-placeholder">
-        Adding one climbs to {altM} m where the vehicle stands, then flies to the point you
-        clicked. Choose <strong>Just a waypoint</strong> if this mission is meant to be joined
-        already airborne.
-      </p>
-    </LaModal>
+    />
   )
 }

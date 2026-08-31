@@ -29,6 +29,26 @@
   z-index: 2000;
 }
 
+/* The narrow end of the card scale. The system sheet defines --wide but
+   nothing the other way, and a dialog that is a question and three answers
+   should not be 560px of mostly nothing. Belongs beside --wide in the
+   canonical sheet if it graduates. */
+.la-modal__card--narrow {
+  width: min(280px, 100%);
+}
+/* An empty body is still a flex child, so it contributes a gap and pads the
+   card out with a band of nothing. */
+.la-modal__body:empty {
+  display: none;
+}
+/* Stacked answers, full width, in the order they should be considered. */
+.la-prompt-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  width: 100%;
+}
+
 /* --- Dark theme ------------------------------------------------------- */
 
 /* The one place in this file where raw hex belongs: these lines *define*
@@ -373,16 +393,6 @@
 .mission-toolbar__head .mission-settings__head {
   border-bottom: none;
   padding-bottom: 0;
-}
-/* Two to a row: they are pairs (read/write, open/save) and reading as pairs
-   is most of what makes six buttons scannable. */
-.mission-toolbar__pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--la-space-2);
-}
-.mission-toolbar__pair .la-btn {
-  width: 100%;
 }
 .mission-toolbar__note {
   margin: 0;

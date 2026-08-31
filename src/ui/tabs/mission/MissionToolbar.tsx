@@ -44,37 +44,43 @@ export default function MissionToolbar() {
       </div>
 
       {/* Vehicle before file: writing is the action that makes a plan real,
-          and it is the one with a consequence, so it leads. */}
-      <div className="mission-toolbar__pair">
-        <LaButton
-          variant="secondary"
-          disabled={working || !connected}
-          onClick={() => void run(readFromVehicle)}
-        >
-          Read
-        </LaButton>
-        <LaButton
-          variant="primary"
-          disabled={working || !connected || items === 0}
-          onClick={() => void run(writeToVehicle)}
-        >
-          Write
-        </LaButton>
-      </div>
+          and it is the one with a consequence, so it leads. One per row and
+          full width -- the column is narrow enough that two to a row gave
+          each a label with barely room for the word in it. */}
+      <LaButton
+        variant="secondary"
+        size="block"
+        disabled={working || !connected}
+        onClick={() => void run(readFromVehicle)}
+      >
+        Read vehicle
+      </LaButton>
+      <LaButton
+        variant="primary"
+        size="block"
+        disabled={working || !connected || items === 0}
+        onClick={() => void run(writeToVehicle)}
+      >
+        Write vehicle
+      </LaButton>
       {!connected && <LaHint>Connect a vehicle to read or write.</LaHint>}
 
-      <div className="mission-toolbar__pair">
-        <LaButton variant="secondary" disabled={working} onClick={() => void run(openFromFile)}>
-          Open…
-        </LaButton>
-        <LaButton
-          variant="secondary"
-          disabled={working || items === 0}
-          onClick={() => saveToFile(fileName(sourceName))}
-        >
-          Save
-        </LaButton>
-      </div>
+      <LaButton
+        variant="secondary"
+        size="block"
+        disabled={working}
+        onClick={() => void run(openFromFile)}
+      >
+        Open file…
+      </LaButton>
+      <LaButton
+        variant="secondary"
+        size="block"
+        disabled={working || items === 0}
+        onClick={() => saveToFile(fileName(sourceName))}
+      >
+        Save file
+      </LaButton>
 
       <LaButton
         variant="ghost"

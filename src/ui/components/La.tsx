@@ -146,6 +146,7 @@ export function LaModal({
   open,
   toast,
   wide,
+  narrow,
   title,
   children,
   actions,
@@ -154,6 +155,11 @@ export function LaModal({
   toast?: boolean
   /** The wider card DESIGN.md defines, for dialogs with a diagram or a table. */
   wide?: boolean
+  /**
+   * The other end of the same axis, for a dialog that is only a question and
+   * its answers. The system sheet has no such modifier -- see app.css.
+   */
+  narrow?: boolean
   title: string
   children?: ReactNode
   actions?: ReactNode
@@ -163,7 +169,13 @@ export function LaModal({
     .join(' ')
   return (
     <div className={cls}>
-      <div className={wide ? 'la-modal__card la-modal__card--wide' : 'la-modal__card'}>
+      <div
+        className={
+          ['la-modal__card', wide ? 'la-modal__card--wide' : '', narrow ? 'la-modal__card--narrow' : '']
+            .filter(Boolean)
+            .join(' ')
+        }
+      >
         <h2 className="la-modal__title">{title}</h2>
         <div className="la-modal__body">{children}</div>
         {actions && <div className="la-modal__actions">{actions}</div>}
