@@ -342,31 +342,40 @@
   gap: var(--la-space-2);
 }
 
+/* Actions in the right column, as Mission Planner has them -- and the column
+   had room the map did not. */
 .mission-toolbar {
   display: flex;
-  align-items: center;
-  gap: var(--la-space-4);
-  flex-wrap: wrap;
-  padding: var(--la-space-2) var(--la-space-3);
-  background: var(--la-surface);
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  flex: none;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  padding: var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
 }
-.mission-toolbar__group {
+.mission-toolbar__head {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-space-2);
+  padding-bottom: var(--la-space-1);
+  border-bottom: 1px solid var(--la-line);
+}
+.mission-toolbar__head .mission-settings__head {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+/* Two to a row: they are pairs (read/write, open/save) and reading as pairs
+   is most of what makes six buttons scannable. */
+.mission-toolbar__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--la-space-2);
 }
-/* The status sits at the far end, so the buttons stay a compact cluster
-   whatever the message says. */
-.mission-toolbar__status {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--la-space-3);
+.mission-toolbar__pair .la-btn {
+  width: 100%;
 }
 .mission-toolbar__note {
-  font-size: var(--la-size-sm);
+  margin: 0;
+  font-size: var(--la-size-xs);
   color: var(--la-ink-3);
 }
 .mission-toolbar__note.is-error {
@@ -380,7 +389,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: var(--la-space-1) var(--la-space-2);
+  padding: 2px var(--la-space-2);
   border-radius: var(--la-radius-pill);
   border: 1px solid var(--la-line-strong);
   color: var(--la-ink-3);
@@ -398,21 +407,26 @@
 .mission-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
+  /* An explicit row, not the implicit `auto` one: without it the children
+     have no definite height to size themselves against, and a grid inside
+     that tries to divide it grows without bound instead. */
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--la-space-2);
   flex: 1;
   min-height: 0;
 }
 
+/* Rows rather than a fixed proportion: the divider between them is draggable,
+   and the two fr values are where it was left.
+   fr and not a percentage -- a percentage row resolves against the grid's own
+   height, which is exactly what these rows are deciding, so it collapses to
+   auto and the lower pane disappears off the bottom of the window. */
 .mission-main {
   display: grid;
-  /* The table is the half that has to hold rows, so it gets the larger
-     share and the map takes the rest -- a map can be panned when it is
-     small, but a table showing one row at a time cannot be worked in. */
-  /* Capped in pixels as well as percent: past about a dozen visible rows
-     the table stops benefiting and the map, which is the thing being
-     planned on, should take the rest of a tall screen. */
-  grid-template-rows: minmax(150px, 1fr) minmax(230px, min(52%, 430px));
-  gap: var(--la-space-2);
+  grid-template-rows:
+    minmax(0, var(--split-top, 1fr))
+    var(--la-space-2)
+    minmax(0, var(--split-bottom, 1fr));
   min-height: 0;
   min-width: 0;
 }
@@ -439,56 +453,104 @@
   cursor: crosshair;
 }
 
+/* Down the left edge, QGC-style. Vertical because the map is wider than it
+   is tall, so a bar across the top steals the band most likely to hold the
+   mission itself. */
 .mission-palette {
   position: absolute;
   z-index: 500;
   top: var(--la-space-2);
   left: var(--la-space-2);
-  right: var(--la-space-2);
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--la-space-1);
+  background: var(--la-surface);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  box-shadow: var(--la-shadow-2);
+}
+.mission-palette__btn {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--la-space-2);
-  flex-wrap: wrap;
+  gap: 1px;
+  width: 62px;
+  padding: var(--la-space-1) 2px;
+  border: 1px solid transparent;
+  border-radius: var(--la-radius-sm);
+  background: none;
+  color: var(--la-ink-2);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--la-ease), color var(--la-ease);
+}
+.mission-palette__btn:hover {
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+}
+.mission-palette__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+/* Armed is a working state, so it is blue -- orange stays the one primary
+   action per region, which on the map is nothing. */
+.mission-palette__btn.is-armed {
+  background: var(--la-blue);
+  border-color: var(--la-blue-deep);
+  color: var(--app-on-dark);
+}
+.mission-palette__label {
+  font-size: var(--la-size-xs);
+  line-height: 1.1;
+  text-align: center;
+}
+
+.mission-palette__more {
+  position: relative;
+}
+.mission-palette__menu {
+  position: absolute;
+  left: calc(100% + var(--la-space-2));
+  bottom: 0;
+  z-index: 501;
+  width: 210px;
+  max-height: 320px;
+  overflow-y: auto;
   padding: var(--la-space-2);
   background: var(--la-surface);
   border: 1px solid var(--la-line-strong);
   border-radius: var(--la-radius-sm);
-  box-shadow: var(--la-shadow-1);
+  box-shadow: var(--la-shadow-2);
 }
-.mission-palette__label {
+.mission-palette__group + .mission-palette__group {
+  margin-top: var(--la-space-2);
+}
+.mission-palette__groupname {
+  margin: 0 0 var(--la-space-1);
   font-size: var(--la-size-xs);
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--la-ink-3);
 }
-.mission-palette__btn {
+.mission-palette__item {
+  appearance: none;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--la-space-1) var(--la-space-2);
+  border: none;
+  border-radius: var(--la-radius-sm);
+  background: none;
+  color: var(--la-ink);
   font: inherit;
   font-size: var(--la-size-sm);
-  padding: var(--la-space-1) var(--la-space-3);
-  border: 1px solid var(--la-line-strong);
-  border-radius: var(--la-radius-sm);
-  background: var(--la-surface);
-  color: var(--la-ink);
   cursor: pointer;
-  transition: background var(--la-ease), border-color var(--la-ease);
 }
-.mission-palette__btn:hover {
+.mission-palette__item:hover {
   background: var(--la-surface-2);
-}
-/* Armed is a working state, so it is blue -- orange stays the one primary
-   action per region, which up here is nothing. */
-.mission-palette__btn.is-armed {
-  background: var(--la-blue);
-  border-color: var(--la-blue-deep);
-  color: #fff;
-}
-.mission-palette__other {
-  max-width: 150px;
-}
-.mission-palette__hint {
-  font-size: var(--la-size-xs);
-  color: var(--la-blue-deep);
 }
 
 .mission-lower {
@@ -628,6 +690,8 @@
   border: 1px solid var(--la-line);
   border-radius: var(--la-radius-sm);
   background: var(--la-surface);
+  display: flex;
+  flex-direction: column;
 }
 .mission-settings {
   display: flex;
@@ -1764,6 +1828,24 @@
 .split__divider:hover::after,
 .split__divider.is-dragging::after {
   background: var(--la-blue);
+}
+/* The grip turns with the divider: a vertical pill on a bar you drag up and
+   down reads as the wrong control. */
+.split__divider--horizontal::after {
+  width: 28px;
+  height: 2px;
+}
+
+/* After the base rule, not before it: both are single-class selectors, so
+   the later one wins. Placed first, these were silently overridden and the
+   divider was laid out in the vertical column, sitting across the top of the
+   grid where dragging it moved the wrong way. */
+.split__divider--horizontal {
+  grid-column: 1;
+  grid-row: 2;
+  width: auto;
+  height: var(--la-space-2);
+  cursor: row-resize;
 }
 
 

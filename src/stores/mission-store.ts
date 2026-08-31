@@ -32,6 +32,18 @@ export type TransferState =
   | { kind: 'error'; text: string }
   | { kind: 'done'; text: string }
 
+const SPLIT_KEY = 'loftgcs.mission.split'
+
+function loadSplit(): number {
+  try {
+    const v = Number(localStorage.getItem(SPLIT_KEY))
+    if (Number.isFinite(v) && v > 0.15 && v < 0.9) return v
+  } catch {
+    // Storage blocked; the default is a reasonable answer.
+  }
+  return 0.5
+}
+
 export interface MissionState {
   plan: MissionPlan
   /** The vehicle's copy, as far as we know it. Null before any transfer. */
@@ -42,6 +54,9 @@ export interface MissionState {
   transfer: TransferState
   /** Where the plan came from, for the title bar. */
   sourceName: string | null
+  /** Fraction of the height given to the map, above the items list. */
+  split: number
+  setSplit(ratio: number): void
 
   setPlan(plan: MissionPlan, opts?: { synced?: boolean; name?: string }): void
   addItem(command: number, at?: { x: number; y: number }): string
@@ -65,6 +80,20 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   selected: null,
   transfer: { kind: 'idle' },
   sourceName: null,
+  split: loadSplit(),
+
+  setSplit(ratio) {
+    // Clamped so the divider cannot be dragged until one pane has no usable
+    // height -- a map or a table you have to drag back out of is worse than
+    // one that simply stops.
+    const clamped = Math.max(0.2, Math.min(0.85, ratio))
+    set({ split: clamped })
+    try {
+      localStorage.setItem(SPLIT_KEY, String(clamped))
+    } catch {
+      // Not remembering the split is a nuisance, never a failure.
+    }
+  },
 
   setPlan(plan, opts) {
     set({

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LaButton } from '../../components/La'
+import { LaButton, LaHint } from '../../components/La'
 import { isDirty, useMissionStore } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { openFromFile, readFromVehicle, saveToFile, writeToVehicle } from '../../../services/mission'
@@ -36,13 +36,39 @@ export default function MissionToolbar() {
 
   return (
     <div className="mission-toolbar">
-      <div className="mission-toolbar__group">
-        <LaButton variant="secondary" size="sm" disabled={working} onClick={() => void run(openFromFile)}>
+      <div className="mission-toolbar__head">
+        <h3 className="mission-settings__head">Mission</h3>
+        <span className={`mission-badge${dirty ? ' is-dirty' : synced ? ' is-synced' : ''}`}>
+          {!synced ? 'Not on vehicle' : dirty ? 'Modified' : 'Matches vehicle'}
+        </span>
+      </div>
+
+      {/* Vehicle before file: writing is the action that makes a plan real,
+          and it is the one with a consequence, so it leads. */}
+      <div className="mission-toolbar__pair">
+        <LaButton
+          variant="secondary"
+          disabled={working || !connected}
+          onClick={() => void run(readFromVehicle)}
+        >
+          Read
+        </LaButton>
+        <LaButton
+          variant="primary"
+          disabled={working || !connected || items === 0}
+          onClick={() => void run(writeToVehicle)}
+        >
+          Write
+        </LaButton>
+      </div>
+      {!connected && <LaHint>Connect a vehicle to read or write.</LaHint>}
+
+      <div className="mission-toolbar__pair">
+        <LaButton variant="secondary" disabled={working} onClick={() => void run(openFromFile)}>
           Open…
         </LaButton>
         <LaButton
           variant="secondary"
-          size="sm"
           disabled={working || items === 0}
           onClick={() => saveToFile(fileName(sourceName))}
         >
@@ -50,46 +76,25 @@ export default function MissionToolbar() {
         </LaButton>
       </div>
 
-      <div className="mission-toolbar__group">
-        <LaButton
-          variant="secondary"
-          size="sm"
-          disabled={working || !connected}
-          onClick={() => void run(readFromVehicle)}
-        >
-          Read vehicle
-        </LaButton>
-        <LaButton
-          variant="primary"
-          size="sm"
-          disabled={working || !connected || items === 0}
-          onClick={() => void run(writeToVehicle)}
-        >
-          Write vehicle
-        </LaButton>
-      </div>
+      <LaButton
+        variant="ghost"
+        size="block"
+        disabled={working || items === 0}
+        onClick={clear}
+      >
+        Clear mission
+      </LaButton>
 
-      <div className="mission-toolbar__group">
-        <LaButton variant="ghost" size="sm" disabled={working || items === 0} onClick={clear}>
-          Clear
-        </LaButton>
-      </div>
-
-      <div className="mission-toolbar__status">
-        {transfer.kind === 'busy' ? (
-          <span className="mission-toolbar__note">
-            {transfer.dir === 'read' ? 'Reading' : 'Writing'} {transfer.got}
-            {transfer.total ? ` of ${transfer.total}` : ''}…
-          </span>
-        ) : transfer.kind === 'error' ? (
-          <span className="mission-toolbar__note is-error">{transfer.text}</span>
-        ) : (
-          <span className="mission-toolbar__note">{transfer.kind === 'done' ? transfer.text : ''}</span>
-        )}
-        <span className={`mission-badge${dirty ? ' is-dirty' : synced ? ' is-synced' : ''}`}>
-          {!synced ? 'Not on vehicle' : dirty ? 'Modified' : 'Matches vehicle'}
-        </span>
-      </div>
+      {transfer.kind === 'busy' ? (
+        <p className="mission-toolbar__note">
+          {transfer.dir === 'read' ? 'Reading' : 'Writing'} {transfer.got}
+          {transfer.total ? ` of ${transfer.total}` : ''}…
+        </p>
+      ) : transfer.kind === 'error' ? (
+        <p className="mission-toolbar__note is-error">{transfer.text}</p>
+      ) : transfer.kind === 'done' ? (
+        <p className="mission-toolbar__note">{transfer.text}</p>
+      ) : null}
     </div>
   )
 }

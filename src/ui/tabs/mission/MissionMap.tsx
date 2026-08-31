@@ -5,6 +5,7 @@ import { useMissionStore } from '../../../stores/mission-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { hasCoords } from '../../../protocol/mission-plan'
 import { commandSpec } from '../../../protocol/mission-commands'
+import { DEFAULT_TOOL, HOME_TOOL } from './ItemPalette'
 import {
   BASE_LAYERS,
   layerById,
@@ -22,9 +23,16 @@ import {
 // numbers a DO_JUMP refers to.
 
 export interface MissionMapProps {
-  /** The command the palette has armed, or null for plain selection. */
+  /** The command the palette has armed, or null to place the default. */
   tool: number | null
   onPlaced: () => void
+  /**
+   * A click landed on an empty plan. Missions almost always begin with a
+   * takeoff, and silently placing a waypoint instead is a mistake nobody
+   * notices until the vehicle refuses to start the mission -- so the first
+   * click asks rather than guesses.
+   */
+  onFirstItem: (at: { x: number; y: number }) => void
 }
 
 /** Numbered waypoint pin. Orange when selected, blue otherwise. */
@@ -55,7 +63,7 @@ function homeIcon(selected: boolean): L.DivIcon {
   })
 }
 
-export default function MissionMap({ tool, onPlaced }: MissionMapProps) {
+export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileRef = useRef<L.TileLayer | null>(null)
@@ -70,25 +78,39 @@ export default function MissionMap({ tool, onPlaced }: MissionMapProps) {
   toolRef.current = tool
   const placedRef = useRef(onPlaced)
   placedRef.current = onPlaced
+  const firstRef = useRef(onFirstItem)
+  firstRef.current = onFirstItem
 
   useEffect(() => {
     const el = containerRef.current
     if (!el || mapRef.current) return
-    const map = L.map(el, { zoomControl: true, attributionControl: true }).setView([0, 0], 3)
+    // Zoom buttons bottom-left: the palette owns the top-left corner here,
+    // and Leaflet's default position puts them straight through its labels.
+    const map = L.map(el, { zoomControl: false, attributionControl: true }).setView([0, 0], 3)
+    L.control.zoom({ position: 'bottomleft' }).addTo(map)
     mapRef.current = map
     layerRef.current = L.layerGroup().addTo(map)
 
     map.on('click', (e: L.LeafletMouseEvent) => {
       const store = useMissionStore.getState()
       const armed = toolRef.current
-      if (armed === null) {
-        store.select(null)
+      const at = { x: Math.round(e.latlng.lat * 1e7), y: Math.round(e.latlng.lng * 1e7) }
+
+      // Home is placed, not appended: there is only ever one.
+      if (armed === HOME_TOOL) {
+        store.setHome({ ...at, z: store.plan.home?.z ?? 0 })
+        placedRef.current()
         return
       }
-      const at = { x: Math.round(e.latlng.lat * 1e7), y: Math.round(e.latlng.lng * 1e7) }
-      // Home is placed, not appended: there is only ever one.
-      if (armed === -1) store.setHome({ ...at, z: store.plan.home?.z ?? 0 })
-      else store.addItem(armed, at)
+
+      // Nothing armed means the common case, which is adding waypoints --
+      // arming a tool to do the thing you do ninety percent of the time is
+      // a click nobody should have to spend. The first one asks first.
+      if (armed === null && store.plan.items.length === 0) {
+        firstRef.current(at)
+        return
+      }
+      store.addItem(armed ?? DEFAULT_TOOL, at)
       placedRef.current()
     })
 

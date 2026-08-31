@@ -13,9 +13,21 @@ export interface DividerProps {
   containerRef: RefObject<HTMLElement | null>
   ratio: number
   onRatio: (r: number) => void
+  /**
+   * Which way the separator itself lies, in the ARIA sense: a `vertical`
+   * separator is a vertical bar dividing left from right and drags sideways;
+   * a `horizontal` one divides top from bottom and drags up and down.
+   */
+  orientation?: 'vertical' | 'horizontal'
 }
 
-export default function Divider({ containerRef, ratio, onRatio }: DividerProps) {
+export default function Divider({
+  containerRef,
+  ratio,
+  onRatio,
+  orientation = 'vertical',
+}: DividerProps) {
+  const vertical = orientation === 'vertical'
   const [dragging, setDragging] = useState(false)
   const onRatioRef = useRef(onRatio)
   onRatioRef.current = onRatio
@@ -24,8 +36,10 @@ export default function Divider({ containerRef, ratio, onRatio }: DividerProps) 
     if (!dragging) return
     const move = (e: PointerEvent) => {
       const box = containerRef.current?.getBoundingClientRect()
-      if (!box || !box.width) return
-      const f = (e.clientX - box.left) / box.width
+      if (!box) return
+      const span = vertical ? box.width : box.height
+      if (!span) return
+      const f = vertical ? (e.clientX - box.left) / span : (e.clientY - box.top) / span
       if (Number.isFinite(f)) onRatioRef.current(f)
     }
     const stop = () => setDragging(false)
@@ -40,13 +54,13 @@ export default function Divider({ containerRef, ratio, onRatio }: DividerProps) 
       window.removeEventListener('pointercancel', stop)
       document.body.classList.remove('is-splitting')
     }
-  }, [dragging, containerRef])
+  }, [dragging, containerRef, vertical])
 
   return (
     <div
-      className={`split__divider${dragging ? ' is-dragging' : ''}`}
+      className={`split__divider split__divider--${orientation}${dragging ? ' is-dragging' : ''}`}
       role="separator"
-      aria-orientation="vertical"
+      aria-orientation={orientation}
       aria-valuenow={Math.round(ratio * 100)}
       aria-label="Resize panels"
       tabIndex={0}
@@ -58,8 +72,10 @@ export default function Divider({ containerRef, ratio, onRatio }: DividerProps) 
         // Keyboard resize, because a pointer-only divider is unusable to
         // anyone driving the app from the keyboard.
         const step = e.shiftKey ? 0.1 : 0.02
-        if (e.key === 'ArrowLeft') onRatio(ratio - step)
-        else if (e.key === 'ArrowRight') onRatio(ratio + step)
+        const less = vertical ? 'ArrowLeft' : 'ArrowUp'
+        const more = vertical ? 'ArrowRight' : 'ArrowDown'
+        if (e.key === less) onRatio(ratio - step)
+        else if (e.key === more) onRatio(ratio + step)
         else return
         e.preventDefault()
       }}

@@ -32,7 +32,7 @@ describe('app shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Mission' }))
     // The planner stands on its own without a vehicle: a mission can be
     // built and saved to a file before anything is connected.
-    expect(screen.getByRole('button', { name: 'Write vehicle' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Write' })).toBeTruthy()
     expect(screen.getByText(/No items yet/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Firmware' })).toBeNull()
 
