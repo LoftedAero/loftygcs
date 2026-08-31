@@ -52,6 +52,9 @@ The installers are **not code-signed**, which means Windows and macOS will
 both object. They are not objecting to anything they found in the file; they
 object because nobody has paid to vouch for it. Here is how to get past each.
 
+Linux gets two files — a `.deb` and an AppImage — and the `.deb` is the one
+to take on Debian or Ubuntu. See below for why.
+
 ### Windows
 
 1. Run `LoftGCS_<version>_windows_setup.exe`.
@@ -65,30 +68,67 @@ outside your own profile is touched.
 
 1. Open the `.dmg` and drag **Loft GCS** to Applications. Take the
    `arm64` file for Apple Silicon (M1 and later) and `x64` for Intel.
-2. Launching it normally reports that the app *"is damaged and can't be
-   opened"*. It is not damaged — that is what macOS says about software it
-   cannot verify.
-3. Open Terminal and run:
+2. Launching it reports that the app *"is damaged and can't be opened"*. It
+   is not damaged — that is what macOS says about software nobody has paid
+   to notarize.
+3. Go to **System Settings → Privacy & Security**, scroll down, and press
+   **Open Anyway**. Then launch it again.
 
-   ```sh
-   xattr -dr com.apple.quarantine "/Applications/Loft GCS.app"
-   ```
+If you would rather do it from a terminal, this does the same thing:
 
-4. It opens normally from then on.
+```sh
+xattr -dr com.apple.quarantine "/Applications/Loft GCS.app"
+```
 
 ### Linux
+
+There are two files. **Take the `.deb` if you are on Debian or Ubuntu** —
+it is the one that installs cleanly:
+
+```sh
+sudo apt install ./LoftGCS_<version>_linux_amd64.deb
+loft-gcs
+```
+
+It lands in `/opt`, puts `loft-gcs` on your `PATH`, and adds a normal
+application entry.
+
+The **AppImage** is for everything else (Fedora, Arch, openSUSE):
 
 ```sh
 chmod +x LoftGCS_<version>_linux_x86_64.AppImage
 ./LoftGCS_<version>_linux_x86_64.AppImage
 ```
 
-If the flight controller is not listed, your user is probably not in the
-`dialout` group:
+Two things that can go wrong with the AppImage specifically, both of which
+the `.deb` avoids:
+
+- *"dlopen(): error loading libfuse.so.2"* — AppImages need FUSE 2, which
+  Ubuntu 22.04 and later no longer install by default. Either
+  `sudo apt install libfuse2`, or skip it with
+  `./LoftGCS_*.AppImage --appimage-extract-and-run`.
+- *"The SUID sandbox helper binary was found, but is not configured
+  correctly"* — on Ubuntu 24.04 and later, unprivileged user namespaces are
+  restricted, and an AppImage cannot ship the helper with the permissions
+  that would work around it. The `.deb` sets this up correctly when it
+  installs; if you are stuck on the AppImage, `--no-sandbox` will start it,
+  at the cost of running the browser engine unsandboxed.
+
+**Serial ports.** If your flight controller does not appear, you are almost
+certainly not in the `dialout` group:
 
 ```sh
-sudo usermod -aG dialout "$USER"   # then log out and back in
+sudo usermod -aG dialout "$USER"   # log out and back in for it to apply
 ```
+
+If it still does not appear and the board uses a CH340 or CP2102 adapter,
+check whether `brltty` has claimed it — it grabs some USB serial adapters on
+Ubuntu, mistaking them for braille displays. `sudo apt remove brltty` is the
+usual fix.
+
+Chromium installed as a **snap** has its own sandbox and may not see serial
+devices at all; if the browser version cannot list ports but the desktop app
+can, that is why.
 
 ---
 

@@ -10,6 +10,8 @@
   },
   "main": "dist-electron/main.cjs",
   "type": "module",
+  "//desktopName": "Top level, not under build.linux: electron-builder reads it from the package metadata. It becomes StartupWMClass in the .desktop file, which is what makes a running window associate with its launcher icon on GNOME and KDE instead of showing a generic one.",
+  "desktopName": "loft-gcs.desktop",
   "scripts": {
     "dev": "vite",
     "dev:electron": "node scripts/dev-electron.mjs",
@@ -99,10 +101,28 @@
     },
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb"
       ],
       "category": "Utility",
-      "artifactName": "LoftGCS_${version}_linux_${arch}.${ext}"
+      "artifactName": "LoftGCS_${version}_linux_${arch}.${ext}",
+      "executableName": "loft-gcs",
+      "synopsis": "Ground control station for ArduPilot",
+      "syncDesktopName": true
+    },
+    "deb": {
+      "maintainer": "Lofted Aero <preview@loftgcs.invalid>",
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0"
+      ]
     }
   }
 }

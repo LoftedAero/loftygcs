@@ -42,9 +42,14 @@ jobs:
           - os: macos-latest
             artifact: macos
             files: dist/*.dmg
+          # Both Linux formats. The .deb is the one that works properly on
+          # current Ubuntu -- see docs/preview-testing.md for why the
+          # AppImage needs two extra steps there.
           - os: ubuntu-latest
             artifact: linux
-            files: dist/*.AppImage
+            files: |
+              dist/*.AppImage
+              dist/*.deb
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
