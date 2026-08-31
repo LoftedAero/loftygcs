@@ -24,9 +24,9 @@ export const BRAND = {
    */
   preview: true,
   /**
-   * Where feedback goes. Deliberately blank: filling this in publishes an
-   * address to everyone who gets a build, which is the author's call to
-   * make, not a default to inherit. Empty hides the button.
+   * Where feedback goes. This is published to everyone who gets a build, so
+   * it is deliberately the company address rather than anyone's personal
+   * one. Setting it to '' hides the button and the address entirely.
    */
-  feedbackEmail: '',
+  feedbackEmail: 'info@loftedaero.com',
 } as const

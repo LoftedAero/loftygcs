@@ -108,9 +108,14 @@ app.whenReady().then(() => {
     return await res.arrayBuffer()
   })
   ipcMain.on('app:open-external', (_e, url: string) => {
-    // Only ever open web links -- a file: or custom scheme from a compromised
-    // renderer must not reach the shell.
-    if (typeof url === 'string' && /^https?:\/\//.test(url)) void shell.openExternal(url)
+    // Web links, plus mailto -- a file: or custom scheme from a compromised
+    // renderer must not reach the shell. mailto is the one exception worth
+    // making: the worst it can do is open a compose window the user still
+    // has to send, where file: hands over files and a registered custom
+    // scheme can launch an application outright.
+    if (typeof url === 'string' && /^(https?:\/\/|mailto:)/.test(url)) {
+      void shell.openExternal(url)
+    }
   })
 
   ipcMain.on('serial:choose', (_e, portId: string) => {

@@ -110,6 +110,17 @@ export default function PreviewNotice() {
         </li>
       </ul>
 
+      {/* The address in text as well as behind the button: a mailto: link is
+          a dead end for anyone whose machine has no mail client set up, and
+          "there was no way to tell you" is the one piece of feedback that
+          cannot arrive. */}
+      {BRAND.feedbackEmail && (
+        <p className="preview-notice__contact">
+          Send anything you find to{' '}
+          <span className="la-selectable">{BRAND.feedbackEmail}</span>.
+        </p>
+      )}
+
     </LaModal>
   )
 }

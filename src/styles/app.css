@@ -163,6 +163,17 @@
 .preview-notice__list strong {
   color: var(--la-ink);
 }
+.preview-notice__contact {
+  margin: var(--la-space-4) 0 0;
+  padding-top: var(--la-space-3);
+  border-top: 1px solid var(--la-line);
+  font-size: var(--la-size-md);
+  color: var(--la-ink-2);
+}
+.preview-notice__contact .la-selectable {
+  font-family: var(--la-font-mono);
+  color: var(--la-ink);
+}
 
 /* Theme toggle. Chrome, not a control the mission depends on, so it is the
    quietest thing in the bar until pointed at. */

@@ -3,14 +3,18 @@
 #  - check: lint + typecheck + unit tests, Linux only, on every push. Cheap
 #    enough to always run, and it is what keeps the protocol layer honest.
 #
-#  - build: the three-platform installer matrix, by hand or on a release
-#    tag only. macOS bills at 10x and Windows 2x on private repos; a full
-#    round is pure waste for a commit that edits a comment. Note the "Run
+#  - build: the three-platform installer matrix, by hand ONLY. macOS bills at
+#    10x and Windows 2x while this repo is private, so a matrix that fires on
+#    its own is a bill for a commit that edited a comment. Note the "Run
 #    workflow" button only appears once this file is on the default branch.
+#
+# push is limited to branches so that pushing a tag does not re-run check on
+# a commit it has already passed on -- tags no longer trigger anything.
 name: CI
 
 on:
   push:
+    branches: ['**']
   workflow_dispatch:
 
 jobs:
@@ -28,8 +32,8 @@ jobs:
       - run: npm test
 
   build:
-    # Installers only when asked for: manual dispatch or a version tag.
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    # Installers only when explicitly asked for, never automatically.
+    if: github.event_name == 'workflow_dispatch'
     needs: check
     strategy:
       # One platform failing should not hide the others.

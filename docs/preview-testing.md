@@ -167,8 +167,12 @@ The desktop app can also run a real ArduPilot simulator for you: **Simulator
 
 ## What to send back
 
-Anything. Confusion counts as a bug — if you could not find something, that
-is a finding, not a failure on your part.
+Email **info@loftedaero.com**, or use the *Send feedback* button in the
+notice the app shows on first run — it fills in the build and platform for
+you.
+
+Anything is worth sending. Confusion counts as a bug — if you could not find
+something, that is a finding, not a failure on your part.
 
 Useful to include when something breaks:
 

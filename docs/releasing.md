@@ -9,13 +9,12 @@ on a laptop.
 1. Bump `version` in `package.json`. Testers report against it, and the
    first-run notice reappears when it changes — which is the point, since a
    new build makes new claims.
-2. Check `src/brand.ts`: `preview` must be `true`, and `feedbackEmail`
-   decides whether the notice offers a *Send feedback* button. It ships
-   blank; filling it in publishes that address to everyone who gets a build.
-3. Check `build.deb.maintainer` in `package.json`. Debian requires one and
-   `dpkg -I` shows it to anyone who installs the package, so it ships as a
-   deliberate placeholder on the `.invalid` TLD rather than a real address.
-   Set it to something you are happy to publish before a build goes wide.
+2. Check `src/brand.ts`: `preview` must be `true`. `feedbackEmail` is
+   `info@loftedaero.com` — the company address rather than anyone's personal
+   one, because it is published to everyone who gets a build. Setting it to
+   `''` removes the button and the address from the notice entirely.
+   `package.json`'s `author` and `build.deb.maintainer` carry the same
+   address; `dpkg -I` shows the maintainer to anyone who installs the `.deb`.
 3. `npm test && npm run lint && npm run typecheck`.
 
 ## 1. The web app
@@ -41,20 +40,24 @@ without rebuilding.
 ## 2. Installers
 
 Only CI can build all three platforms — a Windows machine cannot produce a
-`.dmg`, and macOS builds need macOS. Push a version tag:
+`.dmg`, and macOS builds need macOS.
 
-```sh
-git tag v0.1.1 && git push origin v0.1.1
-```
+**The matrix runs by hand only.** Actions tab → *CI* → **Run workflow**.
+Nothing triggers it automatically: while the repo is private, macOS minutes
+bill at 10× and Windows at 2×, so a matrix that fires on every tag or push is
+a bill for commits that changed a comment. (The button only appears once the
+workflow file is on the default branch.)
 
-That runs the `check` job and then the three-platform matrix. When it
-finishes, open the run on the Actions tab and download the `windows`,
-`macos` and `linux` artifacts. Each is a zip *around* the real file, so
-unwrap them before uploading anywhere.
+When the run finishes, download the `windows`, `macos` and `linux` artifacts
+from it. Each is a zip *around* the real files, so unwrap them before
+uploading anywhere. Artifacts expire after 90 days — once they are on the
+file host that stops mattering.
 
-`workflow_dispatch` ("Run workflow" on the Actions tab) does the same thing
-without tagging, which is what to use for a build you are not calling a
-version yet.
+Because nothing is tagged, **the version in `package.json` is the only record
+of which build is which.** Bump it before every run, or two downloads will
+claim to be the same build and testers will report against the wrong one.
+Tagging afterwards is still worth doing for your own history — it just no
+longer triggers anything.
 
 The files are named `LoftGCS_<version>_<platform>...`, so they stay
 distinguishable once they are sitting in a folder next to each other.
