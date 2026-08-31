@@ -24,6 +24,9 @@ function ParamActions({ tab }: { tab: TabId }) {
   const loadState = useParamStore((s) => s.loadState)
   const [confirming, setConfirming] = useState(false)
   if (loadState !== 'ready') return null
+  // The Parameters page has its own actions column; two Write buttons on one
+  // screen would be two answers to the same question.
+  if (tab === 'parameters') return null
   // ...but if edits are staged on another tab, keep the bar: quietly losing
   // sight of unsaved vehicle changes is the worse of the two outcomes.
   if (PARAMLESS_TABS.has(tab) && dirtyCount === 0) return null
