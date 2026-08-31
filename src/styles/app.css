@@ -18,6 +18,17 @@
   --app-on-dark: #ffffff;
 }
 
+/* The system sheet puts modals at z-index 10, which is plenty for a window
+   made of cards. This app also has maps: Leaflet's own panes and controls run
+   to 1000, our map overlays sit at 500, and the right-click menus at 1200 --
+   all of which painted straight through a modal scrim and stayed clickable,
+   so the palette could add mission items while a dialog was asking about
+   them. Raised here rather than in lofted-aero.css because that sheet is
+   shared byte-identical with three other apps that have no maps in them. */
+.la-modal {
+  z-index: 2000;
+}
+
 /* --- Dark theme ------------------------------------------------------- */
 
 /* The one place in this file where raw hex belongs: these lines *define*

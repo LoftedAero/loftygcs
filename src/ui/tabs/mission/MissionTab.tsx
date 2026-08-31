@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import MissionMap from './MissionMap'
 import MissionTable from './MissionTable'
 import MissionSettings from './MissionSettings'
@@ -138,6 +138,19 @@ function FirstItemPrompt({
   onTakeoff: (at: { x: number; y: number }) => void
 }) {
   const altM = useMissionStore((s) => s.defaults.altM)
+
+  // Escape closes it, as it closes every other menu here. Without this the
+  // only ways out were the two buttons, and a dialog you cannot dismiss the
+  // habitual way reads as a stuck app rather than a question.
+  useEffect(() => {
+    if (!at) return
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [at, onClose])
+
   if (!at) return null
   return (
     <LaModal
