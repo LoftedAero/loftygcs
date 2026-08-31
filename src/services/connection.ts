@@ -5,12 +5,13 @@
 import { TransportManager } from '../transport'
 import type { TransportOptions } from '../transport/Transport'
 import { WorkerClient } from '../worker/worker-client'
-import type { ProtocolEvent, TelemetryDelta } from '../protocol/types'
+import type { MissionItem, ProtocolEvent, TelemetryDelta } from '../protocol/types'
 import { modeName, vehicleTypeName } from '../protocol/modes'
 import { setConnectionState, useConnectionStore } from '../stores/connection-store'
 import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { useCalStore } from '../stores/cal-store'
+import { useMissionStore } from '../stores/mission-store'
 import { telemetryRings } from './telemetry-ring'
 import { fieldRegistry } from './telemetry-fields'
 import { fetchParamMetadata } from './param-metadata'
@@ -140,6 +141,11 @@ class ConnectionService {
       case 'paramProgress':
         useParamStore.getState().setProgress(evt)
         return
+      case 'missionProgress':
+        useMissionStore
+          .getState()
+          .setTransfer({ kind: 'busy', dir: evt.dir, got: evt.got, total: evt.total })
+        return
       case 'magCalProgress':
         useCalStore.getState().magCalProgress(evt.pct, evt.calStatus)
         return
@@ -255,6 +261,20 @@ class ConnectionService {
     const echoed = await worker.setParam(name, value, entry?.mavType ?? 9)
     useParamStore.getState().confirmWrite(name, echoed)
     return echoed
+  }
+
+  /** Read the vehicle's stored mission (or fence, or rally). */
+  downloadMission(missionType = 0) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.downloadMission(missionType)
+  }
+
+  /** Replace the vehicle's mission. Items must start with home at seq 0. */
+  uploadMission(items: MissionItem[], missionType = 0) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.uploadMission(items, missionType)
   }
 
   /** Write every dirty parameter, confirming each against the echo. */

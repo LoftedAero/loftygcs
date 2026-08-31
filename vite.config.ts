@@ -24,5 +24,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Stubs for the browser APIs jsdom lacks; see the file for why they are
+    // here rather than guarded for in the components themselves.
+    setupFiles: ['./src/test-setup.ts'],
   },
 })

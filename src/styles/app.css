@@ -130,14 +130,340 @@
   padding: var(--la-space-4);
 }
 
-.mission-empty {
+/* --- Mission planning ------------------------------------------------- */
+
+.mission-screen {
   display: flex;
-  justify-content: center;
-  padding-top: var(--la-space-6);
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: var(--la-space-2);
 }
 
-.mission-empty > .la-card {
-  max-width: 640px;
+.mission-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-4);
+  flex-wrap: wrap;
+  padding: var(--la-space-2) var(--la-space-3);
+  background: var(--la-surface);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  flex: none;
+}
+.mission-toolbar__group {
+  display: flex;
+  gap: var(--la-space-2);
+}
+/* The status sits at the far end, so the buttons stay a compact cluster
+   whatever the message says. */
+.mission-toolbar__status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+}
+.mission-toolbar__note {
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-3);
+}
+.mission-toolbar__note.is-error {
+  color: var(--la-bad);
+}
+
+/* Status, never an action: green and red here mean "the vehicle agrees" and
+   "it does not", which is exactly what the palette reserves them for. */
+.mission-badge {
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: var(--la-space-1) var(--la-space-2);
+  border-radius: var(--la-radius-pill);
+  border: 1px solid var(--la-line-strong);
+  color: var(--la-ink-3);
+  white-space: nowrap;
+}
+.mission-badge.is-synced {
+  border-color: var(--la-ok);
+  color: var(--la-ok);
+}
+.mission-badge.is-dirty {
+  border-color: var(--la-warn);
+  color: var(--la-warn);
+}
+
+.mission-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: var(--la-space-2);
+  flex: 1;
+  min-height: 0;
+}
+
+.mission-main {
+  display: grid;
+  /* The table is the half that has to hold rows, so it gets the larger
+     share and the map takes the rest -- a map can be panned when it is
+     small, but a table showing one row at a time cannot be worked in. */
+  /* Capped in pixels as well as percent: past about a dozen visible rows
+     the table stops benefiting and the map, which is the thing being
+     planned on, should take the rest of a tall screen. */
+  grid-template-rows: minmax(150px, 1fr) minmax(230px, min(52%, 430px));
+  gap: var(--la-space-2);
+  min-height: 0;
+  min-width: 0;
+}
+
+.mission-map-area {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+}
+.mission-map-wrap {
+  position: relative;
+  height: 100%;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+}
+.mission-map {
+  height: 100%;
+  width: 100%;
+  background: var(--la-surface-2);
+}
+/* A crosshair says "this click places something" without a word of UI. */
+.mission-map-wrap.is-placing .mission-map {
+  cursor: crosshair;
+}
+
+.mission-palette {
+  position: absolute;
+  z-index: 500;
+  top: var(--la-space-2);
+  left: var(--la-space-2);
+  right: var(--la-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  flex-wrap: wrap;
+  padding: var(--la-space-2);
+  background: var(--la-surface);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  box-shadow: var(--la-shadow-1);
+}
+.mission-palette__label {
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+}
+.mission-palette__btn {
+  font: inherit;
+  font-size: var(--la-size-sm);
+  padding: var(--la-space-1) var(--la-space-3);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  color: var(--la-ink);
+  cursor: pointer;
+  transition: background var(--la-ease), border-color var(--la-ease);
+}
+.mission-palette__btn:hover {
+  background: var(--la-surface-2);
+}
+/* Armed is a working state, so it is blue -- orange stays the one primary
+   action per region, which up here is nothing. */
+.mission-palette__btn.is-armed {
+  background: var(--la-blue);
+  border-color: var(--la-blue-deep);
+  color: #fff;
+}
+.mission-palette__other {
+  max-width: 150px;
+}
+.mission-palette__hint {
+  font-size: var(--la-size-xs);
+  color: var(--la-blue-deep);
+}
+
+.mission-lower {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  overflow: hidden;
+}
+.mission-lower__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-space-2);
+  padding: var(--la-space-2) var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+  flex: none;
+}
+.mission-lower__title {
+  margin: 0;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-2);
+}
+.mission-lower__count {
+  font-family: var(--la-font-mono);
+  color: var(--la-ink-3);
+  margin-left: var(--la-space-1);
+}
+
+.mission-profile {
+  flex: none;
+  height: 98px;
+  width: 100%;
+  border-bottom: 1px solid var(--la-line);
+  cursor: pointer;
+}
+
+.mission-table {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.mission-table--empty {
+  padding: var(--la-space-4);
+}
+.mission-table__grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-sm);
+}
+.mission-table__grid th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  background: var(--la-surface-2);
+  padding: var(--la-space-2) var(--la-space-2);
+  border-bottom: 1px solid var(--la-line-strong);
+  white-space: nowrap;
+}
+.mission-table__grid td {
+  padding: var(--la-space-1) var(--la-space-2);
+  border-bottom: 1px solid var(--la-line);
+  vertical-align: middle;
+}
+.mission-table__num {
+  text-align: right;
+  font-family: var(--la-font-mono);
+  white-space: nowrap;
+}
+.mission-table__num .la-input {
+  width: 72px;
+}
+.mission-table__dist {
+  color: var(--la-ink-3);
+}
+.mission-table__param .la-input,
+.mission-table__param .la-select {
+  width: 100%;
+  min-width: 76px;
+}
+/* Rows carry a label per parameter, so they are taller than a plain grid;
+   trimming the cell padding is what keeps a useful number of them on
+   screen without dropping the labels that make the row readable. */
+.mission-table__grid td {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+/* The parameter's meaning changes with the command, so its label rides
+   with the value rather than sitting in a fixed column header. */
+.mission-table__plabel {
+  display: block;
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+.mission-table__dash {
+  color: var(--la-ink-3);
+}
+.mission-table__actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.mission-table__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.mission-row {
+  cursor: pointer;
+}
+.mission-row:hover {
+  background: var(--la-surface-2);
+}
+.mission-row.is-selected {
+  background: var(--la-orange-soft);
+}
+
+.mission-side {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+}
+.mission-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
+  padding: var(--la-space-3);
+}
+.mission-settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+.mission-settings__head {
+  margin: 0;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  padding-bottom: var(--la-space-1);
+  border-bottom: 1px solid var(--la-line);
+}
+.mission-settings__coords {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+}
+
+@media (max-width: 1100px) {
+  /* Below this the settings column starves the map; it goes under the
+     table rather than being squeezed to nothing. */
+  .mission-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .mission-side {
+    max-height: 240px;
+  }
 }
 
 .app-placeholder {

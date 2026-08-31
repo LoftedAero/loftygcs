@@ -30,7 +30,11 @@ describe('app shell', () => {
     expect(screen.getByText(/Connect a vehicle \(or start demo mode\) to fly/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Mission' }))
-    expect(screen.getByText(/Click-to-place waypoints/)).toBeTruthy()
+    // The planner stands on its own without a vehicle: a mission can be
+    // built and saved to a file before anything is connected.
+    expect(screen.getByRole('button', { name: 'Write vehicle' })).toBeTruthy()
+    expect(screen.getByText(/No items yet/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Firmware' })).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Setup' }))
     expect(screen.getByRole('button', { name: 'Firmware' })).toBeTruthy()

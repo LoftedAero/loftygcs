@@ -1,0 +1,241 @@
+import { useEffect, useRef, useState } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import { useMissionStore } from '../../../stores/mission-store'
+import { useVehicleStore } from '../../../stores/vehicle-store'
+import { hasCoords } from '../../../protocol/mission-plan'
+import { commandSpec } from '../../../protocol/mission-commands'
+import {
+  BASE_LAYERS,
+  layerById,
+  loadBaseLayer,
+  saveBaseLayer,
+  type BaseLayerId,
+} from '../flight/map-layers'
+
+// The mission map. Imperative Leaflet for the same reason the flight map is:
+// markers move under the pointer, and routing a drag through React's render
+// cycle fights the map's own DOM.
+//
+// Markers are numbered by their sequence on the vehicle, so what is on the
+// map and what is in the table are the same numbers -- and those are the
+// numbers a DO_JUMP refers to.
+
+export interface MissionMapProps {
+  /** The command the palette has armed, or null for plain selection. */
+  tool: number | null
+  onPlaced: () => void
+}
+
+/** Numbered waypoint pin. Orange when selected, blue otherwise. */
+function itemIcon(seq: number, selected: boolean, kind: 'nav' | 'other'): L.DivIcon {
+  const fill = selected ? '#F7941D' : kind === 'nav' ? '#4684C5' : '#6B7280'
+  return L.divIcon({
+    className: 'mission-marker',
+    html: `<svg width="30" height="38" viewBox="-15 -30 30 38">
+      <path d="M0 8 L-9 -12 A10 10 0 1 1 9 -12 Z" fill="${fill}" stroke="#2D2D2F" stroke-width="1.5"/>
+      <text x="0" y="-14" text-anchor="middle" font-family="Roboto Mono, monospace"
+            font-size="12" font-weight="700" fill="#fff">${seq}</text>
+    </svg>`,
+    iconSize: [30, 38],
+    iconAnchor: [15, 38],
+  })
+}
+
+function homeIcon(selected: boolean): L.DivIcon {
+  return L.divIcon({
+    className: 'mission-marker',
+    html: `<svg width="30" height="38" viewBox="-15 -30 30 38">
+      <path d="M0 8 L-9 -12 A10 10 0 1 1 9 -12 Z" fill="${selected ? '#F7941D' : '#2FAE4E'}"
+            stroke="#2D2D2F" stroke-width="1.5"/>
+      <path d="M-5 -14 L0 -20 L5 -14 L5 -10 L-5 -10 Z" fill="none" stroke="#fff" stroke-width="1.8"/>
+    </svg>`,
+    iconSize: [30, 38],
+    iconAnchor: [15, 38],
+  })
+}
+
+export default function MissionMap({ tool, onPlaced }: MissionMapProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const tileRef = useRef<L.TileLayer | null>(null)
+  const layerRef = useRef<L.LayerGroup | null>(null)
+  const vehicleRef = useRef<L.Marker | null>(null)
+  const [base, setBase] = useState<BaseLayerId>(loadBaseLayer)
+  const [centered, setCentered] = useState(false)
+
+  // Read inside handlers rather than closed over, so the click handler does
+  // not have to be rebound every time the armed tool changes.
+  const toolRef = useRef(tool)
+  toolRef.current = tool
+  const placedRef = useRef(onPlaced)
+  placedRef.current = onPlaced
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || mapRef.current) return
+    const map = L.map(el, { zoomControl: true, attributionControl: true }).setView([0, 0], 3)
+    mapRef.current = map
+    layerRef.current = L.layerGroup().addTo(map)
+
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      const store = useMissionStore.getState()
+      const armed = toolRef.current
+      if (armed === null) {
+        store.select(null)
+        return
+      }
+      const at = { x: Math.round(e.latlng.lat * 1e7), y: Math.round(e.latlng.lng * 1e7) }
+      // Home is placed, not appended: there is only ever one.
+      if (armed === -1) store.setHome({ ...at, z: store.plan.home?.z ?? 0 })
+      else store.addItem(armed, at)
+      placedRef.current()
+    })
+
+    // Leaflet only watches the window, so a pane resize (the table growing,
+    // the settings column opening) leaves it drawing at the old size.
+    let frame = 0
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => map.invalidateSize({ animate: false }))
+    })
+    observer.observe(el)
+
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+      map.remove()
+      mapRef.current = null
+      layerRef.current = null
+      tileRef.current = null
+      vehicleRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const spec = layerById(base)
+    tileRef.current?.remove()
+    tileRef.current = L.tileLayer(spec.url, {
+      maxZoom: spec.maxZoom,
+      maxNativeZoom: spec.maxNativeZoom,
+      attribution: spec.attribution,
+    }).addTo(map)
+    tileRef.current.setZIndex(0)
+    saveBaseLayer(base)
+  }, [base])
+
+  // Redraw the whole plan on change. A mission is tens of markers, not
+  // thousands, and rebuilding is far simpler to keep correct than diffing --
+  // the flight map's per-frame path is the one that needs the cleverness.
+  const plan = useMissionStore((s) => s.plan)
+  const selected = useMissionStore((s) => s.selected)
+  useEffect(() => {
+    const map = mapRef.current
+    const layer = layerRef.current
+    if (!map || !layer) return
+    layer.clearLayers()
+
+    const route: L.LatLngExpression[] = []
+    if (plan.home) {
+      const pos: L.LatLngExpression = [plan.home.x / 1e7, plan.home.y / 1e7]
+      route.push(pos)
+      L.marker(pos, { icon: homeIcon(selected === 'home'), draggable: true })
+        .on('click', () => useMissionStore.getState().select('home'))
+        .on('dragend', (e) => {
+          const p = (e.target as L.Marker).getLatLng()
+          const store = useMissionStore.getState()
+          store.setHome({
+            x: Math.round(p.lat * 1e7),
+            y: Math.round(p.lng * 1e7),
+            z: store.plan.home?.z ?? 0,
+          })
+        })
+        .addTo(layer)
+    }
+
+    plan.items.forEach((it, i) => {
+      if (!hasCoords(it)) return
+      const pos: L.LatLngExpression = [it.x / 1e7, it.y / 1e7]
+      const spec = commandSpec(it.command)
+      const isNav = spec?.category === 'nav'
+      // Only nav commands are legs of the route; an ROI is a place the
+      // camera looks at, not a place the aircraft goes.
+      if (isNav) route.push(pos)
+      L.marker(pos, {
+        icon: itemIcon(i + 1, selected === it.uid, isNav ? 'nav' : 'other'),
+        draggable: true,
+      })
+        .on('click', () => useMissionStore.getState().select(it.uid))
+        .on('dragend', (e) => {
+          const p = (e.target as L.Marker).getLatLng()
+          useMissionStore.getState().updateItem(it.uid, {
+            x: Math.round(p.lat * 1e7),
+            y: Math.round(p.lng * 1e7),
+          })
+        })
+        .addTo(layer)
+    })
+
+    if (route.length > 1) {
+      L.polyline(route, { color: '#F7941D', weight: 3, opacity: 0.9 }).addTo(layer)
+    }
+
+    // Frame the mission once, when there first is one to frame.
+    if (!centered && route.length > 0) {
+      setCentered(true)
+      if (route.length === 1) map.setView(route[0]!, 17)
+      else {
+        // Extra room at the top: the palette floats over the map there, and
+        // fitting to the raw bounds parks the first waypoints underneath it.
+        map.fitBounds(L.latLngBounds(route as L.LatLngTuple[]), {
+          paddingTopLeft: [20, 76],
+          paddingBottomRight: [20, 24],
+        })
+      }
+    }
+  }, [plan, selected, centered])
+
+  // The vehicle, when there is one, so the plan can be seen against it.
+  useEffect(() => {
+    return useVehicleStore.subscribe((v) => {
+      const map = mapRef.current
+      if (!map || (v.latDeg === 0 && v.lonDeg === 0)) return
+      const pos: L.LatLngExpression = [v.latDeg, v.lonDeg]
+      const icon = L.divIcon({
+        className: 'vehicle-marker',
+        html: `<svg width="28" height="28" viewBox="-14 -14 28 28" style="transform: rotate(${v.headingDeg}deg)">
+          <path d="M0 -11 L7 9 L0 5 L-7 9 Z" fill="#F7941D" stroke="#2D2D2F" stroke-width="1.5"/>
+        </svg>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      })
+      if (!vehicleRef.current) vehicleRef.current = L.marker(pos, { icon }).addTo(map)
+      else {
+        vehicleRef.current.setLatLng(pos)
+        vehicleRef.current.setIcon(icon)
+      }
+    })
+  }, [])
+
+  return (
+    <div className={`mission-map-wrap${tool !== null ? ' is-placing' : ''}`}>
+      <div ref={containerRef} className="mission-map" />
+      <div className="map-controls">
+        <div className="map-layer-switch la-row" role="group" aria-label="Base map">
+          {BASE_LAYERS.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              className={`map-layer-switch__btn${base === l.id ? ' is-active' : ''}`}
+              onClick={() => setBase(l.id)}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
