@@ -74,6 +74,10 @@ export default function ActionBar() {
           every Setup tab rather than appearing and vanishing per screen. */}
       {mode === 'setup' && <ParamActions tab={activeTab} />}
       <span className="la-actionbar__spacer"></span>
+      {/* Permanent, quiet, and next to the version it qualifies: someone who
+          dismissed the first-run notice a week ago should still be able to
+          tell at a glance which kind of build they are looking at. */}
+      {BRAND.preview && <span className="app-preview-chip">Preview</span>}
       <LaLinkButton
         onClick={() => {
           if (window.loftgcs) window.loftgcs.app.openExternal(BRAND.repoUrl)

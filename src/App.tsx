@@ -3,6 +3,7 @@ import NavRail from './ui/shell/NavRail'
 import ActionBar from './ui/shell/ActionBar'
 import ConnectModal from './ui/shell/ConnectModal'
 import SerialChooserModal from './ui/shell/SerialChooserModal'
+import PreviewNotice from './ui/shell/PreviewNotice'
 import { useUiStore } from './stores/ui-store'
 import { useGuideStore } from './stores/guide-store'
 import GuideRunner from './ui/guides/GuideRunner'
@@ -80,6 +81,8 @@ export default function App() {
       <ActionBar />
       <ConnectModal />
       <SerialChooserModal />
+      {/* Last, so it sits over everything on first run. */}
+      <PreviewNotice />
     </div>
   )
 }

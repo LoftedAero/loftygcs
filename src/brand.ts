@@ -16,4 +16,17 @@ export const BRAND = {
   tagline: 'Ground control for ArduPilot',
   iconPath: `data:image/svg+xml,${encodeURIComponent(BADGE_SVG)}`,
   repoUrl: 'https://github.com/LoftedAero/loftgcs',
+  /**
+   * Preview builds say so, in the window rather than in a readme nobody
+   * opens. This is a station that arms and flies aircraft and none of it has
+   * been validated against real hardware yet, so the people trying it need
+   * to know what they are holding. Set to false for a release build.
+   */
+  preview: true,
+  /**
+   * Where feedback goes. Deliberately blank: filling this in publishes an
+   * address to everyone who gets a build, which is the author's call to
+   * make, not a default to inherit. Empty hides the button.
+   */
+  feedbackEmail: '',
 } as const

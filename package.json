@@ -16,6 +16,7 @@
     "build:web": "vite build",
     "build:electron": "node scripts/build-electron.mjs",
     "build:demo": "node scripts/build-artifact.mjs",
+    "package:web": "node scripts/package-web.mjs",
     "dist": "npm run build:electron && electron-builder --publish never",
     "test": "vitest run",
     "sitl": "node scripts/sitl.mjs run",
@@ -79,7 +80,7 @@
       "allowToChangeInstallationDirectory": true,
       "menuCategory": "Loft GCS",
       "uninstallDisplayName": "Loft GCS",
-      "artifactName": "LoftGCS_setup_${version}.${ext}"
+      "artifactName": "LoftGCS_${version}_windows_setup.${ext}"
     },
     "mac": {
       "identity": "-",
@@ -93,13 +94,15 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "artifactName": "LoftGCS_${version}_mac_${arch}.${ext}"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "artifactName": "LoftGCS_${version}_linux_${arch}.${ext}"
     }
   }
 }
