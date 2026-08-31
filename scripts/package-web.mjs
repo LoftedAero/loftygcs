@@ -19,9 +19,14 @@ import { createDeflateRaw } from 'node:zlib'
 const version = JSON.parse(readFileSync('package.json', 'utf8')).version
 const out = path.resolve('dist', `LoftGCS_${version}_web.zip`)
 
-console.log('building the web bundle…')
+console.log(`building the web bundle for v${version}…`)
 execFileSync(process.execPath, [path.join('node_modules', 'vite', 'bin', 'vite.js'), 'build'], {
   stdio: 'inherit',
+  // vite.config reads the version from npm_package_version, which only npm
+  // sets. Run this file directly and the bundle would report 0.0.0 while the
+  // zip beside it claimed the real version -- so it is passed explicitly
+  // rather than inherited by luck.
+  env: { ...process.env, npm_package_version: version },
 })
 
 const root = path.resolve('dist-web')

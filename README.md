@@ -27,7 +27,19 @@ npm test               # vitest
 npm run typecheck      # renderer + electron tsconfigs
 npm run lint           # includes the layering rules (see below)
 npm run dist           # build installers for this platform
+npm run package:web    # the web bundle, zipped for a static host
 ```
+
+## Releasing
+
+[`docs/releasing.md`](docs/releasing.md) is the runbook: what to check before a build, how to
+produce the web bundle and the installers, and the platform quirks worth not rediscovering.
+The three-platform installer matrix runs **by hand** (Actions → CI → Run workflow), never
+automatically.
+
+[`docs/preview-testing.md`](docs/preview-testing.md) is written for the people receiving a
+build and travels with the downloads — it covers which channel does what, and how to get past
+the security warnings an unsigned build produces on Windows and macOS.
 
 ## Testing without hardware
 

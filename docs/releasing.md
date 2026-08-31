@@ -15,7 +15,10 @@ on a laptop.
    `''` removes the button and the address from the notice entirely.
    `package.json`'s `author` and `build.deb.maintainer` carry the same
    address; `dpkg -I` shows the maintainer to anyone who installs the `.deb`.
-3. `npm test && npm run lint && npm run typecheck`.
+3. If `public/icons/icon.svg` changed, `npm run icon` to regenerate
+   `build/icon.png`. A missing or stale icon does not fail a build —
+   electron-builder quietly substitutes Electron's default.
+4. `npm test && npm run lint && npm run typecheck`.
 
 ## 1. The web app
 

@@ -62,7 +62,25 @@ design decisions are recorded there and in code comments.
 
 - `npm run dev` / `npm run dev:electron` — browser / desktop development
 - `npm test`, `npm run typecheck`, `npm run lint` — all three must pass; CI runs them on push
-- `npm run dist` — installers (3-OS matrix in CI via workflow_dispatch or v* tags)
+- `npm run dist` — installers for *this* platform only; all three come from CI
+- `npm run package:web` — the web bundle zipped for a static host
+- `npm run icon` — regenerate `build/icon.png` from `public/icons/icon.svg`
+- `npm run build:demo` — the single-file shareable demo
+
+## Shipping
+
+**`docs/releasing.md` is the runbook — follow it rather than reconstructing it.**
+It carries the things that are expensive to rediscover: why macOS `identity: "-"` and
+`hardenedRuntime: false` are load-bearing (arm64 will not execute unsigned, and hardened
+runtime rejects the pre-signed Electron framework), why Linux ships a `.deb` as well as an
+AppImage (only the `.deb` can fix up `chrome-sandbox` for Ubuntu 24.04's namespace
+restrictions), and that `desktopName` belongs at the *top level* of package.json.
+
+The installer matrix is **manual only** (Actions → CI → Run workflow) while the repo is
+private, because macOS bills at 10x. Nothing is tagged automatically, so **the version in
+package.json is the only thing distinguishing one build from another** — bump it before every
+run. `docs/preview-testing.md` is the tester-facing companion and ships with the downloads.
+Preview builds are marked in-app via `BRAND.preview`.
 
 ## SITL (the acceptance target from Phase 1 on)
 

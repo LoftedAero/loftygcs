@@ -19,6 +19,7 @@
     "build:electron": "node scripts/build-electron.mjs",
     "build:demo": "node scripts/build-artifact.mjs",
     "package:web": "node scripts/package-web.mjs",
+    "icon": "electron scripts/make-icon.mjs",
     "dist": "npm run build:electron && electron-builder --publish never",
     "test": "vitest run",
     "sitl": "node scripts/sitl.mjs run",
