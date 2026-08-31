@@ -12,12 +12,15 @@ import type { ParamMeta } from '../../../services/param-metadata'
 // them, and until now both only appeared in a tooltip -- which is to say, only
 // to somebody who already suspected the row was the one they wanted.
 
-/** How the number reads once the metadata is applied to it. */
+/**
+ * How the number reads once the metadata is applied to it — for bitmasks
+ * only. A parameter with named values now shows them in a dropdown of its
+ * own, so repeating the label here would say the same thing twice and take
+ * the room from the description.
+ */
 export function decodeValue(value: number, meta: ParamMeta | undefined): string | null {
-  if (!meta) return null
-  if (meta.bitmask) return describeBits(value, meta.bitmask)
-  const named = meta.values?.[value]
-  return named ?? null
+  if (!meta?.bitmask) return null
+  return describeBits(value, meta.bitmask)
 }
 
 /** "Gyros, Accels, +2 more" -- what is actually switched on. */
@@ -55,48 +58,56 @@ export default memo(function ParamRow({ name }: { name: string }) {
         {meta?.displayName && <span className="param-row__display">{meta.displayName}</span>}
       </div>
 
+      {/* Every row has the same cells in the same places, empty where they do
+          not apply. A grid whose columns move depending on the parameter is
+          one you have to re-read for every row; holding them still is what
+          lets the eye run down a column of values. */}
+      <input
+        className="la-input la-input--num param-row__value"
+        type="number"
+        aria-label={name}
+        step={meta?.increment ?? 'any'}
+        value={entry.value}
+        onChange={(e) => {
+          const v = Number(e.target.value)
+          if (Number.isFinite(v)) edit(name, v)
+        }}
+      />
+
+      {/* The number and the dropdown are separate fields rather than one
+          control that changes shape: the number is what the vehicle stores
+          and what a .param file carries, and it stays editable even when the
+          value is not one of the listed options. */}
       {meta?.values && !meta.bitmask ? (
         <LaSelect
           value={String(entry.value)}
-          aria-label={name}
+          aria-label={`${name} options`}
           onChange={(e) => edit(name, Number(e.target.value))}
-          className="param-row__control"
+          className="param-row__options"
         >
-          {/* Both the number and what it means: the number is what the
-              vehicle stores, what a forum post quotes and what a .param file
-              carries, so hiding it makes the two hard to reconcile. */}
           {Object.entries(meta.values).map(([v, label]) => (
             <option key={v} value={v}>
               {v} — {label}
             </option>
           ))}
           {meta.values[entry.value] === undefined && (
-            <option value={String(entry.value)}>{entry.value} — (not a listed option)</option>
+            <option value={String(entry.value)}>{entry.value} — not a listed option</option>
           )}
         </LaSelect>
+      ) : meta?.bitmask ? (
+        <LaButton
+          variant="ghost"
+          size="sm"
+          className="param-row__options"
+          onClick={() => setBitmaskOpen(true)}
+        >
+          Edit bits…
+        </LaButton>
       ) : (
-        <input
-          className="la-input la-input--num param-row__control"
-          type="number"
-          aria-label={name}
-          step={meta?.increment ?? 'any'}
-          value={entry.value}
-          onChange={(e) => {
-            const v = Number(e.target.value)
-            if (Number.isFinite(v)) edit(name, v)
-          }}
-        />
+        <span className="param-row__options" />
       )}
 
       <span className="param-row__unit">{meta?.units ?? ''}</span>
-
-      {meta?.bitmask ? (
-        <LaButton variant="ghost" size="sm" onClick={() => setBitmaskOpen(true)}>
-          Bits…
-        </LaButton>
-      ) : (
-        <span />
-      )}
 
       <div className="param-row__meta">
         {/* The decoded value first: on a bitmask row it is the only readable

@@ -846,7 +846,12 @@
 /* The params card owns the remaining height and scrolls internally: the
    virtualizer needs a bounded scroll container, and the ~1400-row table
    should never drive the page's own scrollbar. */
-.params-card {
+/* The child selector matters: `.app-content > .la-card` caps cards at 860px
+   and is two classes, so a bare `.params-card` override lost the cascade and
+   the table sat in a column two thirds of the window wide. The parameter
+   table is the one card that wants everything -- 1400 rows of name, value
+   and a paragraph of description have somewhere to put the width. */
+.app-content > .params-card {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -869,9 +874,18 @@
 
 /* One row: name | control | unit | (bits) | range hint. Names are
    monospace so columns of values read as a table without being one. */
+/* Six columns, always the same six, so values line up down the page and the
+   eye can run a column instead of re-reading each row. Everything but the
+   last is a fixed width; the description takes whatever the window has,
+   which is the point of letting this card use the full page. */
 .param-row {
   display: grid;
-  grid-template-columns: 240px 170px 48px 62px minmax(0, 1fr);
+  grid-template-columns:
+    minmax(180px, 260px)   /* name over display name */
+    104px                  /* the number, always present */
+    minmax(150px, 230px)   /* options dropdown, or the bits button */
+    46px                   /* unit */
+    minmax(0, 1fr);        /* decoded value, description, range */
   align-items: center;
   gap: var(--la-space-3);
   padding: var(--la-space-1) var(--la-space-3);
@@ -894,14 +908,38 @@
   white-space: nowrap;
 }
 
+/* The value column is right-aligned and monospaced: a column of numbers is
+   only comparable at a glance if the digits line up. */
+.param-row__value {
+  width: 100%;
+  text-align: right;
+  font-family: var(--la-font-mono);
+}
+/* One slot, whatever fills it -- a dropdown, the bits button, or nothing.
+   The button does not stretch to the full column; a 230px ghost button reads
+   as a panel rather than an action. */
+.param-row__options {
+  min-width: 0;
+  width: 100%;
+}
+.param-row__options.la-btn {
+  width: auto;
+  justify-self: start;
+}
+.param-row__unit {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .param-row__meta {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-/* What the number means, when the metadata can say -- the option's name, or
-   the bits that are set. First, because on a bitmask row it is the only
-   readable form of the value sitting beside it. */
+/* What the number means when only the metadata can say -- the bits that are
+   set. Named values say it in their own dropdown instead. */
 .param-row__decoded {
   font-size: var(--la-size-xs);
   color: var(--la-blue-deep);
@@ -915,6 +953,27 @@
 .param-row__desc {
   font-size: var(--la-size-xs);
   color: var(--la-ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.param-row__hint {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  font-family: var(--la-font-mono);
+  white-space: nowrap;
+}
+
+/* The staged-change highlight uses the brand highlight fill, same as the
+   sequencers' .is-lit rows: orange means "this is what Write will send". */
+.param-row--dirty,
+.is-dirty {
+  background: var(--la-orange-soft);
+}
+
+.param-row__name {
+  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
+  color: var(--la-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
