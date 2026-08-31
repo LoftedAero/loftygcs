@@ -6,6 +6,7 @@ import { SENSOR_BITS } from '../../../protocol/sensors'
 import { armReadiness, batteryLabel, isFailsafe, linkLabel } from './hud-draw'
 import { paintHud } from './hud-paint'
 import VideoLayer from './VideoLayer'
+import { videoService } from '../../../services/video'
 
 // The HUD as a stack of layers rather than one canvas:
 //
@@ -25,12 +26,14 @@ export interface HudProps {
   horizon: boolean
   /** Draw the tapes, state and telemetry over whatever is behind them. */
   overlays: boolean
+  /** Screen position of a right-click on the HUD, for its own menu. */
+  onContextMenu?: (p: { x: number; y: number }) => void
 }
 
 /** How long "ARMED" stays on screen after the transition. */
 const ARMED_BANNER_MS = 4000
 
-export default function Hud({ horizon, overlays }: HudProps) {
+export default function Hud({ horizon, overlays, onContextMenu }: HudProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Read inside the animation frame rather than closed over, so toggling a
   // layer does not have to tear down and restart the loop.
@@ -40,6 +43,13 @@ export default function Hud({ horizon, overlays }: HudProps) {
   // get out of the way. DISARMED stays up: on the ground it is the answer to
   // "why did nothing happen", and in the air it never appears.
   const armedAt = useRef({ armed: false, at: 0 })
+  // Whether there is a picture behind the canvas. A ref, read inside the
+  // frame, so a stream starting does not re-render anything.
+  const videoBehind = useRef(false)
+  useEffect(
+    () => videoService.onStatus((s) => (videoBehind.current = s.state === 'playing')),
+    [],
+  )
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -85,6 +95,7 @@ export default function Hud({ horizon, overlays }: HudProps) {
         readiness: armReadiness(v.armed, v.sensorsPresent, v.sensorsHealth, SENSOR_BITS.prearm),
         horizon: flags.current.horizon,
         overlays: flags.current.overlays,
+        videoBehind: videoBehind.current,
       })
     }
     raf = requestAnimationFrame(draw)
@@ -92,7 +103,15 @@ export default function Hud({ horizon, overlays }: HudProps) {
   }, [])
 
   return (
-    <div className="flight-hud">
+    <div
+      className="flight-hud"
+      onContextMenu={(e) => {
+        if (!onContextMenu) return
+        // Ours replaces the browser's, the same bargain the map makes.
+        e.preventDefault()
+        onContextMenu({ x: e.clientX, y: e.clientY })
+      }}
+    >
       {/* The background layer: decoded video, behind the instruments. */}
       <div className="flight-hud__background">
         <VideoLayer />

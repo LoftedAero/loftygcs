@@ -1600,7 +1600,8 @@ body.is-splitting .flight-map {
 
 /* --- The right-click menu -------------------------------------------- */
 
-.map-menu {
+/* The shell both right-click menus share -- on the map and on the HUD. */
+.context-menu {
   position: fixed;
   z-index: 1200;
   width: 230px;
@@ -1612,6 +1613,28 @@ body.is-splitting .flight-map {
   border: 1px solid var(--la-line-strong);
   border-radius: var(--la-radius);
   box-shadow: var(--la-shadow-2);
+}
+.context-menu__heading {
+  margin: 0;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+}
+.context-menu__heading + * {
+  margin-top: calc(var(--la-space-1) * -1);
+}
+/* Same reasoning as the View menu: toggles aligned to one edge so the on/off
+   column can be scanned down rather than hunted for after each label. */
+.context-menu .la-switch {
+  justify-content: space-between;
+}
+.context-menu__actions {
+  display: flex;
+  gap: var(--la-space-2);
+  padding-top: var(--la-space-2);
+  border-top: 1px solid var(--la-line);
 }
 .map-menu__coords {
   margin: 0;

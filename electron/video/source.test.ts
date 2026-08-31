@@ -11,6 +11,7 @@
 // picture, which is the hardest kind of bug to diagnose against a drone.
 
 import net from 'node:net'
+import dgram from 'node:dgram'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openSource } from './source'
 import type { AccessUnit } from './h264'
@@ -190,5 +191,23 @@ describe('RTSP source', () => {
 
   it('rejects a URL that is not RTSP', async () => {
     await expect(firstUnit('http://127.0.0.1/stream', 3000)).rejects.toThrow(/Not an RTSP URL/)
+  })
+})
+
+describe('UDP source', () => {
+  it('says so when the port is already taken', async () => {
+    // Found the hard way: with SO_REUSEADDR the second bind succeeds and the
+    // first socket keeps the datagrams, so the app reports "Listening" and
+    // then shows nothing at all, with nothing to explain why. A user running
+    // another GCS on the same video port would hit exactly this.
+    const held = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+    const port = await new Promise<number>((resolve) => {
+      held.bind(0, '0.0.0.0', () => resolve(held.address().port))
+    })
+    try {
+      await expect(firstUnit(`udp://:${port}`, 4000)).rejects.toThrow(/already in use/i)
+    } finally {
+      held.close()
+    }
   })
 })

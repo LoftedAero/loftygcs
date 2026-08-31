@@ -171,6 +171,43 @@ describe('H264Depayloader', () => {
   })
 })
 
+describe('access unit delimiters', () => {
+  /** The NAL types of an Annex-B buffer, in order. */
+  function order(data: Uint8Array): number[] {
+    const types: number[] = []
+    for (let i = 0; i + 4 < data.length; i++) {
+      if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0 && data[i + 3] === 1) {
+        types.push((data[i + 4] ?? 0) & 0x1f)
+        i += 3
+      }
+    }
+    return types
+  }
+
+  it('keeps a delimiter first, ahead of the parameter sets', () => {
+    // x264 -- and most cameras -- put an AUD at the head of every access
+    // unit. Inserting SPS/PPS in front of it makes a stream libav still
+    // decodes but Chromium refuses, reporting that no key frame ever
+    // arrived: the picture simply never appears in the HUD. Found against
+    // a real WebCodecs decoder, so it is asserted here.
+    const d = new H264Depayloader()
+    d.setParameterSets(Uint8Array.from(SPS), Uint8Array.from(PPS))
+    d.push(parseRtp(rtp(nal(9, 0x10), { seq: 0 }))!)
+    const units = d.push(parseRtp(rtp(nal(5, 0xaa), { seq: 1, marker: true }))!)
+
+    expect(units).toHaveLength(1)
+    expect(units[0]!.keyframe).toBe(true)
+    expect(order(units[0]!.data)).toEqual([9, 7, 8, 5])
+  })
+
+  it('puts the parameter sets first when there is no delimiter', () => {
+    const d = new H264Depayloader()
+    d.setParameterSets(Uint8Array.from(SPS), Uint8Array.from(PPS))
+    const units = d.push(parseRtp(rtp(nal(5, 0xaa), { seq: 0, marker: true }))!)
+    expect(order(units[0]!.data)).toEqual([7, 8, 5])
+  })
+})
+
 describe('toAnnexB and nalType', () => {
   it('prefixes every NAL with a start code', () => {
     expect([...toAnnexB([Uint8Array.of(0x67, 1), Uint8Array.of(0x68)])]).toEqual([

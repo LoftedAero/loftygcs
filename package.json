@@ -20,6 +20,8 @@
     "test": "vitest run",
     "sitl": "node scripts/sitl.mjs run",
     "sitl:fetch": "node scripts/sitl.mjs fetch",
+    "video:testsrc": "node scripts/video-testsrc.mjs rtsp",
+    "video:testsrc:udp": "node scripts/video-testsrc.mjs udp",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint ."
   },

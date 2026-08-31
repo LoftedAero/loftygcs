@@ -57,6 +57,13 @@ export interface HudState {
   readiness: ArmReadiness
   horizon: boolean
   overlays: boolean
+  /**
+   * A video picture is showing behind this canvas. The horizon then draws its
+   * symbology only -- line, ladder, bank scale -- and leaves out the sky and
+   * ground fill, which would otherwise paint straight over the picture and
+   * make switching video on look like it did nothing at all.
+   */
+  videoBehind: boolean
 }
 
 interface Text {
@@ -281,7 +288,6 @@ function paintHorizon(
   st: HudState,
   s: number,
 ) {
-  const g = gradients(ctx, h * 2)
   const place = () => {
     ctx.translate(cx, cy)
     ctx.rotate(-st.roll)
@@ -297,10 +303,15 @@ function paintHorizon(
   ctx.clip()
   place()
   const reach = Math.max(w, h) * 2
-  ctx.fillStyle = g.sky
-  ctx.fillRect(-reach, -h * 2, reach * 2, h * 2)
-  ctx.fillStyle = g.ground
-  ctx.fillRect(-reach, 0, reach * 2, h * 2)
+  // Over video the fill is left out, so the camera picture is what fills the
+  // sky and ground and the horizon becomes a line drawn on it.
+  if (!st.videoBehind) {
+    const g = gradients(ctx, h * 2)
+    ctx.fillStyle = g.sky
+    ctx.fillRect(-reach, -h * 2, reach * 2, h * 2)
+    ctx.fillStyle = g.ground
+    ctx.fillRect(-reach, 0, reach * 2, h * 2)
+  }
   ctx.strokeStyle = INK
   ctx.lineWidth = 1.6 * s
   ctx.beginPath()

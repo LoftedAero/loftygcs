@@ -66,7 +66,7 @@ export default function MapContextMenu({
   const guided = modeName === 'Guided'
 
   return (
-    <div className="map-menu" style={style} ref={boxRef} role="menu">
+    <div className="context-menu map-menu" style={style} ref={boxRef} role="menu">
       <p className="map-menu__coords">
         {point.lat.toFixed(6)}, {point.lon.toFixed(6)}
       </p>

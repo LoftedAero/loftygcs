@@ -8,3 +8,6 @@ dist-demo/
 
 # Local SITL binaries + their eeprom/log state (npm run sitl:fetch)
 sitl/
+
+# The encoded clip the video test source serves (npm run video:testsrc)
+video-fixtures/

@@ -9,6 +9,7 @@ import Hud from './Hud'
 import Divider from './Divider'
 import FlightControls from './FlightControls'
 import MapContextMenu, { type MapMenuPoint } from './MapContextMenu'
+import HudContextMenu, { type HudMenuPoint } from './HudContextMenu'
 import PlotPanel from './PlotPanel'
 import FieldPicker from './FieldPicker'
 import StatusList from './StatusList'
@@ -26,6 +27,7 @@ export default function FlightTab() {
   const phase = useConnectionStore((s) => s.phase)
   const [follow, setFollow] = useState(true)
   const [menu, setMenu] = useState<MapMenuPoint | null>(null)
+  const [hudMenu, setHudMenu] = useState<HudMenuPoint | null>(null)
   const [target, setTarget] = useState<{ lat: number; lon: number } | null>(null)
   const [home, setHomePin] = useState<{ lat: number; lon: number } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -53,7 +55,9 @@ export default function FlightTab() {
       home={home}
     />
   )
-  const hudPanel = <Hud horizon={layout.hudHorizon} overlays={layout.hudOverlays} />
+  const hudPanel = (
+    <Hud horizon={layout.hudHorizon} overlays={layout.hudOverlays} onContextMenu={setHudMenu} />
+  )
 
   const aspectIsHud = layout.aspectPanel === 'hud'
   const aspectVisible = aspectIsHud ? layout.showHud : layout.showMap
@@ -126,6 +130,14 @@ export default function FlightTab() {
         onToggle={layout.togglePlotField}
         onClose={() => setPickerOpen(false)}
       />
+
+      {hudMenu && (
+        <HudContextMenu
+          point={hudMenu}
+          onClose={() => setHudMenu(null)}
+          onVideo={() => setVideoOpen(true)}
+        />
+      )}
 
       {menu && (
         <MapContextMenu

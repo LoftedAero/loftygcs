@@ -63,6 +63,28 @@ Planner uses, into gitignored `sitl/`), then `npm run sitl` to start it — it s
 it (`src/protocol/*.integration.test.ts`, `electron/sitl-core.test.ts`). The desktop app can
 also install and run SITL itself — Overview > Simulator (`electron/sitl-core.ts`).
 
+## Video test source
+
+Same discipline as SITL, for the HUD video path: our own fake RTSP server can only confirm
+what we already believe, so the client is also run against GStreamer, which makes none of our
+assumptions.
+
+`npm run video:testsrc` serves `rtsp://127.0.0.1:8554/test`; `npm run video:testsrc:udp` sends
+RTP to `127.0.0.1:5600`. Then `VIDEO=1 npm test` runs `electron/video/source.live.test.ts`
+(skipped otherwise). GStreamer is *not* a dependency — it is the thing we replaced, and it
+appears only in `scripts/`. On Windows it is usually already present inside Mission Planner,
+which is where the script looks.
+
+**Both transports are needed, and this is not obvious.** RTP interleaved over RTSP's TCP
+socket has no datagram limit, so GStreamer sends each keyframe whole and the FU-A reassembly
+path never executes — the RTSP tests stayed green against a depayloader deliberately broken to
+drop fragments. Only the UDP source, with `mtu=1200`, forces fragmentation. Two further traps
+found the same way: `videotestsrc pattern=ball` encodes so small that keyframes fit in two
+packets (hence `circular`, ~145 KB a keyframe), and `avdec_h264` conceals a truncated slice and
+still emits a frame, so the decoded frame count matches unless `output-corrupt=false` is set.
+The size assertions there are calibrated against measured values, not guessed — if one fails,
+suspect the fixture went slack before suspecting the client.
+
 **SITL gotcha that bit us twice:** it accepts exactly one TCP client and exits the moment that
 client disconnects, so never probe the port to check readiness — watch stdout for the
 `SERIAL0 on TCP port` banner instead (`waitForReady`). Every protocol feature must be demonstrated

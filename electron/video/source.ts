@@ -83,9 +83,25 @@ class UdpSource extends BaseSource {
     const m = /^udp:\/\/([^:/]*)(?::(\d+))?/i.exec(url)
     const host = m?.[1] || '0.0.0.0'
     const port = Number(m?.[2] ?? 5600)
-    this.socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+    // Deliberately NOT reuseAddr. With it set, binding a port something else
+    // already holds succeeds on Windows and the other socket keeps the
+    // datagrams -- so the app says "Listening" and shows nothing, forever,
+    // with no error to explain it. Failing the bind instead turns a mystery
+    // into a sentence. (Multicast would want the port shared; when we support
+    // it, that is where reuse belongs, alongside joining the group.)
+    this.socket = dgram.createSocket({ type: 'udp4' })
     this.socket.on('message', (msg) => this.feed(new Uint8Array(msg)))
-    this.socket.on('error', (err) => this.emit('error', err))
+    this.socket.on('error', (err) => {
+      const e = err as NodeJS.ErrnoException
+      this.emit(
+        'error',
+        e.code === 'EADDRINUSE'
+          ? new Error(
+              `Port ${port} is already in use -- another program is receiving video on it`,
+            )
+          : err,
+      )
+    })
     this.socket.bind(port, host, () => {
       this.emit('status', `Listening for RTP on ${host}:${port}`)
     })

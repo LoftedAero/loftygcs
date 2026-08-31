@@ -56,6 +56,7 @@ export function parseRtp(buf: Uint8Array): RtpPacket | null {
 export const NAL_IDR = 5
 export const NAL_SPS = 7
 export const NAL_PPS = 8
+export const NAL_AUD = 9
 
 const PKT_STAP_A = 24
 const PKT_FU_A = 28
@@ -197,7 +198,17 @@ export class H264Depayloader {
     this.nals = []
     if (nals.length === 0) return null
     const keyframe = nals.some((n) => nalType(n) === NAL_IDR)
-    const parts = keyframe && this.sps && this.pps ? [this.sps, this.pps, ...nals] : nals
+    let parts = nals
+    if (keyframe && this.sps && this.pps) {
+      // An access unit delimiter, when a sender emits one, has to stay the
+      // first NAL of the access unit -- so the parameter sets go after it,
+      // not in front of it. Getting this backwards produces a stream that
+      // libav happily decodes and Chromium rejects outright, with "a key
+      // frame is required after configure()": its parser will not accept the
+      // IDR that follows a misplaced delimiter, so the picture never appears.
+      const lead = nals.length > 0 && nalType(nals[0]!) === NAL_AUD ? 1 : 0
+      parts = [...nals.slice(0, lead), this.sps, this.pps, ...nals.slice(lead)]
+    }
     return { data: toAnnexB(parts), keyframe, timestamp }
   }
 }

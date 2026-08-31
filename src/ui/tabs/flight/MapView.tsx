@@ -95,7 +95,22 @@ export default function MapView({
     })
     trailRef.current = L.polyline([], { color: '#4684C5', weight: 3, opacity: 0.85 }).addTo(map)
     mapRef.current = map
+
+    // Leaflet caches its container's size and only watches the window, so any
+    // change to this pane -- closing the plot, dragging the divider, swapping
+    // sides -- leaves it drawing at the old size: the container grows and the
+    // map does not follow it. Watch the element itself instead.
+    let frame = 0
+    const observer = new ResizeObserver(() => {
+      // A divider drag fires this continuously; one call per frame is plenty.
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => map.invalidateSize({ animate: false }))
+    })
+    observer.observe(el)
+
     return () => {
+      observer.disconnect()
+      cancelAnimationFrame(frame)
       map.remove()
       mapRef.current = null
       markerRef.current = null
