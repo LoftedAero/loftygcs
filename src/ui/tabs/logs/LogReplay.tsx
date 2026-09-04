@@ -36,6 +36,26 @@ const CESIUM_BASE = './cesium/'
 const IMAGERY_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
+/**
+ * How the glTF models sit relative to Cesium's heading/pitch/roll.
+ *
+ * Both models come from Betaflight Configurator and share a convention that
+ * is not Cesium's: a raw heading of zero points them west rather than
+ * north, and their pitch and roll axes run the opposite way to ArduPilot's.
+ * So ArduPilot's yaw/pitch/roll maps to HeadingPitchRoll(yaw + 90, -pitch,
+ * -roll).
+ *
+ * Measured, not derived -- by drawing the models at known attitudes and
+ * looking: overhead to read heading, from behind to read roll, side-on with
+ * the aircraft facing east to read pitch. Reasoning about the conventions
+ * got this wrong twice, in opposite directions, before the pictures settled
+ * it. If a model is ever replaced, re-measure the same three ways rather
+ * than assuming these numbers carry over.
+ */
+const MODEL_HEADING_OFFSET_DEG = 90
+const MODEL_PITCH_SIGN = -1
+const MODEL_ROLL_SIGN = -1
+
 /** Playback speeds, in multiples of real time. */
 const SPEEDS = [1, 2, 5, 10, 25]
 
@@ -213,9 +233,9 @@ export default function LogReplay() {
               data: Cesium.Transforms.headingPitchRollQuaternion(
                 where,
                 new Cesium.HeadingPitchRoll(
-                  Cesium.Math.toRadians(s.yaw),
-                  Cesium.Math.toRadians(s.pitch),
-                  Cesium.Math.toRadians(s.roll),
+                  Cesium.Math.toRadians(s.yaw + MODEL_HEADING_OFFSET_DEG),
+                  Cesium.Math.toRadians(s.pitch * MODEL_PITCH_SIGN),
+                  Cesium.Math.toRadians(s.roll * MODEL_ROLL_SIGN),
                 ),
               ),
             }),
