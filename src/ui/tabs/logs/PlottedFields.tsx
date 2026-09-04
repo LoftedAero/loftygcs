@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { LaButton, LaHint } from '../../components/La'
-import { fieldUnit } from '../../../protocol/dataflash'
+import { fieldUnit, getSeries, seriesStats } from '../../../protocol/dataflash'
 import { fieldLabel } from '../../../protocol/log-labels'
-import { MAX_AXES, useLogStore } from '../../../stores/log-store'
+import { logEnd } from '../../../protocol/log-modes'
+import { MAX_AXES, TRACE_COLORS, traceColor, useLogStore } from '../../../stores/log-store'
 
 // What is on the plot, and which y axis each trace is drawn against.
 //
@@ -15,18 +17,6 @@ import { MAX_AXES, useLogStore } from '../../../stores/log-store'
 // fields sharing a unit land on the same axis, a new unit takes the next
 // free one. See defaultAxis in the store.
 
-/** Matches LogPlot's trace colors, so a row points at its own line. */
-const COLORS = [
-  '#F7941D',
-  '#4684C5',
-  '#2FAE4E',
-  '#D63031',
-  '#8E44AD',
-  '#16A085',
-  '#E67E22',
-  '#2C3E50',
-]
-
 export default function PlottedFields() {
   const log = useLogStore((s) => s.log)
   const selected = useLogStore((s) => s.selected)
@@ -34,6 +24,9 @@ export default function PlottedFields() {
   const toggleField = useLogStore((s) => s.toggleField)
   const clearFields = useLogStore((s) => s.clearFields)
   const gatherAxes = useLogStore((s) => s.gatherAxes)
+  const setFieldColor = useLogStore((s) => s.setFieldColor)
+  const timeWindow = useLogStore((s) => s.timeWindow)
+  const [picking, setPicking] = useState<string | null>(null)
 
   if (!log) return null
   if (selected.length === 0) {
@@ -53,12 +46,27 @@ export default function PlottedFields() {
       </div>
 
       {selected.map((f, i) => {
+        const id = `${f.message}.${f.field}`
         const named = fieldLabel(log.params, f.message, f.field)
         const unit = fieldUnit(log, f.message, f.field)
+        const color = traceColor(f, i)
+        const series = getSeries(log, f.message, f.field)
+        // Over the visible window, not the whole log: the number worth
+        // reading is the one for what is on screen.
+        const stats = series
+          ? seriesStats(series, timeWindow?.t0 ?? 0, timeWindow?.t1 ?? logEnd(log))
+          : null
         return (
-          <div key={`${f.message}.${f.field}`} className="plotted">
+          <div key={id} className="plotted">
             <div className="plotted__head">
-              <span className="plotted__swatch" style={{ background: COLORS[i % COLORS.length] }} />
+              <button
+                type="button"
+                className="plotted__swatch plotted__swatch--button"
+                style={{ background: color }}
+                aria-label={`Color for ${id}`}
+                aria-expanded={picking === id}
+                onClick={() => setPicking(picking === id ? null : id)}
+              />
               <span className="plotted__name">
                 {f.message}.{f.field}
               </span>
@@ -71,10 +79,43 @@ export default function PlottedFields() {
                 ✕
               </button>
             </div>
+            {picking === id && (
+              <div className="plotted__palette" role="group" aria-label={`Colors for ${id}`}>
+                {TRACE_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`plotted__chip${color === c ? ' is-active' : ''}`}
+                    style={{ background: c }}
+                    aria-label={c}
+                    onClick={() => {
+                      setFieldColor(f, c)
+                      setPicking(null)
+                    }}
+                  />
+                ))}
+              </div>
+            )}
             <div className="plotted__meta">
               {named && <span className="plotted__fn">{named}</span>}
               {unit && <span className="plotted__unit">{unit}</span>}
             </div>
+            {stats && stats.count > 0 && (
+              <dl className="plotted__stats">
+                <div>
+                  <dt>min</dt>
+                  <dd>{fmt(stats.min)}</dd>
+                </div>
+                <div>
+                  <dt>max</dt>
+                  <dd>{fmt(stats.max)}</dd>
+                </div>
+                <div>
+                  <dt>avg</dt>
+                  <dd>{fmt(stats.mean)}</dd>
+                </div>
+              </dl>
+            )}
             <div
               className="plotted__axes"
               role="radiogroup"
@@ -111,6 +152,17 @@ export default function PlottedFields() {
       <LaButton variant="ghost" size="block" onClick={clearFields}>
         Clear {selected.length} {selected.length === 1 ? 'field' : 'fields'}
       </LaButton>
+      {timeWindow && <LaHint>Statistics are for the zoomed range, not the whole log.</LaHint>}
     </section>
   )
+}
+
+/** Compact enough for a narrow column, without lying about the value. */
+function fmt(v: number): string {
+  if (!Number.isFinite(v)) return '—'
+  const abs = Math.abs(v)
+  if (abs >= 1e5 || (abs < 1e-3 && abs > 0)) return v.toExponential(1)
+  if (abs >= 100) return v.toFixed(1)
+  if (abs >= 1) return v.toFixed(2)
+  return v.toFixed(3)
 }

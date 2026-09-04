@@ -3688,3 +3688,52 @@ body.is-splitting .flight-map {
   font-size: var(--la-size-xs);
   color: var(--la-ink-3);
 }
+
+/* The swatch doubles as the color picker's trigger. */
+.plotted__swatch--button {
+  appearance: none;
+  border: 1px solid var(--la-line-strong);
+  height: 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+}
+.plotted__palette {
+  display: flex;
+  gap: var(--la-space-1);
+  flex-wrap: wrap;
+}
+.plotted__chip {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid transparent;
+  border-radius: var(--la-radius-sm);
+  cursor: pointer;
+  padding: 0;
+}
+.plotted__chip.is-active {
+  border-color: var(--la-ink);
+}
+/* min / max / avg over whatever range is on screen. */
+.plotted__stats {
+  display: flex;
+  gap: var(--la-space-3);
+  margin: 0;
+  padding-left: calc(10px + var(--la-space-2));
+  font-size: var(--la-size-xs);
+}
+.plotted__stats div {
+  display: flex;
+  gap: var(--la-space-1);
+  align-items: baseline;
+}
+.plotted__stats dt {
+  color: var(--la-ink-3);
+}
+.plotted__stats dd {
+  margin: 0;
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-ink-2);
+}

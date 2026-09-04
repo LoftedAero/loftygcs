@@ -20,6 +20,32 @@ export interface SelectedField {
   field: string
   /** Which y axis it is drawn against, 0-based. */
   axis: number
+  /** Trace color. Unset means the default for its position in the list. */
+  color?: string
+}
+
+/**
+ * Default trace colors, in order.
+ *
+ * The house palette's working colors first, then enough distinct hues to
+ * tell eight traces apart. A field keeps whichever it was given until the
+ * user says otherwise -- so removing a trace does not recolor the rest,
+ * which would make a plot you were reading rearrange itself.
+ */
+export const TRACE_COLORS = [
+  '#F7941D',
+  '#4684C5',
+  '#2FAE4E',
+  '#D63031',
+  '#8E44AD',
+  '#16A085',
+  '#E67E22',
+  '#2C3E50',
+]
+
+/** The color a field is drawn in: its own, or the default for its slot. */
+export function traceColor(field: SelectedField, index: number): string {
+  return field.color ?? TRACE_COLORS[index % TRACE_COLORS.length]!
 }
 
 /**
@@ -111,6 +137,17 @@ interface LogState {
   toggleField(field: { message: string; field: string }): void
   /** Move a plotted field to another axis. */
   setFieldAxis(field: { message: string; field: string }, axis: number): void
+  /** Recolor a plotted field. */
+  setFieldColor(field: { message: string; field: string }, color: string): void
+
+  /**
+   * The visible time window, or null for the whole log.
+   *
+   * In the store rather than in the plot because the statistics beside each
+   * field are for what is on screen, and they are drawn somewhere else.
+   */
+  timeWindow: { t0: number; t1: number } | null
+  setTimeWindow(window: { t0: number; t1: number } | null): void
   clearFields(): void
   setTableMessage(message: string | null): void
   setSearch(search: string): void
@@ -130,6 +167,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   tableMessage: null,
   search: '',
   shadeModes: true,
+  timeWindow: null,
   vehicleLogs: [],
   vehicleStatus: { kind: 'idle' },
 
@@ -160,6 +198,7 @@ export const useLogStore = create<LogState>((set, get) => ({
         // a guess at what the reader came for, and a wrong guess is a field
         // to remove before starting rather than a head start.
         selected: [],
+        timeWindow: null,
         tableMessage: firstPresent(log, ['MODE', 'MSG', 'ATT']),
       })
     } catch (err) {
@@ -175,6 +214,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       rawBytes: null,
       status: { kind: 'empty' },
       selected: [],
+      timeWindow: null,
       tableMessage: null,
       search: '',
     })
@@ -198,6 +238,15 @@ export const useLogStore = create<LogState>((set, get) => ({
       unit: log ? fieldUnit(log, f.message, f.field) : '',
     }))
     set({ selected: [...selected, { ...field, axis: defaultAxis(existing, unit) }] })
+  },
+
+  setFieldColor(field, color) {
+    const k = key(field)
+    set({ selected: get().selected.map((f) => (key(f) === k ? { ...f, color } : f)) })
+  },
+
+  setTimeWindow(timeWindow) {
+    set({ timeWindow })
   },
 
   setFieldAxis(field, axis) {

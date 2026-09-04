@@ -478,6 +478,42 @@ export function getSeries(log: ParsedLog, message: string, field: string): Serie
   return { message, field, unit: spec?.unit ?? '', time, values }
 }
 
+/** What a trace does over a stretch of time. */
+export interface SeriesStats {
+  min: number
+  max: number
+  mean: number
+  /** Samples inside the window. Zero means the window missed the data. */
+  count: number
+}
+
+/**
+ * Summarize a series over a time window.
+ *
+ * Over the *visible* window rather than the whole log, deliberately: the
+ * number worth reading is the one for what you are looking at. A maximum
+ * from a part of the flight you have zoomed away from answers a question
+ * nobody asked.
+ */
+export function seriesStats(s: Series, from: number, to: number): SeriesStats {
+  let min = Infinity
+  let max = -Infinity
+  let sum = 0
+  let count = 0
+  for (let i = 0; i < s.values.length; i++) {
+    const t = s.time[i]!
+    if (t < from || t > to) continue
+    const v = s.values[i]!
+    if (!Number.isFinite(v)) continue
+    if (v < min) min = v
+    if (v > max) max = v
+    sum += v
+    count++
+  }
+  if (count === 0) return { min: 0, max: 0, mean: 0, count: 0 }
+  return { min, max, mean: sum / count, count }
+}
+
 /** The unit a field reports, or '' if it declares none. */
 export function fieldUnit(log: ParsedLog, message: string, field: string): string {
   const spec = log.messages.get(message)?.format.fields.find((f) => f.name === field)

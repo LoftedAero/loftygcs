@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
-import { parseDataflash, getSeries, plottableFields, HEAD1, HEAD2 } from './dataflash'
+import {
+  parseDataflash,
+  getSeries,
+  plottableFields,
+  seriesStats,
+  HEAD1,
+  HEAD2,
+} from './dataflash'
 
 // Tested against a real ArduCopter SITL log rather than one this code wrote
 // itself -- the same discipline the video path uses GStreamer for. A parser
@@ -142,5 +149,39 @@ describe('surviving a damaged file', () => {
   it('knows a header when it sees one', () => {
     expect(HEAD1).toBe(0xa3)
     expect(HEAD2).toBe(0x95)
+  })
+})
+
+describe('summarizing a trace', () => {
+  it('reports min, max and mean over a window', () => {
+    const roll = getSeries(log, 'ATT', 'Roll')!
+    const all = seriesStats(roll, 0, 1e9)
+    expect(all.count).toBe(roll.values.length)
+    expect(all.min).toBeLessThanOrEqual(all.mean)
+    expect(all.mean).toBeLessThanOrEqual(all.max)
+    // Gravity again, as the arithmetic check that needs no fixture knowledge.
+    const accZ = seriesStats(getSeries(log, 'IMU', 'AccZ')!, 0, 1e9)
+    expect(accZ.mean).toBeGreaterThan(-11)
+    expect(accZ.mean).toBeLessThan(-9)
+  })
+
+  it('summarizes only what is inside the window', () => {
+    // The point of taking a window at all: a maximum from a part of the
+    // flight you have zoomed away from answers a question nobody asked.
+    const roll = getSeries(log, 'ATT', 'Roll')!
+    const mid = (roll.time[0]! + roll.time[roll.time.length - 1]!) / 2
+    const first = seriesStats(roll, roll.time[0]!, mid)
+    const second = seriesStats(roll, mid, roll.time[roll.time.length - 1]!)
+    const all = seriesStats(roll, 0, 1e9)
+    expect(first.count + second.count).toBeGreaterThanOrEqual(all.count)
+    expect(first.count).toBeGreaterThan(0)
+    expect(second.count).toBeGreaterThan(0)
+    expect(Math.min(first.min, second.min)).toBe(all.min)
+    expect(Math.max(first.max, second.max)).toBe(all.max)
+  })
+
+  it('says nothing rather than NaN when the window holds no samples', () => {
+    const roll = getSeries(log, 'ATT', 'Roll')!
+    expect(seriesStats(roll, 1e8, 1e9)).toEqual({ min: 0, max: 0, mean: 0, count: 0 })
   })
 })

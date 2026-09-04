@@ -116,11 +116,18 @@ export default function LogsTab() {
                   ))}
                 </div>
                 {view === 'plot' && (
-                  <LaSwitch
-                    label="Shade by flight mode"
-                    checked={shadeModes}
-                    onChange={(e) => setShadeModes(e.target.checked)}
-                  />
+                  <>
+                    <LaSwitch
+                      label="Shade by flight mode"
+                      checked={shadeModes}
+                      onChange={(e) => setShadeModes(e.target.checked)}
+                    />
+                    {/* Gestures are not discoverable by looking at a canvas. */}
+                    <LaHint>
+                      Drag across the plot to zoom to that stretch. Shift-drag pans, the wheel
+                      zooms, and a double-click puts it all back.
+                    </LaHint>
+                  </>
                 )}
               </section>
 

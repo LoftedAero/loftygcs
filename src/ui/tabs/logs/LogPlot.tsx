@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSeries, type Series } from '../../../protocol/dataflash'
 import { fieldLabel } from '../../../protocol/log-labels'
-import { MAX_AXES, useLogStore } from '../../../stores/log-store'
+import { MAX_AXES, traceColor, useLogStore } from '../../../stores/log-store'
 import { modeSpans, type ModeSpan } from '../../../protocol/log-modes'
 
 // The time-series plot, drawn on a canvas.
@@ -15,17 +15,6 @@ import { modeSpans, type ModeSpan } from '../../../protocol/log-modes'
 // the y range is what the data is, and a plot you can lose your data off the
 // top of is a plot you spend your time hunting in.
 
-const COLORS = [
-  '#F7941D',
-  '#4684C5',
-  '#2FAE4E',
-  '#D63031',
-  '#8E44AD',
-  '#16A085',
-  '#E67E22',
-  '#2C3E50',
-]
-
 /**
  * Width of one y-axis gutter, per plotted field.
  *
@@ -35,7 +24,7 @@ const COLORS = [
  */
 const AXIS_W = 58
 
-const PAD = { top: 12, bottom: 26, right: 14 }
+const PAD = { top: 26, bottom: 26, right: 14 }
 
 /** A series' own min and max within the visible window. */
 export function rangeOf(
@@ -96,16 +85,18 @@ export default function LogPlot() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
-  /** Visible time window, or null for "all of it". */
-  const [span, setSpan] = useState<{ t0: number; t1: number } | null>(null)
+  const span = useLogStore((s) => s.timeWindow)
+  const setSpan = useLogStore((s) => s.setTimeWindow)
   const [cursor, setCursor] = useState<number | null>(null)
+  /** Where a box-zoom drag started, and where it is now, in seconds. */
+  const [box, setBox] = useState<{ from: number; to: number } | null>(null)
 
   const series = useMemo(() => {
     if (!log) return []
     return selected
-      .map((f) => {
+      .map((f, i) => {
         const s = getSeries(log, f.message, f.field)
-        return s ? { ...s, axis: f.axis } : null
+        return s ? { ...s, axis: f.axis, color: traceColor(f, i) } : null
       })
       .filter((s): s is PlottedSeries => s !== null)
   }, [log, selected])
@@ -121,9 +112,6 @@ export default function LogPlot() {
     }
     return Number.isFinite(t0) ? { t0, t1 } : null
   }, [series])
-
-  // A new selection should not stay zoomed into the old one's window.
-  useEffect(() => setSpan(null), [log])
 
   useEffect(() => {
     const el = wrapRef.current
@@ -147,8 +135,8 @@ export default function LogPlot() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    draw(ctx, size, series, view, cursor, spans)
-  }, [size, series, view, cursor, spans])
+    draw(ctx, size, series, view, cursor, spans, box)
+  }, [size, series, view, cursor, spans, box])
 
   if (!log) return null
 
@@ -178,25 +166,48 @@ export default function LogPlot() {
         ref={canvasRef}
         style={{ width: '100%', height: '100%' }}
         onMouseMove={(e) => {
-          if (dragRef.current !== null) {
-            const t = toTime(e.clientX)
+          const t = toTime(e.clientX)
+          if (panRef.current !== null) {
             if (t !== null && view) {
-              const dt = dragRef.current - t
+              const dt = panRef.current - t
               setSpan({ t0: view.t0 + dt, t1: view.t1 + dt })
             }
             return
           }
-          setCursor(toTime(e.clientX))
+          if (boxRef.current !== null && t !== null) {
+            setBox({ from: boxRef.current, to: t })
+            setCursor(null)
+            return
+          }
+          setCursor(t)
         }}
         onMouseLeave={() => {
           setCursor(null)
-          dragRef.current = null
+          panRef.current = null
+          boxRef.current = null
+          setBox(null)
         }}
         onMouseDown={(e) => {
-          dragRef.current = toTime(e.clientX)
+          const t = toTime(e.clientX)
+          // Shift pans, plain drag boxes. Zooming is the thing done most
+          // often on a log, so it gets the unmodified gesture.
+          if (e.shiftKey) panRef.current = t
+          else boxRef.current = t
         }}
-        onMouseUp={() => {
-          dragRef.current = null
+        onMouseUp={(e) => {
+          panRef.current = null
+          const start = boxRef.current
+          boxRef.current = null
+          setBox(null)
+          if (start === null) return
+          const end = toTime(e.clientX)
+          if (end === null) return
+          // A click is not a zoom. Below a few pixels it was someone
+          // pointing at the trace, and zooming to a sliver of a second
+          // would be a nasty surprise.
+          const width = Math.abs(end - start)
+          if (!view || width < (view.t1 - view.t0) / 200) return
+          setSpan({ t0: Math.min(start, end), t1: Math.max(start, end) })
         }}
         onWheel={(e) => {
           if (!view) return
@@ -221,11 +232,13 @@ export default function LogPlot() {
   )
 }
 
-/** Where a drag started, in seconds. Outside state: it changes per frame. */
-const dragRef = { current: null as number | null }
+// Where each kind of drag began, in seconds. Outside React state because
+// they change on every pointer event and nothing renders from them.
+const panRef = { current: null as number | null }
+const boxRef = { current: null as number | null }
 
-/** A series with the axis it was assigned to. */
-export type PlottedSeries = Series & { axis: number }
+/** A series with the axis and color it was assigned. */
+export type PlottedSeries = Series & { axis: number; color: string }
 
 function Legend({
   series,
@@ -239,12 +252,12 @@ function Legend({
   const params = useLogStore((s) => s.log?.params)
   return (
     <div className="log-legend">
-      {series.map((s, i) => {
+      {series.map((s) => {
         const named = params ? fieldLabel(params, s.message, s.field) : null
         const at = cursor !== null ? sampleAt(s, cursor) : null
         return (
           <span key={`${s.message}.${s.field}`} className="log-legend__item">
-            <span className="log-legend__swatch" style={{ background: COLORS[i % COLORS.length] }} />
+            <span className="log-legend__swatch" style={{ background: s.color }} />
             <span className="log-legend__axis">Y{s.axis + 1}</span>
             <span className="log-legend__name">
               {s.message}.{s.field}
@@ -296,6 +309,7 @@ function draw(
   view: { t0: number; t1: number } | null,
   cursor: number | null,
   spans: ModeSpan[],
+  box: { from: number; to: number } | null,
 ) {
   const style = getComputedStyle(document.documentElement)
   const ink = style.getPropertyValue('--la-ink-2').trim() || '#555'
@@ -372,13 +386,22 @@ function draw(
     // An axis carrying one trace takes that trace's color, which is what
     // ties the numbers to the line. An axis shared by several has no one
     // color to borrow, so it stays neutral and the legend does the tying.
-    ctx.fillStyle =
-      on.length === 1 ? COLORS[series.indexOf(on[0]!) % COLORS.length]! : ink
+    ctx.fillStyle = on.length === 1 ? on[0]!.color : ink
     ctx.textAlign = 'right'
     const x = (column + 1) * AXIS_W + 4
     for (let i = 0; i <= 4; i++) {
       const y = PAD.top + (plotH * i) / 4
       ctx.fillText(format(r.max - ((r.max - r.min) * i) / 4), x, y)
+    }
+    // The unit at the head of its column: without it the numbers on a
+    // three-axis plot are three columns of digits meaning nothing.
+    const units = [...new Set(on.map((t) => t.unit).filter(Boolean))]
+    if (units.length > 0) {
+      // At the very top of the canvas, clear of the topmost tick: both are
+      // right-aligned to the same edge, so anything closer overlaps it.
+      ctx.textBaseline = 'top'
+      ctx.fillText(units.length === 1 ? units[0]! : 'mixed', x, 2)
+      ctx.textBaseline = 'middle'
     }
   })
 
@@ -403,8 +426,8 @@ function draw(
   ctx.beginPath()
   ctx.rect(left, PAD.top, plotW, plotH)
   ctx.clip()
-  series.forEach((s, idx) => {
-    ctx.strokeStyle = COLORS[idx % COLORS.length]!
+  series.forEach((s) => {
+    ctx.strokeStyle = s.color
     ctx.lineWidth = 1.4
     ctx.beginPath()
     // At most one segment per pixel column: a log has far more samples than
@@ -428,6 +451,27 @@ function draw(
     ctx.stroke()
   })
   ctx.restore()
+
+  // The zoom box, over everything so it is visible against any trace.
+  if (box && box.from !== box.to) {
+    const x0 = xOf(Math.min(box.from, box.to))
+    const x1 = xOf(Math.max(box.from, box.to))
+    ctx.fillStyle = 'rgba(70, 132, 197, 0.18)'
+    ctx.fillRect(x0, PAD.top, x1 - x0, plotH)
+    ctx.strokeStyle = '#4684C5'
+    ctx.beginPath()
+    ctx.moveTo(Math.round(x0) + 0.5, PAD.top)
+    ctx.lineTo(Math.round(x0) + 0.5, PAD.top + plotH)
+    ctx.moveTo(Math.round(x1) + 0.5, PAD.top)
+    ctx.lineTo(Math.round(x1) + 0.5, PAD.top + plotH)
+    ctx.stroke()
+    // How long the selection is, which is the number being chosen.
+    ctx.fillStyle = ink
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fillText(`${Math.abs(box.to - box.from).toFixed(2)} s`, (x0 + x1) / 2, PAD.top + 4)
+    ctx.textBaseline = 'middle'
+  }
 
   if (cursor !== null && cursor >= view.t0 && cursor <= view.t1) {
     ctx.strokeStyle = ink
