@@ -59,13 +59,19 @@ interface LogState {
   /** Filter text for the field picker. */
   search: string
   /**
-   * Draw every series on its own 0..1 scale.
+   * How the y axis is scaled.
    *
-   * Off by default because a shared axis is the truthful view; on the
-   * moment you put degrees and microseconds on one plot, where shape is the
-   * only thing left worth comparing.
+   * 'perField' gives every trace its own axis and its own range, which is
+   * what plot.ardupilot.org does and what makes a mixed-unit plot readable
+   * at all -- an altitude in metres beside a servo output in microseconds
+   * is otherwise a flat line along the bottom. 'shared' puts everything on
+   * one axis, which is what you want the moment two traces are the same
+   * quantity: desired roll against actual roll only means something when
+   * they are drawn against the same numbers.
    */
-  normalize: boolean
+  axisMode: 'perField' | 'shared'
+  /** Shade the plot behind the traces by flight mode. */
+  shadeModes: boolean
 
   /** Logs found on the vehicle, newest first. */
   vehicleLogs: VehicleLog[]
@@ -81,7 +87,8 @@ interface LogState {
   clearFields(): void
   setTableMessage(message: string | null): void
   setSearch(search: string): void
-  setNormalize(on: boolean): void
+  setAxisMode(mode: 'perField' | 'shared'): void
+  setShadeModes(on: boolean): void
 }
 
 const key = (f: SelectedField) => `${f.message}.${f.field}`
@@ -94,7 +101,8 @@ export const useLogStore = create<LogState>((set, get) => ({
   selected: [],
   tableMessage: null,
   search: '',
-  normalize: false,
+  axisMode: 'perField',
+  shadeModes: true,
   vehicleLogs: [],
   vehicleStatus: { kind: 'idle' },
 
@@ -121,15 +129,12 @@ export const useLogStore = create<LogState>((set, get) => ({
         log,
         rawBytes: bytes,
         status: { kind: 'ready', name },
+        // Nothing plotted to begin with. Opening on an altitude trace was
+        // a guess at what the reader came for, and a wrong guess is a field
+        // to remove before starting rather than a head start.
         selected: [],
-        // Open on something worth looking at rather than an empty plot: the
-        // altitude trace is what nearly every review starts from.
         tableMessage: firstPresent(log, ['MODE', 'MSG', 'ATT']),
       })
-      const opening = firstPresent(log, ['BARO', 'CTUN', 'ATT'])
-      if (opening === 'BARO') get().toggleField({ message: 'BARO', field: 'Alt' })
-      else if (opening === 'CTUN') get().toggleField({ message: 'CTUN', field: 'Alt' })
-      else if (opening === 'ATT') get().toggleField({ message: 'ATT', field: 'Roll' })
     } catch (err) {
       set({ status: { kind: 'error', text: err instanceof Error ? err.message : 'could not read that file' } })
     }
@@ -171,8 +176,12 @@ export const useLogStore = create<LogState>((set, get) => ({
     set({ search })
   },
 
-  setNormalize(normalize) {
-    set({ normalize })
+  setAxisMode(axisMode) {
+    set({ axisMode })
+  },
+
+  setShadeModes(shadeModes) {
+    set({ shadeModes })
   },
 }))
 

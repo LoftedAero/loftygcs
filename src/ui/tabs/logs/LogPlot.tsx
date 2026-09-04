@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSeries, type Series } from '../../../protocol/dataflash'
 import { fieldLabel } from '../../../protocol/log-labels'
 import { useLogStore } from '../../../stores/log-store'
+import { modeSpans, type ModeSpan } from '../../../protocol/log-modes'
 
 // The time-series plot, drawn on a canvas.
 //
@@ -25,67 +26,67 @@ const COLORS = [
   '#2C3E50',
 ]
 
-const PAD = { left: 58, right: 58, top: 12, bottom: 26 }
-
 /**
- * Group the selected series by unit, and give each group its own y range.
+ * Width of one y-axis gutter, per plotted field.
  *
- * A shared axis is the truthful view only while everything on it is
- * measured in the same thing. Put an altitude in metres beside a servo
- * output in microseconds and the altitude becomes a flat line along the
- * bottom -- which is what this plot did until it grouped.
- *
- * Two groups get real axes, left and right. Beyond two there is nowhere
- * left to put an axis, so every group is scaled to its own range and the
- * legend says so: at that point only the shapes are comparable anyway.
+ * Wide enough for the longest thing format() produces -- "2.29e-3" is
+ * seven monospace characters -- plus a gap. At 46 the columns touched and
+ * read as one number: "1176.0" and "2.29e-3" became "1176.02.29e-3".
  */
-export interface AxisGroup {
-  unit: string
-  min: number
-  max: number
-  /** Indices into the series array. */
-  members: number[]
+const AXIS_W = 58
+
+/** Beyond this many axes there is no room left to plot in. */
+const MAX_AXES = 4
+
+const PAD = { top: 12, bottom: 26, right: 14 }
+
+/** A series' own min and max within the visible window. */
+export function rangeOf(
+  s: { time: Float64Array; values: Float64Array },
+  view: { t0: number; t1: number },
+): { min: number; max: number } {
+  let min = Infinity
+  let max = -Infinity
+  for (let i = 0; i < s.values.length; i++) {
+    const t = s.time[i]!
+    if (t < view.t0 || t > view.t1) continue
+    const v = s.values[i]!
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+  if (!Number.isFinite(min)) return { min: 0, max: 1 }
+  // A constant trace still needs a band to be drawn in, or it lands on a
+  // division by zero and vanishes.
+  return min === max ? { min: min - 1, max: max + 1 } : { min, max }
 }
 
-export function groupByUnit(
-  series: { unit: string; time: Float64Array; values: Float64Array }[],
+/**
+ * The y range each series is drawn against.
+ *
+ * Per field by default, the way plot.ardupilot.org does it: every trace at
+ * its own scale with its own axis, so an altitude in metres and a servo
+ * output in microseconds are both legible on one plot. Shared is the mode
+ * for when the traces *are* comparable -- desired roll against actual roll
+ * says nothing unless both are drawn against the same numbers.
+ */
+export function scalesFor(
+  series: { time: Float64Array; values: Float64Array }[],
   view: { t0: number; t1: number },
-): AxisGroup[] {
-  const groups = new Map<string, AxisGroup>()
-  series.forEach((s, idx) => {
-    let g = groups.get(s.unit)
-    if (!g) {
-      g = { unit: s.unit, min: Infinity, max: -Infinity, members: [] }
-      groups.set(s.unit, g)
-    }
-    g.members.push(idx)
-    for (let i = 0; i < s.values.length; i++) {
-      const t = s.time[i]!
-      if (t < view.t0 || t > view.t1) continue
-      const v = s.values[i]!
-      if (v < g.min) g.min = v
-      if (v > g.max) g.max = v
-    }
-  })
-  for (const g of groups.values()) {
-    if (!Number.isFinite(g.min)) {
-      g.min = 0
-      g.max = 1
-    }
-    if (g.min === g.max) {
-      // A constant trace still needs a band to be drawn in, or it lands on
-      // a division by zero and disappears.
-      g.min -= 1
-      g.max += 1
-    }
-  }
-  return [...groups.values()]
+  mode: 'perField' | 'shared',
+): { min: number; max: number }[] {
+  const own = series.map((s) => rangeOf(s, view))
+  if (mode === 'perField') return own
+  const min = Math.min(...own.map((r) => r.min))
+  const max = Math.max(...own.map((r) => r.max))
+  return own.map(() => (min === max ? { min: min - 1, max: max + 1 } : { min, max }))
 }
 
 export default function LogPlot() {
   const log = useLogStore((s) => s.log)
   const selected = useLogStore((s) => s.selected)
-  const normalize = useLogStore((s) => s.normalize)
+  const axisMode = useLogStore((s) => s.axisMode)
+  const shadeModes = useLogStore((s) => s.shadeModes)
+  const spans = useMemo(() => (log && shadeModes ? modeSpans(log) : []), [log, shadeModes])
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -137,33 +138,33 @@ export default function LogPlot() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    draw(ctx, size, series, view, normalize, cursor)
-  }, [size, series, view, normalize, cursor])
+    draw(ctx, size, series, view, axisMode, cursor, spans)
+  }, [size, series, view, axisMode, cursor, spans])
 
   if (!log) return null
-  if (series.length === 0) {
-    return (
-      <div className="log-plot log-plot--empty">
-        <p className="app-placeholder">
-          Pick a field on the right to plot it. Fields are grouped by the message that carries
-          them, and RC and servo channels are named by what they do on this aircraft.
-        </p>
-      </div>
-    )
-  }
 
   const toTime = (clientX: number): number | null => {
     const canvas = canvasRef.current
     if (!canvas || !view) return null
     const rect = canvas.getBoundingClientRect()
-    const x = clientX - rect.left
-    const w = size.w - PAD.left - PAD.right
+    const left = gutter(series.length, axisMode)
+    const w = size.w - left - PAD.right
     if (w <= 0) return null
-    return view.t0 + ((x - PAD.left) / w) * (view.t1 - view.t0)
+    return view.t0 + ((clientX - rect.left - left) / w) * (view.t1 - view.t0)
   }
 
   return (
+    // The wrapper and canvas are always mounted, even with nothing selected.
+    // Returning a different element for the empty case left the sizing
+    // observer -- which runs once, on mount -- attached to nothing, so the
+    // canvas stayed zero-sized and drew nothing for the rest of the session.
     <div className="log-plot" ref={wrapRef}>
+      {series.length === 0 && (
+        <p className="log-plot__hint app-placeholder">
+          Pick a field on the left to plot it. Fields are grouped by the message that carries
+          them, and RC and servo channels are named by what they do on this aircraft.
+        </p>
+      )}
       <canvas
         ref={canvasRef}
         style={{ width: '100%', height: '100%' }}
@@ -249,24 +250,6 @@ function Legend({
   )
 }
 
-/** A series' own min and max within the visible window. */
-function rangeOf(
-  s: { time: Float64Array; values: Float64Array },
-  view: { t0: number; t1: number },
-): { min: number; max: number } {
-  let min = Infinity
-  let max = -Infinity
-  for (let i = 0; i < s.values.length; i++) {
-    const t = s.time[i]!
-    if (t < view.t0 || t > view.t1) continue
-    const v = s.values[i]!
-    if (v < min) min = v
-    if (v > max) max = v
-  }
-  if (!Number.isFinite(min)) return { min: 0, max: 1 }
-  return min === max ? { min: min - 1, max: max + 1 } : { min, max }
-}
-
 /** Value of a series at a time, by binary search. Null outside its range. */
 function sampleAt(s: Series, t: number): number | null {
   const time = s.time
@@ -288,16 +271,24 @@ function format(v: number): string {
   return v.toFixed(abs >= 100 ? 1 : 3)
 }
 
+/** How much room the y axes need on the left. */
+function gutter(count: number, mode: 'perField' | 'shared'): number {
+  if (mode === 'shared') return AXIS_W + 12
+  return Math.max(1, Math.min(count, MAX_AXES)) * AXIS_W + 12
+}
+
 function draw(
   ctx: CanvasRenderingContext2D,
   size: { w: number; h: number },
   series: Series[],
   view: { t0: number; t1: number } | null,
-  normalize: boolean,
+  axisMode: 'perField' | 'shared',
   cursor: number | null,
+  spans: ModeSpan[],
 ) {
   const style = getComputedStyle(document.documentElement)
   const ink = style.getPropertyValue('--la-ink-2').trim() || '#555'
+  const faint = style.getPropertyValue('--la-ink-3').trim() || '#888'
   const grid = style.getPropertyValue('--la-line').trim() || '#ddd'
   const surface = style.getPropertyValue('--la-surface').trim() || '#fff'
 
@@ -305,74 +296,84 @@ function draw(
   ctx.fillRect(0, 0, size.w, size.h)
   if (!view || view.t1 <= view.t0) return
 
-  const plotW = size.w - PAD.left - PAD.right
+  const left = gutter(series.length, axisMode)
+  const plotW = size.w - left - PAD.right
   const plotH = size.h - PAD.top - PAD.bottom
   if (plotW <= 0 || plotH <= 0) return
 
-  // Series are grouped by unit; each group gets its own range. Normalizing
-  // collapses every group to 0..1, which is also what happens on its own
-  // once there are more units than there are sides to hang an axis on.
-  const groups = groupByUnit(series, view)
-  const autoNormalize = groups.length > 2
-  const perSeriesRange = new Map<number, { min: number; max: number }>()
-  for (const g of groups) {
-    for (const m of g.members) {
-      perSeriesRange.set(m, normalize ? rangeOf(series[m]!, view) : { min: g.min, max: g.max })
-    }
-  }
-  if (autoNormalize && !normalize) {
-    for (const g of groups) {
-      for (const m of g.members) perSeriesRange.set(m, { min: g.min, max: g.max })
-    }
-  }
-
-  const xOf = (t: number) => PAD.left + ((t - view.t0) / (view.t1 - view.t0)) * plotW
+  const scales = scalesFor(series, view, axisMode)
+  const xOf = (t: number) => left + ((t - view.t0) / (view.t1 - view.t0)) * plotW
   const yOf = (v: number, idx: number) => {
-    const r = perSeriesRange.get(idx) ?? { min: 0, max: 1 }
+    const r = scales[idx] ?? { min: 0, max: 1 }
     return PAD.top + plotH - ((v - r.min) / (r.max - r.min)) * plotH
   }
 
-  // Grid and axis labels.
-  ctx.strokeStyle = grid
-  ctx.fillStyle = ink
-  ctx.lineWidth = 1
   ctx.font = '11px "Roboto Mono", monospace'
+
+  // Flight modes first, behind everything: the context a trace is read in.
+  if (spans.length > 0) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(left, PAD.top, plotW, plotH)
+    ctx.clip()
+    spans.forEach((span, i) => {
+      const x0 = xOf(Math.max(span.from, view.t0))
+      const x1 = xOf(Math.min(span.to, view.t1))
+      if (x1 <= x0) return
+      // Alternating tints of one hue rather than a color per mode: the
+      // label says which mode it is, and a rainbow behind the data would
+      // compete with the traces it exists to give context to.
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(70, 132, 197, 0.09)' : 'rgba(70, 132, 197, 0.04)'
+      ctx.fillRect(x0, PAD.top, x1 - x0, plotH)
+      ctx.strokeStyle = grid
+      ctx.beginPath()
+      ctx.moveTo(Math.round(x0) + 0.5, PAD.top)
+      ctx.lineTo(Math.round(x0) + 0.5, PAD.top + plotH)
+      ctx.stroke()
+      // Only label a band wide enough to hold the name.
+      const width = ctx.measureText(span.name).width
+      if (x1 - x0 > width + 10) {
+        ctx.fillStyle = faint
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'top'
+        ctx.fillText(span.name, x0 + 5, PAD.top + 3)
+      }
+    })
+    ctx.restore()
+  }
+
+  // Horizontal grid, and one y axis per series (or one shared).
+  ctx.strokeStyle = grid
+  ctx.lineWidth = 1
   ctx.textBaseline = 'middle'
-  const left = groups[0]
-  const right = groups.length === 2 ? groups[1] : undefined
   for (let i = 0; i <= 4; i++) {
     const y = PAD.top + (plotH * i) / 4
     ctx.beginPath()
-    ctx.moveTo(PAD.left, Math.round(y) + 0.5)
+    ctx.moveTo(left, Math.round(y) + 0.5)
     ctx.lineTo(size.w - PAD.right, Math.round(y) + 0.5)
     ctx.stroke()
-    if (normalize || autoNormalize) continue
-    if (left) {
-      ctx.textAlign = 'right'
-      ctx.fillText(format(left.max - ((left.max - left.min) * i) / 4), PAD.left - 6, y)
-    }
-    if (right) {
-      ctx.textAlign = 'left'
-      ctx.fillText(format(right.max - ((right.max - right.min) * i) / 4), size.w - PAD.right + 6, y)
-    }
   }
-  // Say which axis is measuring what, or the numbers are just numbers.
-  if (!normalize && !autoNormalize) {
-    ctx.textBaseline = 'top'
-    if (left?.unit) {
-      ctx.textAlign = 'left'
-      ctx.fillText(left.unit, 4, 2)
+
+  const axes = axisMode === 'shared' ? series.slice(0, 1) : series.slice(0, MAX_AXES)
+  axes.forEach((_, idx) => {
+    const r = scales[idx] ?? { min: 0, max: 1 }
+    // Each axis in its trace's color, which is the only thing tying the
+    // numbers to the line they belong to.
+    ctx.fillStyle = axisMode === 'shared' ? ink : COLORS[idx % COLORS.length]!
+    ctx.textAlign = 'right'
+    const x = (idx + 1) * AXIS_W + 4
+    for (let i = 0; i <= 4; i++) {
+      const y = PAD.top + (plotH * i) / 4
+      ctx.fillText(format(r.max - ((r.max - r.min) * i) / 4), x, y)
     }
-    if (right?.unit) {
-      ctx.textAlign = 'right'
-      ctx.fillText(right.unit, size.w - 4, 2)
-    }
-    ctx.textBaseline = 'middle'
-  }
-  ctx.textAlign = 'center'
+  })
+
+  // Time axis.
+  ctx.strokeStyle = grid
+  ctx.fillStyle = ink
   ctx.textBaseline = 'top'
   for (let i = 0; i <= 5; i++) {
-    const x = PAD.left + (plotW * i) / 5
+    const x = left + (plotW * i) / 5
     ctx.beginPath()
     ctx.moveTo(Math.round(x) + 0.5, PAD.top)
     ctx.lineTo(Math.round(x) + 0.5, PAD.top + plotH)
@@ -383,18 +384,17 @@ function draw(
     ctx.fillText(`${t.toFixed(1)}s`, x, PAD.top + plotH + 6)
   }
 
-  // The traces, clipped to the plot area so a pan cannot draw over the axes.
+  // The traces, clipped so a pan cannot draw over the axes.
   ctx.save()
   ctx.beginPath()
-  ctx.rect(PAD.left, PAD.top, plotW, plotH)
+  ctx.rect(left, PAD.top, plotW, plotH)
   ctx.clip()
   series.forEach((s, idx) => {
     ctx.strokeStyle = COLORS[idx % COLORS.length]!
     ctx.lineWidth = 1.4
     ctx.beginPath()
-    // At most one line segment per pixel column: a log has far more samples
-    // than the canvas has columns, and drawing them all is time spent
-    // painting the same pixel.
+    // At most one segment per pixel column: a log has far more samples than
+    // the canvas has columns, and drawing them all repaints the same pixel.
     const step = Math.max(1, Math.floor(s.values.length / (plotW * 2)))
     let started = false
     for (let i = 0; i < s.values.length; i += step) {

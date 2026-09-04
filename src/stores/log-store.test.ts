@@ -9,12 +9,14 @@ const store = () => useLogStore.getState()
 beforeEach(() => store().clear())
 
 describe('loading a log', () => {
-  it('parses it and opens on something worth looking at', () => {
+  it('parses it and plots nothing until asked', () => {
     store().loadBytes('flight.bin', bytes)
     expect(store().status).toEqual({ kind: 'ready', name: 'flight.bin' })
     expect(store().log!.messages.size).toBeGreaterThan(50)
-    // An empty plot is a worse first impression than one trace of altitude.
-    expect(store().selected).toEqual([{ message: 'BARO', field: 'Alt' }])
+    // It used to open on an altitude trace, which was a guess at what the
+    // reader came for -- and a wrong guess is a field to remove before
+    // starting rather than a head start.
+    expect(store().selected).toEqual([])
   })
 
   it('refuses a file that is not a log, without throwing', () => {

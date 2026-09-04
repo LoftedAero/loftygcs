@@ -21,6 +21,8 @@
      OSD all grew one independently and all picked a different number; this is
      the one they share. Change it here and every screen moves together. */
   --app-col-w: 280px;
+  /* The log field list. Matches the OSD panel list's 262px. */
+  --app-log-fields-w: 262px;
 }
 
 /* The system sheet puts modals at z-index 10, which is plenty for a window
@@ -3568,4 +3570,41 @@ body.is-splitting .flight-map {
 .log-progress::-webkit-progress-value {
   background: var(--la-blue);
   border-radius: 2px;
+}
+
+/* The plot view gains a field list on the left, the shape the OSD screen
+   uses: a long list to hunt through belongs beside the work, not inside the
+   actions column where it would leave no room for the actions. */
+.log-body--fields {
+  grid-template-columns: var(--app-log-fields-w) minmax(0, 1fr) var(--app-col-w);
+}
+.log-fields {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  padding: var(--la-space-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+}
+@media (max-width: 1240px) {
+  /* Below this the plot is narrower than the two columns beside it. */
+  .log-body--fields {
+    grid-template-columns: minmax(0, 1fr) var(--app-col-w);
+  }
+  .log-fields {
+    display: none;
+  }
+}
+
+/* Shown over the empty canvas rather than instead of it: the canvas has to
+   stay mounted for its size observer to ever fire. */
+.log-plot__hint {
+  position: absolute;
+  top: var(--la-space-5);
+  left: var(--la-space-5);
+  right: var(--la-space-5);
+  margin: 0;
+  pointer-events: none;
 }

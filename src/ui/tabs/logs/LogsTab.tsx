@@ -10,15 +10,18 @@ import FieldPicker from './FieldPicker'
 
 // Reviewing a flight log.
 //
-//   ┌──────────────────────────────┬──────────┐
-//   │ plot, or the record table    │ open,    │
-//   │                              │ view,    │
-//   │                              │ fields   │
-//   └──────────────────────────────┴──────────┘
+//   ┌─────────┬────────────────────┬──────────┐
+//   │ fields  │ plot, or the       │ open,    │
+//   │ to plot │ record table       │ download,│
+//   │         │                    │ view     │
+//   └─────────┴────────────────────┴──────────┘
 //
-// The actions column on the right like every other editing screen, holding
-// where the log came from, which view is showing, and -- taking most of it --
-// the field picker, because choosing what to look at is the whole activity.
+// Three columns, the shape the OSD screen uses: the long list of things you
+// can pick from on the left, the thing you are working on in the middle, and
+// the actions column on the right where every other screen keeps it. The
+// field list went left because it is a list to hunt through rather than a
+// setting to adjust, and six hundred fields squeezed into the actions
+// column left no room for the actions.
 //
 // Everything happens in the page: a log is never uploaded anywhere, which is
 // worth saying out loud since the browser tools people currently use for
@@ -29,8 +32,10 @@ export default function LogsTab() {
   const status = useLogStore((s) => s.status)
   const view = useLogStore((s) => s.view)
   const setView = useLogStore((s) => s.setView)
-  const normalize = useLogStore((s) => s.normalize)
-  const setNormalize = useLogStore((s) => s.setNormalize)
+  const axisMode = useLogStore((s) => s.axisMode)
+  const setAxisMode = useLogStore((s) => s.setAxisMode)
+  const shadeModes = useLogStore((s) => s.shadeModes)
+  const setShadeModes = useLogStore((s) => s.setShadeModes)
   const selected = useLogStore((s) => s.selected)
   const clearFields = useLogStore((s) => s.clearFields)
   const clear = useLogStore((s) => s.clear)
@@ -48,7 +53,14 @@ export default function LogsTab() {
 
   return (
     <div className="log-screen">
-      <div className="log-body">
+      <div className={log && view === 'plot' ? 'log-body log-body--fields' : 'log-body'}>
+        {log && view === 'plot' && (
+          <aside className="log-fields">
+            <h3 className="app-col__head">Fields</h3>
+            <FieldPicker />
+          </aside>
+        )}
+
         <div className="log-main">
           {!log ? (
             <Welcome status={status} busy={busy} onOpen={() => void open()} />
@@ -108,15 +120,34 @@ export default function LogsTab() {
                 </div>
                 {view === 'plot' && (
                   <>
-                    <LaSwitch
-                      label="Normalize each field"
-                      checked={normalize}
-                      onChange={(e) => setNormalize(e.target.checked)}
-                    />
+                    <div className="log-viewswitch" role="radiogroup" aria-label="Y axis">
+                      {(
+                        [
+                          ['perField', 'Axis per field'],
+                          ['shared', 'One shared axis'],
+                        ] as const
+                      ).map(([id, label]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          role="radio"
+                          aria-checked={axisMode === id}
+                          className={`log-viewswitch__btn${axisMode === id ? ' is-active' : ''}`}
+                          onClick={() => setAxisMode(id)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                     <LaHint>
-                      Puts every trace on its own 0–1 scale, for comparing the shape of things
-                      measured in different units.
+                      An axis each keeps a metre and a microsecond both readable. Share one when
+                      the traces are the same quantity — desired against actual.
                     </LaHint>
+                    <LaSwitch
+                      label="Shade by flight mode"
+                      checked={shadeModes}
+                      onChange={(e) => setShadeModes(e.target.checked)}
+                    />
                     {selected.length > 0 && (
                       <LaButton variant="ghost" size="block" onClick={clearFields}>
                         Clear {selected.length} {selected.length === 1 ? 'field' : 'fields'}
@@ -125,13 +156,6 @@ export default function LogsTab() {
                   </>
                 )}
               </section>
-
-              {view === 'plot' && (
-                <section className="app-col__group app-col__group--grow">
-                  <h3 className="app-col__head">Fields</h3>
-                  <FieldPicker />
-                </section>
-              )}
             </>
           )}
         </aside>
