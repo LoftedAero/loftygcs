@@ -674,8 +674,15 @@
   border: 1px solid var(--la-line-strong);
   border-radius: var(--la-radius-sm);
   box-shadow: var(--la-shadow-2);
+  /* The strip must never outgrow the map it floats over: the lower pane can
+     be dragged until the map is a few hundred pixels tall, and a palette that
+     spills past the bottom edge lands on the zoom control -- which is what
+     happened the moment Survey made it one button longer. */
+  max-height: calc(100% - var(--la-space-4));
+  overflow-y: auto;
 }
 .mission-palette__btn {
+  flex: none;
   appearance: none;
   display: flex;
   flex-direction: column;

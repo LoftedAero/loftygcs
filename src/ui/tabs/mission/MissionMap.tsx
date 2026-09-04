@@ -6,6 +6,7 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 import { hasCoords } from '../../../protocol/mission-plan'
 import { commandSpec } from '../../../protocol/mission-commands'
 import { DEFAULT_TOOL, HOME_TOOL } from './ItemPalette'
+import { surveyGrid } from '../../../protocol/survey'
 import {
   BASE_LAYERS,
   layerById,
@@ -50,6 +51,19 @@ function itemIcon(seq: number, selected: boolean, kind: 'nav' | 'other'): L.DivI
   })
 }
 
+function cornerIcon(n: number): L.DivIcon {
+  return L.divIcon({
+    className: 'mission-marker',
+    html: `<svg width="20" height="20" viewBox="-10 -10 20 20">
+      <circle r="8" fill="#4684C5" stroke="#fff" stroke-width="2"/>
+      <text x="0" y="3.5" text-anchor="middle" font-family="Roboto Mono, monospace"
+            font-size="9" font-weight="700" fill="#fff">${n}</text>
+    </svg>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  })
+}
+
 function homeIcon(selected: boolean): L.DivIcon {
   return L.divIcon({
     className: 'mission-marker',
@@ -84,10 +98,10 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
   useEffect(() => {
     const el = containerRef.current
     if (!el || mapRef.current) return
-    // Zoom buttons bottom-left: the palette owns the top-left corner here,
-    // and Leaflet's default position puts them straight through its labels.
+    // Zoom buttons bottom-right: the palette owns the whole left edge, and it
+    // grows -- bottom-left only looked clear because the strip was shorter.
     const map = L.map(el, { zoomControl: false, attributionControl: true }).setView([0, 0], 3)
-    L.control.zoom({ position: 'bottomleft' }).addTo(map)
+    L.control.zoom({ position: 'bottomright' }).addTo(map)
     mapRef.current = map
     layerRef.current = L.layerGroup().addTo(map)
 
@@ -95,6 +109,13 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
       const store = useMissionStore.getState()
       const armed = toolRef.current
       const at = { x: Math.round(e.latlng.lat * 1e7), y: Math.round(e.latlng.lng * 1e7) }
+
+      // While an area is being drawn, a click is a corner of it. Nothing else
+      // on the map means anything until the survey is generated or cancelled.
+      if (store.survey) {
+        store.addSurveyVertex(at)
+        return
+      }
 
       // Home is placed, not appended: there is only ever one.
       if (armed === HOME_TOOL) {
@@ -153,6 +174,7 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
   // the flight map's per-frame path is the one that needs the cleverness.
   const plan = useMissionStore((s) => s.plan)
   const selected = useMissionStore((s) => s.selected)
+  const survey = useMissionStore((s) => s.survey)
   useEffect(() => {
     const map = mapRef.current
     const layer = layerRef.current
@@ -204,6 +226,44 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
       L.polyline(route, { color: '#F7941D', weight: 3, opacity: 0.9 }).addTo(layer)
     }
 
+    // The survey area and a live preview of the passes it would generate.
+    // Drawn in blue: nothing here is part of the mission until Add turns it
+    // into waypoints, and orange is what the aircraft will actually fly.
+    if (survey) {
+      const ring = survey.polygon.map((p) => [p.x / 1e7, p.y / 1e7] as L.LatLngTuple)
+      if (ring.length >= 3) {
+        L.polygon(ring, {
+          color: '#4684C5',
+          weight: 2,
+          fillOpacity: 0.12,
+          dashArray: '6 4',
+        }).addTo(layer)
+        const preview = surveyGrid(survey.polygon, survey.options)
+        for (let i = 0; i + 1 < preview.points.length; i += 2) {
+          L.polyline(
+            [
+              [preview.points[i]!.x / 1e7, preview.points[i]!.y / 1e7],
+              [preview.points[i + 1]!.x / 1e7, preview.points[i + 1]!.y / 1e7],
+            ],
+            { color: '#4684C5', weight: 2, opacity: 0.85 },
+          ).addTo(layer)
+        }
+      } else if (ring.length === 2) {
+        L.polyline(ring, { color: '#4684C5', weight: 2, dashArray: '6 4' }).addTo(layer)
+      }
+      survey.polygon.forEach((p, i) => {
+        L.marker([p.x / 1e7, p.y / 1e7], { icon: cornerIcon(i + 1), draggable: true })
+          .on('dragend', (e) => {
+            const q = (e.target as L.Marker).getLatLng()
+            useMissionStore
+              .getState()
+              .moveSurveyVertex(i, { x: Math.round(q.lat * 1e7), y: Math.round(q.lng * 1e7) })
+          })
+          .on('contextmenu', () => useMissionStore.getState().removeSurveyVertex(i))
+          .addTo(layer)
+      })
+    }
+
     // Frame the mission once, when there first is one to frame.
     if (!centered && route.length > 0) {
       setCentered(true)
@@ -217,7 +277,7 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
         })
       }
     }
-  }, [plan, selected, centered])
+  }, [plan, selected, survey, centered])
 
   // The vehicle, when there is one, so the plan can be seen against it.
   useEffect(() => {

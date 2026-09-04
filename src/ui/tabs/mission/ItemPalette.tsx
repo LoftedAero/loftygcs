@@ -38,6 +38,9 @@ interface Entry {
 
 export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
   const addItem = useMissionStore((s) => s.addItem)
+  const startSurvey = useMissionStore((s) => s.startSurvey)
+  const cancelSurvey = useMissionStore((s) => s.cancelSurvey)
+  const surveying = useMissionStore((s) => s.survey !== null)
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
 
@@ -96,6 +99,21 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
           <span className="mission-palette__label">{e.label}</span>
         </button>
       ))}
+
+      <button
+        type="button"
+        className={`mission-palette__btn${surveying ? ' is-armed' : ''}`}
+        aria-pressed={surveying}
+        title="Cover an area with a lawnmower pattern"
+        onClick={() => {
+          onTool(null)
+          if (surveying) cancelSurvey()
+          else startSurvey()
+        }}
+      >
+        <SurveyIcon />
+        <span className="mission-palette__label">Survey</span>
+      </button>
 
       <button
         type="button"
@@ -222,6 +240,15 @@ function HomeIcon() {
     <svg {...box} aria-hidden="true">
       <path d="M4 11 12 4l8 7" {...stroke} />
       <path d="M6.5 9.5V19h11V9.5" {...stroke} />
+    </svg>
+  )
+}
+
+function SurveyIcon() {
+  return (
+    <svg {...box} aria-hidden="true">
+      <path d="M4 5h16v14H4z" {...stroke} />
+      <path d="M7 5v14M12 5v14M17 5v14" {...stroke} strokeDasharray="2 3" />
     </svg>
   )
 }

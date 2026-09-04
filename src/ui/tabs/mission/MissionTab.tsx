@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import MissionMap from './MissionMap'
 import MissionTable from './MissionTable'
 import MissionSettings from './MissionSettings'
+import SurveyPanel from './SurveyPanel'
 import MissionToolbar from './MissionToolbar'
 import ItemPalette from './ItemPalette'
 import AltitudeProfile from './AltitudeProfile'
@@ -97,6 +98,9 @@ export default function MissionTab() {
 
         <aside className="mission-side">
           <MissionToolbar />
+          {/* Above the settings: while an area is being drawn it is what the
+              map clicks mean, so it should be the first thing in reach. */}
+          <SurveyPanel />
           <MissionSettings />
         </aside>
       </div>

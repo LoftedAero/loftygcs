@@ -8,6 +8,7 @@ import {
   type PlanItem,
 } from '../protocol/mission-plan'
 import { commandSpec } from '../protocol/mission-commands'
+import { SURVEY_DEFAULTS, type SurveyOptions } from '../protocol/survey'
 import type { MissionItem } from '../protocol/types'
 
 // The plan being edited, plus what is known about the vehicle's copy of it.
@@ -58,6 +59,21 @@ export interface MissionState {
   split: number
   setSplit(ratio: number): void
 
+  /**
+   * The survey area being drawn, or null when not surveying. Held apart from
+   * the plan because it is not itself a mission: the polygon is the input,
+   * and the waypoints it generates are the output that gets flown. Keeping
+   * the polygon means the grid can be re-cut at a different spacing without
+   * redrawing the area.
+   */
+  survey: SurveyDraft | null
+  startSurvey(): void
+  cancelSurvey(): void
+  addSurveyVertex(at: { x: number; y: number }): void
+  moveSurveyVertex(index: number, at: { x: number; y: number }): void
+  removeSurveyVertex(index: number): void
+  setSurveyOptions(patch: Partial<SurveyOptions> & { altM?: number }): void
+
   setPlan(plan: MissionPlan, opts?: { synced?: boolean; name?: string }): void
   addItem(command: number, at?: { x: number; y: number }): string
   updateItem(uid: string, patch: Partial<Omit<PlanItem, 'uid'>>): void
@@ -71,6 +87,14 @@ export interface MissionState {
   clear(): void
 }
 
+/** A survey area under construction, and how it should be flown. */
+export interface SurveyDraft {
+  polygon: { x: number; y: number }[]
+  options: SurveyOptions
+  /** Altitude for the generated passes, metres in the plan's frame. */
+  altM: number
+}
+
 const emptyPlan = (): MissionPlan => ({ home: null, items: [] })
 
 export const useMissionStore = create<MissionState>((set, get) => ({
@@ -81,6 +105,41 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   transfer: { kind: 'idle' },
   sourceName: null,
   split: loadSplit(),
+  survey: null,
+
+  startSurvey() {
+    set({ survey: { polygon: [], options: { ...SURVEY_DEFAULTS }, altM: get().defaults.altM } })
+  },
+  cancelSurvey() {
+    set({ survey: null })
+  },
+  addSurveyVertex(at) {
+    const s = get().survey
+    if (!s) return
+    set({ survey: { ...s, polygon: [...s.polygon, at] } })
+  },
+  moveSurveyVertex(index, at) {
+    const s = get().survey
+    if (!s) return
+    set({ survey: { ...s, polygon: s.polygon.map((p, i) => (i === index ? at : p)) } })
+  },
+  removeSurveyVertex(index) {
+    const s = get().survey
+    if (!s) return
+    set({ survey: { ...s, polygon: s.polygon.filter((_, i) => i !== index) } })
+  },
+  setSurveyOptions(patch) {
+    const s = get().survey
+    if (!s) return
+    const { altM, ...rest } = patch
+    set({
+      survey: {
+        ...s,
+        options: { ...s.options, ...rest },
+        ...(altM !== undefined ? { altM } : {}),
+      },
+    })
+  },
 
   setSplit(ratio) {
     // Clamped so the divider cannot be dragged until one pane has no usable
