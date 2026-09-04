@@ -3193,3 +3193,321 @@ body.is-splitting .flight-map {
   background: var(--la-ok);
   border-radius: 2px;
 }
+
+/* ── Log review ─────────────────────────────────────────────────────────
+   Same shape as Mission and Parameters: the thing you are looking at, and
+   the actions column beside it. See the actions-column notes above. */
+.log-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.log-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--app-col-w);
+  /* An explicit row for the same reason the mission body needs one: the
+     children have no definite height to size a canvas against otherwise. */
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--la-space-2);
+  flex: 1;
+  min-height: 0;
+}
+.log-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  overflow: hidden;
+}
+.log-side {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+/* The field picker takes whatever the groups above it did not. */
+.app-col__group--grow {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-welcome {
+  padding: var(--la-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-3);
+  align-items: flex-start;
+  max-width: 60ch;
+}
+.log-welcome__title {
+  margin: 0;
+  font-size: var(--la-size-lg);
+  color: var(--la-ink);
+}
+
+/* ── Plot ── */
+.log-plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.log-plot--empty {
+  padding: var(--la-space-5);
+}
+.log-plot canvas {
+  flex: 1;
+  min-height: 0;
+  display: block;
+  /* Dragging the time axis should not select the legend text behind it. */
+  user-select: none;
+  cursor: crosshair;
+}
+.log-plot__reset {
+  position: absolute;
+  top: var(--la-space-2);
+  right: var(--la-space-2);
+  appearance: none;
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-xs);
+  padding: 2px var(--la-space-2);
+  cursor: pointer;
+}
+.log-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--la-space-1) var(--la-space-4);
+  padding: var(--la-space-2) var(--la-space-3);
+  border-top: 1px solid var(--la-line);
+  background: var(--la-surface-2);
+  font-size: var(--la-size-xs);
+}
+.log-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--la-space-1);
+}
+.log-legend__swatch {
+  width: 10px;
+  height: 3px;
+  border-radius: 1px;
+  flex: none;
+}
+.log-legend__name {
+  font-family: var(--la-font-mono);
+  color: var(--la-ink);
+}
+/* The channel function, which is the reason these labels exist at all. */
+.log-legend__fn {
+  font-style: normal;
+  color: var(--la-blue);
+}
+.log-legend__value,
+.log-legend__time {
+  font-family: var(--la-font-mono);
+  color: var(--la-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Field picker ── */
+.log-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-height: 0;
+  flex: 1;
+}
+.log-picker__list {
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+.log-picker__msg {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--la-ink);
+  font: inherit;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  padding: var(--la-space-1) 0;
+  cursor: pointer;
+  text-align: left;
+}
+.log-picker__msg:hover {
+  color: var(--la-blue);
+}
+.log-picker__caret {
+  width: 1em;
+  color: var(--la-ink-3);
+}
+.log-picker__count {
+  margin-left: auto;
+  color: var(--la-ink-3);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.log-picker__field {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-2);
+  border: 0;
+  border-radius: var(--la-radius-sm);
+  background: transparent;
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-xs);
+  padding: 2px var(--la-space-2);
+  padding-left: calc(1em + var(--la-space-1));
+  cursor: pointer;
+  text-align: left;
+}
+.log-picker__field:hover {
+  background: var(--la-surface-2);
+}
+.log-picker__field.is-on {
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
+.log-picker__fname {
+  font-family: var(--la-font-mono);
+}
+.log-picker__label {
+  color: var(--la-blue);
+}
+.log-picker__field.is-on .log-picker__label {
+  color: var(--app-on-dark);
+}
+.log-picker__unit {
+  margin-left: auto;
+  color: var(--la-ink-3);
+}
+.log-picker__field.is-on .log-picker__unit {
+  color: var(--app-on-dark);
+}
+
+/* ── Data table ── */
+.log-table {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.log-table__head {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+  padding: var(--la-space-2) var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+}
+.log-table__pick {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-2);
+}
+.log-table__count {
+  margin-left: auto;
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.log-table__scroll {
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+.log-table__grid {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: var(--la-size-xs);
+}
+.log-table__grid th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--la-surface-2);
+  border-bottom: 1px solid var(--la-line-strong);
+  padding: var(--la-space-1) var(--la-space-2);
+  text-align: left;
+  white-space: nowrap;
+  font-family: var(--la-font-mono);
+  color: var(--la-ink);
+}
+.log-table__fn {
+  display: block;
+  font-family: var(--la-font);
+  font-weight: 400;
+  color: var(--la-blue);
+}
+.log-table__unit {
+  display: block;
+  font-family: var(--la-font);
+  font-weight: 400;
+  color: var(--la-ink-3);
+}
+.log-table__grid td {
+  padding: 0 var(--la-space-2);
+  white-space: nowrap;
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-ink-2);
+  border-bottom: 1px solid var(--la-line);
+}
+.log-table__row:hover td {
+  background: var(--la-surface-2);
+}
+
+/* ── Plot / table switch ── */
+.log-viewswitch {
+  display: flex;
+  flex: none;
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+  background: var(--la-surface);
+}
+.log-viewswitch__btn {
+  appearance: none;
+  flex: 1;
+  padding: var(--la-space-2) 0;
+  border: 0;
+  border-right: 1px solid var(--la-line);
+  background: transparent;
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.log-viewswitch__btn:last-child {
+  border-right: 0;
+}
+.log-viewswitch__btn:hover {
+  background: var(--la-surface-2);
+}
+/* Blue, not orange: choosing a view is a working control, and this column's
+   one primary action is opening a log. */
+.log-viewswitch__btn.is-active {
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
