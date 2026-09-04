@@ -4,15 +4,14 @@ import path from 'node:path'
 import {
   SITL_PORT,
   SIM_VEHICLES,
-  CMAC_HOME,
   installVehicle,
   installedVehicles,
   simSupported,
   spawnSim,
   waitForReady,
-  type SimHome,
   type SimVehicle,
 } from './sitl-core'
+import type { SimHome } from '../src/sim-home'
 
 // IPC glue for the managed simulator. One SITL at a time, owned here so it
 // dies with the app rather than outliving it as an orphan holding port 5760.
@@ -50,8 +49,9 @@ export function registerSitlIpc(getWindow: () => BrowserWindow | null) {
   ipcMain.handle('sim:start', async (_e, vehicle: SimVehicle, home?: SimHome) => {
     stopSim()
     // Home is taken at boot and cannot be moved afterwards, which is why
-    // changing it in the UI is a restart rather than a setting.
-    const proc = spawnSim(simDir(), vehicle, home ?? CMAC_HOME)
+    // changing it in the UI is a restart rather than a setting. Undefined
+    // falls through to spawnSim's default rather than being decided twice.
+    const proc = spawnSim(simDir(), vehicle, home)
     child = proc
     runningVehicle = vehicle
     proc.stdout?.on('data', (d: Buffer) => send('sim:log', d.toString()))
