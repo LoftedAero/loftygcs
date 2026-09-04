@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { parseDataflash, type ParsedLog } from '../protocol/dataflash'
+import { fieldUnit, parseDataflash, type ParsedLog } from '../protocol/dataflash'
 
 // The log being reviewed, and what is being looked at in it.
 //
@@ -11,10 +11,46 @@ import { parseDataflash, type ParsedLog } from '../protocol/dataflash'
 
 export type LogView = 'plot' | 'table'
 
+/** How many y axes the plot will draw at once. */
+export const MAX_AXES = 4
+
 /** One field selected for plotting. */
 export interface SelectedField {
   message: string
   field: string
+  /** Which y axis it is drawn against, 0-based. */
+  axis: number
+}
+
+/**
+ * Which axis a newly plotted field should land on.
+ *
+ * Fields measured in the same unit share an axis, because that is nearly
+ * always what was meant: adding Pitch after Roll means comparing them, and
+ * putting them on separate scales would make two different pictures of the
+ * same wobble. A new unit takes the next free axis until they run out, and
+ * after that it joins the axis that already has the most company -- crowded
+ * beats invisible, and the field can be moved.
+ */
+export function defaultAxis(
+  existing: readonly { axis: number; unit: string }[],
+  unit: string,
+): number {
+  const sameUnit = existing.find((e) => e.unit === unit && unit !== '')
+  if (sameUnit) return sameUnit.axis
+  const used = new Set(existing.map((e) => e.axis))
+  for (let i = 0; i < MAX_AXES; i++) if (!used.has(i)) return i
+  const counts = new Map<number, number>()
+  for (const e of existing) counts.set(e.axis, (counts.get(e.axis) ?? 0) + 1)
+  let best = 0
+  let most = -1
+  for (const [axis, n] of counts) {
+    if (n > most) {
+      most = n
+      best = axis
+    }
+  }
+  return best
 }
 
 /** A log sitting on the vehicle's card. */
@@ -58,18 +94,6 @@ interface LogState {
   tableMessage: string | null
   /** Filter text for the field picker. */
   search: string
-  /**
-   * How the y axis is scaled.
-   *
-   * 'perField' gives every trace its own axis and its own range, which is
-   * what plot.ardupilot.org does and what makes a mixed-unit plot readable
-   * at all -- an altitude in metres beside a servo output in microseconds
-   * is otherwise a flat line along the bottom. 'shared' puts everything on
-   * one axis, which is what you want the moment two traces are the same
-   * quantity: desired roll against actual roll only means something when
-   * they are drawn against the same numbers.
-   */
-  axisMode: 'perField' | 'shared'
   /** Shade the plot behind the traces by flight mode. */
   shadeModes: boolean
 
@@ -83,15 +107,19 @@ interface LogState {
   loadBytes(name: string, bytes: Uint8Array): void
   clear(): void
   setView(view: LogView): void
-  toggleField(field: SelectedField): void
+  /** Add or remove a field. The axis is chosen for it; see defaultAxis. */
+  toggleField(field: { message: string; field: string }): void
+  /** Move a plotted field to another axis. */
+  setFieldAxis(field: { message: string; field: string }, axis: number): void
   clearFields(): void
   setTableMessage(message: string | null): void
   setSearch(search: string): void
-  setAxisMode(mode: 'perField' | 'shared'): void
+  /** Put every plotted field on one axis, or give each its own. */
+  gatherAxes(onto: 'one' | 'each'): void
   setShadeModes(on: boolean): void
 }
 
-const key = (f: SelectedField) => `${f.message}.${f.field}`
+const key = (f: { message: string; field: string }) => `${f.message}.${f.field}`
 
 export const useLogStore = create<LogState>((set, get) => ({
   log: null,
@@ -101,7 +129,6 @@ export const useLogStore = create<LogState>((set, get) => ({
   selected: [],
   tableMessage: null,
   search: '',
-  axisMode: 'perField',
   shadeModes: true,
   vehicleLogs: [],
   vehicleStatus: { kind: 'idle' },
@@ -158,10 +185,28 @@ export const useLogStore = create<LogState>((set, get) => ({
   },
 
   toggleField(field) {
-    const { selected } = get()
+    const { selected, log } = get()
     const k = key(field)
-    const next = selected.filter((f) => key(f) !== k)
-    set({ selected: next.length === selected.length ? [...selected, field] : next })
+    const without = selected.filter((f) => key(f) !== k)
+    if (without.length !== selected.length) {
+      set({ selected: without })
+      return
+    }
+    const unit = log ? fieldUnit(log, field.message, field.field) : ''
+    const existing = selected.map((f) => ({
+      axis: f.axis,
+      unit: log ? fieldUnit(log, f.message, f.field) : '',
+    }))
+    set({ selected: [...selected, { ...field, axis: defaultAxis(existing, unit) }] })
+  },
+
+  setFieldAxis(field, axis) {
+    const k = key(field)
+    set({
+      selected: get().selected.map((f) =>
+        key(f) === k ? { ...f, axis: Math.max(0, Math.min(MAX_AXES - 1, axis)) } : f,
+      ),
+    })
   },
 
   clearFields() {
@@ -176,8 +221,14 @@ export const useLogStore = create<LogState>((set, get) => ({
     set({ search })
   },
 
-  setAxisMode(axisMode) {
-    set({ axisMode })
+  gatherAxes(onto) {
+    const { selected } = get()
+    set({
+      selected:
+        onto === 'one'
+          ? selected.map((f) => ({ ...f, axis: 0 }))
+          : selected.map((f, i) => ({ ...f, axis: Math.min(i, MAX_AXES - 1) })),
+    })
   },
 
   setShadeModes(shadeModes) {
@@ -191,6 +242,6 @@ function firstPresent(log: ParsedLog, names: string[]): string | null {
 }
 
 /** Is this field currently plotted? */
-export function isSelected(state: LogState, field: SelectedField): boolean {
+export function isSelected(state: LogState, field: { message: string; field: string }): boolean {
   return state.selected.some((f) => key(f) === key(field))
 }

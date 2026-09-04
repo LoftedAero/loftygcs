@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getSeries, type Series } from '../../../protocol/dataflash'
 import { fieldLabel } from '../../../protocol/log-labels'
-import { useLogStore } from '../../../stores/log-store'
+import { MAX_AXES, useLogStore } from '../../../stores/log-store'
 import { modeSpans, type ModeSpan } from '../../../protocol/log-modes'
 
 // The time-series plot, drawn on a canvas.
@@ -35,9 +35,6 @@ const COLORS = [
  */
 const AXIS_W = 58
 
-/** Beyond this many axes there is no room left to plot in. */
-const MAX_AXES = 4
-
 const PAD = { top: 12, bottom: 26, right: 14 }
 
 /** A series' own min and max within the visible window. */
@@ -61,30 +58,39 @@ export function rangeOf(
 }
 
 /**
- * The y range each series is drawn against.
+ * The y range each *axis* is drawn against.
  *
- * Per field by default, the way plot.ardupilot.org does it: every trace at
- * its own scale with its own axis, so an altitude in metres and a servo
- * output in microseconds are both legible on one plot. Shared is the mode
- * for when the traces *are* comparable -- desired roll against actual roll
- * says nothing unless both are drawn against the same numbers.
+ * An axis spans everything assigned to it, so two traces sharing one are
+ * directly comparable -- which is the whole reason to put them together.
+ * Axes nobody is using get no range and no gutter.
  */
-export function scalesFor(
-  series: { time: Float64Array; values: Float64Array }[],
+export function axisRanges(
+  series: readonly { time: Float64Array; values: Float64Array; axis: number }[],
   view: { t0: number; t1: number },
-  mode: 'perField' | 'shared',
-): { min: number; max: number }[] {
-  const own = series.map((s) => rangeOf(s, view))
-  if (mode === 'perField') return own
-  const min = Math.min(...own.map((r) => r.min))
-  const max = Math.max(...own.map((r) => r.max))
-  return own.map(() => (min === max ? { min: min - 1, max: max + 1 } : { min, max }))
+): Map<number, { min: number; max: number }> {
+  const out = new Map<number, { min: number; max: number }>()
+  for (const s of series) {
+    const r = rangeOf(s, view)
+    const have = out.get(s.axis)
+    out.set(
+      s.axis,
+      have ? { min: Math.min(have.min, r.min), max: Math.max(have.max, r.max) } : r,
+    )
+  }
+  for (const [axis, r] of out) {
+    if (r.min === r.max) out.set(axis, { min: r.min - 1, max: r.max + 1 })
+  }
+  return out
+}
+
+/** Axes with something on them, in drawing order. */
+export function usedAxes(series: readonly { axis: number }[]): number[] {
+  return [...new Set(series.map((s) => s.axis))].sort((a, b) => a - b)
 }
 
 export default function LogPlot() {
   const log = useLogStore((s) => s.log)
   const selected = useLogStore((s) => s.selected)
-  const axisMode = useLogStore((s) => s.axisMode)
   const shadeModes = useLogStore((s) => s.shadeModes)
   const spans = useMemo(() => (log && shadeModes ? modeSpans(log) : []), [log, shadeModes])
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -97,8 +103,11 @@ export default function LogPlot() {
   const series = useMemo(() => {
     if (!log) return []
     return selected
-      .map((f) => getSeries(log, f.message, f.field))
-      .filter((s): s is Series => s !== null)
+      .map((f) => {
+        const s = getSeries(log, f.message, f.field)
+        return s ? { ...s, axis: f.axis } : null
+      })
+      .filter((s): s is PlottedSeries => s !== null)
   }, [log, selected])
 
   // Full extent of everything selected, which is what "reset zoom" means.
@@ -138,8 +147,8 @@ export default function LogPlot() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    draw(ctx, size, series, view, axisMode, cursor, spans)
-  }, [size, series, view, axisMode, cursor, spans])
+    draw(ctx, size, series, view, cursor, spans)
+  }, [size, series, view, cursor, spans])
 
   if (!log) return null
 
@@ -147,7 +156,7 @@ export default function LogPlot() {
     const canvas = canvasRef.current
     if (!canvas || !view) return null
     const rect = canvas.getBoundingClientRect()
-    const left = gutter(series.length, axisMode)
+    const left = gutter(usedAxes(series).length)
     const w = size.w - left - PAD.right
     if (w <= 0) return null
     return view.t0 + ((clientX - rect.left - left) / w) * (view.t1 - view.t0)
@@ -215,12 +224,15 @@ export default function LogPlot() {
 /** Where a drag started, in seconds. Outside state: it changes per frame. */
 const dragRef = { current: null as number | null }
 
+/** A series with the axis it was assigned to. */
+export type PlottedSeries = Series & { axis: number }
+
 function Legend({
   series,
   cursor,
   view,
 }: {
-  series: Series[]
+  series: PlottedSeries[]
   cursor: number | null
   view: { t0: number; t1: number } | null
 }) {
@@ -233,6 +245,7 @@ function Legend({
         return (
           <span key={`${s.message}.${s.field}`} className="log-legend__item">
             <span className="log-legend__swatch" style={{ background: COLORS[i % COLORS.length] }} />
+            <span className="log-legend__axis">Y{s.axis + 1}</span>
             <span className="log-legend__name">
               {s.message}.{s.field}
               {/* The whole point of the labels: "RCOU.C3" means nothing,
@@ -272,17 +285,15 @@ function format(v: number): string {
 }
 
 /** How much room the y axes need on the left. */
-function gutter(count: number, mode: 'perField' | 'shared'): number {
-  if (mode === 'shared') return AXIS_W + 12
+function gutter(count: number): number {
   return Math.max(1, Math.min(count, MAX_AXES)) * AXIS_W + 12
 }
 
 function draw(
   ctx: CanvasRenderingContext2D,
   size: { w: number; h: number },
-  series: Series[],
+  series: PlottedSeries[],
   view: { t0: number; t1: number } | null,
-  axisMode: 'perField' | 'shared',
   cursor: number | null,
   spans: ModeSpan[],
 ) {
@@ -296,15 +307,16 @@ function draw(
   ctx.fillRect(0, 0, size.w, size.h)
   if (!view || view.t1 <= view.t0) return
 
-  const left = gutter(series.length, axisMode)
+  const axes = usedAxes(series)
+  const left = gutter(axes.length)
   const plotW = size.w - left - PAD.right
   const plotH = size.h - PAD.top - PAD.bottom
   if (plotW <= 0 || plotH <= 0) return
 
-  const scales = scalesFor(series, view, axisMode)
+  const ranges = axisRanges(series, view)
   const xOf = (t: number) => left + ((t - view.t0) / (view.t1 - view.t0)) * plotW
-  const yOf = (v: number, idx: number) => {
-    const r = scales[idx] ?? { min: 0, max: 1 }
+  const yOf = (v: number, axis: number) => {
+    const r = ranges.get(axis) ?? { min: 0, max: 1 }
     return PAD.top + plotH - ((v - r.min) / (r.max - r.min)) * plotH
   }
 
@@ -354,14 +366,16 @@ function draw(
     ctx.stroke()
   }
 
-  const axes = axisMode === 'shared' ? series.slice(0, 1) : series.slice(0, MAX_AXES)
-  axes.forEach((_, idx) => {
-    const r = scales[idx] ?? { min: 0, max: 1 }
-    // Each axis in its trace's color, which is the only thing tying the
-    // numbers to the line they belong to.
-    ctx.fillStyle = axisMode === 'shared' ? ink : COLORS[idx % COLORS.length]!
+  axes.forEach((axis, column) => {
+    const r = ranges.get(axis) ?? { min: 0, max: 1 }
+    const on = series.filter((s) => s.axis === axis)
+    // An axis carrying one trace takes that trace's color, which is what
+    // ties the numbers to the line. An axis shared by several has no one
+    // color to borrow, so it stays neutral and the legend does the tying.
+    ctx.fillStyle =
+      on.length === 1 ? COLORS[series.indexOf(on[0]!) % COLORS.length]! : ink
     ctx.textAlign = 'right'
-    const x = (idx + 1) * AXIS_W + 4
+    const x = (column + 1) * AXIS_W + 4
     for (let i = 0; i <= 4; i++) {
       const y = PAD.top + (plotH * i) / 4
       ctx.fillText(format(r.max - ((r.max - r.min) * i) / 4), x, y)
@@ -404,7 +418,7 @@ function draw(
         continue
       }
       const x = xOf(t)
-      const y = yOf(s.values[i]!, idx)
+      const y = yOf(s.values[i]!, s.axis)
       if (started) ctx.lineTo(x, y)
       else {
         ctx.moveTo(x, y)

@@ -3608,3 +3608,83 @@ body.is-splitting .flight-map {
   margin: 0;
   pointer-events: none;
 }
+
+/* One plotted field, and the y axis it is drawn against. */
+.plotted {
+  padding: var(--la-space-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.plotted__head {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+/* Matches the trace color, so the row points at its own line. */
+.plotted__swatch {
+  width: 10px;
+  height: 3px;
+  border-radius: 1px;
+  flex: none;
+}
+.plotted__name {
+  flex: 1;
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plotted__meta {
+  display: flex;
+  gap: var(--la-space-2);
+  font-size: var(--la-size-xs);
+  padding-left: calc(10px + var(--la-space-2));
+}
+.plotted__fn {
+  color: var(--la-blue);
+}
+.plotted__unit {
+  margin-left: auto;
+  color: var(--la-ink-3);
+}
+.plotted__axes {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+}
+.plotted__axis {
+  appearance: none;
+  flex: 1;
+  padding: 2px 0;
+  border: 0;
+  border-right: 1px solid var(--la-line);
+  background: transparent;
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-xs);
+  font-family: var(--la-font-mono);
+  cursor: pointer;
+}
+.plotted__axis:last-child {
+  border-right: 0;
+}
+.plotted__axis:hover {
+  background: var(--la-surface-2);
+}
+.plotted__axis.is-active {
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
+/* Which axis a trace is on, in the legend under the plot. */
+.log-legend__axis {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}

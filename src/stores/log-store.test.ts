@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
-import { isSelected, useLogStore } from './log-store'
+import { defaultAxis, isSelected, MAX_AXES, useLogStore } from './log-store'
 
 const bytes = new Uint8Array(gunzipSync(readFileSync('src/test-fixtures/copter-sitl.bin.gz')))
 const store = () => useLogStore.getState()
@@ -44,12 +44,12 @@ describe('choosing fields to plot', () => {
     store().clearFields()
     store().toggleField({ message: 'RCOU', field: 'C1' })
     store().toggleField({ message: 'ATT', field: 'Roll' })
-    expect(store().selected).toEqual([
-      { message: 'RCOU', field: 'C1' },
-      { message: 'ATT', field: 'Roll' },
+    expect(store().selected.map((f) => `${f.message}.${f.field}`)).toEqual([
+      'RCOU.C1',
+      'ATT.Roll',
     ])
     store().toggleField({ message: 'RCOU', field: 'C1' })
-    expect(store().selected).toEqual([{ message: 'ATT', field: 'Roll' }])
+    expect(store().selected.map((f) => f.field)).toEqual(['Roll'])
   })
 
   it('tells the picker what is already on', () => {
@@ -58,5 +58,90 @@ describe('choosing fields to plot', () => {
     expect(isSelected(useLogStore.getState(), { message: 'RCOU', field: 'C1' })).toBe(true)
     // Same field name, different message: not the same series.
     expect(isSelected(useLogStore.getState(), { message: 'RCIN', field: 'C1' })).toBe(false)
+  })
+})
+
+describe('assigning fields to y axes', () => {
+  beforeEach(() => {
+    store().loadBytes('flight.bin', bytes)
+    store().clearFields()
+  })
+
+  it('puts fields sharing a unit on the same axis', () => {
+    // Adding Pitch after Roll means comparing them, and separate scales
+    // would draw two different pictures of the same wobble.
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().toggleField({ message: 'ATT', field: 'Pitch' })
+    expect(store().selected.map((f) => f.axis)).toEqual([0, 0])
+  })
+
+  it('gives a different unit its own axis', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' }) // deg
+    store().toggleField({ message: 'RCOU', field: 'C1' }) // us
+    const axes = store().selected.map((f) => f.axis)
+    expect(axes[0]).not.toBe(axes[1])
+  })
+
+  it('moves a field when told to, and only that field', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().toggleField({ message: 'ATT', field: 'Pitch' })
+    store().setFieldAxis({ message: 'ATT', field: 'Pitch' }, 2)
+    expect(store().selected.map((f) => f.axis)).toEqual([0, 2])
+  })
+
+  it('refuses an axis that does not exist', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().setFieldAxis({ message: 'ATT', field: 'Roll' }, 99)
+    expect(store().selected[0]!.axis).toBe(MAX_AXES - 1)
+    store().setFieldAxis({ message: 'ATT', field: 'Roll' }, -3)
+    expect(store().selected[0]!.axis).toBe(0)
+  })
+
+  it('gathers everything onto one axis, or spreads it out again', () => {
+    for (const f of ['Roll', 'Pitch', 'DesRoll']) {
+      store().toggleField({ message: 'ATT', field: f })
+    }
+    store().gatherAxes('each')
+    expect(store().selected.map((f) => f.axis)).toEqual([0, 1, 2])
+    store().gatherAxes('one')
+    expect(store().selected.map((f) => f.axis)).toEqual([0, 0, 0])
+  })
+
+  it('does not spread past the last axis there is', () => {
+    for (const f of ['Roll', 'Pitch', 'DesRoll', 'DesPitch', 'Yaw', 'DesYaw']) {
+      store().toggleField({ message: 'ATT', field: f })
+    }
+    store().gatherAxes('each')
+    expect(Math.max(...store().selected.map((f) => f.axis))).toBe(MAX_AXES - 1)
+  })
+})
+
+describe('defaultAxis', () => {
+  it('takes the next free axis for each new unit', () => {
+    expect(defaultAxis([], 'm')).toBe(0)
+    expect(defaultAxis([{ axis: 0, unit: 'm' }], 'us')).toBe(1)
+    expect(defaultAxis([{ axis: 0, unit: 'm' }, { axis: 1, unit: 'us' }], 'deg')).toBe(2)
+  })
+
+  it('reuses the axis already holding that unit', () => {
+    expect(defaultAxis([{ axis: 0, unit: 'm' }, { axis: 1, unit: 'us' }], 'us')).toBe(1)
+  })
+
+  it('treats "no unit" as no reason to share', () => {
+    // Two unitless fields are not thereby the same quantity, and stacking
+    // every unlabelled field on one axis is how they all become flat lines.
+    expect(defaultAxis([{ axis: 0, unit: '' }], '')).toBe(1)
+  })
+
+  it('joins the busiest axis once they are all in use', () => {
+    // Crowded beats invisible, and the field can be moved afterwards.
+    const full = [
+      { axis: 0, unit: 'a' },
+      { axis: 0, unit: 'a' },
+      { axis: 1, unit: 'b' },
+      { axis: 2, unit: 'c' },
+      { axis: 3, unit: 'd' },
+    ]
+    expect(defaultAxis(full, 'e')).toBe(0)
   })
 })

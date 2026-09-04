@@ -478,6 +478,12 @@ export function getSeries(log: ParsedLog, message: string, field: string): Serie
   return { message, field, unit: spec?.unit ?? '', time, values }
 }
 
+/** The unit a field reports, or '' if it declares none. */
+export function fieldUnit(log: ParsedLog, message: string, field: string): string {
+  const spec = log.messages.get(message)?.format.fields.find((f) => f.name === field)
+  return spec?.unit ?? ''
+}
+
 /** Every plottable field, for a picker. Text and time columns are not. */
 export function plottableFields(log: ParsedLog): { message: string; field: string; unit: string }[] {
   const out: { message: string; field: string; unit: string }[] = []
