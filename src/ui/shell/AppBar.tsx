@@ -5,6 +5,7 @@ import { useVehicleStore } from '../../stores/vehicle-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
 import ThemeToggle from './ThemeToggle'
+import { hasIpLinks } from '../../env'
 import type { TransportKind } from '../../transport/Transport'
 
 // Top-level mode switch. Deliberately NOT orange: the bar already has one
@@ -38,6 +39,7 @@ export default function AppBar() {
   const phase = useConnectionStore((s) => s.phase)
   const error = useConnectionStore((s) => s.error)
   const selectedKind = useConnectionStore((s) => s.selectedKind)
+  const ipLinks = hasIpLinks()
   const setSelectedKind = useConnectionStore((s) => s.setSelectedKind)
   const vehicleName = useVehicleStore((s) => s.vehicleName)
   const vehicleMode = useVehicleStore((s) => s.modeName)
@@ -91,8 +93,13 @@ export default function AppBar() {
         title="Connection type"
       >
         <option value="serial">USB serial</option>
-        <option value="tcp">TCP</option>
-        <option value="udp">UDP</option>
+        {/* A browser tab cannot open a raw socket, so offering TCP and UDP
+            there is offering two ways to fail. They are the first thing
+            anyone opens this menu to look at, which made the web build read
+            as broken before it had done anything. A WebSocket bridge is the
+            browser's route to the same simulators and radios, and it stays. */}
+        {ipLinks && <option value="tcp">TCP</option>}
+        {ipLinks && <option value="udp">UDP</option>}
         <option value="ws">WebSocket</option>
         <option value="virtual">Demo</option>
       </LaSelect>

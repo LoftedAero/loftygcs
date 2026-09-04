@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, fireEvent } from '@testing-library/react'
 import App from './App'
+import AppBar from './ui/shell/AppBar'
 import { MODES, TABS, useUiStore } from './stores/ui-store'
 
 // Testing Library only auto-cleans between tests when the runner exposes
@@ -60,5 +61,32 @@ describe('app shell', () => {
     for (const mode of MODES) {
       expect(screen.getByRole('tab', { name: mode.label }).className).not.toContain('la-btn')
     }
+  })
+})
+
+describe('the connection menu adapts to what the environment can do', () => {
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).loftgcs
+  })
+
+  const options = () =>
+    Array.from(screen.getByTitle('Connection type').querySelectorAll('option')).map(
+      (o) => o.textContent,
+    )
+
+  it('leaves TCP and UDP out of a browser, where sockets do not exist', () => {
+    render(<AppBar />)
+    // Offering them in a browser is offering two ways to fail, in the first
+    // menu anyone opens -- which made the web build read as broken.
+    expect(options()).toEqual(['USB serial', 'WebSocket', 'Demo'])
+  })
+
+  it('offers them in the desktop app, which can open sockets', () => {
+    // The bar alone, not the whole app: a bare object is enough to say
+    // "Electron is here" for this question, but not enough to be the bridge
+    // the Simulator card would go on to call.
+    ;(window as unknown as Record<string, unknown>).loftgcs = {}
+    render(<AppBar />)
+    expect(options()).toEqual(['USB serial', 'TCP', 'UDP', 'WebSocket', 'Demo'])
   })
 })
