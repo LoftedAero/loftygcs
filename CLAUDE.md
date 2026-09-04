@@ -68,6 +68,17 @@ design decisions are recorded there and in code comments.
   connectionService (setParamNow/runCommand) so everything stays ack-verified.
 - **Encoding**: never round-trip source files through PowerShell Get-Content/Set-Content —
   it mangles UTF-8 (mojibake). Use the Edit/Write tools.
+- **The demo vehicle models ArduPilot's rules, but only ones seen on SITL first**
+  (`transport/virtual-fc.ts`): it refuses arming and the position modes until a simulated EKF
+  settles, refuses NAV_TAKEOFF outside Guided, disarms itself after sitting armed on the
+  ground, and sits at the first item when Auto is entered on the ground — each with
+  ArduPilot's own wording. Two bugs shipped because it was more permissive than the real
+  thing. The entry requirement is narrow on purpose: a rule invented here teaches the app a
+  lesson ArduPilot never gives, and tests written against it bake the mistake in. Deliberately
+  absent, and to stay absent: flight dynamics (SITL's job), MAVFTP (its absence exercises the
+  parameter stream fallback), and the full parameter set. **None of this softens the rule that
+  every protocol feature is demonstrated against SITL** — a more convincing demo vehicle makes
+  that discipline easier to forget, not less necessary.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

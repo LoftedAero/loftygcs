@@ -5,7 +5,23 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ProtocolEngine } from './engine'
 import { VirtualFcTransport } from '../transport/virtual-fc'
-import type { EngineOutput } from './types'
+import type { EngineOutput, MissionItem } from './types'
+
+const wire = (seq: number, over: Partial<MissionItem>): MissionItem => ({
+  seq,
+  frame: 0,
+  command: 16,
+  current: 0,
+  autocontinue: 1,
+  param1: 0,
+  param2: 0,
+  param3: 0,
+  param4: 0,
+  x: 0,
+  y: 0,
+  z: 0,
+  ...over,
+})
 
 describe('mission round trip against the virtual FC', () => {
   let engine: ProtocolEngine
@@ -47,7 +63,25 @@ describe('mission round trip against the virtual FC', () => {
     expect(await engine.downloadMission(0)).toEqual([])
   })
 
-  it('acks a fence request as unsupported instead of stalling', async () => {
-    await expect(engine.downloadMission(1)).rejects.toThrow(/Unsupported|no MISSION_COUNT/)
+  it('keeps the three plans apart, as mission_type says it should', async () => {
+    // The demo vehicle used to answer anything but mission_type 0 with
+    // "unsupported", which left the fence and rally screens with nothing to
+    // talk to in the browser build. It stores all three now, and the point
+    // of this test is that they do not leak into each other.
+    const fence = [
+      wire(0, { command: 5001, param1: 3, x: 1, y: 1 }),
+      wire(1, { command: 5001, param1: 3, x: 2, y: 1 }),
+      wire(2, { command: 5001, param1: 3, x: 2, y: 2 }),
+    ]
+    const rally = [wire(0, { command: 5100, x: 9, y: 9, z: 60 })]
+    await engine.uploadMission(fence, 1)
+    await engine.uploadMission(rally, 2)
+
+    const readFence = await engine.downloadMission(1)
+    expect(readFence).toHaveLength(3)
+    expect(readFence.every((i) => i.command === 5001)).toBe(true)
+    expect(await engine.downloadMission(2)).toHaveLength(1)
+    // And the mission the vehicle started with is untouched by either.
+    expect((await engine.downloadMission(0)).length).toBeGreaterThan(1)
   })
 })

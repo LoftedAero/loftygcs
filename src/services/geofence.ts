@@ -60,7 +60,9 @@ export async function writeFence(): Promise<void> {
     useMissionStore.getState().setFence(fence, { synced: true })
     store.setTransfer({
       kind: 'done',
-      text: items.length ? `Wrote ${fence.shapes.length} shapes` : 'Cleared the fence',
+      text: items.length
+        ? `Wrote ${fence.shapes.length} ${fence.shapes.length === 1 ? 'shape' : 'shapes'}`
+        : 'Cleared the fence',
     })
   } catch (err) {
     store.setTransfer({ kind: 'error', text: message(err) })
@@ -76,7 +78,9 @@ export async function readRally(): Promise<void> {
     store.setRally(points, { synced: true })
     store.setTransfer({
       kind: 'done',
-      text: points.length ? `Read ${points.length} rally points` : 'Vehicle has no rally points',
+      text: points.length
+        ? `Read ${points.length} rally ${points.length === 1 ? 'point' : 'points'}`
+        : 'Vehicle has no rally points',
     })
   } catch (err) {
     store.setTransfer({ kind: 'error', text: message(err) })
@@ -93,7 +97,9 @@ export async function writeRally(): Promise<void> {
     useMissionStore.getState().setRally(points, { synced: true })
     store.setTransfer({
       kind: 'done',
-      text: points.length ? `Wrote ${points.length} rally points` : 'Cleared the rally points',
+      text: points.length
+        ? `Wrote ${points.length} rally ${points.length === 1 ? 'point' : 'points'}`
+        : 'Cleared the rally points',
     })
   } catch (err) {
     store.setTransfer({ kind: 'error', text: message(err) })

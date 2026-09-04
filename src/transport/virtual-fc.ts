@@ -4,6 +4,20 @@
 // tests all drive exactly the code path a real vehicle does. It is NOT a
 // substitute for SITL validation: it proves the app's plumbing, not
 // ArduPilot's behavior.
+//
+// Some of ArduPilot's behavior is modelled here anyway, and the rule for
+// what gets in is narrow on purpose: **only rules observed against real
+// SITL**, with the vehicle's own wording. Two app bugs shipped because this
+// vehicle was more permissive than the real one -- it accepted NAV_TAKEOFF
+// in any mode, and it accepted every mode change instantly -- so the Takeoff
+// button sent a command ArduPilot refuses, and the app reported a mode the
+// vehicle was not in. Those rules are here now.
+//
+// What is deliberately NOT modelled: flight dynamics (that is what SITL is
+// for), MAVFTP (its absence exercises the parameter stream fallback), and
+// the full ~1400-parameter set. Guessing at a rule would be worse than not
+// having it: a wrong rule here teaches the app a wrong lesson and any test
+// written against it bakes the error in.
 import { MavFramer, encodeFrame } from '../protocol/frames'
 import { decodeFrameFields } from '../protocol/serializer'
 import { SENSOR_BITS } from '../protocol/sensors'
@@ -21,6 +35,25 @@ import type { Transport, TransportOptions } from './Transport'
  * `active` stays false until the demo UI takes the sticks, so an untouched
  * demo still shows the idle wiggle.
  */
+/**
+ * Modes that will not engage without a position estimate: Auto, Guided,
+ * Loiter, RTL. Observed on SITL, which refuses each of them by name.
+ */
+const NEEDS_POSITION = new Set([3, 4, 5, 6])
+
+const MODE_LABEL: Record<number, string> = {
+  3: 'Auto',
+  4: 'Guided',
+  5: 'Loiter',
+  6: 'RTL',
+}
+
+/** How long the simulated EKF takes to produce a position estimate. */
+const POSITION_READY_MS = 4000
+
+/** How long a Copter sits armed on the ground before disarming itself. */
+const GROUND_DISARM_MS = 10000
+
 export const demoSticks = {
   active: false,
   roll: 0,
@@ -372,9 +405,36 @@ export class VirtualFcTransport implements Transport {
   // A stored mission (item 0 = home), so Mission mode has something real to
   // read in demo mode and the transfer machinery gets exercised end to end
   // -- count, per-item requests, ack -- not just against scripted fixtures.
-  private missionItems = demoMission()
+  // Mission, fence and rally, keyed by MAVLink's mission_type -- the same
+  // three plans Mission mode edits. Storing all three means the geofence and
+  // rally screens have a vehicle to talk to in demo mode; before this they
+  // could only be given "unsupported", which made them undemonstrable in the
+  // browser build where there is no SITL to fall back on.
+  private plans: Record<number, Record<string, FieldValue>[]> = {
+    0: demoMission(),
+    1: [],
+    2: [],
+  }
   /** Non-null while a GCS upload is in progress: items land here first. */
-  private missionRx: { total: number; items: Record<string, FieldValue>[] } | null = null
+  private missionRx: {
+    total: number
+    missionType: number
+    items: Record<string, FieldValue>[]
+  } | null = null
+
+  /**
+   * Whether the EKF has a position estimate the vehicle will act on.
+   *
+   * Real ArduPilot refuses arming ("Arm: Need Position Estimate") and any
+   * position-holding mode ("Mode change to Guided failed: requires
+   * position") until this is true, and on SITL that takes the better part of
+   * a minute. A few seconds here: long enough that the refusal is a thing
+   * you can see and the wording is one you will meet again, short enough
+   * that a demo is not an exercise in waiting.
+   */
+  private positionOk = false
+  /** When the vehicle last became armed, for the ground disarm timer. */
+  private armedAt = 0
 
   async open(_opts: TransportOptions): Promise<void> {
     this.t0 = Date.now()
@@ -384,15 +444,35 @@ export class VirtualFcTransport implements Transport {
     this.timers.push(setInterval(() => this.sendStatusAndGps(), 1000))
     this.timers.push(setInterval(() => this.sendRcChannels(), 200))
     setTimeout(() => this.sendStatusText(6, 'Loft GCS virtual vehicle ready'), 300)
-    // A little scripted life: arm and lift off into a lazy circle.
+    // The EKF settling, compressed. Until it lands, arming and the position
+    // modes are refused exactly as the real vehicle refuses them.
+    setTimeout(() => {
+      this.positionOk = true
+      this.sendStatusText(6, 'EKF3 IMU0 is using GPS')
+    }, POSITION_READY_MS)
+    // A little scripted life: arm and lift off into a lazy circle. Set
+    // directly rather than through the command path, so the showreel does
+    // not depend on the gating above -- but it starts after it, so a demo
+    // still opens on a vehicle that behaves.
     setTimeout(() => {
       this.armed = true
+      this.armedAt = Date.now()
       this.mode = 5 // Loiter
       this.sendStatusText(6, 'Arming motors')
     }, 5000)
     setTimeout(() => {
       if (this.armed) this.airborne = true
     }, 8000)
+    // Copter disarms itself after sitting armed on the ground, which is what
+    // silently undid a takeoff that never got into Guided.
+    this.timers.push(
+      setInterval(() => {
+        if (this.armed && !this.airborne && Date.now() - this.armedAt > GROUND_DISARM_MS) {
+          this.armed = false
+          this.sendStatusText(6, 'Disarming motors')
+        }
+      }, 500),
+    )
   }
 
   async close(): Promise<void> {
@@ -444,9 +524,12 @@ export class VirtualFcTransport implements Transport {
   }
 
   /**
-   * The vehicle side of mission transfer -- for the primary mission only,
-   * which is all the demo vehicle stores. Fences and rally requests get a
-   * clean "unsupported" ack instead of silence.
+   * The vehicle side of mission transfer, for all three plans.
+   *
+   * Parameterized by mission_type rather than special-cased, the same way
+   * MissionClient is on the other end -- so uploading a fence exercises the
+   * identical count/request/ack dance the mission does, and demo mode can
+   * demonstrate the geofence and rally screens rather than only refusing.
    */
   private handleMission(msgName: string, fields: Record<string, FieldValue>) {
     const missionType = (fields.missionType as number) ?? 0
@@ -457,7 +540,8 @@ export class VirtualFcTransport implements Transport {
         type,
         missionType,
       })
-    if (missionType !== 0) {
+    const plan = this.plans[missionType]
+    if (!plan) {
       if (msgName !== 'MISSION_ACK') ack(3) // MAV_MISSION_UNSUPPORTED
       return
     }
@@ -466,29 +550,40 @@ export class VirtualFcTransport implements Transport {
       this.emit('MISSION_COUNT', {
         targetSystem: 255,
         targetComponent: 190,
-        count: this.missionItems.length,
-        missionType: 0,
+        count: plan.length,
+        missionType,
       })
     } else if (msgName === 'MISSION_REQUEST_INT') {
-      const item = this.missionItems[fields.seq as number]
-      if (item) this.emit('MISSION_ITEM_INT', { ...item, targetSystem: 255, targetComponent: 190 })
-      else ack(13) // MAV_MISSION_INVALID_SEQUENCE
+      const item = plan[fields.seq as number]
+      if (item) {
+        this.emit('MISSION_ITEM_INT', {
+          ...item,
+          missionType,
+          targetSystem: 255,
+          targetComponent: 190,
+        })
+      } else ack(13) // MAV_MISSION_INVALID_SEQUENCE
     } else if (msgName === 'MISSION_COUNT') {
       const total = fields.count as number
       if (total === 0) {
-        this.missionItems = []
+        this.plans[missionType] = []
         ack(0)
         return
       }
-      this.missionRx = { total, items: [] }
-      this.emit('MISSION_REQUEST_INT', { targetSystem: 255, targetComponent: 190, seq: 0, missionType: 0 })
+      this.missionRx = { total, missionType, items: [] }
+      this.emit('MISSION_REQUEST_INT', {
+        targetSystem: 255,
+        targetComponent: 190,
+        seq: 0,
+        missionType,
+      })
     } else if (msgName === 'MISSION_ITEM_INT') {
       const rx = this.missionRx
-      if (!rx) return
+      if (!rx || rx.missionType !== missionType) return
       if ((fields.seq as number) === rx.items.length) rx.items.push(fields)
       if (rx.items.length >= rx.total) {
-        // The upload replaces the stored mission wholesale, as ArduPilot's does.
-        this.missionItems = rx.items
+        // The upload replaces the stored plan wholesale, as ArduPilot's does.
+        this.plans[missionType] = rx.items
         this.missionRx = null
         ack(0)
       } else {
@@ -496,11 +591,11 @@ export class VirtualFcTransport implements Transport {
           targetSystem: 255,
           targetComponent: 190,
           seq: rx.items.length,
-          missionType: 0,
+          missionType,
         })
       }
     } else if (msgName === 'MISSION_CLEAR_ALL') {
-      this.missionItems = []
+      this.plans[missionType] = []
       ack(0)
     }
     // MISSION_ACK from the GCS ends a download; nothing to do.
@@ -582,17 +677,47 @@ export class VirtualFcTransport implements Transport {
           else this.sendStatusText(6, 'Calibration successful')
         }, 500)
         return
-      case 176: // DO_SET_MODE: param2 is the custom mode
+      case 176: {
+        // DO_SET_MODE: param2 is the custom mode. Every mode that holds a
+        // position needs one, and ArduPilot refuses with this exact sentence
+        // until the EKF has one -- ack 4 plus a STATUSTEXT saying why, which
+        // is the pair the Fly screen now reports together.
+        if (NEEDS_POSITION.has(param2) && !this.positionOk) {
+          this.sendStatusText(4, `Mode change to ${MODE_LABEL[param2] ?? param2} failed: requires position`)
+          return ack(4)
+        }
         this.mode = param2
-        this.sendStatusText(6, `Mode change`)
+        this.sendStatusText(6, 'Mode change')
+        // Auto with a takeoff at its head does not start itself from the
+        // ground: Copter waits for a throttle raise no station can give it.
+        // The mission is "running" and the vehicle simply sits there, which
+        // is the confusing part worth reproducing.
+        if (param2 === 3 && !this.airborne) this.sendStatusText(6, 'Mission: 1 Takeoff')
         return ack()
+      }
       case 400: // ARM_DISARM
-        this.armed = param1 === 1
-        if (!this.armed) this.airborne = false
+        if (param1 === 1) {
+          if (!this.positionOk) {
+            this.sendStatusText(4, 'Arm: Need Position Estimate')
+            return ack(4)
+          }
+          this.armed = true
+          this.armedAt = Date.now()
+        } else {
+          this.armed = false
+          this.airborne = false
+        }
         this.sendStatusText(6, this.armed ? 'Arming motors' : 'Disarming motors')
         return ack()
       case 22: // NAV_TAKEOFF
         if (!this.armed) return ack(4) // FAILED, like the real thing
+        // Copter only takes off on command in Guided. Accepting this in
+        // Stabilize is exactly what hid the Takeoff button's missing mode
+        // change: the app looked fine and the aircraft never moved.
+        if (this.mode !== 4) {
+          this.sendStatusText(4, 'Takeoff failed: not in Guided')
+          return ack(4)
+        }
         this.airborne = true
         this.sendStatusText(6, 'Takeoff')
         return ack()
