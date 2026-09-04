@@ -475,17 +475,25 @@ function draw(
     ctx.textBaseline = 'middle'
   }
 
-  // Where the 3D replay has got to. Solid and orange, so it reads as a
-  // position in the flight rather than as the dashed pointer cursor.
+  // Where the 3D replay has got to: solid, charcoal, with a marker at the
+  // top. Not orange -- that is the first trace colour, and a playhead the
+  // same colour as the line it crosses disappears into it.
   if (playhead !== null && playhead >= view.t0 && playhead <= view.t1) {
-    ctx.strokeStyle = '#F7941D'
+    const x = Math.round(xOf(playhead)) + 0.5
+    ctx.strokeStyle = '#2D2D2F'
     ctx.lineWidth = 1.5
     ctx.beginPath()
-    const x = Math.round(xOf(playhead)) + 0.5
     ctx.moveTo(x, PAD.top)
     ctx.lineTo(x, PAD.top + plotH)
     ctx.stroke()
     ctx.lineWidth = 1
+    ctx.fillStyle = '#2D2D2F'
+    ctx.beginPath()
+    ctx.moveTo(x - 4, PAD.top)
+    ctx.lineTo(x + 4, PAD.top)
+    ctx.lineTo(x, PAD.top + 6)
+    ctx.closePath()
+    ctx.fill()
   }
 
   if (cursor !== null && cursor >= view.t0 && cursor <= view.t1) {

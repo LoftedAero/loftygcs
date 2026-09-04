@@ -17,6 +17,10 @@ import react from '@vitejs/plugin-react'
 // config, simply does not have this -- and the replay is lazy-loaded, so
 // that build works without it.
 const CESIUM_DIRS = ['Assets', 'ThirdParty', 'Widgets', 'Workers']
+// The prebuilt bundle itself. Loaded by a script tag at runtime rather than
+// imported, because Cesium's ESM source does not survive tree-shaking --
+// see the note in LogReplay.tsx.
+const CESIUM_FILES = ['Cesium.js']
 
 function cesiumAssets(): Plugin {
   const require = createRequire(import.meta.url)
@@ -47,6 +51,10 @@ function cesiumAssets(): Plugin {
       for (const dir of CESIUM_DIRS) {
         const from = path.join(source, dir)
         if (existsSync(from)) cpSync(from, path.join(out, dir), { recursive: true })
+      }
+      for (const file of CESIUM_FILES) {
+        const from = path.join(source, file)
+        if (existsSync(from)) cpSync(from, path.join(out, file))
       }
     },
   }

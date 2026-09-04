@@ -51,10 +51,57 @@ function hasWebGL(): boolean {
 
 /** What the replay holds on to between renders. */
 interface Live {
-  Cesium: typeof import('cesium')
+  Cesium: CesiumModule
   viewer: import('cesium').Viewer
   epoch: import('cesium').JulianDate
 }
+
+type CesiumModule = typeof import('cesium')
+
+/**
+ * Load the prebuilt CesiumJS bundle, once.
+ *
+ * A script tag rather than `import('cesium')`, and the reason is not
+ * convenience. Cesium's ESM source does not survive bundling: put through
+ * Vite it produced a viewer that drew its skybox, its points and its
+ * models, and no globe at all -- silently, with no error and no failed
+ * request. The globe's surface shaders are composed at runtime from pieces
+ * a tree-shaker cannot see referenced, and it drops them. The same scene,
+ * same browser and same assets renders correctly from Build/Cesium.js,
+ * which is what this loads.
+ *
+ * It also means Cesium never enters the bundle at all, which is a better
+ * outcome than the code-split chunk it used to be.
+ */
+function loadCesium(): Promise<CesiumModule> {
+  const existing = (window as unknown as { Cesium?: CesiumModule }).Cesium
+  if (existing) return Promise.resolve(existing)
+  if (!pending) {
+    pending = new Promise<CesiumModule>((resolve, reject) => {
+      // Cesium reads this as it initializes, so it must be set before the
+      // script runs -- not after it loads.
+      ;(window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = CESIUM_BASE
+
+      const css = document.createElement('link')
+      css.rel = 'stylesheet'
+      css.href = `${CESIUM_BASE}Widgets/widgets.css`
+      document.head.appendChild(css)
+
+      const script = document.createElement('script')
+      script.src = `${CESIUM_BASE}Cesium.js`
+      script.onload = () => {
+        const loaded = (window as unknown as { Cesium?: CesiumModule }).Cesium
+        if (loaded) resolve(loaded)
+        else reject(new Error('Cesium.js loaded but defined no Cesium global'))
+      }
+      script.onerror = () => reject(new Error(`could not load ${script.src}`))
+      document.head.appendChild(script)
+    })
+  }
+  return pending
+}
+
+let pending: Promise<CesiumModule> | null = null
 
 export default function LogReplay() {
   const log = useLogStore((s) => s.log)
@@ -89,11 +136,7 @@ export default function LogReplay() {
     void (async () => {
       try {
         if (!hasWebGL()) throw new Error('this browser has no WebGL')
-        // Cesium reads this as it initializes, so it has to be set before
-        // the module body runs -- not after the import resolves.
-        ;(window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = CESIUM_BASE
-        const Cesium = await import('cesium')
-        await import('cesium/Build/Cesium/Widgets/widgets.css')
+        const Cesium = await loadCesium()
         if (cancelled) return
 
         const offline = await Cesium.TileMapServiceImageryProvider.fromUrl(
@@ -145,7 +188,7 @@ export default function LogReplay() {
 
         const position = new Cesium.SampledPositionProperty()
         const orientation = new Cesium.TimeIntervalCollectionProperty()
-        const track: import('cesium').Cartesian3[] = []
+        const track: InstanceType<CesiumModule['Cartesian3']>[] = []
         for (let i = 0; i < path.samples.length; i++) {
           const s = path.samples[i]!
           const when = timeOf(s.time)
