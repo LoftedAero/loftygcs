@@ -9,6 +9,15 @@ import {
 } from '../protocol/mission-plan'
 import { commandSpec } from '../protocol/mission-commands'
 import { SURVEY_DEFAULTS, type SurveyOptions } from '../protocol/survey'
+import {
+  emptyFence,
+  fenceToItems,
+  newFenceUid,
+  type FencePlan,
+  type FenceShape,
+  type FenceShapePatch,
+  type RallyPoint,
+} from '../protocol/geofence'
 import type { MissionItem } from '../protocol/types'
 
 // The plan being edited, plus what is known about the vehicle's copy of it.
@@ -45,6 +54,26 @@ function loadSplit(): number {
   return 0.5
 }
 
+/**
+ * Which of the three plans the screen is editing.
+ *
+ * All three are drawn on the map at once and only one takes clicks. Hiding
+ * the fence while planning a mission is how you plan a mission through it,
+ * so the switch changes what you *edit*, never what you can see.
+ */
+export type PlanKind = 'mission' | 'fence' | 'rally'
+
+/** What a fence click means, while a fence is being drawn. */
+export type FenceTool =
+  | 'inclusionPolygon'
+  | 'exclusionPolygon'
+  | 'inclusionCircle'
+  | 'exclusionCircle'
+  | 'returnPoint'
+
+/** Radius a freshly placed circle gets, in meters. Edited straight after. */
+const NEW_CIRCLE_RADIUS_M = 100
+
 export interface MissionState {
   plan: MissionPlan
   /** The vehicle's copy, as far as we know it. Null before any transfer. */
@@ -73,6 +102,38 @@ export interface MissionState {
   moveSurveyVertex(index: number, at: { x: number; y: number }): void
   removeSurveyVertex(index: number): void
   setSurveyOptions(patch: Partial<SurveyOptions> & { altM?: number }): void
+
+  editing: PlanKind
+  setEditing(kind: PlanKind): void
+
+  /** The geofence, and the vehicle's copy of it as far as we know. */
+  fence: FencePlan
+  fenceSynced: FencePlan | null
+  /** Rally points, and the vehicle's copy. */
+  rally: RallyPoint[]
+  rallySynced: RallyPoint[] | null
+  /** uid of the selected fence shape or rally point. */
+  selectedShape: string | null
+  selectShape(uid: string | null): void
+
+  /** The armed fence tool, or null. Polygons collect corners in `fenceDraft`. */
+  fenceTool: FenceTool | null
+  fenceDraft: { x: number; y: number }[]
+  setFenceTool(tool: FenceTool | null): void
+  /** Route a map click by the armed tool. */
+  placeFencePoint(at: { x: number; y: number }): void
+  /** Commit the polygon under construction. Needs three corners. */
+  finishFenceShape(): void
+  removeShape(uid: string): void
+  updateShape(uid: string, patch: FenceShapePatch): void
+  moveShapeVertex(uid: string, index: number, at: { x: number; y: number }): void
+  setFenceReturn(at: { x: number; y: number } | null): void
+  setFence(fence: FencePlan, opts?: { synced?: boolean }): void
+
+  addRally(at: { x: number; y: number }): void
+  updateRally(uid: string, patch: Partial<Omit<RallyPoint, 'uid'>>): void
+  removeRally(uid: string): void
+  setRally(points: RallyPoint[], opts?: { synced?: boolean }): void
 
   setPlan(plan: MissionPlan, opts?: { synced?: boolean; name?: string }): void
   addItem(command: number, at?: { x: number; y: number }): string
@@ -106,6 +167,157 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   sourceName: null,
   split: loadSplit(),
   survey: null,
+  editing: 'mission',
+  fence: emptyFence(),
+  fenceSynced: null,
+  rally: [],
+  rallySynced: null,
+  selectedShape: null,
+  fenceTool: null,
+  fenceDraft: [],
+
+  setEditing(kind) {
+    // Switching away abandons anything half-drawn: a two-corner polygon is
+    // not a fence, and keeping it would only resurface later as a shape the
+    // vehicle rejects.
+    set({ editing: kind, fenceTool: null, fenceDraft: [], selectedShape: null })
+  },
+  selectShape(uid) {
+    set({ selectedShape: uid })
+  },
+  setFenceTool(tool) {
+    set({ fenceTool: tool, fenceDraft: [] })
+  },
+
+  placeFencePoint(at) {
+    const { fenceTool, fenceDraft, fence } = get()
+    if (!fenceTool) return
+    switch (fenceTool) {
+      case 'inclusionPolygon':
+      case 'exclusionPolygon':
+        set({ fenceDraft: [...fenceDraft, at] })
+        return
+      case 'inclusionCircle':
+      case 'exclusionCircle': {
+        // One click is a whole circle: there is nothing to accumulate, and
+        // dragging out a radius on a map is a worse way to say "300 m" than
+        // typing it into the field that appears.
+        const uid = newFenceUid()
+        const shape: FenceShape = {
+          uid,
+          kind: 'circle',
+          inclusive: fenceTool === 'inclusionCircle',
+          center: at,
+          radiusM: NEW_CIRCLE_RADIUS_M,
+        }
+        set({
+          fence: { ...fence, shapes: [...fence.shapes, shape] },
+          fenceTool: null,
+          selectedShape: uid,
+        })
+        return
+      }
+      case 'returnPoint':
+        set({ fence: { ...fence, returnPoint: at }, fenceTool: null })
+        return
+    }
+  },
+
+  finishFenceShape() {
+    const { fenceTool, fenceDraft, fence } = get()
+    if (fenceTool !== 'inclusionPolygon' && fenceTool !== 'exclusionPolygon') return
+    if (fenceDraft.length < 3) return
+    const uid = newFenceUid()
+    set({
+      fence: {
+        ...fence,
+        shapes: [
+          ...fence.shapes,
+          {
+            uid,
+            kind: 'polygon',
+            inclusive: fenceTool === 'inclusionPolygon',
+            points: fenceDraft,
+          },
+        ],
+      },
+      fenceTool: null,
+      fenceDraft: [],
+      selectedShape: uid,
+    })
+  },
+
+  removeShape(uid) {
+    const { fence, selectedShape } = get()
+    set({
+      fence: { ...fence, shapes: fence.shapes.filter((s) => s.uid !== uid) },
+      selectedShape: selectedShape === uid ? null : selectedShape,
+    })
+  },
+
+  updateShape(uid, patch) {
+    const { fence } = get()
+    set({
+      fence: {
+        ...fence,
+        shapes: fence.shapes.map((s) => (s.uid === uid ? ({ ...s, ...patch } as FenceShape) : s)),
+      },
+    })
+  },
+
+  moveShapeVertex(uid, index, at) {
+    const { fence } = get()
+    set({
+      fence: {
+        ...fence,
+        shapes: fence.shapes.map((s) =>
+          s.uid === uid && s.kind === 'polygon'
+            ? { ...s, points: s.points.map((p, i) => (i === index ? at : p)) }
+            : s,
+        ),
+      },
+    })
+  },
+
+  setFenceReturn(at) {
+    set({ fence: { ...get().fence, returnPoint: at } })
+  },
+
+  setFence(fence, opts) {
+    set({
+      fence,
+      fenceTool: null,
+      fenceDraft: [],
+      selectedShape: null,
+      ...(opts?.synced ? { fenceSynced: cloneFence(fence) } : {}),
+    })
+  },
+
+  addRally(at) {
+    const uid = newFenceUid()
+    set({
+      rally: [...get().rally, { uid, x: at.x, y: at.y, altM: get().defaults.altM }],
+      selectedShape: uid,
+    })
+  },
+  updateRally(uid, patch) {
+    set({ rally: get().rally.map((p) => (p.uid === uid ? { ...p, ...patch } : p)) })
+  },
+  removeRally(uid) {
+    const { rally, selectedShape } = get()
+    set({
+      rally: rally.filter((p) => p.uid !== uid),
+      selectedShape: selectedShape === uid ? null : selectedShape,
+    })
+  },
+  setRally(points, opts) {
+    set({
+      rally: points,
+      selectedShape: null,
+      ...(opts?.synced ? { rallySynced: points.map((p) => ({ ...p })) } : {}),
+    })
+  },
+
 
   startSurvey() {
     set({ survey: { polygon: [], options: { ...SURVEY_DEFAULTS }, altM: get().defaults.altM } })
@@ -245,6 +457,17 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   },
 }))
 
+function cloneFence(f: FencePlan): FencePlan {
+  return {
+    returnPoint: f.returnPoint ? { ...f.returnPoint } : null,
+    shapes: f.shapes.map((s) =>
+      s.kind === 'polygon'
+        ? { ...s, points: s.points.map((p) => ({ ...p })) }
+        : { ...s, center: { ...s.center } },
+    ),
+  }
+}
+
 function clonePlan(p: MissionPlan): MissionPlan {
   return { home: p.home ? { ...p.home } : null, items: p.items.map((i) => ({ ...i })) }
 }
@@ -253,6 +476,24 @@ function clonePlan(p: MissionPlan): MissionPlan {
 export function isDirty(s: MissionState): boolean {
   if (!s.synced) return s.plan.items.length > 0
   return plansDiffer(s.plan, s.synced)
+}
+
+/**
+ * Does the fence on screen disagree with the vehicle's?
+ *
+ * Compared through the wire form rather than field by field: that is exactly
+ * what would be uploaded, so two fences that serialize the same are the same
+ * fence however differently they were built.
+ */
+export function fenceDirty(s: MissionState): boolean {
+  if (!s.fenceSynced) return s.fence.shapes.length > 0 || s.fence.returnPoint !== null
+  return JSON.stringify(fenceToItems(s.fence)) !== JSON.stringify(fenceToItems(s.fenceSynced))
+}
+
+export function rallyDirty(s: MissionState): boolean {
+  if (!s.rallySynced) return s.rally.length > 0
+  const key = (p: RallyPoint) => `${p.x},${p.y},${p.altM}`
+  return s.rally.map(key).join('|') !== s.rallySynced.map(key).join('|')
 }
 
 /** Convenience for the map and profile: the plan as wire items would number. */

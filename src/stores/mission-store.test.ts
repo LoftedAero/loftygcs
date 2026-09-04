@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { isDirty, useMissionStore } from './mission-store'
+import { fenceDirty, isDirty, rallyDirty, useMissionStore } from './mission-store'
 import { planFromItems } from '../protocol/mission-plan'
 import type { MissionItem } from '../protocol/types'
 
@@ -29,6 +29,15 @@ beforeEach(() => {
     selected: null,
     transfer: { kind: 'idle' },
     sourceName: null,
+    survey: null,
+    editing: 'mission',
+    fence: { shapes: [], returnPoint: null },
+    fenceSynced: null,
+    rally: [],
+    rallySynced: null,
+    selectedShape: null,
+    fenceTool: null,
+    fenceDraft: [],
   })
 })
 
@@ -138,5 +147,111 @@ describe('dirty tracking', () => {
     store().setPlan(planFromItems([wire(0), wire(1), wire(2)]), { name: 'a.waypoints' })
     expect(isDirty(store())).toBe(true)
     expect(store().sourceName).toBe('a.waypoints')
+  })
+})
+
+describe('fence editing', () => {
+  const at = (x: number, y: number) => ({ x, y })
+
+  it('collects polygon corners and refuses to finish under three', () => {
+    store().setEditing('fence')
+    store().setFenceTool('inclusionPolygon')
+    store().placeFencePoint(at(1, 1))
+    store().placeFencePoint(at(2, 1))
+    store().finishFenceShape()
+    expect(store().fence.shapes).toHaveLength(0)
+    expect(store().fenceDraft).toHaveLength(2)
+
+    store().placeFencePoint(at(2, 2))
+    store().finishFenceShape()
+    expect(store().fence.shapes).toHaveLength(1)
+    // The tool disarms and the draft empties, so the next click does not
+    // start extending the shape that was just committed.
+    expect(store().fenceTool).toBeNull()
+    expect(store().fenceDraft).toEqual([])
+  })
+
+  it('places a whole circle from one click, selected and ready to size', () => {
+    store().setFenceTool('exclusionCircle')
+    store().placeFencePoint(at(10, 20))
+    const shape = store().fence.shapes[0]!
+    expect(shape.kind).toBe('circle')
+    expect(shape.inclusive).toBe(false)
+    expect(store().selectedShape).toBe(shape.uid)
+    expect(store().fenceTool).toBeNull()
+    store().updateShape(shape.uid, { radiusM: 250 })
+    const sized = store().fence.shapes[0]!
+    expect(sized.kind === 'circle' && sized.radiusM).toBe(250)
+  })
+
+  it('places the return point and lets it be removed', () => {
+    store().setFenceTool('returnPoint')
+    store().placeFencePoint(at(5, 6))
+    expect(store().fence.returnPoint).toEqual({ x: 5, y: 6 })
+    store().setFenceReturn(null)
+    expect(store().fence.returnPoint).toBeNull()
+  })
+
+  it('ignores a click with no tool armed', () => {
+    store().setEditing('fence')
+    store().placeFencePoint(at(1, 1))
+    expect(store().fence.shapes).toEqual([])
+    expect(store().fenceDraft).toEqual([])
+  })
+
+  it('abandons a half-drawn polygon when the plan being edited changes', () => {
+    store().setFenceTool('inclusionPolygon')
+    store().placeFencePoint(at(1, 1))
+    store().placeFencePoint(at(2, 2))
+    store().setEditing('rally')
+    // A two-corner polygon is not a fence, and keeping it would resurface
+    // later as a shape the vehicle rejects.
+    expect(store().fenceDraft).toEqual([])
+    expect(store().fenceTool).toBeNull()
+  })
+
+  it('moves one vertex of one shape and leaves the others alone', () => {
+    store().setFenceTool('inclusionPolygon')
+    for (const p of [at(1, 1), at(2, 1), at(2, 2)]) store().placeFencePoint(p)
+    store().finishFenceShape()
+    const uid = store().fence.shapes[0]!.uid
+    store().moveShapeVertex(uid, 1, at(9, 9))
+    const pts = store().fence.shapes[0]!
+    expect(pts.kind === 'polygon' && pts.points).toEqual([at(1, 1), at(9, 9), at(2, 2)])
+  })
+
+  it('is dirty until read or written, and clean straight after', () => {
+    expect(fenceDirty(useMissionStore.getState())).toBe(false)
+    store().setFenceTool('inclusionCircle')
+    store().placeFencePoint(at(1, 1))
+    expect(fenceDirty(useMissionStore.getState())).toBe(true)
+    store().setFence(store().fence, { synced: true })
+    expect(fenceDirty(useMissionStore.getState())).toBe(false)
+    // The synced copy is a clone, so editing the live one still shows.
+    store().updateShape(store().fence.shapes[0]!.uid, { radiusM: 999 })
+    expect(fenceDirty(useMissionStore.getState())).toBe(true)
+  })
+})
+
+describe('rally editing', () => {
+  it('adds points at the default altitude and tracks dirtiness', () => {
+    store().setDefaults({ altM: 70 })
+    store().setEditing('rally')
+    store().addRally({ x: 1, y: 2 })
+    expect(store().rally[0]).toMatchObject({ x: 1, y: 2, altM: 70 })
+    expect(rallyDirty(useMissionStore.getState())).toBe(true)
+    store().setRally(store().rally, { synced: true })
+    expect(rallyDirty(useMissionStore.getState())).toBe(false)
+    store().updateRally(store().rally[0]!.uid, { altM: 90 })
+    expect(rallyDirty(useMissionStore.getState())).toBe(true)
+  })
+
+  it('clears the selection when the selected point is removed', () => {
+    store().addRally({ x: 1, y: 2 })
+    const uid = store().rally[0]!.uid
+    expect(store().selectedShape).toBe(uid)
+    store().removeRally(uid)
+    expect(store().rally).toEqual([])
+    expect(store().selectedShape).toBeNull()
   })
 })

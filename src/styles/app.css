@@ -3097,3 +3097,99 @@ body.is-splitting .flight-map {
     grid-template-columns: 180px 120px 48px auto minmax(0, 1fr);
   }
 }
+
+/* Mission / Fence / Rally: which plan the map clicks belong to.
+   A segmented control rather than three buttons in a stack -- the three are
+   one choice, and stacking them reads as three separate things to do. */
+.plan-switch {
+  /* The column is a flex column that scrolls, so anything without this is
+     squeezed by whatever sits below it -- the switch collapsed to two pixels
+     and the buttons overflowed on top of the group beneath. */
+  flex: none;
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+  background: var(--la-surface);
+}
+.plan-switch__btn {
+  appearance: none;
+  flex: 1;
+  padding: var(--la-space-2) 0;
+  border: 0;
+  border-right: 1px solid var(--la-line);
+  background: transparent;
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.plan-switch__btn:last-child {
+  border-right: 0;
+}
+.plan-switch__btn:hover {
+  background: var(--la-surface-2);
+}
+/* Blue, not orange: choosing what to edit is a working control, and the one
+   primary action in this column stays Write. */
+.plan-switch__btn.is-active {
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
+
+/* One fence shape or rally point, with whatever it has to set. */
+.fence-item {
+  padding: var(--la-space-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  cursor: pointer;
+}
+.fence-item.is-selected {
+  border-color: var(--la-orange);
+}
+.fence-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.fence-item__name {
+  flex: 1;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  color: var(--la-ink);
+  text-transform: capitalize;
+}
+.fence-item__x {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--la-ink-3);
+  cursor: pointer;
+  font-size: var(--la-size-sm);
+  line-height: 1;
+  padding: 2px var(--la-space-1);
+}
+.fence-item__x:hover {
+  color: var(--la-bad);
+}
+/* Matches the shape's color on the map, so the list and the map agree. */
+.fence-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.fence-dot.is-inclusive,
+.fence-dot.is-return {
+  background: var(--la-ok);
+}
+.fence-dot.is-exclusive {
+  background: var(--la-bad);
+}
+.fence-dot.is-rally {
+  background: var(--la-ok);
+  border-radius: 2px;
+}

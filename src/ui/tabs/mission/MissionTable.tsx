@@ -18,6 +18,7 @@ import {
 
 export default function MissionTable() {
   const plan = useMissionStore((s) => s.plan)
+  const editing = useMissionStore((s) => s.editing)
   const selected = useMissionStore((s) => s.selected)
   const select = useMissionStore((s) => s.select)
   const update = useMissionStore((s) => s.updateItem)
@@ -29,8 +30,19 @@ export default function MissionTable() {
     return (
       <div className="mission-table mission-table--empty">
         <p className="app-placeholder">
-          No items yet. Use <strong>Add</strong> above the map to place a takeoff and some
-          waypoints, or read the mission off the vehicle.
+          {/* The palette is only shown while the mission is what clicks
+              edit, so pointing at it from a fence would be pointing at
+              nothing. */}
+          {editing === 'mission' ? (
+            <>
+              No items yet. Use <strong>Add</strong> above the map to place a takeoff and some
+              waypoints, or read the mission off the vehicle.
+            </>
+          ) : (
+            <>
+              No mission items. Switch back to <strong>Mission</strong> to plan a route.
+            </>
+          )}
         </p>
       </div>
     )

@@ -46,6 +46,15 @@ design decisions are recorded there and in code comments.
   class="app-col__head">`; order is what-you-do before what-you-set (vehicle actions, then file
   actions, then settings); and one orange action per column — the one that changes the
   aircraft. Write/Revert/Reload come from `VehicleParamActions`, never re-implemented.
+- **Mission mode edits three plans, not one** (`mission-store`'s `editing`): the mission, the
+  geofence and the rally points. They share the map, the transfer client and the actions
+  column, and differ only by MAVLink's `mission_type` — so there is no second state machine,
+  and `MissionClient` was already parameterized for it. All three stay *drawn* whichever is
+  selected (the two you are not editing go faint); the switch changes what clicks mean. Two
+  things about the fence are easy to get wrong and are handled in `protocol/geofence.ts`: a
+  polygon is N consecutive wire items whose only boundary marker is the vertex count each one
+  repeats in param1, and the vehicle answers a bad fence with a single error code that names
+  nothing — so `validateFence` runs before upload and names the shape itself.
 - **Staged parameter edits belong to the page that made them.** Leaving a page with unwritten
   edits prompts (`ui-store`'s `pendingNav`), so a screen's column can own its own Write. The
   global action bar still carries Write for Setup tabs that have no column.

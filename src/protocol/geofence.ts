@@ -46,6 +46,19 @@ export type FenceShape =
       radiusM: number
     }
 
+/**
+ * The editable fields of a shape, flattened across both kinds.
+ *
+ * `Omit` over the union would keep only the fields both kinds share, which
+ * is neither `points` nor `radiusM` -- the two things anyone actually edits.
+ */
+export type FenceShapePatch = Partial<{
+  inclusive: boolean
+  points: { x: number; y: number }[]
+  center: { x: number; y: number }
+  radiusM: number
+}>
+
 export interface FencePlan {
   shapes: FenceShape[]
   /**

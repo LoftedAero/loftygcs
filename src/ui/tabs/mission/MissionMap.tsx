@@ -51,6 +51,51 @@ function itemIcon(seq: number, selected: boolean, kind: 'nav' | 'other'): L.DivI
   })
 }
 
+// Status colors, used here as status and not as actions: a fence shape says
+// where the aircraft may and may not be. Written as literals because Leaflet
+// takes colors as options rather than through CSS -- they are --la-good and
+// --la-bad, and must be changed with them.
+const FENCE_IN = '#2FAE4E'
+const FENCE_OUT = '#D63031'
+
+/** A small draggable handle on a fence vertex or a circle's center. */
+function vertexIcon(color: string): L.DivIcon {
+  return L.divIcon({
+    className: 'mission-marker',
+    html: `<svg width="14" height="14" viewBox="-7 -7 14 14">
+      <rect x="-5" y="-5" width="10" height="10" fill="${color}" stroke="#fff" stroke-width="2"/>
+    </svg>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  })
+}
+
+function returnIcon(opacity: number): L.DivIcon {
+  return L.divIcon({
+    className: 'mission-marker',
+    html: `<svg width="26" height="26" viewBox="-13 -13 26 26" opacity="${opacity}">
+      <circle r="11" fill="#2FAE4E" stroke="#fff" stroke-width="2"/>
+      <path d="M-4 2 L0 -5 L4 2 Z" fill="#fff"/>
+    </svg>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  })
+}
+
+function rallyIcon(n: number, selected: boolean, opacity: number): L.DivIcon {
+  return L.divIcon({
+    className: 'mission-marker',
+    html: `<svg width="26" height="30" viewBox="-13 -24 26 30" opacity="${opacity}">
+      <path d="M0 6 L-8 -10 A9 9 0 1 1 8 -10 Z" fill="${selected ? '#F7941D' : '#2FAE4E'}"
+            stroke="#2D2D2F" stroke-width="1.5"/>
+      <text x="0" y="-8" text-anchor="middle" font-family="Roboto Mono, monospace"
+            font-size="10" font-weight="700" fill="#fff">R${n}</text>
+    </svg>`,
+    iconSize: [26, 30],
+    iconAnchor: [13, 30],
+  })
+}
+
 function cornerIcon(n: number): L.DivIcon {
   return L.divIcon({
     className: 'mission-marker',
@@ -117,6 +162,19 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
         return
       }
 
+      // A click belongs to whichever plan is being edited. Fence clicks go
+      // nowhere until a tool is armed, because a fence has five kinds of
+      // thing to place and no sensible default among them; rally has one, so
+      // a bare click adds a point the way it adds a waypoint in Mission.
+      if (store.editing === 'fence') {
+        store.placeFencePoint(at)
+        return
+      }
+      if (store.editing === 'rally') {
+        store.addRally(at)
+        return
+      }
+
       // Home is placed, not appended: there is only ever one.
       if (armed === HOME_TOOL) {
         store.setHome({ ...at, z: store.plan.home?.z ?? 0 })
@@ -175,6 +233,11 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
   const plan = useMissionStore((s) => s.plan)
   const selected = useMissionStore((s) => s.selected)
   const survey = useMissionStore((s) => s.survey)
+  const editing = useMissionStore((s) => s.editing)
+  const fence = useMissionStore((s) => s.fence)
+  const fenceDraft = useMissionStore((s) => s.fenceDraft)
+  const rally = useMissionStore((s) => s.rally)
+  const selectedShape = useMissionStore((s) => s.selectedShape)
   useEffect(() => {
     const map = mapRef.current
     const layer = layerRef.current
@@ -225,6 +288,107 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
     if (route.length > 1) {
       L.polyline(route, { color: '#F7941D', weight: 3, opacity: 0.9 }).addTo(layer)
     }
+
+    // The fence and the rally points, always drawn -- a fence you cannot see
+    // while planning a mission is a fence you plan a mission through. The
+    // plan not being edited is drawn faint, so which one takes clicks is
+    // visible rather than something to remember.
+    const dim = editing === 'fence' ? 1 : 0.45
+    for (const shape of fence.shapes) {
+      const color = shape.inclusive ? FENCE_IN : FENCE_OUT
+      const style = {
+        color,
+        weight: selectedShape === shape.uid ? 4 : 2,
+        opacity: dim,
+        fillOpacity: 0.08 * dim,
+        // Exclusion zones are hatched by dashing: on a satellite base map
+        // two translucent fills are hard to tell apart by hue alone.
+        dashArray: shape.inclusive ? undefined : '8 5',
+      }
+      if (shape.kind === 'polygon') {
+        L.polygon(
+          shape.points.map((q) => [q.x / 1e7, q.y / 1e7] as L.LatLngTuple),
+          style,
+        )
+          .on('click', () => useMissionStore.getState().selectShape(shape.uid))
+          .addTo(layer)
+        if (editing === 'fence') {
+          shape.points.forEach((q, i) => {
+            L.marker([q.x / 1e7, q.y / 1e7], { icon: vertexIcon(color), draggable: true })
+              .on('dragend', (e) => {
+                const t = (e.target as L.Marker).getLatLng()
+                useMissionStore
+                  .getState()
+                  .moveShapeVertex(shape.uid, i, {
+                    x: Math.round(t.lat * 1e7),
+                    y: Math.round(t.lng * 1e7),
+                  })
+              })
+              .addTo(layer)
+          })
+        }
+      } else {
+        L.circle([shape.center.x / 1e7, shape.center.y / 1e7], {
+          ...style,
+          radius: shape.radiusM,
+        })
+          .on('click', () => useMissionStore.getState().selectShape(shape.uid))
+          .addTo(layer)
+        if (editing === 'fence') {
+          L.marker([shape.center.x / 1e7, shape.center.y / 1e7], {
+            icon: vertexIcon(color),
+            draggable: true,
+          })
+            .on('dragend', (e) => {
+              const t = (e.target as L.Marker).getLatLng()
+              useMissionStore.getState().updateShape(shape.uid, {
+                center: { x: Math.round(t.lat * 1e7), y: Math.round(t.lng * 1e7) },
+              })
+            })
+            .addTo(layer)
+        }
+      }
+    }
+
+    // The polygon under construction, open rather than closed: it is not a
+    // shape until Finish says so, and drawing it closed would claim it is.
+    if (fenceDraft.length > 0) {
+      const line = fenceDraft.map((q) => [q.x / 1e7, q.y / 1e7] as L.LatLngTuple)
+      if (line.length > 1) L.polyline(line, { color: FENCE_IN, weight: 2, dashArray: '4 4' }).addTo(layer)
+      fenceDraft.forEach((q) => {
+        L.marker([q.x / 1e7, q.y / 1e7], { icon: vertexIcon(FENCE_IN) }).addTo(layer)
+      })
+    }
+
+    if (fence.returnPoint) {
+      L.marker([fence.returnPoint.x / 1e7, fence.returnPoint.y / 1e7], {
+        icon: returnIcon(dim),
+        draggable: editing === 'fence',
+      })
+        .on('dragend', (e) => {
+          const t = (e.target as L.Marker).getLatLng()
+          useMissionStore
+            .getState()
+            .setFenceReturn({ x: Math.round(t.lat * 1e7), y: Math.round(t.lng * 1e7) })
+        })
+        .addTo(layer)
+    }
+
+    const rallyDim = editing === 'rally' ? 1 : 0.5
+    rally.forEach((q, i) => {
+      L.marker([q.x / 1e7, q.y / 1e7], {
+        icon: rallyIcon(i + 1, selectedShape === q.uid, rallyDim),
+        draggable: editing === 'rally',
+      })
+        .on('click', () => useMissionStore.getState().selectShape(q.uid))
+        .on('dragend', (e) => {
+          const t = (e.target as L.Marker).getLatLng()
+          useMissionStore
+            .getState()
+            .updateRally(q.uid, { x: Math.round(t.lat * 1e7), y: Math.round(t.lng * 1e7) })
+        })
+        .addTo(layer)
+    })
 
     // The survey area and a live preview of the passes it would generate.
     // Drawn in blue: nothing here is part of the mission until Add turns it
@@ -277,7 +441,7 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
         })
       }
     }
-  }, [plan, selected, survey, centered])
+  }, [plan, selected, survey, editing, fence, fenceDraft, rally, selectedShape, centered])
 
   // The vehicle, when there is one, so the plan can be seen against it.
   useEffect(() => {

@@ -3,6 +3,9 @@ import MissionMap from './MissionMap'
 import MissionTable from './MissionTable'
 import MissionSettings from './MissionSettings'
 import SurveyPanel from './SurveyPanel'
+import PlanKindSwitch from './PlanKindSwitch'
+import FencePanel from './FencePanel'
+import RallyPanel from './RallyPanel'
 import MissionToolbar from './MissionToolbar'
 import ItemPalette from './ItemPalette'
 import AltitudeProfile from './AltitudeProfile'
@@ -41,6 +44,7 @@ export default function MissionTab() {
   const items = useMissionStore((s) => s.plan.items.length)
   const addItem = useMissionStore((s) => s.addItem)
   const split = useMissionStore((s) => s.split)
+  const editing = useMissionStore((s) => s.editing)
   const setSplit = useMissionStore((s) => s.setSplit)
 
   const profileVisible = showProfile && items > 0
@@ -59,7 +63,7 @@ export default function MissionTab() {
           }
         >
           <div className="mission-map-area">
-            <ItemPalette tool={tool} onTool={setTool} />
+            {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
             <MissionMap
               tool={tool}
               onPlaced={() => setTool(null)}
@@ -97,11 +101,20 @@ export default function MissionTab() {
         </div>
 
         <aside className="mission-side">
-          <MissionToolbar />
-          {/* Above the settings: while an area is being drawn it is what the
-              map clicks mean, so it should be the first thing in reach. */}
-          <SurveyPanel />
-          <MissionSettings />
+          {/* First, because it decides what everything below it is about. */}
+          <PlanKindSwitch />
+          {editing === 'mission' && (
+            <>
+              <MissionToolbar />
+              {/* Above the settings: while an area is being drawn it is what
+                  the map clicks mean, so it should be the first thing in
+                  reach. */}
+              <SurveyPanel />
+              <MissionSettings />
+            </>
+          )}
+          {editing === 'fence' && <FencePanel />}
+          {editing === 'rally' && <RallyPanel />}
         </aside>
       </div>
 
