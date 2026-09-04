@@ -8,6 +8,12 @@ import { describe, expect, it } from 'vitest'
 import net from 'node:net'
 import { once } from 'node:events'
 import { ProtocolEngine } from './engine'
+import {
+  fenceFromItems,
+  fenceToItems,
+  rallyFromItems,
+  rallyToItems,
+} from './geofence'
 import type { ProtocolEvent } from './types'
 
 const SITL_HOST = '127.0.0.1'
@@ -47,6 +53,12 @@ async function connectVehicle(
 ): Promise<net.Socket> {
   for (let attempt = 0; ; attempt++) {
     const socket = await connectSitl()
+    // SITL exits the moment its one client disconnects, so tearing a test
+    // down races its shutdown and the reset arrives as an unhandled
+    // exception -- which made a fully green run exit non-zero, defeating the
+    // gate the run exists to be. There is nothing to recover from here: the
+    // test is already over.
+    socket.on('error', () => {})
     const seen = events.length
     // Wire tx before starting: the engine requests streams the moment the
     // first heartbeat lands, and that send must not fall on the floor.
@@ -229,6 +241,89 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
 
         // Leave SITL holding the good mission, restored for whoever's next.
         await engine.uploadMission(plan, 0)
+      } finally {
+        engine.stop()
+        socket?.destroy()
+      }
+    },
+    90000,
+  )
+
+  it(
+    'round trips a geofence and rally points through real ArduPilot',
+    async () => {
+      const events: ProtocolEvent[] = []
+      let socket: net.Socket | null = null
+      const engine = new ProtocolEngine((out) => {
+        if (out.t === 'tx') socket?.write(out.bytes)
+        else if (out.t === 'evt') events.push(out.evt)
+      })
+      socket = await connectVehicle(engine, events, (s) => (socket = s))
+
+      try {
+        // Around SITL's default home at Canberra. Two polygons of the SAME
+        // kind and the SAME vertex count, deliberately: on the wire nothing
+        // separates them but the running count each vertex carries in
+        // param1, and this is the case that proves the grouping is real
+        // rather than an artifact of our own serializer.
+        const box = (lat: number, lon: number, d: number) => [
+          { x: Math.round((lat - d) * 1e7), y: Math.round((lon - d) * 1e7) },
+          { x: Math.round((lat + d) * 1e7), y: Math.round((lon - d) * 1e7) },
+          { x: Math.round((lat + d) * 1e7), y: Math.round((lon + d) * 1e7) },
+          { x: Math.round((lat - d) * 1e7), y: Math.round((lon + d) * 1e7) },
+        ]
+        const fence = {
+          shapes: [
+            { uid: 'a', kind: 'polygon' as const, inclusive: true, points: box(-35.3632, 149.1652, 0.004) },
+            { uid: 'b', kind: 'polygon' as const, inclusive: true, points: box(-35.3700, 149.1750, 0.004) },
+            {
+              uid: 'c',
+              kind: 'circle' as const,
+              inclusive: false,
+              center: { x: -353640000, y: 1491660000 },
+              radiusM: 75,
+            },
+          ],
+          returnPoint: { x: -353632620, y: 1491652370 },
+        }
+
+        await engine.uploadMission(fenceToItems(fence), 1)
+        const backItems = await engine.downloadMission(1)
+        const { plan: back, problems } = fenceFromItems(backItems)
+        expect(problems).toEqual([])
+        expect(back.shapes).toHaveLength(3)
+        // The two same-kind polygons came back as two, not one of eight
+        // vertices and not one of four with four dropped.
+        expect(back.shapes.filter((x) => x.kind === 'polygon')).toHaveLength(2)
+        for (const shape of back.shapes) {
+          if (shape.kind === 'polygon') expect(shape.points).toHaveLength(4)
+        }
+        const circle = back.shapes.find((x) => x.kind === 'circle')
+        expect(circle?.kind === 'circle' && circle.radiusM).toBeCloseTo(75, 1)
+        expect(back.returnPoint?.x).toBe(fence.returnPoint.x)
+
+        // An empty fence must actually remove it, not be a no-op: a fence
+        // you think you deleted but the vehicle still enforces is the worst
+        // outcome available.
+        await engine.uploadMission([], 1)
+        expect(await engine.downloadMission(1)).toHaveLength(0)
+
+        // --- Rally points ---
+        const rally = [
+          { uid: 'r1', x: -353620000, y: 1491640000, altM: 60 },
+          { uid: 'r2', x: -353650000, y: 1491680000, altM: 90 },
+        ]
+        await engine.uploadMission(rallyToItems(rally), 2)
+        const readRally = rallyFromItems(await engine.downloadMission(2))
+        expect(readRally).toHaveLength(2)
+        for (let i = 0; i < rally.length; i++) {
+          expect(readRally[i]!.x).toBe(rally[i]!.x)
+          expect(readRally[i]!.y).toBe(rally[i]!.y)
+          expect(readRally[i]!.altM).toBeCloseTo(rally[i]!.altM, 1)
+        }
+
+        // Leave the vehicle as we found it.
+        await engine.uploadMission([], 2)
       } finally {
         engine.stop()
         socket?.destroy()
