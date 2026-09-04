@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { LaButton, LaHint, LaSwitch } from '../../components/La'
 import { useLogStore } from '../../../stores/log-store'
 import { openLogFile } from '../../../services/log-file'
@@ -9,6 +9,7 @@ import LogPlot from './LogPlot'
 import LogTable from './LogTable'
 import LogReplay from './LogReplay'
 import FieldPicker from './FieldPicker'
+import Divider from '../../components/Divider'
 
 // Reviewing a flight log.
 //
@@ -35,6 +36,9 @@ export default function LogsTab() {
   const view = useLogStore((s) => s.view)
   const setView = useLogStore((s) => s.setView)
   const shadeModes = useLogStore((s) => s.shadeModes)
+  const split = useLogStore((s) => s.split)
+  const setSplit = useLogStore((s) => s.setSplit)
+  const mainRef = useRef<HTMLDivElement>(null)
   const setShadeModes = useLogStore((s) => s.setShadeModes)
   const clear = useLogStore((s) => s.clear)
   const bytes = useLogStore((s) => s.rawBytes)
@@ -51,8 +55,12 @@ export default function LogsTab() {
 
   return (
     <div className="log-screen">
-      <div className={log && view === 'plot' ? 'log-body log-body--fields' : 'log-body'}>
-        {log && view === 'plot' && (
+      <div
+        className={
+          log && (view === 'plot' || view === 'both') ? 'log-body log-body--fields' : 'log-body'
+        }
+      >
+        {log && (view === 'plot' || view === 'both') && (
           <aside className="log-fields">
             <h3 className="app-col__head">Fields</h3>
             <FieldPicker />
@@ -66,6 +74,32 @@ export default function LogsTab() {
             <LogPlot />
           ) : view === 'replay' ? (
             <LogReplay />
+          ) : view === 'both' ? (
+            // Plot above, replay below, the way plot.ardupilot.org stacks
+            // them -- and a drag on either sends the other to that instant.
+            <div
+              className="log-split"
+              ref={mainRef}
+              style={
+                {
+                  '--split-top': `${split.toFixed(3)}fr`,
+                  '--split-bottom': `${(1 - split).toFixed(3)}fr`,
+                } as React.CSSProperties
+              }
+            >
+              <div className="log-split__pane">
+                <LogPlot />
+              </div>
+              <Divider
+                orientation="horizontal"
+                containerRef={mainRef}
+                ratio={split}
+                onRatio={setSplit}
+              />
+              <div className="log-split__pane">
+                <LogReplay />
+              </div>
+            </div>
           ) : (
             <LogTable />
           )}
@@ -105,7 +139,7 @@ export default function LogsTab() {
               <section className="app-col__group">
                 <h3 className="app-col__head">View</h3>
                 <div className="log-viewswitch" role="tablist" aria-label="View">
-                  {(['plot', 'table', 'replay'] as const).map((v) => (
+                  {(['plot', 'both', 'replay', 'table'] as const).map((v) => (
                     <button
                       key={v}
                       type="button"
@@ -114,11 +148,11 @@ export default function LogsTab() {
                       className={`log-viewswitch__btn${view === v ? ' is-active' : ''}`}
                       onClick={() => setView(v)}
                     >
-                      {v === 'plot' ? 'Plot' : v === 'table' ? 'Table' : '3D'}
+                      {v === 'plot' ? 'Plot' : v === 'both' ? 'Both' : v === 'replay' ? '3D' : 'Table'}
                     </button>
                   ))}
                 </div>
-                {view === 'plot' && (
+                {(view === 'plot' || view === 'both') && (
                   <>
                     <LaSwitch
                       label="Shade by flight mode"
@@ -134,7 +168,7 @@ export default function LogsTab() {
                 )}
               </section>
 
-              {view === 'plot' && <PlottedFields />}
+              {(view === 'plot' || view === 'both') && <PlottedFields />}
             </>
           )}
         </aside>

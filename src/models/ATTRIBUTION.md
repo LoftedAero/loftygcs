@@ -13,9 +13,10 @@ by [lord_syrup](https://sketchfab.com/lord_syrup) licensed under
 changed: the stock red livery is repainted to the neutral grey of the Lofted Aero mark, with
 the struts, undercarriage and propeller re-toned so they stay legible against it.
 
-The license requires that credit travels with the model, so the app shows it in the
-Overview tab alongside the model itself — not only here. Do not remove that line without
-replacing the model.
+The license requires that credit travels with the model, so the app shows it wherever the
+model is drawn — not only here. That is two places now: the Overview tab, and the Logs
+tab's 3D replay when the log says a plane flew. Do not remove either line without
+replacing the model, and add one anywhere else the biplane appears.
 
 The upstream notice is kept verbatim in `airplane.license.txt`.
 

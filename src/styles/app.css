@@ -3794,3 +3794,21 @@ body.is-splitting .flight-map {
   background: var(--la-surface);
   padding: 2px var(--la-space-1);
 }
+
+/* Plot above, replay below, with a draggable boundary -- the same shape the
+   mission screen uses for its map and table. */
+.log-split {
+  display: grid;
+  grid-template-rows:
+    minmax(0, var(--split-top, 1fr))
+    var(--la-space-2)
+    minmax(0, var(--split-bottom, 1fr));
+  min-height: 0;
+  flex: 1;
+}
+.log-split__pane {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

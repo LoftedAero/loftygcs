@@ -157,3 +157,33 @@ describe('choosing a position source', () => {
     expect(sampleAt(path, 5)).toBeNull()
   })
 })
+
+describe('altitude, and what a globe with no terrain needs', () => {
+  it('keeps AMSL and offers height above the launch point', () => {
+    const path = flightPath(real)
+    const first = path.samples[0]!
+    // The field is nearly 600 m up; the aircraft started on it.
+    expect(first.alt).toBeGreaterThan(500)
+    expect(Math.abs(first.altAboveHome)).toBeLessThan(2)
+    expect(path.groundAlt).toBeGreaterThan(500)
+  })
+
+  it('prefers the relative altitude the log recorded', () => {
+    // POS carries RelHomeAlt outright, and the vehicle's own number beats
+    // any arithmetic done out here.
+    const path = flightPath(real)
+    for (const s of path.samples) {
+      expect(s.altAboveHome).toBeCloseTo(s.alt - path.groundAlt!, 0)
+    }
+  })
+
+  it('subtracts the ground when the source has no relative field', () => {
+    // AHR2 and GPS report AMSL only. Drawn as-is on a terrain-less globe,
+    // a track at a field 584 m up floats 584 m over the rendered ground.
+    const path = flightPath(
+      logWith({ message: 'AHR2', time: [0, 1], lat: [51, 51], lon: [-1, -1], alt: [584, 599] }),
+    )
+    expect(path.groundAlt).toBe(584)
+    expect(path.samples.map((s) => s.altAboveHome)).toEqual([0, 15])
+  })
+})

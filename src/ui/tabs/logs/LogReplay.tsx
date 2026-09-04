@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { LaButton, LaHint } from '../../components/La'
 import { flightPath, type FlightPath } from '../../../protocol/log-path'
 import { useLogStore } from '../../../stores/log-store'
+import { vehicleClassFromLog } from '../../../protocol/log-modes'
 import quadModelUrl from '../../../models/quad_x.gltf?url'
+import planeModelUrl from '../../../models/airplane.gltf?url'
 
 // The 3D replay: fly the log back, on a globe you can orbit.
 //
@@ -106,6 +108,7 @@ let pending: Promise<CesiumModule> | null = null
 export default function LogReplay() {
   const log = useLogStore((s) => s.log)
   const setPlayhead = useLogStore((s) => s.setPlayhead)
+  const seekTo = useLogStore((s) => s.seekTo)
   const containerRef = useRef<HTMLDivElement>(null)
   /** The live scene, off React state: it changes every frame. */
   const liveRef = useRef<Live | null>(null)
@@ -113,6 +116,10 @@ export default function LogReplay() {
   const [error, setError] = useState<string | null>(null)
   const [diagnostic, setDiagnostic] = useState('')
   const [path, setPath] = useState<FlightPath | null>(null)
+  // Which airframe flew, from the log's own firmware banner -- a plane
+  // replayed as a quadcopter is a small lie that undermines the rest.
+  const isPlane = log ? vehicleClassFromLog(log) === 'plane' : false
+  const modelUrl = isPlane ? planeModelUrl : quadModelUrl
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(5)
   const [at, setAt] = useState(0)
@@ -192,7 +199,10 @@ export default function LogReplay() {
         for (let i = 0; i < path.samples.length; i++) {
           const s = path.samples[i]!
           const when = timeOf(s.time)
-          const where = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt)
+          // altAboveHome, not the AMSL altitude: with no terrain the
+          // rendered ground is the ellipsoid at height zero, so an AMSL
+          // track at a field 584 m up floats 584 m over it.
+          const where = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.altAboveHome)
           position.addSample(when, where)
           track.push(where)
           orientation.intervals.addInterval(
@@ -233,7 +243,7 @@ export default function LogReplay() {
           },
         })
         viewer.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(first.lon, first.lat, first.alt),
+          position: Cesium.Cartesian3.fromDegrees(first.lon, first.lat, first.altAboveHome),
           point: {
             pixelSize: 9,
             color: Cesium.Color.fromCssColorString('#2FAE4E'),
@@ -253,7 +263,7 @@ export default function LogReplay() {
             outlineColor: Cesium.Color.fromCssColorString('#2D2D2F'),
             outlineWidth: 2,
           },
-          model: { uri: quadModelUrl, minimumPixelSize: 48, maximumScale: 200 },
+          model: { uri: modelUrl, minimumPixelSize: 48, maximumScale: 200 },
         })
 
         const sphere = Cesium.BoundingSphere.fromPoints(track)
@@ -302,7 +312,7 @@ export default function LogReplay() {
     }
     // Deliberately not depending on `speed`: it is applied to the clock by
     // the effect below, rather than by rebuilding the whole scene.
-  }, [path, setPlayhead])
+  }, [path, modelUrl, setPlayhead])
 
   useEffect(() => {
     const live = liveRef.current
@@ -311,7 +321,16 @@ export default function LogReplay() {
     live.viewer.clock.shouldAnimate = playing
   }, [playing, speed, status])
 
-  const scrub = (t: number) => {
+  // A seek asked for elsewhere -- a click on the plot. Kept on its own
+  // store field rather than reading `playhead`, which this component writes
+  // every frame: the two would otherwise chase each other forever.
+  useEffect(() => {
+    if (seekTo === null || status !== 'ready') return
+    setPlaying(false)
+    seek(seekTo)
+  }, [seekTo, status])
+
+  const seek = (t: number) => {
     const live = liveRef.current
     if (!live) return
     live.viewer.clock.currentTime = live.Cesium.JulianDate.addSeconds(
@@ -356,7 +375,7 @@ export default function LogReplay() {
             aria-label="Replay position"
             onChange={(e) => {
               setPlaying(false)
-              scrub(Number(e.target.value))
+              seek(Number(e.target.value))
             }}
           />
           <span className="log-replay__clock">
@@ -381,6 +400,22 @@ export default function LogReplay() {
         <p className="log-replay__note">
           {path.samples.length.toLocaleString()} positions from {path.source}
           {!path.hasAttitude && ' · no attitude in this log'}
+          {path.groundAlt !== null && ` · heights above launch (${path.groundAlt.toFixed(0)} m AMSL)`}
+          {/* CC-BY requires the credit to travel with the model, not to sit
+              on one other screen. See src/models/ATTRIBUTION.md. */}
+          {isPlane && (
+            <>
+              {' · biplane by '}
+              <a
+                href="https://sketchfab.com/3d-models/low-poly-biplane-755175daea384176813e7dc90b2245a5"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                lord_syrup
+              </a>
+              {', CC-BY-4.0, recoloured'}
+            </>
+          )}
           {diagnostic && ` · ${diagnostic}`} · imagery © Esri, Maxar, Earthstar Geographics ·
           tiles fetched for this area; the log itself stays on this machine
         </p>

@@ -9,7 +9,20 @@ import { fieldUnit, parseDataflash, type ParsedLog } from '../protocol/dataflash
 // to lose. A log large enough to be a problem should move the parse into a
 // worker before it moves it out of memory.
 
-export type LogView = 'plot' | 'table' | 'replay'
+export type LogView = 'plot' | 'table' | 'replay' | 'both'
+
+/** Fraction of the height given to the plot in the split view. */
+const SPLIT_KEY = 'loftgcs.logs.split'
+
+function loadSplit(): number {
+  try {
+    const v = Number(localStorage.getItem(SPLIT_KEY))
+    if (Number.isFinite(v) && v > 0.15 && v < 0.85) return v
+  } catch {
+    // Storage blocked; the default is a reasonable answer.
+  }
+  return 0.45
+}
 
 /** How many y axes the plot will draw at once. */
 export const MAX_AXES = 4
@@ -159,6 +172,20 @@ interface LogState {
    */
   playhead: number | null
   setPlayhead(t: number | null): void
+  /**
+   * Where the playhead was put from outside the replay -- a click on the
+   * plot, mostly.
+   *
+   * Kept apart from `playhead` so the replay can tell a request to seek
+   * from the value it published itself a frame ago. Sharing one field makes
+   * the two views chase each other in a loop.
+   */
+  seekTo: number | null
+  requestSeek(t: number): void
+
+  /** Height split between plot and replay when both are shown. */
+  split: number
+  setSplit(ratio: number): void
   clearFields(): void
   setTableMessage(message: string | null): void
   setSearch(search: string): void
@@ -180,6 +207,8 @@ export const useLogStore = create<LogState>((set, get) => ({
   shadeModes: true,
   timeWindow: null,
   playhead: null,
+  seekTo: null,
+  split: loadSplit(),
   vehicleLogs: [],
   vehicleStatus: { kind: 'idle' },
 
@@ -212,6 +241,8 @@ export const useLogStore = create<LogState>((set, get) => ({
         selected: [],
         timeWindow: null,
   playhead: null,
+  seekTo: null,
+  split: loadSplit(),
         tableMessage: firstPresent(log, ['MODE', 'MSG', 'ATT']),
       })
     } catch (err) {
@@ -229,6 +260,8 @@ export const useLogStore = create<LogState>((set, get) => ({
       selected: [],
       timeWindow: null,
   playhead: null,
+  seekTo: null,
+  split: loadSplit(),
       tableMessage: null,
       search: '',
     })
@@ -265,6 +298,20 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   setPlayhead(playhead) {
     set({ playhead })
+  },
+
+  requestSeek(t) {
+    set({ seekTo: t, playhead: t })
+  },
+
+  setSplit(ratio) {
+    const clamped = Math.max(0.2, Math.min(0.8, ratio))
+    set({ split: clamped })
+    try {
+      localStorage.setItem(SPLIT_KEY, String(clamped))
+    } catch {
+      // Not remembering the split is a nuisance, never a failure.
+    }
   },
 
   setFieldAxis(field, axis) {

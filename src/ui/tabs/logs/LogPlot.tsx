@@ -82,6 +82,7 @@ export default function LogPlot() {
   const selected = useLogStore((s) => s.selected)
   const shadeModes = useLogStore((s) => s.shadeModes)
   const playhead = useLogStore((s) => s.playhead)
+  const requestSeek = useLogStore((s) => s.requestSeek)
   const spans = useMemo(() => (log && shadeModes ? modeSpans(log) : []), [log, shadeModes])
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -207,7 +208,13 @@ export default function LogPlot() {
           // pointing at the trace, and zooming to a sliver of a second
           // would be a nasty surprise.
           const width = Math.abs(end - start)
-          if (!view || width < (view.t1 - view.t0) / 200) return
+          // Too small to be a zoom, so it was a click: send the replay to
+          // that instant instead. One gesture, two readings -- what the
+          // trace says there and where the aircraft was.
+          if (!view || width < (view.t1 - view.t0) / 200) {
+            requestSeek(end)
+            return
+          }
           setSpan({ t0: Math.min(start, end), t1: Math.max(start, end) })
         }}
         onWheel={(e) => {

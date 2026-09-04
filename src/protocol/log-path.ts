@@ -25,8 +25,16 @@ export interface PathSample {
   time: number
   lat: number
   lon: number
-  /** Metres above mean sea level. */
+  /** Metres above mean sea level, as the log reports it. */
   alt: number
+  /**
+   * Metres above the launch point.
+   *
+   * The one to draw on a globe with no terrain, where the rendered ground
+   * sits at ellipsoid height zero: an AMSL track at a field 584 m up floats
+   * 584 m above that ground, which is exactly as wrong as it sounds.
+   */
+  altAboveHome: number
   /** Degrees. Zero when the log carried no attitude to sample. */
   roll: number
   pitch: number
@@ -38,6 +46,8 @@ export interface FlightPath {
   samples: PathSample[]
   /** Which message the positions came from. */
   source: string | null
+  /** AMSL elevation of the launch point, if the log said. */
+  groundAlt: number | null
   /** Whether attitude was found, or the samples are flying level. */
   hasAttitude: boolean
   problems: string[]
@@ -76,8 +86,22 @@ export function flightPath(log: ParsedLog): FlightPath {
   }
 
   if (!source || !time || !lat || !lon || !alt) {
-    return { samples: [], source: null, hasAttitude: false, problems: ['No position in this log.'] }
+    return {
+      samples: [],
+      source: null,
+      groundAlt: null,
+      hasAttitude: false,
+      problems: ['No position in this log.'],
+    }
   }
+
+  // Height above the launch point. POS logs it directly; for the other
+  // sources it is the AMSL altitude less the ground's, which the EKF origin
+  // gives when the log has one and the first fix approximates when it does
+  // not -- the aircraft was on the ground at the time either way.
+  const relative = getSeries(log, source, 'RelHomeAlt')?.values ?? null
+  const originAlt = getSeries(log, 'ORGN', 'Alt')?.values[0] ?? null
+  let groundAlt = originAlt
 
   let attTime: Float64Array | null = null
   let roll: Float64Array | null = null
@@ -114,11 +138,22 @@ export function flightPath(log: ParsedLog): FlightPath {
       p = interpolate(attTime, pitch, t, cursor)
       y = interpolateAngle(attTime, yaw, t, cursor)
     }
-    samples.push({ time: t, lat: la, lon: lo, alt: alt[i]!, roll: r, pitch: p, yaw: y })
+    const amsl = alt[i]!
+    if (groundAlt === null) groundAlt = amsl
+    samples.push({
+      time: t,
+      lat: la,
+      lon: lo,
+      alt: amsl,
+      altAboveHome: relative ? relative[i]! : amsl - groundAlt,
+      roll: r,
+      pitch: p,
+      yaw: y,
+    })
   }
 
   if (samples.length === 0) problems.push('The log has position records but no fix in any of them.')
-  return { samples, source, hasAttitude: attTime !== null, problems }
+  return { samples, source, groundAlt, hasAttitude: attTime !== null, problems }
 }
 
 /**
