@@ -3767,3 +3767,30 @@ body.is-splitting .flight-map {
   font-size: var(--la-size-xs);
   color: var(--la-ink-3);
 }
+
+/* Replay transport: play, scrub, speed. */
+.log-replay__transport {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  padding: var(--la-space-2) var(--la-space-3);
+  border-top: 1px solid var(--la-line);
+  background: var(--la-surface-2);
+}
+.log-replay__scrub {
+  flex: 1;
+  min-width: 0;
+}
+.log-replay__clock,
+.log-replay__speed {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.log-replay__speed {
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  padding: 2px var(--la-space-1);
+}

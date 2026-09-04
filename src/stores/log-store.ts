@@ -148,6 +148,17 @@ interface LogState {
    */
   timeWindow: { t0: number; t1: number } | null
   setTimeWindow(window: { t0: number; t1: number } | null): void
+
+  /**
+   * Where the replay has got to, in seconds since boot, or null when it is
+   * not running.
+   *
+   * Shared so the plot can mark the same instant: watching the aircraft fly
+   * and reading what its sensors said at that moment is the point of having
+   * both views in one tool rather than two.
+   */
+  playhead: number | null
+  setPlayhead(t: number | null): void
   clearFields(): void
   setTableMessage(message: string | null): void
   setSearch(search: string): void
@@ -168,6 +179,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   search: '',
   shadeModes: true,
   timeWindow: null,
+  playhead: null,
   vehicleLogs: [],
   vehicleStatus: { kind: 'idle' },
 
@@ -199,6 +211,7 @@ export const useLogStore = create<LogState>((set, get) => ({
         // to remove before starting rather than a head start.
         selected: [],
         timeWindow: null,
+  playhead: null,
         tableMessage: firstPresent(log, ['MODE', 'MSG', 'ATT']),
       })
     } catch (err) {
@@ -215,6 +228,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       status: { kind: 'empty' },
       selected: [],
       timeWindow: null,
+  playhead: null,
       tableMessage: null,
       search: '',
     })
@@ -247,6 +261,10 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   setTimeWindow(timeWindow) {
     set({ timeWindow })
+  },
+
+  setPlayhead(playhead) {
+    set({ playhead })
   },
 
   setFieldAxis(field, axis) {

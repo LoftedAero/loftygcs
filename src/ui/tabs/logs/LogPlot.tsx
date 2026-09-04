@@ -81,6 +81,7 @@ export default function LogPlot() {
   const log = useLogStore((s) => s.log)
   const selected = useLogStore((s) => s.selected)
   const shadeModes = useLogStore((s) => s.shadeModes)
+  const playhead = useLogStore((s) => s.playhead)
   const spans = useMemo(() => (log && shadeModes ? modeSpans(log) : []), [log, shadeModes])
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -135,8 +136,8 @@ export default function LogPlot() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    draw(ctx, size, series, view, cursor, spans, box)
-  }, [size, series, view, cursor, spans, box])
+    draw(ctx, size, series, view, cursor, spans, box, playhead)
+  }, [size, series, view, cursor, spans, box, playhead])
 
   if (!log) return null
 
@@ -310,6 +311,7 @@ function draw(
   cursor: number | null,
   spans: ModeSpan[],
   box: { from: number; to: number } | null,
+  playhead: number | null,
 ) {
   const style = getComputedStyle(document.documentElement)
   const ink = style.getPropertyValue('--la-ink-2').trim() || '#555'
@@ -471,6 +473,19 @@ function draw(
     ctx.textBaseline = 'top'
     ctx.fillText(`${Math.abs(box.to - box.from).toFixed(2)} s`, (x0 + x1) / 2, PAD.top + 4)
     ctx.textBaseline = 'middle'
+  }
+
+  // Where the 3D replay has got to. Solid and orange, so it reads as a
+  // position in the flight rather than as the dashed pointer cursor.
+  if (playhead !== null && playhead >= view.t0 && playhead <= view.t1) {
+    ctx.strokeStyle = '#F7941D'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    const x = Math.round(xOf(playhead)) + 0.5
+    ctx.moveTo(x, PAD.top)
+    ctx.lineTo(x, PAD.top + plotH)
+    ctx.stroke()
+    ctx.lineWidth = 1
   }
 
   if (cursor !== null && cursor >= view.t0 && cursor <= view.t1) {
