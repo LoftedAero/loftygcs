@@ -9,7 +9,7 @@ import { fieldUnit, parseDataflash, type ParsedLog } from '../protocol/dataflash
 // to lose. A log large enough to be a problem should move the parse into a
 // worker before it moves it out of memory.
 
-export type LogView = 'plot' | 'table'
+export type LogView = 'plot' | 'table' | 'replay'
 
 /** How many y axes the plot will draw at once. */
 export const MAX_AXES = 4

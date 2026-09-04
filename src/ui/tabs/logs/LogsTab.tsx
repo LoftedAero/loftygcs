@@ -7,6 +7,7 @@ import VehicleLogs from './VehicleLogs'
 import PlottedFields from './PlottedFields'
 import LogPlot from './LogPlot'
 import LogTable from './LogTable'
+import LogReplay from './LogReplay'
 import FieldPicker from './FieldPicker'
 
 // Reviewing a flight log.
@@ -63,6 +64,8 @@ export default function LogsTab() {
             <Welcome status={status} busy={busy} onOpen={() => void open()} />
           ) : view === 'plot' ? (
             <LogPlot />
+          ) : view === 'replay' ? (
+            <LogReplay />
           ) : (
             <LogTable />
           )}
@@ -102,7 +105,7 @@ export default function LogsTab() {
               <section className="app-col__group">
                 <h3 className="app-col__head">View</h3>
                 <div className="log-viewswitch" role="tablist" aria-label="View">
-                  {(['plot', 'table'] as const).map((v) => (
+                  {(['plot', 'table', 'replay'] as const).map((v) => (
                     <button
                       key={v}
                       type="button"
@@ -111,7 +114,7 @@ export default function LogsTab() {
                       className={`log-viewswitch__btn${view === v ? ' is-active' : ''}`}
                       onClick={() => setView(v)}
                     >
-                      {v === 'plot' ? 'Plot' : 'Data table'}
+                      {v === 'plot' ? 'Plot' : v === 'table' ? 'Table' : '3D'}
                     </button>
                   ))}
                 </div>
