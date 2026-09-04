@@ -108,7 +108,14 @@ Preview builds are marked in-app via `BRAND.preview`.
 
 `npm run sitl:fetch` once (downloads the prebuilt Windows ArduCopter SITL that Mission
 Planner uses, into gitignored `sitl/`), then `npm run sitl` to start it — it serves TCP on
-127.0.0.1:5760 and waits for a GCS. `SITL=1 npm test` runs the integration suite against
+127.0.0.1:5760 and waits for a GCS. `npm run sitl -- --home 38.9034,-77.0365` (or `SITL_HOME`)
+boots it at your own field instead of CMAC, so a mission planned on the map can be flown
+without dragging every waypoint to Canberra; the desktop app's Simulator card has the same
+field. Home is read at boot, so changing it means restarting. `SITL_HOME=... SITL=1 npm test`
+then asserts the vehicle really reports being there. **Do not check whether 5760 is free by
+binding it** — Windows lets a second bind succeed over a listening socket, so the probe says
+"free" and you end up talking to the *previous* simulator at its own home; the runner instead
+gives up after three immediate exits and says so. `SITL=1 npm test` runs the integration suite against
 it (`src/protocol/*.integration.test.ts`, `electron/sitl-core.test.ts`). The desktop app can
 also install and run SITL itself — Overview > Simulator (`electron/sitl-core.ts`).
 

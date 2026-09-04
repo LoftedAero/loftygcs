@@ -4,10 +4,15 @@
 // SITL proves ArduPilot agrees with us.
 //
 //   node scripts/sitl.mjs fetch [copter|plane|rover]
-//   node scripts/sitl.mjs run   [copter|plane|rover]
+//   node scripts/sitl.mjs run   [copter|plane|rover] [--home lat,lon[,alt[,yaw]]]
 //
 // Vehicle defaults to copter. All three share the cygwin runtime, so the
 // second vehicle you fetch only pulls its own binary and defaults file.
+//
+// --home (or SITL_HOME in the environment) boots the vehicle somewhere other
+// than CMAC -- your own flying field, so a mission planned on the map can be
+// flown in the simulator without dragging every waypoint to Canberra. Taken
+// at boot, so it applies to every relaunch this run makes.
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, createWriteStream, renameSync } from 'node:fs'
 import { get } from 'node:https'
@@ -72,8 +77,42 @@ function download(url, dest) {
   })
 }
 
-const cmd = process.argv[2] ?? 'run'
-const name = process.argv[3] ?? 'copter'
+const argv = process.argv.slice(2)
+const homeFlag = argv.indexOf('--home')
+const homeArg = homeFlag >= 0 ? argv.splice(homeFlag, 2)[1] : undefined
+const positional = argv.filter((a) => !a.startsWith('-'))
+
+const cmd = positional[0] ?? 'run'
+const name = positional[1] ?? 'copter'
+
+const CMAC = '-35.363262,149.165237,584,270'
+const home = normalizeHome(homeArg ?? process.env.SITL_HOME ?? CMAC)
+
+/**
+ * Accept the two numbers a map gives you and fill in the rest. SITL wants
+ * four fields and silently misbehaves with fewer, so completing them here is
+ * the difference between "--home 38.9,-77" working and booting at sea level
+ * facing an arbitrary direction.
+ */
+function normalizeHome(text) {
+  const parts = String(text).split(/[,;\s]+/).filter(Boolean).map(Number)
+  if (parts.length < 2 || parts.some((n) => !Number.isFinite(n))) {
+    console.error(`bad --home "${text}" -- expected decimal degrees, like 38.9034,-77.0365`)
+    process.exit(1)
+  }
+  const [lat, lon, alt = 0, yaw = 0] = parts
+  // Latitude past the poles is nearly always a swapped pair, and it is the
+  // one typo that stays plausible all the way to a vehicle in the wrong sea.
+  if (Math.abs(lat) > 90) {
+    console.error(`bad --home "${text}" -- latitude ${lat} is out of range; are they swapped?`)
+    process.exit(1)
+  }
+  if (Math.abs(lon) > 180) {
+    console.error(`bad --home "${text}" -- longitude ${lon} is out of range`)
+    process.exit(1)
+  }
+  return [lat, lon, alt, yaw].join(',')
+}
 const vehicle = VEHICLES[name]
 if (!vehicle) {
   console.error(`unknown vehicle "${name}" -- expected ${Object.keys(VEHICLES).join(', ')}`)
@@ -110,16 +149,30 @@ if (cmd === 'fetch') {
   if (!existsSync(exe)) await fetchVehicle()
 
   // -w wipes state so every run boots clean; the default serial0 is a TCP
-  // server on 5760 that waits for the GCS. CMAC home, like sim_vehicle.py.
+  // server on 5760 that waits for the GCS. Home defaults to CMAC, like
+  // sim_vehicle.py.
   //
   // This SITL build exits when its TCP client disconnects, so relaunch it
   // in a loop -- one `npm run sitl` then serves any number of sequential
   // connections (each getting a freshly-booted vehicle). Ctrl+C ends it.
+  if (home !== CMAC) console.log(`${name} SITL home: ${home}`)
+
   let stopping = false
   process.on('SIGINT', () => {
     stopping = true
   })
+  // A SITL that dies immediately never served anyone, so relaunching it is
+  // an infinite loop that looks like it is working. The most common cause is
+  // another SITL already on 5760 -- which is worth naming, because with
+  // --home the symptom is a healthy simulator at the *previous* location
+  // rather than an error. (Checking the port first does not work: Windows
+  // lets a second bind succeed over a listening socket, so the probe says
+  // "free" and the guard never fires.)
+  const MIN_USEFUL_MS = 5000
+  let quickExits = 0
+
   const launch = () => {
+    const startedAt = Date.now()
     const child = spawn(
       exe,
       [
@@ -129,7 +182,7 @@ if (cmd === 'fetch') {
         '--defaults',
         vehicle.defaults,
         '--home',
-        '-35.363262,149.165237,584,270',
+        home,
         // No --rate override: the default sim rate keeps the gyro sample
         // rate above the 1.8x-loop-rate arming check.
       ],
@@ -137,6 +190,13 @@ if (cmd === 'fetch') {
     )
     child.on('exit', () => {
       if (stopping) process.exit(0)
+      if (Date.now() - startedAt < MIN_USEFUL_MS && ++quickExits >= 3) {
+        console.error(
+          `${name} SITL keeps exiting at startup. Is another simulator already on 5760? ` +
+            'With --home, a second one leaves you connected to the first, at its own location.',
+        )
+        process.exit(1)
+      }
       console.log(`${name} SITL exited (client disconnected) -- relaunching`)
       // A short breather: relaunching into still-closing sockets has been
       // seen to stall the sim clock at boot.

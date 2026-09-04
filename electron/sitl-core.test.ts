@@ -111,4 +111,36 @@ describe.runIf(process.env.SITL === '1')('sitl-core spawn', () => {
     expect(child.killed).toBe(false)
     expect(child.exitCode).toBeNull()
   }, 45000)
+
+  it('boots the in-app simulator at the home it was given', async () => {
+    // The desktop path end to end: what the Simulator card sets reaches the
+    // running vehicle. Read off stdout rather than over MAVLink, so this
+    // needs neither the TCP slot nor a second simulator to be free.
+    const dir = path.resolve('sitl')
+    child = spawnSim(dir, 'copter', {
+      latDeg: 51.4769,
+      lonDeg: -0.0005,
+      altM: 15,
+      headingDeg: 45,
+    })
+    const line = await new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no Home line from SITL')), 30000)
+      child?.stdout?.on('data', (d: Buffer) => {
+        const m = /Home: (-?[\d.]+) (-?[\d.]+)/.exec(d.toString())
+        if (m) {
+          clearTimeout(timer)
+          resolve(m[0])
+        }
+      })
+    })
+    expect(line).toContain('51.4769')
+    expect(line).toContain('-0.0005')
+  }, 45000)
+})
+
+describe('simArgs with a home', () => {
+  it('passes the location through to --home', () => {
+    const args = simArgs('copter', { latDeg: 51.5, lonDeg: -0.12, altM: 20, headingDeg: 90 })
+    expect(args[args.indexOf('--home') + 1]).toBe('51.5,-0.12,20,90')
+  })
 })

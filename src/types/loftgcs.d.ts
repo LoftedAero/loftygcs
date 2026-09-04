@@ -1,5 +1,9 @@
 // The entire surface the Electron preload exposes. The browser build sees
 // `window.loftgcs === undefined`; everything else in the renderer is shared.
+import type { SimHome } from '../sim-home'
+
+export type { SimHome }
+
 export type LinkId = number
 
 export interface LinkOpenOptions {
@@ -38,8 +42,11 @@ export interface LoftGcsBridge {
   sim: {
     status(): Promise<SimStatus>
     install(vehicle: string): Promise<void>
-    /** Spawns SITL and resolves with the TCP port once it is accepting. */
-    start(vehicle: string): Promise<number>
+    /**
+     * Spawns SITL and resolves with the TCP port once it is accepting.
+     * `home` is taken at boot; moving it later means restarting.
+     */
+    start(vehicle: string, home?: SimHome): Promise<number>
     stop(): Promise<void>
     onProgress(cb: (p: { file: string; done: number; total: number }) => void): () => void
     onLog(cb: (line: string) => void): () => void

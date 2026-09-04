@@ -14,6 +14,7 @@ import {
   rallyFromItems,
   rallyToItems,
 } from './geofence'
+import { parseHome } from '../sim-home'
 import type { ProtocolEvent } from './types'
 
 const SITL_HOST = '127.0.0.1'
@@ -247,6 +248,53 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       }
     },
     90000,
+  )
+
+  // Runs only when SITL was launched somewhere specific:
+  //   npm run sitl -- --home 38.9034,-77.0365,20,90
+  //   SITL=1 SITL_HOME=38.9034,-77.0365,20,90 npm test
+  // Which is the whole point of being able to set it -- a simulator at your
+  // own field is only useful if the vehicle actually reports being there.
+  it.runIf(process.env.SITL_HOME)(
+    'boots where it was told to',
+    async () => {
+      const parsed = parseHome(process.env.SITL_HOME ?? '')
+      if ('error' in parsed) throw new Error(`SITL_HOME: ${parsed.error}`)
+      const events: ProtocolEvent[] = []
+      let socket: net.Socket | null = null
+      const engine = new ProtocolEngine((out) => {
+        if (out.t === 'tx') socket?.write(out.bytes)
+        else if (out.t === 'evt') events.push(out.evt)
+      })
+      socket = await connectVehicle(engine, events, (s) => (socket = s))
+
+      const fix = () => {
+        for (let i = events.length - 1; i >= 0; i--) {
+          const e = events[i]!
+          if (e.t !== 'telemetry') continue
+          for (let j = e.batch.length - 1; j >= 0; j--) {
+            const d = e.batch[j]!
+            // A zero fix is SITL before its GPS has settled, not a vehicle
+            // at null island.
+            if (d.k === 'position' && d.latDeg !== 0) return d
+          }
+        }
+        return null
+      }
+
+      try {
+        await waitFor(() => fix() !== null, 30000, 'a GPS fix')
+        const at = fix()!
+        // Loose: SITL's simulated GPS wanders a few meters around home, and
+        // 1e-4 degrees is about 11 m.
+        expect(at.latDeg).toBeCloseTo(parsed.home.latDeg, 3)
+        expect(at.lonDeg).toBeCloseTo(parsed.home.lonDeg, 3)
+      } finally {
+        engine.stop()
+        socket?.destroy()
+      }
+    },
+    60000,
   )
 
   it(

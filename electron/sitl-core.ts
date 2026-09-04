@@ -6,6 +6,10 @@
 // Mission Planner ships). Everywhere else, users run their own
 // sim_vehicle.py and the app connects to it over TCP like any other link.
 import { spawn, type ChildProcess } from 'node:child_process'
+// Shared with the renderer, which cannot import from electron/: the parser
+// has to run on both sides -- in the settings field that accepts the text,
+// and here where the argument is built.
+import { CMAC_HOME, formatHome, type SimHome } from '../src/sim-home'
 import { createWriteStream, existsSync, mkdirSync, renameSync } from 'node:fs'
 import { get } from 'node:https'
 import path from 'node:path'
@@ -105,8 +109,17 @@ export function installedVehicles(baseDir: string): SimVehicle[] {
  * below the arming check's 1.8x-loop-rate threshold and the vehicle then
  * refuses to arm forever.
  */
-export function simArgs(vehicle: SimVehicle, home: string = SIM_HOME): string[] {
-  return ['--model', SIM_VEHICLES[vehicle].model, '-w', '--defaults', SIM_VEHICLES[vehicle].defaults, '--home', home]
+export function simArgs(vehicle: SimVehicle, home: string | SimHome = SIM_HOME): string[] {
+  const homeArg = typeof home === 'string' ? home : formatHome(home)
+  return [
+    '--model',
+    SIM_VEHICLES[vehicle].model,
+    '-w',
+    '--defaults',
+    SIM_VEHICLES[vehicle].defaults,
+    '--home',
+    homeArg,
+  ]
 }
 
 function download(url: string, dest: string): Promise<void> {
@@ -175,10 +188,14 @@ export async function installVehicle(
   onProgress?.({ file: 'done', done, total: jobs.length })
 }
 
-export function spawnSim(baseDir: string, vehicle: SimVehicle): ChildProcess {
+export function spawnSim(
+  baseDir: string,
+  vehicle: SimVehicle,
+  home: SimHome = CMAC_HOME,
+): ChildProcess {
   const exe = executablePath(baseDir, vehicle)
   if (!existsSync(exe)) throw new Error(`${exe} is missing; install the simulator first`)
-  return spawn(exe, simArgs(vehicle), { cwd: baseDir })
+  return spawn(exe, simArgs(vehicle, home), { cwd: baseDir })
 }
 
 /** SITL announces its GCS port on stdout once serial0 is listening. */

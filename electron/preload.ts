@@ -48,7 +48,7 @@ contextBridge.exposeInMainWorld('loftgcs', {
   sim: {
     status: () => ipcRenderer.invoke('sim:status'),
     install: (vehicle: string) => ipcRenderer.invoke('sim:install', vehicle),
-    start: (vehicle: string) => ipcRenderer.invoke('sim:start', vehicle),
+    start: (vehicle: string, home?: unknown) => ipcRenderer.invoke('sim:start', vehicle, home),
     stop: () => ipcRenderer.invoke('sim:stop'),
     onProgress: (cb: (p: { file: string; done: number; total: number }) => void) => {
       const handler = (_e: unknown, p: { file: string; done: number; total: number }) => cb(p)

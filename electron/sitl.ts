@@ -4,11 +4,13 @@ import path from 'node:path'
 import {
   SITL_PORT,
   SIM_VEHICLES,
+  CMAC_HOME,
   installVehicle,
   installedVehicles,
   simSupported,
   spawnSim,
   waitForReady,
+  type SimHome,
   type SimVehicle,
 } from './sitl-core'
 
@@ -45,9 +47,11 @@ export function registerSitlIpc(getWindow: () => BrowserWindow | null) {
     await installVehicle(simDir(), vehicle, (p) => send('sim:progress', p))
   })
 
-  ipcMain.handle('sim:start', async (_e, vehicle: SimVehicle) => {
+  ipcMain.handle('sim:start', async (_e, vehicle: SimVehicle, home?: SimHome) => {
     stopSim()
-    const proc = spawnSim(simDir(), vehicle)
+    // Home is taken at boot and cannot be moved afterwards, which is why
+    // changing it in the UI is a restart rather than a setting.
+    const proc = spawnSim(simDir(), vehicle, home ?? CMAC_HOME)
     child = proc
     runningVehicle = vehicle
     proc.stdout?.on('data', (d: Buffer) => send('sim:log', d.toString()))
