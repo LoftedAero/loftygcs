@@ -3,7 +3,7 @@ import { LaButton, LaModal, LaSelect } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { MAV_RESULT } from '../../../protocol/commands'
-import { modeNumberByName, modeTable } from '../../../protocol/modes'
+import { modeNumberByName, modeTable, vehicleClass } from '../../../protocol/modes'
 import {
   arm,
   changeSpeed,
@@ -13,7 +13,7 @@ import {
   restartScripting,
   setCurrentMissionItem,
   setGuidedAltitude,
-  setMode,
+  setModeConfirmed,
   takeoff,
   triggerCamera,
 } from '../../../services/flight'
@@ -60,6 +60,9 @@ const DO_ACTIONS: DoAction[] = [
 
 const TAKEOFF_ALT_M = 20
 
+/** How recent a STATUSTEXT has to be to count as the reason for a refusal. */
+const REASON_WINDOW_MS = 4000
+
 export interface FlightControlsProps {
   onVideo: () => void
 }
@@ -72,6 +75,7 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
   const armed = useVehicleStore((s) => s.armed)
   const relAltM = useVehicleStore((s) => s.relAltM)
   const groundspeedMs = useVehicleStore((s) => s.groundspeedMs)
+  const isCopter = vehicleClass(vehicleType) === 'copter'
 
   const [status, setStatus] = useState('')
   const [speed, setSpeed] = useState('')
@@ -82,8 +86,28 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
   const [confirmForce, setConfirmForce] = useState(false)
 
   const modes = modeTable(vehicleType)
-  const report = (what: string) => (result: number) =>
-    setStatus(result === 0 ? `${what}: accepted` : `${what}: ${MAV_RESULT[result] ?? result}`)
+
+  /**
+   * A refusal is only useful with the vehicle's own words attached.
+   *
+   * MAV_RESULT says FAILED and nothing else; the reason -- "Arm: Need
+   * Position Estimate", "Mode change to Guided failed: requires position" --
+   * arrives moments later as a STATUSTEXT, in a feed the pilot is not
+   * looking at while pressing a button. So pull the newest one back here.
+   */
+  const reason = () => {
+    const texts = useVehicleStore.getState().statusTexts
+    const recent = texts[texts.length - 1]
+    if (!recent) return ''
+    return Date.now() - recent.at < REASON_WINDOW_MS ? ` — ${recent.text}` : ''
+  }
+
+  const report = (what: string) => async (result: number) => {
+    if (result === 0) return setStatus(`${what}: accepted`)
+    // The vehicle usually explains itself just after the ack, not with it.
+    await new Promise((r) => setTimeout(r, 400))
+    setStatus(`${what}: ${MAV_RESULT[result] ?? result}${reason()}`)
+  }
   const fail = (what: string) => (err: unknown) =>
     setStatus(`${what}: ${err instanceof Error ? err.message : 'no answer'}`)
 
@@ -93,7 +117,22 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
       setStatus(`${name} is not a mode on this vehicle`)
       return
     }
-    void setMode(num).then(report(name)).catch(fail(name))
+    void setModeConfirmed(num)
+      .then(async (r) => {
+        await report(name)(r)
+        // Auto with a takeoff as its first item will not start itself from
+        // the ground: Copter waits for the throttle stick to be raised,
+        // which a station with no transmitter cannot do. Say so rather than
+        // leaving a vehicle that is armed, in Auto, and going nowhere until
+        // it auto-disarms.
+        if (r === 0 && name === 'Auto' && isCopter && relAltM < 1) {
+          setStatus(
+            'Auto: accepted, but Copter will not begin a takeoff on the ground — ' +
+              'take off first, or set AUTO_OPTIONS to allow it.',
+          )
+        }
+      })
+      .catch(fail(name))
   }
 
   const onArmClick = () => {
@@ -129,7 +168,7 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
           disabled={!connected}
           aria-label="Flight mode"
           onChange={(e) =>
-            void setMode(Number(e.target.value)).then(report('Mode')).catch(fail('Mode'))
+            void setModeConfirmed(Number(e.target.value)).then(report('Mode')).catch(fail('Mode'))
           }
         >
           {Object.entries(modes).map(([num, name]) => (
@@ -157,9 +196,13 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
         <LaButton
           variant="secondary"
           disabled={!connected || !armed}
-          onClick={() =>
+          onClick={() => {
+            // Takeoff switches to Guided first, and a vehicle whose EKF is
+            // still settling refuses that for a few seconds. Say so, or the
+            // button looks like it did nothing for twenty seconds.
+            setStatus('Takeoff: switching to Guided…')
             void takeoff(TAKEOFF_ALT_M).then(report('Takeoff')).catch(fail('Takeoff'))
-          }
+          }}
         >
           Takeoff {TAKEOFF_ALT_M} m
         </LaButton>
