@@ -36,6 +36,12 @@ async function handleRequest(cmd: Extract<EngineCommand, { t: 'req' }>) {
       case 'clearMission':
         data = await engine.clearMission(cmd.missionType)
         break
+      case 'listFiles':
+        data = await engine.listFiles(cmd.path)
+        break
+      case 'downloadFile':
+        data = await engine.downloadFile(cmd.path)
+        break
     }
     self.postMessage({ t: 'res', id: cmd.id, ok: true, data })
   } catch (err) {

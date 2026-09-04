@@ -6,7 +6,7 @@ import { MavFramer, encodeFrame } from './frames'
 import { decodeFrameFields } from './serializer'
 import { collectFields } from './fields'
 import { messageToDeltas } from './telemetry'
-import { MavFtpClient } from './ftp/mavftp'
+import { MavFtpClient, type FtpDirEntry } from './ftp/mavftp'
 import { decodeParamPck } from './params/pck'
 import { ParamStreamClient } from './params/param-client'
 import { CommandClient } from './commands'
@@ -34,6 +34,9 @@ const FIELDS_FLUSH_MS = 100
 const LINKSTATS_INTERVAL_MS = 1000
 // 4 Hz for every stream: plenty for readouts, gentle on telemetry radios.
 const STREAM_RATE_HZ = 4
+
+/** Smallest gap between file-transfer progress events, in milliseconds. */
+const PROGRESS_INTERVAL_MS = 100
 
 export class ProtocolEngine {
   private framer = new MavFramer()
@@ -271,6 +274,33 @@ export class ProtocolEngine {
 
   runCommand(command: number, params: number[], timeoutMs?: number): Promise<number> {
     return this.commands.run(command, params, timeoutMs !== undefined ? { timeoutMs } : {})
+  }
+
+  /** List a directory on the vehicle's filesystem, over MAVFTP. */
+  listFiles(path: string): Promise<FtpDirEntry[]> {
+    return this.ftp.listDirectory(path)
+  }
+
+  /**
+   * Read a file off the vehicle.
+   *
+   * Progress is reported per chunk because a dataflash log is megabytes
+   * over a link that may be a telemetry radio -- a transfer with no visible
+   * progress is indistinguishable from one that has hung.
+   */
+  downloadFile(path: string): Promise<Uint8Array> {
+    // Throttled: a burst read delivers a packet every third of a
+    // millisecond, and a ten-megabyte log produced forty-three thousand
+    // progress events -- each one a postMessage, a store write and a
+    // render, to move a bar by a quarter of a pixel. Ten a second is more
+    // than the eye resolves and the last one is always sent.
+    let lastAt = 0
+    return this.ftp.readFile(path, (got, total) => {
+      const now = Date.now()
+      if (got < total && now - lastAt < PROGRESS_INTERVAL_MS) return
+      lastAt = now
+      this.emit({ t: 'evt', evt: { t: 'fileProgress', path, got, total } })
+    })
   }
 
   downloadMission(missionType: number): Promise<MissionItem[]> {

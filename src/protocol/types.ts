@@ -49,6 +49,8 @@ export type ProtocolEvent =
   | { t: 'commandAck'; command: number; result: number }
   | { t: 'linkStats'; stats: LinkStats }
   | { t: 'paramProgress'; got: number; total: number; source: 'ftp' | 'stream' }
+  /** A file coming off the vehicle over MAVFTP -- a log, mostly. */
+  | { t: 'fileProgress'; path: string; got: number; total: number }
   | { t: 'missionProgress'; got: number; total: number; dir: 'read' | 'write' }
   | {
       t: 'magCalProgress'
@@ -139,6 +141,8 @@ export type EngineRequest =
   | { op: 'downloadMission'; missionType: number }
   | { op: 'uploadMission'; items: MissionItem[]; missionType: number }
   | { op: 'clearMission'; missionType: number }
+  | { op: 'listFiles'; path: string }
+  | { op: 'downloadFile'; path: string }
 
 /** Messages into the protocol worker. */
 export type EngineCommand =

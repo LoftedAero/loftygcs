@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { LaButton, LaHint, LaSwitch } from '../../components/La'
 import { useLogStore } from '../../../stores/log-store'
 import { openLogFile } from '../../../services/log-file'
+import { saveOpenLog } from '../../../services/log-download'
+import VehicleLogs from './VehicleLogs'
 import LogPlot from './LogPlot'
 import LogTable from './LogTable'
 import FieldPicker from './FieldPicker'
@@ -32,6 +34,7 @@ export default function LogsTab() {
   const selected = useLogStore((s) => s.selected)
   const clearFields = useLogStore((s) => s.clearFields)
   const clear = useLogStore((s) => s.clear)
+  const bytes = useLogStore((s) => s.rawBytes)
   const [busy, setBusy] = useState(false)
 
   const open = async () => {
@@ -62,21 +65,28 @@ export default function LogsTab() {
             <LaButton variant="primary" size="block" disabled={busy} onClick={() => void open()}>
               Open log file
             </LaButton>
-            {/* Downloading off the vehicle is the obvious next thing and is
-                not built yet; saying so beats a button that does nothing. */}
-            <LaButton variant="secondary" size="block" disabled title="Not built yet">
-              Download from vehicle
-            </LaButton>
-            <LaHint>Reading a log off the vehicle over MAVFTP is not wired up yet.</LaHint>
             {log && (
               <>
                 <p className="app-col__note">{describe(status)}</p>
+                {/* Saving is offered only once a log is open: a download
+                    goes straight into the viewer, so this is how a log you
+                    pulled off the vehicle gets kept. */}
+                <LaButton
+                  variant="secondary"
+                  size="block"
+                  onClick={() => bytes && saveOpenLog(describe(status) || 'log.bin', bytes)}
+                  disabled={!bytes}
+                >
+                  Save to file
+                </LaButton>
                 <LaButton variant="ghost" size="block" onClick={clear}>
                   Close log
                 </LaButton>
               </>
             )}
           </section>
+
+          <VehicleLogs />
 
           {log && (
             <>

@@ -15,6 +15,7 @@ import type {
   ParamDownloadResult,
   ProtocolEvent,
 } from '../protocol/types'
+import type { FtpDirEntry } from '../protocol/ftp/mavftp'
 
 export class WorkerClient {
   private worker: Worker
@@ -76,6 +77,19 @@ export class WorkerClient {
 
   uploadMission(items: MissionItem[], missionType = 0): Promise<void> {
     return this.request({ op: 'uploadMission', items, missionType }) as Promise<void>
+  }
+
+  /** List a directory on the vehicle over MAVFTP. */
+  listFiles(path: string): Promise<FtpDirEntry[]> {
+    return this.request({ op: 'listFiles', path }) as Promise<FtpDirEntry[]>
+  }
+
+  /**
+   * Read a file off the vehicle. Progress arrives as `fileProgress` events
+   * rather than a callback, which cannot cross the worker boundary.
+   */
+  downloadFile(path: string): Promise<Uint8Array> {
+    return this.request({ op: 'downloadFile', path }) as Promise<Uint8Array>
   }
 
   clearMission(missionType = 0): Promise<void> {

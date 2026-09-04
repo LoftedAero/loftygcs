@@ -62,6 +62,10 @@ export function encodeFtpPacket(p: {
   data?: Uint8Array
   /** Overrides the size field: ReadFile puts its byte count here, with no data. */
   size?: number
+  /** Which opcode this answers. Set on replies only -- a device sets it. */
+  reqOpcode?: number
+  /** Last packet of a burst. Set on replies only. */
+  burstComplete?: number
 }): number[] {
   const data = p.data ?? new Uint8Array(0)
   const buf = new Uint8Array(FTP_HEADER_SIZE + FTP_MAX_DATA) // full-size, zero-padded
@@ -70,8 +74,11 @@ export function encodeFtpPacket(p: {
   buf[2] = p.session
   buf[3] = p.opcode
   buf[4] = p.size ?? data.length
-  buf[5] = 0 // req_opcode: only meaningful in replies
-  buf[6] = 0 // burst_complete
+  // Both are meaningful only on replies, which this app does not send --
+  // but a test standing in for a device does, and dropping them silently
+  // made a burst-read test pass by falling back to ordinary reads.
+  buf[5] = p.reqOpcode ?? 0
+  buf[6] = p.burstComplete ?? 0
   buf[7] = 0 // padding
   view.setUint32(8, p.offset, true)
   buf.set(data, FTP_HEADER_SIZE)

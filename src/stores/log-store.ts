@@ -17,6 +17,21 @@ export interface SelectedField {
   field: string
 }
 
+/** A log sitting on the vehicle's card. */
+export interface VehicleLog {
+  name: string
+  path: string
+  /** Bytes, as the directory listing reported them. */
+  size: number
+}
+
+/** What the vehicle side of this screen is doing. */
+export type VehicleLogStatus =
+  | { kind: 'idle' }
+  | { kind: 'listing' }
+  | { kind: 'downloading'; name: string; got: number; total: number }
+  | { kind: 'error'; text: string }
+
 export type LogStatus =
   | { kind: 'empty' }
   | { kind: 'reading'; name: string; got: number; total: number }
@@ -26,6 +41,15 @@ export type LogStatus =
 
 interface LogState {
   log: ParsedLog | null
+  /**
+   * The file exactly as it arrived.
+   *
+   * Kept so a log pulled off the vehicle can be saved without fetching it
+   * twice -- the parsed tables are lossy and cannot be turned back into a
+   * .bin. It is a second copy of a few megabytes, which is the cheaper half
+   * of that trade.
+   */
+  rawBytes: Uint8Array | null
   status: LogStatus
   view: LogView
   /** Fields drawn on the plot, in the order they were added. */
@@ -43,6 +67,12 @@ interface LogState {
    */
   normalize: boolean
 
+  /** Logs found on the vehicle, newest first. */
+  vehicleLogs: VehicleLog[]
+  vehicleStatus: VehicleLogStatus
+  setVehicleLogs(logs: VehicleLog[]): void
+  setVehicleStatus(status: VehicleLogStatus): void
+
   setStatus(status: LogStatus): void
   loadBytes(name: string, bytes: Uint8Array): void
   clear(): void
@@ -58,12 +88,22 @@ const key = (f: SelectedField) => `${f.message}.${f.field}`
 
 export const useLogStore = create<LogState>((set, get) => ({
   log: null,
+  rawBytes: null,
   status: { kind: 'empty' },
   view: 'plot',
   selected: [],
   tableMessage: null,
   search: '',
   normalize: false,
+  vehicleLogs: [],
+  vehicleStatus: { kind: 'idle' },
+
+  setVehicleLogs(vehicleLogs) {
+    set({ vehicleLogs })
+  },
+  setVehicleStatus(vehicleStatus) {
+    set({ vehicleStatus })
+  },
 
   setStatus(status) {
     set({ status })
@@ -79,6 +119,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       }
       set({
         log,
+        rawBytes: bytes,
         status: { kind: 'ready', name },
         selected: [],
         // Open on something worth looking at rather than an empty plot: the
@@ -95,7 +136,16 @@ export const useLogStore = create<LogState>((set, get) => ({
   },
 
   clear() {
-    set({ log: null, status: { kind: 'empty' }, selected: [], tableMessage: null, search: '' })
+    // The vehicle's listing survives: after looking at one log the next
+    // thing anyone does is open another from the same aircraft.
+    set({
+      log: null,
+      rawBytes: null,
+      status: { kind: 'empty' },
+      selected: [],
+      tableMessage: null,
+      search: '',
+    })
   },
 
   setView(view) {

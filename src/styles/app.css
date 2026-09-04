@@ -3511,3 +3511,61 @@ body.is-splitting .flight-map {
   background: var(--la-blue);
   color: var(--app-on-dark);
 }
+
+/* Logs sitting on the vehicle's card. */
+.log-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  overflow: auto;
+  max-height: 240px;
+}
+.log-list__item {
+  appearance: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-2);
+  border: 0;
+  border-bottom: 1px solid var(--la-line);
+  background: transparent;
+  color: var(--la-ink);
+  font: inherit;
+  font-size: var(--la-size-xs);
+  padding: var(--la-space-1) var(--la-space-2);
+  cursor: pointer;
+  text-align: left;
+}
+.log-list__item:last-child {
+  border-bottom: 0;
+}
+.log-list__item:hover:enabled {
+  background: var(--la-surface-2);
+}
+.log-list__item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.log-list__name {
+  font-family: var(--la-font-mono);
+}
+/* The size is the only thing that says what you are about to wait for. */
+.log-list__size {
+  margin-left: auto;
+  color: var(--la-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.log-progress {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  border: 0;
+}
+.log-progress::-webkit-progress-bar {
+  background: var(--la-surface-2);
+  border-radius: 2px;
+}
+.log-progress::-webkit-progress-value {
+  background: var(--la-blue);
+  border-radius: 2px;
+}

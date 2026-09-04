@@ -79,6 +79,17 @@ design decisions are recorded there and in code comments.
   parameter stream fallback), and the full parameter set. **None of this softens the rule that
   every protocol feature is demonstrated against SITL** — a more convincing demo vehicle makes
   that discipline easier to forget, not less necessary.
+- **Log download uses MAVFTP burst reads, and the path matters.** A plain read is a round trip
+  per 239 bytes — measured at 28 ms against SITL, so 8 kB/s, or twenty-four minutes for a
+  ten-megabyte log. `BurstReadFile` makes that 700 kB/s. Pipelining ordinary reads does *not*
+  work: ArduPilot serves one FTP request at a time and times the rest out. `readFile` tries
+  burst and falls back to sequential, the same shape as the parameter download's FTP→stream
+  fallback. Two traps: burst replies do not answer a pending sequence number, so they are
+  routed by `req_opcode` and the seq matcher would drop them; and a packet arriving *ahead* of
+  the contiguous fill point must be ignored rather than written, or a lost packet leaves a hole
+  in the middle of a log that nothing later fills. Log directories differ — real hardware
+  mounts the card at `/APM/LOGS`, SITL has none and keeps them in `/logs` — so the service
+  probes both rather than assuming.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

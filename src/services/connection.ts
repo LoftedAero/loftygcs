@@ -12,6 +12,7 @@ import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { useCalStore } from '../stores/cal-store'
 import { useMissionStore } from '../stores/mission-store'
+import { useLogStore } from '../stores/log-store'
 import { telemetryRings } from './telemetry-ring'
 import { fieldRegistry } from './telemetry-fields'
 import { fetchParamMetadata } from './param-metadata'
@@ -124,6 +125,23 @@ class ConnectionService {
       case 'telemetry':
         for (const d of evt.batch) this.applyDelta(d)
         return
+      case 'fileProgress': {
+        // Only meaningful while the Logs screen asked for a file; anything
+        // else fetching over FTP (the parameter blob) has its own progress.
+        const log = useLogStore.getState()
+        if (log.vehicleStatus.kind === 'downloading') {
+          log.setVehicleStatus({
+            kind: 'downloading',
+            name: log.vehicleStatus.name,
+            got: evt.got,
+            // The listing's size is the one to trust: MAVFTP reports the
+            // size it opened the file with, which agrees, but a zero from
+            // either would divide a progress bar by nothing.
+            total: log.vehicleStatus.total || evt.total,
+          })
+        }
+        return
+      }
       case 'statustext':
         useVehicleStore
           .getState()
@@ -261,6 +279,20 @@ class ConnectionService {
     const echoed = await worker.setParam(name, value, entry?.mavType ?? 9)
     useParamStore.getState().confirmWrite(name, echoed)
     return echoed
+  }
+
+  /** List a directory on the vehicle's filesystem over MAVFTP. */
+  listFiles(path: string) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.listFiles(path)
+  }
+
+  /** Read a file off the vehicle. Progress arrives as fileProgress events. */
+  downloadFile(path: string) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.downloadFile(path)
   }
 
   /** Read the vehicle's stored mission (or fence, or rally). */

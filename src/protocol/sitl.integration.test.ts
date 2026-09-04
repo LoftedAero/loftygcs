@@ -15,6 +15,7 @@ import {
   rallyToItems,
 } from './geofence'
 import { parseHome } from '../sim-home'
+import { parseDataflash } from './dataflash'
 import type { ProtocolEvent } from './types'
 
 const SITL_HOST = '127.0.0.1'
@@ -295,6 +296,62 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       }
     },
     60000,
+  )
+
+  it(
+    'lists and downloads a dataflash log over MAVFTP',
+    async () => {
+      // The listing opcode is the one that does not work like the others:
+      // its offset field is an entry index rather than a byte offset, and
+      // the device ends the listing by NAKing EndOfFile, which is a normal
+      // reply. Both are easy to get wrong against a scripted fake and
+      // obvious against a real one.
+      const events: ProtocolEvent[] = []
+      let socket: net.Socket | null = null
+      const engine = new ProtocolEngine((out) => {
+        if (out.t === 'tx') socket?.write(out.bytes)
+        else if (out.t === 'evt') events.push(out.evt)
+      })
+      socket = await connectVehicle(engine, events, (s) => (socket = s))
+
+      try {
+        // SITL has no SD card: it runs on the host filesystem rooted at
+        // its working directory, so its logs are at /logs where real
+        // hardware mounts them at /APM/LOGS. The service probes both; this
+        // test names the one the simulator actually has.
+        const entries = await engine.listFiles('/logs')
+        // SITL has been flying throughout this suite, so it has logs.
+        const logs = entries.filter((e) => e.kind === 'file' && /\.bin$/i.test(e.name))
+        expect(logs.length).toBeGreaterThan(0)
+        // Sizes come back with the names, which is what lets the UI say
+        // what a download is going to cost before starting it.
+        expect(logs.some((l) => (l.size ?? 0) > 0)).toBe(true)
+        // The listing includes '.' and '..' as directories; neither is a
+        // log and neither may reach the picker.
+        expect(logs.some((l) => l.name === '.' || l.name === '..')).toBe(false)
+
+        // Take the smallest, so this test is about the mechanism and not
+        // about waiting for ten megabytes over a loopback socket.
+        const smallest = logs
+          .filter((l) => (l.size ?? 0) > 0)
+          .sort((a, b) => (a.size ?? 0) - (b.size ?? 0))[0]!
+        const bytes = await engine.downloadFile(`/logs/${smallest.name}`)
+        expect(bytes.length).toBe(smallest.size)
+
+        // And it is a real log: the parser reads it, header and all.
+        const parsed = parseDataflash(bytes)
+        expect(parsed.messages.size).toBeGreaterThan(10)
+        expect(parsed.problems).toEqual([])
+
+        // Progress was reported, or a long transfer looks like a hang.
+        const progress = events.filter((e) => e.t === 'fileProgress')
+        expect(progress.length).toBeGreaterThan(0)
+      } finally {
+        engine.stop()
+        socket?.destroy()
+      }
+    },
+    240000,
   )
 
   it(
