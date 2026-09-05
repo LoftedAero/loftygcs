@@ -279,16 +279,16 @@ export default function LogReplay() {
         viewer.entities.add({
           position,
           orientation,
-          // A point as well as the model: if the glTF fails to load there
-          // is still something visibly flying, rather than an empty sky and
-          // no clue which of the two went wrong.
-          point: {
-            pixelSize: 8,
-            color: Cesium.Color.WHITE,
-            outlineColor: Cesium.Color.fromCssColorString('#2D2D2F'),
-            outlineWidth: 2,
-          },
-          model: { uri: modelUrl, minimumPixelSize: 48, maximumScale: 200 },
+          // No point marker alongside the model. It was here so that a glTF
+          // that failed to load still left something visibly flying, but it
+          // rides along inside the aircraft and reads as a wart -- and the
+          // track is drawn anyway, so a missing model is obvious without it.
+          //
+          // minimumPixelSize is what makes the aircraft readable at all: at
+          // the distances a flight is framed from, an 8 m model is a few
+          // pixels, so this is the size it is actually seen at rather than
+          // its size in the world.
+          model: { uri: modelUrl, minimumPixelSize: 110, maximumScale: 200 },
         })
 
         const sphere = Cesium.BoundingSphere.fromPoints(track)

@@ -23,10 +23,18 @@ The upstream notice is kept verbatim in `airplane.license.txt`.
 ## f35b.glb — Lofted Aero, own work
 
 Generated from `F-35B Solid Model.STEP`, the SolidWorks assembly for Lofted Aero's own
-3D-printed F-35B. Tessellated with FreeCAD, decimated to ~5,000 triangles in Blender, and
-re-oriented to the convention the biplane already uses (span on X, nose toward +Y, up on Z)
-so the two are interchangeable to the renderers. No third-party geometry, so nothing here
-needs a credit line in the app — unlike the biplane below.
+3D-printed F-35B: tessellated in FreeCAD at 0.6 mm (73k triangles), welded and decimated to
+30k in Blender, auto-smoothed at 30 degrees, and re-oriented to the convention the biplane
+already uses (span on X, nose toward +Y, up on Z) so the two are interchangeable to the
+renderers. No third-party geometry, so nothing here needs a credit line in the app — unlike
+the biplane below.
+
+The numbers are load-bearing. A first pass tessellated at 1.5 mm and decimated to 5k melted
+the nose and left the wing edges ragged: collapse decimation moves vertices off the real
+surface, and it has nowhere good to move them when the triangles are already coarser than the
+curvature. Tessellate finely and decimate gently, not the other way round. Auto-smooth rather
+than flat or fully smooth shading, or the chines and control-surface edges that give the
+aircraft its shape either disappear or turn into faceting.
 
 The pipeline is in the commit that added it; the source CAD is not in this repo.
 
