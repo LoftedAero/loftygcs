@@ -3,6 +3,7 @@ import { useMissionStore } from '../../../stores/mission-store'
 import { legStats, hasCoords } from '../../../protocol/mission-plan'
 import { commandSpec } from '../../../protocol/mission-commands'
 import { token } from '../../theme-tokens'
+import { useThemeStore } from '../../../stores/theme-store'
 
 // QGroundControl's altitude profile: the mission seen from the side, with
 // distance along the bottom and height up the left.
@@ -20,6 +21,7 @@ import { token } from '../../theme-tokens'
 const PAD = { left: 44, right: 16, top: 22, bottom: 22 }
 
 export default function AltitudeProfile() {
+  const theme = useThemeStore((s) => s.resolved)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const plan = useMissionStore((s) => s.plan)
   const selected = useMissionStore((s) => s.selected)
@@ -147,7 +149,9 @@ export default function AltitudeProfile() {
     const observer = new ResizeObserver(draw)
     observer.observe(canvas)
     return () => observer.disconnect()
-  }, [plan, selected])
+    // See LogPlot: the palette is read inside the draw, so the theme has
+    // to be a dependency or the canvas keeps its last paint.
+  }, [plan, selected, theme])
 
   return (
     <canvas

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Series } from '../../../protocol/dataflash'
 import { fieldLabel } from '../../../protocol/log-labels'
 import { MAX_AXES, traceColor, traceSeries, useLogStore } from '../../../stores/log-store'
+import { useThemeStore } from '../../../stores/theme-store'
+import { token } from '../../theme-tokens'
 import { modeSpans, type ModeSpan } from '../../../protocol/log-modes'
 
 // The time-series plot, drawn on a canvas.
@@ -86,6 +88,7 @@ export default function LogPlot() {
   const [size, setSize] = useState({ w: 0, h: 0 })
   const span = useLogStore((s) => s.timeWindow)
   const setSpan = useLogStore((s) => s.setTimeWindow)
+  const theme = useThemeStore((s) => s.resolved)
   const [cursor, setCursor] = useState<number | null>(null)
   /** Where a box-zoom drag started, and where it is now, in seconds. */
   const [box, setBox] = useState<{ from: number; to: number } | null>(null)
@@ -135,7 +138,12 @@ export default function LogPlot() {
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     draw(ctx, size, series, view, cursor, spans, box, playhead)
-  }, [size, series, view, cursor, spans, box, playhead])
+    // `theme` is not read here -- draw() reads the tokens itself -- but a
+    // canvas holds its last paint until something repaints it, and nothing
+    // else in this list changes when the palette does. Without it the plot
+    // keeps its old background until an unrelated redraw happens to fire,
+    // which in practice meant "until you move the mouse over it".
+  }, [size, series, view, cursor, spans, box, playhead, theme])
 
   if (!log) return null
 
@@ -322,11 +330,10 @@ function draw(
   box: { from: number; to: number } | null,
   playhead: number | null,
 ) {
-  const style = getComputedStyle(document.documentElement)
-  const ink = style.getPropertyValue('--la-ink-2').trim() || '#555'
-  const faint = style.getPropertyValue('--la-ink-3').trim() || '#888'
-  const grid = style.getPropertyValue('--la-line').trim() || '#ddd'
-  const surface = style.getPropertyValue('--la-surface').trim() || '#fff'
+  const ink = token('--la-ink-2', '#555')
+  const faint = token('--la-ink-3', '#888')
+  const grid = token('--la-line', '#ddd')
+  const surface = token('--la-surface', '#fff')
 
   ctx.fillStyle = surface
   ctx.fillRect(0, 0, size.w, size.h)
