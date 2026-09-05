@@ -142,6 +142,18 @@ design decisions are recorded there and in code comments.
   centered, labeled, canceled, -ize verbs). Third-party text is the exception and stays
   verbatim: the GPL LICENSE, dependency names, and identifiers from external specs (MAVLink's
   own `MAV_RESULT_CANCELLED` keeps its spelling; only our rendered label is Americanized).
+- **The replay's attitude mapping is settled empirically, never by reasoning.** Three attempts
+  to derive `HeadingPitchRoll(yaw + 90, -pitch, -roll)` from Cesium's conventions have reached
+  three different wrong answers, the last one "proving" the nose points straight down. What it
+  actually needs is a real log: on a 346-sample straight leg the model sits tangent to its own
+  track, which confirms the heading. Pick a *straight* leg — at a figure-eight crossing the
+  local track direction is ambiguous and the picture proves nothing.
+- **`log-sweep.test.ts` runs the whole log pipeline over a directory of real logs**
+  (`LOG_SWEEP=<dir> npx vitest run log-sweep.test.ts`). It found the bug a single fixture never
+  could: ArduPlane 4.1.6 writes `Frame: F-35B/` — the frame *class* with an empty type — where
+  4.2.2 writes `Frame: F-35B`, so an exact match missed nine of one aircraft's own logs. Point
+  it at any log collection after touching the parser, `log-path`, `log-modes` or expressions.
+
 - **The vehicle draws itself when it says what it is** (`protocol/airframe.ts`). ArduPilot
   announces its frame at boot -- "QuadPlane Frame: F-35B" -- to both STATUSTEXT and a MSG
   record, so one matcher serves the live view and the log replay. Match `Frame:` and the name

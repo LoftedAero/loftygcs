@@ -9,6 +9,8 @@ import { airframeFrom, airframeFromLog, frameName, knownAirframe } from './airfr
 // looks for "Frame:" and not for a phrase:
 //   4.2.2 (every existing log):  "QuadPlane Frame: F-35B"
 //   4.6.3 (the current build):   "QuadPlane initialised, Frame: F-35B"
+const V406 = 'QuadPlane initialised'
+const V416 = 'QuadPlane Frame: F-35B/'
 const V422 = 'QuadPlane Frame: F-35B'
 const V463 = 'QuadPlane initialised, Frame: F-35B'
 
@@ -39,11 +41,27 @@ describe('reading the frame out of a boot banner', () => {
 })
 
 describe('recognizing an airframe we can draw', () => {
-  it('knows the F-35B by either spelling', () => {
+  it('knows the F-35B by every spelling its firmwares have used', () => {
     expect(knownAirframe('F-35B')).toBe('f35b')
     expect(knownAirframe('f35b')).toBe('f35b')
+    expect(airframeFrom([V416])).toBe('f35b')
     expect(airframeFrom([V422])).toBe('f35b')
     expect(airframeFrom([V463])).toBe('f35b')
+  })
+
+  it('matches the frame class, not the class/type pair', () => {
+    // 4.1.6 logs "F-35B/" -- the class with an unset type -- and an exact
+    // match on the whole string missed nine of this aircraft's own logs.
+    expect(knownAirframe('F-35B/')).toBe('f35b')
+    expect(frameName([V416])).toBe('F-35B/')
+    // The same shape with the type filled in still must not match.
+    expect(knownAirframe('QUAD/PLUS')).toBeNull()
+  })
+
+  it('says nothing for a firmware that does not report a frame', () => {
+    // 4.0.6 announces the quadplane and never names it. Null is the honest
+    // answer; guessing from anything else in the log would not be.
+    expect(airframeFrom([V406, 'ArduPlane V4.0.6 (dc9e9b6a)'])).toBeNull()
   })
 
   it('does not claim an aircraft it has no model for', () => {

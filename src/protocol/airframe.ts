@@ -7,10 +7,18 @@
 // rather than beside either consumer.
 //
 // The wording moves between firmware versions and the exact phrase is not
-// the interesting part: 4.2.2 writes "QuadPlane Frame: F-35B" and 4.6.3
-// writes "QuadPlane initialised, Frame: F-35B". Matching either one exactly
-// would have missed every log that already exists, so what is matched is
-// the part ArduPilot has kept stable -- "Frame:" and the name after it.
+// the interesting part. Four real spellings, from one aircraft's own logs:
+//
+//   4.0.6        "QuadPlane initialised"                  (no frame at all)
+//   4.1.6beta1   "QuadPlane Frame: F-35B/"                (class, empty type)
+//   4.2.2        "QuadPlane Frame: F-35B"
+//   4.6.3        "QuadPlane initialised, Frame: F-35B"
+//
+// So what is matched is the part ArduPilot has kept stable -- "Frame:", and
+// the *class* of the name after it. 4.0.6 gets a null, honestly: it does not
+// say. Every version of this matcher that was written against one spelling
+// silently missed logs from another, which is why the test runs against a
+// real corpus rather than against strings anyone remembered.
 
 import type { ParsedLog } from './dataflash'
 
@@ -37,10 +45,19 @@ const MATCHERS: [KnownAirframe, RegExp][] = [
   ['f35b', /^F-?35B$/i],
 ]
 
-/** The airframe a frame name identifies, or null for anything unrecognized. */
+/**
+ * The airframe a frame name identifies, or null for anything unrecognized.
+ *
+ * ArduPilot reports the frame as `class/type`, and matching is against the
+ * class alone. A quadplane whose type is unset logs a bare trailing slash --
+ * 4.1.6 writes "QuadPlane Frame: F-35B/" where 4.2.2 writes "Frame: F-35B" --
+ * and an exact match on the whole string silently missed every log from that
+ * firmware. Copter's "QUAD/PLUS" is the same shape with the type filled in.
+ */
 export function knownAirframe(frame: string | null | undefined): KnownAirframe | null {
   if (!frame) return null
-  for (const [id, re] of MATCHERS) if (re.test(frame)) return id
+  const frameClass = frame.split('/')[0]!
+  for (const [id, re] of MATCHERS) if (re.test(frameClass)) return id
   return null
 }
 
