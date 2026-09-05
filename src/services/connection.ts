@@ -6,7 +6,12 @@ import { TransportManager } from '../transport'
 import { useInspectorStore } from '../stores/inspector-store'
 import type { TransportOptions } from '../transport/Transport'
 import { WorkerClient } from '../worker/worker-client'
-import type { MissionItem, ProtocolEvent, TelemetryDelta } from '../protocol/types'
+import type {
+  FirmwareVersion,
+  MissionItem,
+  ProtocolEvent,
+  TelemetryDelta,
+} from '../protocol/types'
 import { modeName, vehicleTypeName } from '../protocol/modes'
 import { setConnectionState, useConnectionStore } from '../stores/connection-store'
 import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
@@ -19,6 +24,15 @@ import { telemetryRings } from './telemetry-ring'
 import { fieldRegistry } from './telemetry-fields'
 import { fetchParamMetadata } from './param-metadata'
 
+/**
+ * How long to hold the metadata fetch for AUTOPILOT_VERSION.
+ *
+ * Long enough for one command round trip on a slow radio, short enough that
+ * a vehicle which never answers still gets its hints while the parameter
+ * table is still loading.
+ */
+const VERSION_WAIT_MS = 3000
+
 const HANDSHAKE_TIMEOUT_MS = 5000
 const LINK_LOST_AFTER_MS = 3000
 const SNAPSHOT_INTERVAL_MS = 200
@@ -27,6 +41,9 @@ class ConnectionService {
   private manager = new TransportManager()
   private worker: WorkerClient | null = null
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null
+  /** Held while waiting for AUTOPILOT_VERSION to pick matching metadata. */
+  private metadataTimer: ReturnType<typeof setTimeout> | null = null
+  private metadataVehicle = ''
   private snapshotTimer: ReturnType<typeof setInterval> | null = null
   // Deltas mutate this between snapshot flushes so the store re-renders at
   // a few Hz no matter how fast telemetry arrives.
@@ -108,9 +125,17 @@ class ConnectionService {
           setConnectionState({ phase: 'connected' })
           if (conn.phase === 'handshaking') {
             // A configurator without the parameters is an empty shell:
-            // fetch them (and their metadata) as soon as the vehicle exists.
+            // fetch them as soon as the vehicle exists.
             void this.refreshParams()
-            void this.loadMetadata(vehicleTypeName(evt.vehicleType))
+            // Metadata waits a moment for AUTOPILOT_VERSION, because the
+            // version picks which metadata to fetch. Only a moment: a
+            // vehicle that never answers still gets hints, just the
+            // current release's, which is what it got before this existed.
+            this.metadataVehicle = vehicleTypeName(evt.vehicleType)
+            this.metadataTimer = setTimeout(() => {
+              this.metadataTimer = null
+              void this.loadMetadata(this.metadataVehicle, null)
+            }, VERSION_WAIT_MS)
           }
         }
         this.pending.present = true
@@ -127,6 +152,18 @@ class ConnectionService {
       case 'telemetry':
         for (const d of evt.batch) this.applyDelta(d)
         return
+      case 'version': {
+        useVehicleStore
+          .getState()
+          .apply({ firmware: evt.firmware, capabilities: evt.capabilities })
+        // The answer we were holding the metadata fetch for.
+        if (this.metadataTimer) {
+          clearTimeout(this.metadataTimer)
+          this.metadataTimer = null
+          void this.loadMetadata(this.metadataVehicle, evt.firmware)
+        }
+        return
+      }
       case 'fileProgress': {
         // Whichever screen asked for a file: the Files browser and the Logs
         // screen both transfer over the same FTP client, and anything else
@@ -274,9 +311,10 @@ class ConnectionService {
     }
   }
 
-  private async loadMetadata(vehicleName: string) {
+  private async loadMetadata(vehicleName: string, firmware: FirmwareVersion | null) {
     try {
-      useParamStore.getState().setMetadata(await fetchParamMetadata(vehicleName))
+      const { params, source } = await fetchParamMetadata(vehicleName, firmware)
+      useParamStore.getState().setMetadata(params, source)
     } catch {
       // Metadata is decoration; offline or firewalled is not an error state.
     }

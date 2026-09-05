@@ -15,6 +15,7 @@ export default function ParamsTab() {
   const progress = useParamStore((s) => s.progress)
   const error = useParamStore((s) => s.error)
   const order = useParamStore((s) => s.order)
+  const metadataSource = useParamStore((s) => s.metadataSource)
   const [filter, setFilter] = useState('')
 
   const names = useMemo(() => {
@@ -104,8 +105,12 @@ export default function ParamsTab() {
             </div>
           </div>
           <p className="la-card__note">
-            {names.length} of {order.length} parameters. Changes stage here and are written
-            from the column beside them.
+            {names.length} of {order.length} parameters. Changes stage here and are written from
+            the column beside them.
+            {/* Which documentation is on screen. Parameters are added and
+                re-scaled between releases, so a hint from the wrong version
+                is worse than no hint -- worth one line to say. */}
+            {metadataSource && ` Hints from ArduPilot ${metadataSource}.`}
           </p>
         </div>
 

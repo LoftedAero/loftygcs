@@ -82,6 +82,28 @@ export type ProtocolEvent =
       completionMask: number[]
     }
   | { t: 'magCalReport'; compassId: number; calStatus: number; fitness: number; autosaved: number }
+  /**
+   * What the vehicle answered about itself: firmware version and the
+   * capability bits. Sent once per connection, after the first heartbeat.
+   */
+  | {
+      t: 'version'
+      firmware: FirmwareVersion
+      /** MAV_PROTOCOL_CAPABILITY bits, as far as they fit a number. */
+      capabilities: number
+      /** Board type, from the vendor/product ids the vehicle reports. */
+      vendorId: number
+      productId: number
+    }
+
+/** ArduPilot's own version, decoded from AUTOPILOT_VERSION. */
+export interface FirmwareVersion {
+  major: number
+  minor: number
+  patch: number
+  /** FIRMWARE_VERSION_TYPE: 0 dev, 64 alpha, 128 beta, 192 rc, 255 official. */
+  type: number
+}
 
 export type TelemetryDelta =
   | { k: 'attitude'; rollRad: number; pitchRad: number; yawRad: number }

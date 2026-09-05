@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LaButton, LaCard, LaHint, LaInput, LaModal } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
+import { useVehicleStore } from '../../../stores/vehicle-store'
 import { parentPath, useFilesStore } from '../../../stores/files-store'
 import {
   downloadEntry,
@@ -46,6 +47,11 @@ export default function FilesTab() {
   const [confirming, setConfirming] = useState<FtpDirEntry | null>(null)
   const [newFolder, setNewFolder] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<{ entry: FtpDirEntry; to: string } | null>(null)
+  // MAV_PROTOCOL_CAPABILITY_FTP. Zero capabilities means the vehicle never
+  // answered AUTOPILOT_VERSION, which is not the same as saying no -- so
+  // this only speaks up when it actually said no.
+  const capabilities = useVehicleStore((s) => s.capabilities)
+  const saysNoFtp = capabilities !== 0 && (capabilities & (1 << 11)) === 0
 
   // Listed on arrival rather than behind a button: an empty screen with a
   // "List" button on it is a screen that has told you nothing.
@@ -215,6 +221,11 @@ export default function FilesTab() {
           </LaButton>
         </section>
 
+        {saysNoFtp && (
+          <LaHint error>
+            This vehicle does not report MAVFTP support, so there is nothing here to browse.
+          </LaHint>
+        )}
         {status.kind === 'error' && <p className="app-col__note is-error">{status.text}</p>}
         {status.kind === 'done' && <p className="app-col__note">{status.text}</p>}
       </aside>

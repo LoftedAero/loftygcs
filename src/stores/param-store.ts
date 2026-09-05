@@ -26,6 +26,14 @@ interface ParamState {
   dirtyCount: number
   writeBusy: boolean
   metadata: Record<string, ParamMeta>
+  /**
+   * Which metadata is loaded -- "4.5.7" or "latest release".
+   *
+   * Worth showing: parameters that exist in one firmware and not another
+   * are the usual reason a hint is missing, and a station that quietly used
+   * the wrong version's documentation would be lying rather than silent.
+   */
+  metadataSource: string | null
   lastWrite: { written: number; failed: string[] } | null
 
   beginDownload: () => void
@@ -36,7 +44,7 @@ interface ParamState {
   revertAll: () => void
   confirmWrite: (name: string, value: number) => void
   setWriteBusy: (b: boolean) => void
-  setMetadata: (m: Record<string, ParamMeta>) => void
+  setMetadata: (m: Record<string, ParamMeta>, source?: string | null) => void
   setLastWrite: (r: { written: number; failed: string[] } | null) => void
   reset: () => void
 }
@@ -63,6 +71,7 @@ export const useParamStore = create<ParamState>((set, get) => ({
   dirtyCount: 0,
   writeBusy: false,
   metadata: {},
+  metadataSource: null,
   lastWrite: null,
 
   beginDownload: () => set({ loadState: 'downloading', progress: null, error: null }),
@@ -106,7 +115,7 @@ export const useParamStore = create<ParamState>((set, get) => ({
   },
 
   setWriteBusy: (writeBusy) => set({ writeBusy }),
-  setMetadata: (metadata) => set({ metadata }),
+  setMetadata: (metadata, source = null) => set({ metadata, metadataSource: source }),
   setLastWrite: (lastWrite) => set({ lastWrite }),
   reset: () =>
     set({

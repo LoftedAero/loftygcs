@@ -109,6 +109,20 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
         )
         expect(kinds.has('attitude')).toBe(true)
 
+        // The vehicle says what firmware it is, which is what picks
+        // matching parameter metadata. Field names on the decoded message
+        // are the decoder's, not ours, so this is the only place that
+        // catches a rename or a mis-cased key -- a wrong key reads as
+        // undefined and silently decodes to version 0.0.0.
+        await waitFor(() => events.some((e) => e.t === 'version'), 15000, 'AUTOPILOT_VERSION')
+        const version = events.find((e) => e.t === 'version')
+        if (version?.t !== 'version') throw new Error('unreachable')
+        expect(version.firmware.major).toBeGreaterThanOrEqual(4)
+        expect(version.firmware.minor).toBeLessThan(100)
+        // MAV_PROTOCOL_CAPABILITY_FTP; a real ArduPilot has it, and this is
+        // what lets a screen tell "no MAVFTP" from "MAVFTP not answering".
+        expect(version.capabilities & (1 << 11)).toBeTruthy()
+
         // ArduPilot always talks at boot; STATUSTEXT decode is exercised too.
         await waitFor(() => events.some((e) => e.t === 'statustext'), 15000, 'statustext')
 

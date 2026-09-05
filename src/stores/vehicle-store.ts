@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { frameName, knownAirframe, type KnownAirframe } from '../protocol/airframe'
+import type { FirmwareVersion } from '../protocol/types'
 
 // Throttled snapshot of vehicle state for ordinary React components (mode
 // label, battery readout, GPS badge). The connection service pushes here at
@@ -63,6 +64,16 @@ export interface VehicleSnapshot {
   sensorsPresent: number
   sensorsEnabled: number
   sensorsHealth: number
+  /**
+   * What the vehicle said about itself, once, in AUTOPILOT_VERSION.
+   *
+   * Null until it answers, and for anything that never does. The version
+   * picks matching parameter metadata; the capability bits say what the
+   * link actually supports, which is how a screen can tell "no MAVFTP" from
+   * "MAVFTP is not answering".
+   */
+  firmware: FirmwareVersion | null
+  capabilities: number
   statusTexts: StatusText[]
 }
 
@@ -102,6 +113,8 @@ const EMPTY: VehicleSnapshot = {
   sensorsPresent: 0,
   sensorsEnabled: 0,
   sensorsHealth: 0,
+  firmware: null,
+  capabilities: 0,
   statusTexts: [],
 }
 

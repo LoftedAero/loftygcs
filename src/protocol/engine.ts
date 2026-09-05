@@ -225,7 +225,33 @@ export class ProtocolEngine {
         if (!this.streamsRequested) {
           this.streamsRequested = true
           this.requestStreams()
+          this.requestVersion()
         }
+        return
+      }
+      case 'AUTOPILOT_VERSION': {
+        // flight_sw_version packs the version into one uint32, high byte
+        // first: major, minor, patch, then FIRMWARE_VERSION_TYPE. Reading
+        // it as four bytes rather than as a number keeps the shift out of
+        // every consumer.
+        const packed = Number(msg.fields.flightSwVersion ?? 0)
+        this.emit({
+          t: 'evt',
+          evt: {
+            t: 'version',
+            firmware: {
+              major: (packed >>> 24) & 0xff,
+              minor: (packed >>> 16) & 0xff,
+              patch: (packed >>> 8) & 0xff,
+              type: packed & 0xff,
+            },
+            // The capability field is a uint64 and arrives as a BigInt on
+            // some decoders; every bit anyone uses is well inside 2^53.
+            capabilities: Number(msg.fields.capabilities ?? 0),
+            vendorId: Number(msg.fields.vendorId ?? 0),
+            productId: Number(msg.fields.productId ?? 0),
+          },
+        })
         return
       }
       case 'STATUSTEXT':
@@ -315,6 +341,20 @@ export class ProtocolEngine {
       reqMessageRate: STREAM_RATE_HZ,
       startStop: 1,
     })
+  }
+
+  /**
+   * Ask what firmware this is.
+   *
+   * MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES, which every ArduPilot answers
+   * with AUTOPILOT_VERSION. Fired once and forgotten: the version is used
+   * to pick matching parameter metadata, and a vehicle that will not say
+   * simply gets the current release's, which is what it got before this
+   * existed.
+   */
+  private requestVersion() {
+    if (this.vehicleSysid === null) return
+    void this.commands.run(520, [1, 0, 0, 0, 0, 0, 0]).catch(() => {})
   }
 
   private sendFtpPayload(payload: number[]) {

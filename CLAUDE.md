@@ -215,6 +215,20 @@ design decisions are recorded there and in code comments.
   showing rather than offering a transfer that silently does nothing. The write path has no
   fallback to hide a mistake, so it is covered by a SITL integration test that creates a
   directory, writes 1,500 bytes, reads them back byte for byte, renames and deletes.
+- **Parameter metadata is matched to the firmware, and the two published forms differ.**
+  Documentation from the wrong release is worse than none — a range or a bitmask that looks
+  authoritative and is wrong — so `services/param-metadata.ts` asks the vehicle what it is
+  first. AUTOPILOT_VERSION is requested once per connection (MAV_CMD 520) and the metadata
+  fetch waits three seconds for the answer before falling back. The server's two trees do not
+  match: `/Parameters/ArduCopter/apm.pdef.json` is the current release, while
+  `/Parameters/versioned/Copter/stable-4.5.7/apm.pdef.xml` is a specific one — different
+  vehicle spelling, different format, one form each. So both readers live in that file, and the
+  XML has its own traps: names are prefixed `ArduCopter:` for vehicle parameters and bare for
+  library ones, a Range is `"0 10"` in one element rather than two attributes, and a `<values>`
+  block under a bitmask parameter lists *mask* values (0,1,2,4) where the `Bitmask` field lists
+  *bits* (0,1,2) — so the field wins whenever both are present. The version is rounded *down*
+  to the newest published release that is not newer. `NET=1 npm test` runs the live check
+  against the real server, which is the only thing that catches a path change.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,
@@ -260,6 +274,7 @@ design decisions are recorded there and in code comments.
 
 - `npm run dev` / `npm run dev:electron` — browser / desktop development
 - `npm test`, `npm run typecheck`, `npm run lint` — all three must pass; CI runs them on push
+- `NET=1 npm test` — also runs the live checks against ardupilot.org (parameter metadata paths)
 - `npm run dist` — installers for *this* platform only; all three come from CI
 - `npm run package:web` — the web bundle zipped for a static host
 - `npm run icon` — regenerate `build/icon.png` from `public/icons/icon.svg`
