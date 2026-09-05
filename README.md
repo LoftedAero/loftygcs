@@ -123,7 +123,7 @@ before more readouts multiply; the inspector helps debug everything after it).
 | ~~5~~ | ~~Pre-arm / pre-flight panel~~ | done — Fly ▸ Preflight, reasons in ArduPilot's own words |
 | ~~6~~ | ~~Offline maps / tile prefetch~~ | done — Mission ▸ Offline maps; panning online also fills the cache |
 | ~~7~~ | ~~Terrain elevation in planning~~ | done — ground under the altitude profile, and the clearance it leaves |
-| 8 | KML / GPX import & export | Planning I/O; imported plans get terrain-checked by #7 |
+| ~~8~~ | ~~KML / GPX import & export~~ | done — what a shape becomes depends on which plan is on screen |
 | 9 | MAVFTP file browser | Rides the existing FTP stack; unlocks Lua/fonts/terrain files |
 | 10 | Version-matched parameter metadata | Standalone service upgrade |
 | 11 | Camera & gimbal control | MAVLink camera/gimbal protocols; SITL can simulate a mount |

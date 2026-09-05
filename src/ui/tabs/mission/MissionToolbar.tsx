@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LaButton, LaHint } from '../../components/La'
+import { LaButton, LaHint, LaModal } from '../../components/La'
 import { isDirty, useMissionStore } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import {
@@ -8,6 +8,14 @@ import {
   saveToFile,
   writeToVehicle,
 } from '../../../services/mission'
+import {
+  applyGeoShape,
+  destinationFor,
+  pickGeoFile,
+  saveGpx,
+  saveKml,
+  type GeoFilePick,
+} from '../../../services/geo-import'
 
 // File in, file out, vehicle in, vehicle out -- and one badge saying whether
 // the screen and the aircraft agree.
@@ -25,6 +33,19 @@ export default function MissionToolbar() {
   const sourceName = useMissionStore((s) => s.sourceName)
   const clear = useMissionStore((s) => s.clear)
   const [busy, setBusy] = useState(false)
+  // A file with one shape in it is applied straight away; only a file that
+  // holds several has a question in it worth asking.
+  const [choosing, setChoosing] = useState<GeoFilePick | null>(null)
+  const editing = useMissionStore((s) => s.editing)
+  const setTransfer = useMissionStore((s) => s.setTransfer)
+
+  const importGeo = async () => {
+    const picked = await pickGeoFile()
+    if (!picked) return
+    const only = picked.shapes.length === 1 ? picked.shapes[0] : null
+    if (only) setTransfer({ kind: 'done', text: applyGeoShape(only, picked.name) })
+    else setChoosing(picked)
+  }
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true)
@@ -87,6 +108,41 @@ export default function MissionToolbar() {
         Save to file
       </LaButton>
 
+      {/* Below the native formats: this is the interchange path, used when
+          something is coming from or going to a tool that is not a station. */}
+      <LaButton
+        variant="secondary"
+        size="block"
+        disabled={working}
+        onClick={() =>
+          void run(async () => {
+            try {
+              await importGeo()
+            } catch (err) {
+              setTransfer({ kind: 'error', text: err instanceof Error ? err.message : String(err) })
+            }
+          })
+        }
+      >
+        Import KML or GPX…
+      </LaButton>
+      <LaButton
+        variant="ghost"
+        size="block"
+        disabled={working || items === 0}
+        onClick={() => saveKml(exchangeName(sourceName, 'kml'))}
+      >
+        Export KML
+      </LaButton>
+      <LaButton
+        variant="ghost"
+        size="block"
+        disabled={working || items === 0}
+        onClick={() => saveGpx(exchangeName(sourceName, 'gpx'))}
+      >
+        Export GPX
+      </LaButton>
+
       <LaButton variant="ghost" size="block" disabled={working || items === 0} onClick={clear}>
         Clear mission
       </LaButton>
@@ -101,8 +157,61 @@ export default function MissionToolbar() {
       ) : transfer.kind === 'done' ? (
         <p className="app-col__note">{transfer.text}</p>
       ) : null}
+
+      {choosing && (
+        <LaModal
+          open
+          narrow
+          title={`What to take from ${choosing.name}`}
+          actions={
+            <div className="la-prompt-actions">
+              {choosing.shapes.map((shape, i) => (
+                <LaButton
+                  key={i}
+                  variant={i === 0 ? 'primary' : 'secondary'}
+                  size="block"
+                  onClick={() => {
+                    setTransfer({ kind: 'done', text: applyGeoShape(shape, choosing.name) })
+                    setChoosing(null)
+                  }}
+                >
+                  {shapeLabel(shape.name, shape.kind, shape.fixes.length)}
+                </LaButton>
+              ))}
+              <LaButton variant="ghost" size="block" onClick={() => setChoosing(null)}>
+                Cancel
+              </LaButton>
+            </div>
+          }
+        >
+          <p className="app-col__note">
+            Each becomes {DESTINATION_WORDS[destinationFor(choosing.shapes[0]!, editing)]}, because
+            that is the plan on screen.
+          </p>
+        </LaModal>
+      )}
     </div>
   )
+}
+
+const DESTINATION_WORDS = {
+  waypoints: 'mission waypoints',
+  survey: 'a survey area',
+  fence: 'a fence polygon',
+  rally: 'rally points',
+} as const
+
+const KIND_WORDS = { track: 'line', points: 'points', polygon: 'shape' } as const
+
+function shapeLabel(name: string | null, kind: keyof typeof KIND_WORDS, count: number): string {
+  const what = `${KIND_WORDS[kind]}, ${count} point${count === 1 ? '' : 's'}`
+  return name ? `${name} — ${what}` : what[0]!.toUpperCase() + what.slice(1)
+}
+
+/** An export name, reusing the loaded one where there was one. */
+function exchangeName(source: string | null, ext: 'kml' | 'gpx'): string {
+  if (!source || source === 'Vehicle') return `mission.${ext}`
+  return `${source.replace(/\.[^.]+$/, '')}.${ext}`
 }
 
 /** A .waypoints name, reusing the loaded one where there was one. */

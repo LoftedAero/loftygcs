@@ -186,6 +186,22 @@ design decisions are recorded there and in code comments.
   down unless it is pulled up to zero (`groundLevel`), which also overstates the ground in Death
   Valley — the safe direction. Sampling is bilinear because nearest-pixel puts a 38 m staircase
   in the profile and reads as cliffs on a slope.
+- **An imported shape means whatever plan is on screen.** KML and GPX come in through
+  `services/geo-import.ts`, and the destination is decided by `editing`, not by the shape: the
+  same polygon is a survey area while planning a mission and a geofence while editing the
+  fence, and a line is a route in one and a boundary in the other. That is the rule Mission
+  mode already follows, and it removes a dialog that would ask a question the screen has
+  answered — only a file holding *several* shapes gets a picker. Parsing lives in `services`
+  rather than `protocol` because it needs DOMParser, and a regular expression over KML finds
+  CDATA, entities and namespaces one bug report at a time; elements are matched on `localName`
+  so `gx:`-prefixed documents work. Three things bite: KML is **lon,lat** and everything else
+  here is lat,lon (a swap still parses, and puts a Colorado mission in the Indian Ocean);
+  `<coordinates>` is comma separated while `gx:coord` in the same file is space separated; and
+  a KML ring repeats its first vertex where a fence does not. Every import is Douglas-Peucker
+  simplified to a cap — a GPX track is a fix a second, and 3,600 waypoints is a way of not
+  importing it at all. A file's elevation is always AMSL, so it is only used directly in the
+  AMSL frame; converting it to a relative one needs a surveyed home, and without one the
+  editor's default altitude is used rather than a guess.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,
