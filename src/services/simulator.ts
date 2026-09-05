@@ -4,7 +4,7 @@
 // set over MAVFTP, real arming checks, and real mode logic.
 import { connectionService } from './connection'
 import { useSimStore } from '../stores/sim-store'
-import type { SimHome } from '../types/loftgcs'
+import type { SimLaunch } from '../types/loftgcs'
 
 const SIM_HOST = '127.0.0.1'
 
@@ -34,13 +34,13 @@ export async function installSimulator(vehicle: string): Promise<void> {
   }
 }
 
-export async function startSimulator(vehicle: string, home?: SimHome): Promise<void> {
+export async function startSimulator(launch: SimLaunch): Promise<void> {
   const bridge = window.loftgcs
   if (!bridge) return
   const store = useSimStore.getState()
   store.setPhase('starting')
   try {
-    const port = await bridge.sim.start(vehicle, home)
+    const port = await bridge.sim.start(launch)
     await refreshSimStatus()
     useSimStore.getState().setPhase('running')
     await connectionService.connect({ kind: 'tcp', host: SIM_HOST, port })

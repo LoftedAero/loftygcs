@@ -154,6 +154,20 @@ The desktop app can also run a real ArduPilot simulator for you: open the
 **SITL** tray in the app bar, then **Install**, then **Start** — it connects
 itself. The dot on that button stays lit while one is running.
 
+The tray also takes your own setup, if you have one:
+
+- **Build** — *Official release*, or point it at your own SITL executable.
+  It reads the vehicle and firmware version out of the binary, so there is
+  nothing to tell it.
+- **Physics** — the built-in model, or **RealFlight**. RealFlight must be
+  running with Simulation > Settings > Physics > "RealFlight Link enabled";
+  leave the host blank for the copy on this machine.
+- **Parameters** — wipe to defaults, keep whatever the last session left, or
+  load a `.parm` file or a saved `eeprom.bin`. A supplied EEPROM is copied
+  in, so the file you point at is never written to.
+
+All three are remembered, so a rig only has to be set up once.
+
 ---
 
 ## What is missing, so you don't report it

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import SimTray from './SimTray'
 import { useSimStore } from '../../stores/sim-store'
 import { useUiStore } from '../../stores/ui-store'
@@ -8,6 +8,11 @@ import { useConnectionStore } from '../../stores/connection-store'
 // The simulator moved out of a mode and into the app bar. The two things
 // worth holding still are the dot -- the whole reason it earns bar space --
 // and that the panel still offers exactly what the screen did.
+
+/** What the last Start handed the main process. */
+let started: unknown = null
+let pickedBuild: unknown = null
+let pickedParams: string | null = null
 
 const bridge = (over: Partial<Record<string, unknown>> = {}) => ({
   platform: 'win32',
@@ -25,21 +30,55 @@ const bridge = (over: Partial<Record<string, unknown>> = {}) => ({
         ...over,
       }),
     install: () => Promise.resolve(),
-    start: () => Promise.resolve(5760),
+    start: (launch: unknown) => {
+      started = launch
+      return Promise.resolve(5760)
+    },
     stop: () => Promise.resolve(),
+    pickBuild: () => Promise.resolve(pickedBuild),
+    pickParams: () => Promise.resolve(pickedParams),
     onProgress: () => () => {},
     onLog: () => () => {},
     onExit: () => () => {},
   },
 })
 
+const READY = {
+  supported: true,
+  vehicles: [{ id: 'copter', label: 'ArduCopter' }],
+  installed: ['copter'],
+  running: null,
+  port: 5760,
+}
+
+/** An open tray on a desktop build, with a vehicle ready to launch. */
+const openTray = () => {
+  setBridge(bridge())
+  useSimStore.setState({ status: READY })
+  render(<SimTray />)
+  fireEvent.click(trayButton())
+}
+
 const setBridge = (b: unknown) => {
   ;(window as unknown as Record<string, unknown>).loftgcs = b
 }
 
 beforeEach(() => {
+  started = null
+  pickedBuild = null
+  pickedParams = null
+  localStorage.clear()
   useUiStore.setState({ simTrayOpen: false })
-  useSimStore.setState({ status: null, phase: 'idle', progress: null, error: null })
+  useSimStore.setState({
+    status: null,
+    phase: 'idle',
+    progress: null,
+    error: null,
+    build: null,
+    physics: { kind: 'builtin' },
+    params: { kind: 'wipe' },
+    homeText: '',
+  })
 })
 
 afterEach(() => {
@@ -207,5 +246,112 @@ describe('what the panel offers', () => {
     render(<SimTray />)
     fireEvent.click(trayButton())
     expect(screen.getByRole('button', { name: /connect to a running simulator/i })).toBeTruthy()
+  })
+})
+
+describe('choosing what to launch', () => {
+  it('launches the managed build with its own physics and a wipe', async () => {
+    openTray()
+    fireEvent.click(screen.getByRole('button', { name: /start simulator/i }))
+    await waitFor(() => expect(started).not.toBeNull())
+    // The defaults are what someone gets who just presses Start -- the
+    // behavior before any of this was choosable.
+    expect(started).toMatchObject({
+      vehicle: 'copter',
+      physics: { kind: 'builtin' },
+      params: { kind: 'wipe' },
+    })
+    expect((started as { exe?: string }).exe).toBeUndefined()
+  })
+
+  it('takes the vehicle from the build rather than asking', async () => {
+    // A binary knows what it is, and asking invites the answer that
+    // launches ArduPlane against copter defaults.
+    pickedBuild = { path: 'C:/rf/arduplane.exe', vehicle: 'plane', version: '4.6.3' }
+    openTray()
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'custom' } })
+    await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
+    // Named by what it is, not by where it sits.
+    expect(screen.getByLabelText('Build').textContent).toMatch(/Plane 4\.6\.3/)
+    fireEvent.click(screen.getByRole('button', { name: /start simulator/i }))
+    await waitFor(() => expect(started).not.toBeNull())
+    expect(started).toMatchObject({ vehicle: 'plane', exe: 'C:/rf/arduplane.exe' })
+  })
+
+  it('leaves the setup alone when the picker is cancelled', async () => {
+    pickedBuild = { path: 'C:/rf/arduplane.exe', vehicle: 'plane', version: '4.6.3' }
+    openTray()
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'custom' } })
+    await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
+
+    // Cancelling a second pick must not throw the first one away -- the
+    // dropdown is only a way to reach the picker, not a choice in itself.
+    pickedBuild = null
+    fireEvent.click(screen.getByRole('button', { name: /change/i }))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(useSimStore.getState().build?.path).toBe('C:/rf/arduplane.exe')
+  })
+
+  it('sends RealFlight the flightaxis physics, with a host when given one', async () => {
+    openTray()
+    fireEvent.change(screen.getByLabelText('Physics'), { target: { value: 'flightaxis' } })
+    fireEvent.change(screen.getByLabelText('RealFlight host'), {
+      target: { value: '192.168.1.5' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /start simulator/i }))
+    await waitFor(() => expect(started).not.toBeNull())
+    expect(started).toMatchObject({ physics: { kind: 'flightaxis', host: '192.168.1.5' } })
+  })
+
+  it('says what RealFlight needs switched on, because forgetting it hangs', () => {
+    openTray()
+    fireEvent.change(screen.getByLabelText('Physics'), { target: { value: 'flightaxis' } })
+    expect(screen.getByText(/RealFlight Link enabled/)).toBeTruthy()
+  })
+
+  it('tells a parameter list from a stored image when one is picked', async () => {
+    pickedParams = 'C:/rf/flightaxis/eeprom.bin'
+    openTray()
+    fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'file' } })
+    await waitFor(() => expect(useSimStore.getState().params.kind).toBe('eeprom'))
+    expect(screen.getByText(/copied in whole/i)).toBeTruthy()
+
+    pickedParams = 'C:/rf/f35.parm'
+    fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'file' } })
+    await waitFor(() => expect(useSimStore.getState().params.kind).toBe('file'))
+    expect(screen.getByText(/with a wipe so it takes/i)).toBeTruthy()
+  })
+
+  it('keeps stored parameters when asked, and says what that means', async () => {
+    openTray()
+    fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'keep' } })
+    expect(screen.getByText(/Carries on from wherever/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /start simulator/i }))
+    await waitFor(() => expect(started).not.toBeNull())
+    expect(started).toMatchObject({ params: { kind: 'keep' } })
+  })
+
+  it('remembers the setup, because a rig is not a per-launch decision', async () => {
+    pickedBuild = { path: 'C:/rf/arduplane.exe', vehicle: 'plane', version: '4.6.3' }
+    openTray()
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'custom' } })
+    fireEvent.change(screen.getByLabelText('Physics'), { target: { value: 'flightaxis' } })
+    await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
+    const saved = JSON.parse(localStorage.getItem('loftgcs.sim.rig')!) as {
+      build: { path: string }
+      physics: { kind: string }
+    }
+    expect(saved.build.path).toBe('C:/rf/arduplane.exe')
+    expect(saved.physics.kind).toBe('flightaxis')
+  })
+
+  it('offers no install for a build that came from disk', async () => {
+    pickedBuild = { path: 'C:/rf/arduplane.exe', vehicle: 'plane', version: '4.6.3' }
+    openTray()
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'custom' } })
+    await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
+    // It is already on the disk; there is nothing to download.
+    expect(screen.queryByRole('button', { name: /install simulator/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /start simulator/i })).toBeTruthy()
   })
 })

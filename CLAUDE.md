@@ -96,6 +96,36 @@ design decisions are recorded there and in code comments.
   in the middle of a log that nothing later fills. Log directories differ — real hardware
   mounts the card at `/APM/LOGS`, SITL has none and keeps them in `/logs` — so the service
   probes both rather than assuming.
+- **Launching SITL has three choices, and each hides a trap** (`electron/sitl-core.ts`).
+  *Which build*: a custom executable is identified by reading ArduPilot's own
+  `ArduPlane V4.6.3` banner out of the binary rather than by asking, because the wrong answer
+  launches one vehicle against another's defaults and fails like a broken simulator. Custom
+  builds get no stock `--defaults` — layering our bench configuration over an aircraft someone
+  tuned would quietly change it. **The published binaries are cygwin builds that need ten DLLs
+  beside them, so a build living anywhere else must be spawned with the managed install on
+  PATH** (Mission Planner does the same): without it the process exits with status 0 and no
+  output at all, which reads as "started and stopped" rather than "a DLL is missing".
+  *What it boots with*: `--defaults` only sets defaults and a stored value outranks a default,
+  so a parameter file must arrive with `-w` or it is read and silently ignored; an `eeprom.bin`
+  is the stored set itself and must **not** be wiped. SITL has no option to read storage from
+  elsewhere — it opens `eeprom.bin` in its working directory — so a supplied image is copied
+  in, leaving the distributed file untouched while the working copy accumulates changes.
+  *Where state lives*: one working directory per model, `<build dir>/<model>/`, which is
+  Mission Planner's convention and the shape an aircraft ships in — an executable beside a
+  `flightaxis/eeprom.bin`, so pointing at the executable finds the parameters with no further
+  instruction. The FlightAxis host is dropped from that name (a colon cannot be a Windows
+  directory, and it is the same aircraft whichever machine draws it).
+- **RealFlight is reached by `--model flightaxis[:host]`** over SOAP on port 18083, and the
+  app probes that port before launching. Without the probe the failure is a thirty-second hang
+  and a timeout that never mentions RealFlight, because SITL retries the connection forever
+  without printing its readiness banner. The setting people forget is Simulation > Settings >
+  Physics > "RealFlight Link enabled", so the error names it.
+- **SITL says nothing about a defaults file it could not open** — not for a missing file, not
+  for a bad path. Do not look for an error; there is none. When a launch-path change needs
+  proving, the probe that works is `SERIAL0_PROTOCOL -1`, which switches MAVLink off: "did a
+  heartbeat arrive" is binary, needs no MAVLink parsing, and cannot pass for the wrong reason.
+  `SYSID_THISMAV` looks like the obvious marker and is not — it does not reach the heartbeat
+  from a defaults file, so a test built on it can only ever pass.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

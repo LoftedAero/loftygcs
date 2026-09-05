@@ -13,6 +13,40 @@ export interface LinkOpenOptions {
   localPort?: number
 }
 
+/**
+ * How to launch a simulator.
+ *
+ * The renderer builds this and the main process acts on it, so the shapes
+ * are declared here and matched in electron/sitl-core.ts. Every field is
+ * optional except the vehicle: the defaults are the managed build, its own
+ * physics, and a wipe -- what someone gets who just presses Start.
+ */
+export type SimPhysics = { kind: 'builtin' } | { kind: 'flightaxis'; host?: string }
+
+export type SimParams =
+  | { kind: 'keep' }
+  | { kind: 'wipe' }
+  /** A .parm list, applied over the defaults with a wipe so it takes. */
+  | { kind: 'file'; path: string }
+  /** A stored-parameter image, copied in whole. */
+  | { kind: 'eeprom'; path: string }
+
+export interface SimLaunch {
+  vehicle: string
+  /** A build the user supplied; unset uses the managed download. */
+  exe?: string | undefined
+  home?: SimHome | undefined
+  physics?: SimPhysics | undefined
+  params?: SimParams | undefined
+}
+
+/** What a chosen build turned out to be, read out of the binary itself. */
+export interface SimBuildChoice {
+  path: string
+  vehicle?: string
+  version?: string
+}
+
 export interface SimStatus {
   /** Prebuilt SITL binaries exist for this platform (Windows only today). */
   supported: boolean
@@ -44,10 +78,13 @@ export interface LoftGcsBridge {
     install(vehicle: string): Promise<void>
     /**
      * Spawns SITL and resolves with the TCP port once it is accepting.
-     * `home` is taken at boot; moving it later means restarting.
+     * Home is taken at boot; moving it later means restarting.
      */
-    start(vehicle: string, home?: SimHome): Promise<number>
+    start(launch: SimLaunch): Promise<number>
     stop(): Promise<void>
+    /** Native file pickers: SITL needs a path, not a file's contents. */
+    pickBuild(): Promise<SimBuildChoice | null>
+    pickParams(): Promise<string | null>
     onProgress(cb: (p: { file: string; done: number; total: number }) => void): () => void
     onLog(cb: (line: string) => void): () => void
     onExit(cb: () => void): () => void
@@ -69,9 +106,7 @@ export interface LoftGcsBridge {
     open(url: string): Promise<{ ok: true } | { ok: false; error: string }>
     close(): Promise<{ ok: true }>
     onReady(cb: (info: { codec: string }) => void): () => void
-    onUnit(
-      cb: (u: { data: Uint8Array; keyframe: boolean; timestamp: number }) => void,
-    ): () => void
+    onUnit(cb: (u: { data: Uint8Array; keyframe: boolean; timestamp: number }) => void): () => void
     onStatus(cb: (s: { text: string; error?: boolean; closed?: boolean }) => void): () => void
   }
 }
