@@ -47,7 +47,7 @@ afterEach(() => {
   delete (window as unknown as Record<string, unknown>).loftgcs
 })
 
-const trayButton = () => screen.getByRole('button', { name: /simulator/i })
+const trayButton = () => screen.getByRole('button', { name: /^SITL$/ })
 
 describe('the dot', () => {
   it('is dark, and says so, when nothing is running', () => {
@@ -104,7 +104,7 @@ describe('opening and dismissing', () => {
     render(<SimTray />)
     expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(trayButton())
-    expect(screen.getByRole('dialog', { name: 'Simulator' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'SITL' })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
   })

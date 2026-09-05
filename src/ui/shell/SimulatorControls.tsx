@@ -44,7 +44,7 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
 
   return (
     <>
-      <h3 className="app-simtray__head">Simulator</h3>
+      <h3 className="app-simtray__head">SITL</h3>
       <p className="app-simtray__note">
         {status?.supported
           ? 'Real ArduPilot firmware, running locally — the full parameter set, real arming checks, real mode logic.'

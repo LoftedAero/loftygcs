@@ -52,8 +52,7 @@ Two options, and they are not interchangeable:
   This is the actual firmware — ~1400 parameters over MAVFTP, real arming checks, real mode
   logic. Prebuilt SITL binaries exist for Windows only; on macOS and Linux run `sim_vehicle.py`
   yourself and use *Connect to a running simulator*. Demo mode is in the connection menu;
-  the simulator is in the app bar's **Simulator** tray, which carries a dot while one is
-  running.
+  SITL is in the app bar's **SITL** tray, which carries a dot while one is running.
 
 There is no browser option for real SITL: ArduPilot has no WebAssembly build, and the artifact
 sandbox blocks the WebSocket a remote simulator would need.

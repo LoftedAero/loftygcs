@@ -105,11 +105,11 @@ describe('the connection menu adapts to what the environment can do', () => {
     expect(options()).toEqual(['USB serial', 'TCP', 'UDP', 'WebSocket', 'Demo'])
   })
 
-  it('shows the simulator tray, dark, until something is running', () => {
+  it('shows the SITL tray, dark, until something is running', () => {
     render(<AppBar />)
     // The dot is the reason the tray earns bar space: a SITL left running
     // in the background is otherwise invisible from every screen.
-    const btn = screen.getByRole('button', { name: /simulator/i })
+    const btn = screen.getByRole('button', { name: /^SITL$/ })
     expect(btn.querySelector('.app-simtray__dot--off')).not.toBeNull()
     expect(btn.getAttribute('title')).toMatch(/not running/i)
   })

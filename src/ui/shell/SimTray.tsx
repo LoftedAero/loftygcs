@@ -48,14 +48,14 @@ export default function SimTray() {
   const state = phase === 'error' ? 'bad' : running ? 'ok' : busy ? 'busy' : 'off'
   const summary =
     phase === 'error'
-      ? 'Simulator failed'
+      ? 'SITL failed'
       : running
-        ? `${status?.running ?? 'Simulator'} running on port ${status?.port ?? 5760}`
+        ? `${status?.running ?? 'SITL'} running on port ${status?.port ?? 5760}`
         : phase === 'installing'
-          ? 'Downloading the simulator…'
+          ? 'Downloading SITL…'
           : phase === 'starting'
-            ? 'Starting the simulator…'
-            : 'Simulator — not running'
+            ? 'Starting SITL…'
+            : 'SITL — not running'
 
   return (
     <div className="app-simtray" ref={wrap}>
@@ -68,10 +68,10 @@ export default function SimTray() {
         onClick={() => setOpen(!open)}
       >
         <span className={`app-simtray__dot app-simtray__dot--${state}`} aria-hidden="true" />
-        Simulator
+        SITL
       </button>
       {open && (
-        <div className="app-simtray__panel" role="dialog" aria-label="Simulator">
+        <div className="app-simtray__panel" role="dialog" aria-label="SITL">
           {simulatorAvailable() ? (
             <SimulatorControls onStarted={() => setOpen(false)} />
           ) : (
@@ -94,11 +94,11 @@ export default function SimTray() {
 function BrowserNote() {
   return (
     <>
-      <h3 className="app-simtray__head">Simulator</h3>
+      <h3 className="app-simtray__head">SITL</h3>
       <p className="app-simtray__note">
-        The desktop app downloads and runs ArduPilot SITL for you — real firmware, the full
-        parameter set, real arming checks. A browser cannot start a process or open the raw TCP
-        socket SITL listens on.
+        The desktop app downloads and runs ArduPilot&rsquo;s software-in-the-loop simulator for
+        you — real firmware, the full parameter set, real arming checks. A browser cannot start a
+        process or open the raw TCP socket SITL listens on.
       </p>
       <p className="app-simtray__note">
         You can still reach a simulator someone else is running, if it is exposed through a

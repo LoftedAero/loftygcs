@@ -37,7 +37,7 @@ design decisions are recorded there and in code comments.
   deliberately precedes Sensors because SERIALn_PROTOCOL gates compass/GPS detection.
   The mode switch is never orange: Connect owns the app bar's one primary action.
   **The simulator was a fourth mode and is not one** — it is something you switch on before
-  flying or planning, not an activity in itself, so it lives in the app bar's tray
+  flying or planning, not an activity in itself, so it lives in the app bar's SITL tray
   (`ui/shell/SimTray.tsx`). Its open state is in `ui-store` because other screens send people
   to it. The dot is the part that earns the bar space: a SITL left running in the background
   is otherwise invisible, and the cost of forgetting is a mystery TCP connection or a second
@@ -145,7 +145,7 @@ binding it** — Windows lets a second bind succeed over a listening socket, so 
 "free" and you end up talking to the *previous* simulator at its own home; the runner instead
 gives up after three immediate exits and says so. `SITL=1 npm test` runs the integration suite against
 it (`src/protocol/*.integration.test.ts`, `electron/sitl-core.test.ts`). The desktop app can
-also install and run SITL itself — the app bar's Simulator tray (`electron/sitl-core.ts`).
+also install and run SITL itself — the app bar's SITL tray (`electron/sitl-core.ts`).
 
 ## Video test source
 

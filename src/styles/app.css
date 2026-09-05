@@ -465,45 +465,62 @@
    In the bar rather than as a mode: a simulator is something you switch on
    before flying or planning, not a third thing to do. The dot is the part
    that earns the space -- one running in the background is easy to forget,
-   and it is visible from every screen. */
+   and it is visible from every screen.
+
+   It gets the mode switch's own well and segment shape, but as a separate
+   pill with a gap between them: matching the weight says "a control of the
+   same rank", and staying out of their group says "not a mode". Loose text
+   on the bar said neither. */
 .app-simtray {
   position: relative;
+  display: flex;
+  margin-left: var(--la-space-2);
+  padding: 2px;
+  background: var(--app-onbar-well);
+  border-radius: var(--la-radius-sm);
   flex: none;
 }
 .app-simtray__btn {
   appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: var(--la-space-1);
-  height: 30px;
-  padding: 0 var(--la-space-2);
-  border: 1px solid transparent;
-  border-radius: var(--la-radius-sm);
-  background: transparent;
+  gap: var(--la-space-2);
+  border: none;
+  background: none;
+  font: 600 var(--la-size-sm) / 1 var(--la-font);
   color: var(--app-onbar-text);
-  font: inherit;
-  font-size: var(--la-size-sm);
-  cursor: pointer;
+  padding: var(--la-space-2) var(--la-space-4);
+  border-radius: var(--la-radius-sm);
+  cursor: default;
   transition: background var(--la-ease), color var(--la-ease);
 }
-.app-simtray__btn:hover,
-.app-simtray__btn.is-open {
+.app-simtray__btn:hover {
   background: var(--app-onbar-hover);
-  color: #fff;
+  color: var(--app-on-dark);
 }
 .app-simtray__btn:focus-visible {
-  outline: none;
   box-shadow: var(--la-ring);
 }
+/* Open inverts the same way an active mode segment does -- the panel below
+   is what "you are here" means for a control that opens something. */
+.app-simtray__btn.is-open,
+.app-simtray__btn.is-open:hover {
+  background: var(--la-surface);
+  color: var(--la-ink);
+}
+
 .app-simtray__dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   flex: none;
-  background: var(--app-onbar-text);
+  /* currentColor, not a fixed value: the button inverts when open, and a
+     white-on-charcoal dot disappears against the inverted surface. */
+  background: currentColor;
   opacity: 0.45;
 }
-/* Status only, never an action -- the house color rule. */
+/* Status only, never an action -- the house color rule. Each of these is
+   legible on both grounds the button takes. */
 .app-simtray__dot--ok {
   background: var(--la-ok);
   opacity: 1;
