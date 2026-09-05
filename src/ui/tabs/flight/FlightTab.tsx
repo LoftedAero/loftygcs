@@ -13,6 +13,7 @@ import HudContextMenu, { type HudMenuPoint } from './HudContextMenu'
 import PlotPanel from './PlotPanel'
 import FieldPicker from './FieldPicker'
 import StatusList from './StatusList'
+import PreflightPanel from './PreflightPanel'
 import VideoSourceModal from './VideoSourceModal'
 
 // The flight screen, arranged as Mission Planner arranges it: one panel
@@ -168,8 +169,8 @@ function LogPane({
   plotted,
   onTogglePlot,
 }: {
-  pane: 'messages' | 'status'
-  onPane: (p: 'messages' | 'status') => void
+  pane: 'messages' | 'status' | 'preflight'
+  onPane: (p: 'messages' | 'status' | 'preflight') => void
   plotted: readonly string[]
   onTogglePlot: (name: string) => void
 }) {
@@ -194,12 +195,19 @@ function LogPane({
         >
           Status
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pane === 'preflight'}
+          className={`log-pane__tab${pane === 'preflight' ? ' is-active' : ''}`}
+          onClick={() => onPane('preflight')}
+        >
+          Preflight
+        </button>
       </div>
-      {pane === 'messages' ? (
-        <FlightMessages />
-      ) : (
-        <StatusList plotted={plotted} onTogglePlot={onTogglePlot} />
-      )}
+      {pane === 'messages' && <FlightMessages />}
+      {pane === 'status' && <StatusList plotted={plotted} onTogglePlot={onTogglePlot} />}
+      {pane === 'preflight' && <PreflightPanel />}
     </div>
   )
 }

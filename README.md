@@ -120,7 +120,7 @@ before more readouts multiply; the inspector helps debug everything after it).
 | ~~2~~ | ~~MAVLink inspector~~ | done — Setup ▸ Inspector; counts always, snapshots only while watched |
 | ~~3~~ | ~~Display unit preferences (ft/m, kts/m/s)~~ | done — and the Preferences dialog language will live in |
 | ~~4~~ | ~~Mission progress on the Fly screen~~ | done — plus the plan drawn on the flying map |
-| 5 | Pre-arm / pre-flight panel | Distills SYS_STATUS + PreArm into "why won't it arm" |
+| ~~5~~ | ~~Pre-arm / pre-flight panel~~ | done — Fly ▸ Preflight, reasons in ArduPilot's own words |
 | 6 | Offline maps / tile prefetch | Map infrastructure; the cache also serves #7 |
 | 7 | Terrain elevation in planning | Rides the tile cache for elevation data |
 | 8 | KML / GPX import & export | Planning I/O; imported plans get terrain-checked by #7 |

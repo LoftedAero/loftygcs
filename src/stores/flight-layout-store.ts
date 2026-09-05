@@ -40,7 +40,7 @@ export interface FlightLayoutState {
   /** Which plotted series the Y axis numbers belong to. */
   plotAxisField: string | null
   /** Whether the lower pane shows messages or the telemetry field list. */
-  logPane: 'messages' | 'status'
+  logPane: 'messages' | 'status' | 'preflight'
   /** The artificial horizon. Off leaves the background layer showing. */
   hudHorizon: boolean
   /** Overlay elements drawn on the HUD, so they can be turned off for video. */
@@ -48,9 +48,11 @@ export interface FlightLayoutState {
 
   setRatio: (r: number) => void
   swap: () => void
-  toggle: (key: 'showMap' | 'showHud' | 'showMessages' | 'showPlot' | 'hudHorizon' | 'hudOverlays') => void
+  toggle: (
+    key: 'showMap' | 'showHud' | 'showMessages' | 'showPlot' | 'hudHorizon' | 'hudOverlays',
+  ) => void
   togglePlotField: (name: string) => void
-  setLogPane: (pane: 'messages' | 'status') => void
+  setLogPane: (pane: 'messages' | 'status' | 'preflight') => void
   setPlotAxisField: (name: string) => void
   setVideoUrl: (url: string) => void
   reset: () => void
@@ -65,7 +67,7 @@ interface Persisted {
   showMessages: boolean
   showPlot: boolean
   plotFields: string[]
-  logPane: 'messages' | 'status'
+  logPane: 'messages' | 'status' | 'preflight'
   plotAxisField: string | null
   videoUrl: string
   hudHorizon: boolean
@@ -160,9 +162,7 @@ export const useFlightLayoutStore = create<FlightLayoutState>((set, get) => {
     },
     togglePlotField: (name) => {
       const current = get().plotFields
-      const next = current.includes(name)
-        ? current.filter((f) => f !== name)
-        : [...current, name]
+      const next = current.includes(name) ? current.filter((f) => f !== name) : [...current, name]
       // Adding the first field is always meant to show the plot; nobody picks
       // a field in order to look at a panel that is switched off.
       set({ plotFields: next, showPlot: next.length > 0 ? true : get().showPlot })
