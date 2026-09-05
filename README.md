@@ -116,7 +116,7 @@ before more readouts multiply; the inspector helps debug everything after it).
 
 | # | Feature | Why this position |
 | --- | --- | --- |
-| 1 | Log analysis link-outs (MAGFit / FilterReview / PIDReview) | Smallest item; closes an old roadmap promise |
+| ~~1~~ | ~~Log analysis link-outs (MAGFit / FilterReview / PIDReview)~~ | done — plus Hardware Report, gated by what each log contains |
 | 2 | MAVLink inspector | Early because it aids debugging every feature after it |
 | 3 | Display unit preferences (ft/m, kts/m/s) | Before new readout surfaces multiply |
 | 4 | Mission progress on the Fly screen (current item, distance, ETA) | Felt every flight; small |

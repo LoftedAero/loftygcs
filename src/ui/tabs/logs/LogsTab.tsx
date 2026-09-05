@@ -3,6 +3,8 @@ import { LaButton, LaHint, LaSwitch } from '../../components/La'
 import { useLogStore } from '../../../stores/log-store'
 import { openLogFile } from '../../../services/log-file'
 import { saveLogParams, saveOpenLog } from '../../../services/log-download'
+import { webToolsFor } from '../../../protocol/log-tools'
+import { openExternal } from '../../../env'
 import VehicleLogs from './VehicleLogs'
 import ExpressionInput from './ExpressionInput'
 import PlotPresets from './PlotPresets'
@@ -146,6 +148,30 @@ export default function LogsTab() {
 
           {log && (
             <>
+              {/* Link-outs to ArduPilot WebTools. There is no upload API to
+                  hand the log across -- each opens in the browser and the
+                  user drops the .bin in -- so the useful work here is saying
+                  in advance whether this log has what each tool reads. */}
+              <section className="app-col__group">
+                <h3 className="app-col__head">Analyze (WebTools)</h3>
+                {webToolsFor(log).map((t) => (
+                  <LaButton
+                    key={t.id}
+                    variant="secondary"
+                    size="block"
+                    disabled={t.missing !== null}
+                    title={t.missing ?? t.purpose}
+                    onClick={() => openExternal(t.url)}
+                  >
+                    {t.name}
+                  </LaButton>
+                ))}
+                <LaHint>
+                  Opens in the browser — drop this log&rsquo;s .bin file into the page. If the log
+                  came off the vehicle, Save to file first.
+                </LaHint>
+              </section>
+
               <section className="app-col__group">
                 <h3 className="app-col__head">View</h3>
                 <div className="log-viewswitch" role="radiogroup" aria-label="Upper pane">

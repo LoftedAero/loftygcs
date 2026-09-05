@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { openExternal } from '../../env'
 import { BRAND } from '../../brand'
 import { LaButton, LaModal } from '../components/La'
 
@@ -72,8 +73,7 @@ export default function PreviewNotice() {
                 const url = `mailto:${BRAND.feedbackEmail}?subject=${encodeURIComponent(
                   subject,
                 )}&body=${encodeURIComponent(body)}`
-                if (window.loftgcs) window.loftgcs.app.openExternal(url)
-                else window.open(url)
+                openExternal(url)
               }}
             >
               Send feedback
@@ -92,21 +92,20 @@ export default function PreviewNotice() {
 
       <ul className="preview-notice__list">
         <li>
-          <strong>Do not fly an aircraft you care about on this.</strong> Arming, mode changes
-          and mission upload have been tested against ArduPilot SITL, not against hardware in
-          the air.
+          <strong>Do not fly an aircraft you care about on this.</strong> Arming, mode changes and
+          mission upload have been tested against ArduPilot SITL, not against hardware in the air.
         </li>
         <li>
-          <strong>Firmware flashing has never been run on a real board.</strong> Use a board you
-          are willing to recover with a bootloader, or leave that tab alone.
+          <strong>Firmware flashing has never been run on a real board.</strong> Use a board you are
+          willing to recover with a bootloader, or leave that tab alone.
         </li>
         <li>
-          Parameters are written to the vehicle for real, and take effect immediately. Keep a
-          saved copy of any configuration you rely on.
+          Parameters are written to the vehicle for real, and take effect immediately. Keep a saved
+          copy of any configuration you rely on.
         </li>
         <li>
-          Missions, calibrations and the flight screen are the parts most worth your feedback —
-          they are complete enough to judge.
+          Missions, calibrations and the flight screen are the parts most worth your feedback — they
+          are complete enough to judge.
         </li>
       </ul>
 
@@ -116,11 +115,9 @@ export default function PreviewNotice() {
           cannot arrive. */}
       {BRAND.feedbackEmail && (
         <p className="preview-notice__contact">
-          Send anything you find to{' '}
-          <span className="la-selectable">{BRAND.feedbackEmail}</span>.
+          Send anything you find to <span className="la-selectable">{BRAND.feedbackEmail}</span>.
         </p>
       )}
-
     </LaModal>
   )
 }
