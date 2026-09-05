@@ -122,7 +122,7 @@ before more readouts multiply; the inspector helps debug everything after it).
 | ~~4~~ | ~~Mission progress on the Fly screen~~ | done — plus the plan drawn on the flying map |
 | ~~5~~ | ~~Pre-arm / pre-flight panel~~ | done — Fly ▸ Preflight, reasons in ArduPilot's own words |
 | ~~6~~ | ~~Offline maps / tile prefetch~~ | done — Mission ▸ Offline maps; panning online also fills the cache |
-| 7 | Terrain elevation in planning | Rides the tile cache for elevation data |
+| ~~7~~ | ~~Terrain elevation in planning~~ | done — ground under the altitude profile, and the clearance it leaves |
 | 8 | KML / GPX import & export | Planning I/O; imported plans get terrain-checked by #7 |
 | 9 | MAVFTP file browser | Rides the existing FTP stack; unlocks Lua/fonts/terrain files |
 | 10 | Version-matched parameter metadata | Standalone service upgrade |

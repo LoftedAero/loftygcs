@@ -171,6 +171,21 @@ design decisions are recorded there and in code comments.
   that will not open (private browsing, storage denied) has to degrade to plain network
   fetching rather than break a map someone is flying with. Concurrency stays at six because
   these are public tile servers used keyless, and courtesy is the condition of that.
+- **Terrain is a raster, and the datum is the part to get right.** Ground elevation comes from
+  Terrarium tiles (`services/terrain.ts`) — an ordinary PNG whose RGB encodes one height, from
+  AWS's keyless `elevation-tiles-prod`, which is the same SRTM/NED data ArduPilot's own terrain
+  server is built from. Zoom 12 is deliberate: that is SRTM's own ~38 m resolution, and more
+  zoom resamples the same measurements while downloading sixteen times as much. One tile covers
+  about ten kilometers, so a field is one or two and the offline download brings terrain along
+  for nothing. Three traps, all in `services/mission-terrain.ts` with tests: MAVLink's three
+  altitude frames have to be converted to one datum before anything is drawn or compared — a
+  terrain-frame 50 and a relative 50 are different heights, and drawing them at the same place
+  hides exactly the mistake a profile exists to catch; clearance must be sampled *between*
+  waypoints, since two waypoints at 100 m with a 140 m hill between them are each individually
+  fine; and Terrarium carries bathymetry, so an offshore leg reads the sea floor four kilometers
+  down unless it is pulled up to zero (`groundLevel`), which also overstates the ground in Death
+  Valley — the safe direction. Sampling is bilinear because nearest-pixel puts a 38 m staircase
+  in the profile and reads as cliffs on a slope.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

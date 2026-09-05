@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import MissionMap from './MissionMap'
 import MissionTable from './MissionTable'
 import MissionSettings from './MissionSettings'
+import TerrainPanel from './TerrainPanel'
 import OfflineMapsPanel from './OfflineMapsPanel'
 import type { LatLonBounds } from '../../../services/tile-math'
 import SurveyPanel from './SurveyPanel'
@@ -115,6 +116,9 @@ export default function MissionTab() {
                   reach. */}
               <SurveyPanel />
               <MissionSettings />
+              {/* Below the settings because it reports on the plan rather
+                  than changing it. */}
+              <TerrainPanel />
             </>
           )}
           {editing === 'fence' && <FencePanel />}

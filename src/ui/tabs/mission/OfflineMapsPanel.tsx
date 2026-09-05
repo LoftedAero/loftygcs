@@ -14,6 +14,7 @@ import {
   type LatLonBounds,
 } from '../../../services/tile-math'
 import { layerById, loadBaseLayer } from '../flight/map-layers'
+import { TERRAIN_LAYER_ID, TERRAIN_URL, terrainTilesForArea } from '../../../services/terrain'
 
 // Downloading the map before leaving for the field.
 //
@@ -26,6 +27,11 @@ import { layerById, loadBaseLayer } from '../flight/map-layers'
 // tile counts quadruple per zoom level, and someone who asks for six levels
 // over a whole valley on a phone hotspot should find that out before the
 // download starts, not during.
+//
+// Elevation comes along with the imagery. It is a handful of tiles for a
+// field -- one terrain tile is ten kilometers across -- and an area
+// downloaded for a trip whose terrain profile then reads "no data" would be
+// a download that did not do what it said.
 
 /** How far past the current view to fetch, so a small pan stays covered. */
 const ZOOM_CHOICES = [
@@ -60,10 +66,23 @@ export default function OfflineMapsPanel({ bounds, zoom }: OfflineMapsPanelProps
   const start = async () => {
     if (!bounds) return
     const tiles = tilesForBounds(bounds, minZoom, maxZoom)
+    const terrain = terrainTilesForArea(bounds)
+    const total = tiles.length + terrain.length
     const controller = new AbortController()
     abortRef.current = controller
-    setProgress({ done: 0, total: tiles.length, cached: 0, failed: 0 })
-    await prefetchTiles(layer.id, layer.url, tiles, setProgress, controller.signal)
+    setProgress({ done: 0, total, cached: 0, failed: 0 })
+    const shift = (offset: number) => (p: PrefetchProgress) =>
+      setProgress({ ...p, total, done: offset + p.done })
+    await prefetchTiles(layer.id, layer.url, tiles, shift(0), controller.signal)
+    if (!controller.signal.aborted) {
+      await prefetchTiles(
+        TERRAIN_LAYER_ID,
+        TERRAIN_URL,
+        terrain,
+        shift(tiles.length),
+        controller.signal,
+      )
+    }
     abortRef.current = null
     setProgress(null)
     refresh()
@@ -124,7 +143,8 @@ export default function OfflineMapsPanel({ bounds, zoom }: OfflineMapsPanelProps
           </LaButton>
           {/* The warning that earns this panel its space. */}
           <LaHint>
-            About {formatBytes(count * BYTES_PER_TILE)}. Tiles already stored are skipped.
+            About {formatBytes(count * BYTES_PER_TILE)}, plus elevation for the area. Tiles already
+            stored are skipped.
           </LaHint>
         </>
       )}
