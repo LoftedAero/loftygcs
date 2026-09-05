@@ -172,9 +172,6 @@ All three are remembered, so a rig only has to be set up once.
 
 ## What is missing, so you don't report it
 
-- **The 3D log replay's bank angle has not been confirmed against a real turn.** Its heading
-  has: on a long straight leg the model sits tangent to its own track. Whether it leans the
-  right way in a turn is still worth an eye.
 - **The app does not update itself.** You will be sent a new build.
 - Firmware flashing is written but has never run against a real board.
 

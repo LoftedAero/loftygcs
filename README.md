@@ -105,7 +105,7 @@ These layering rules are enforced by ESLint (`import/no-restricted-paths`).
 | 4 | Firmware flashing: ArduPilot serial bootloader (.apj) + DFU recovery (WebUSB, with-bootloader .hex), official manifest browser | built — hardware gate pending |
 | 5 | Flight screen: live map, HUD, arm/mode/takeoff, guided click-to-go | done (SITL flies) |
 | 6 | Mission planning: waypoints, survey grids, geofences and rally points | done (SITL-validated) |
-| 7 | Log review: MAVFTP download, dataflash parser, plots with expressions, record table, 3D replay | built — flown-log gate pending |
+| 7 | Log review: MAVFTP download, dataflash parser, plots with expressions, record table, 3D replay | done (112 flown logs, 9 firmware versions) |
 | later | Joystick, signing UI, multi-vehicle, version-matched param metadata | — |
 
 Remaining hardware checks before calling v1 phases fully closed are in
