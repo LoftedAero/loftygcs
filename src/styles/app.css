@@ -580,6 +580,92 @@
   color: var(--la-ink-3);
 }
 
+/* ── Vehicle files ──
+   The inspector's two-column shape, for the same reason: a list to scan
+   beside the actions that act on what you picked. Names are monospace so a
+   column of 00000042.BIN lines up and a stray space in a filename shows. */
+.files {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--app-col-w);
+  gap: var(--la-space-4);
+  min-height: 0;
+  flex: 1;
+}
+.files__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-height: 0;
+}
+.files__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+  flex: none;
+}
+.files__path {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-sm);
+  color: var(--la-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.files__scroll {
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+}
+.files__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-sm);
+}
+.files__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--la-surface-2);
+  text-align: left;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  padding: var(--la-space-2) var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+}
+.files__table td {
+  padding: var(--la-space-1) var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink);
+  cursor: pointer;
+}
+.files__table th.num,
+.files__table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.files__table tbody tr:hover td {
+  background: var(--la-surface-2);
+}
+.files__table tbody tr.is-selected td {
+  background: var(--la-blue-soft);
+}
+/* A three-letter tag rather than an icon: it survives every theme, needs no
+   asset, and reads at the size this table uses. */
+.files__kind {
+  display: inline-block;
+  min-width: 34px;
+  margin-right: var(--la-space-3);
+  color: var(--la-ink-3);
+}
+
 /* ── MAVLink inspector ──
    A table to scan beside one detail pane -- the same two-column shape the
    Logs and OSD screens use, sized the way .log-screen is: flex:1 inside the

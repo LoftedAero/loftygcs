@@ -13,6 +13,7 @@ import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { useCalStore } from '../stores/cal-store'
 import { useMissionStore } from '../stores/mission-store'
+import { useFilesStore } from '../stores/files-store'
 import { useLogStore } from '../stores/log-store'
 import { telemetryRings } from './telemetry-ring'
 import { fieldRegistry } from './telemetry-fields'
@@ -127,8 +128,17 @@ class ConnectionService {
         for (const d of evt.batch) this.applyDelta(d)
         return
       case 'fileProgress': {
-        // Only meaningful while the Logs screen asked for a file; anything
-        // else fetching over FTP (the parameter blob) has its own progress.
+        // Whichever screen asked for a file: the Files browser and the Logs
+        // screen both transfer over the same FTP client, and anything else
+        // using it (the parameter blob) has its own progress.
+        const files = useFilesStore.getState()
+        if (files.transfer) {
+          files.setTransfer({
+            ...files.transfer,
+            got: evt.got,
+            total: files.transfer.total || evt.total,
+          })
+        }
         const log = useLogStore.getState()
         if (log.vehicleStatus.kind === 'downloading') {
           log.setVehicleStatus({
@@ -311,6 +321,37 @@ class ConnectionService {
     const worker = this.worker
     if (!worker) return Promise.reject(new Error('not connected'))
     return worker.downloadFile(path)
+  }
+
+  /** Write a file to the vehicle. Progress arrives as fileProgress events. */
+  uploadFile(path: string, bytes: Uint8Array) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.uploadFile(path, bytes)
+  }
+
+  removeFile(path: string) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.removeFile(path)
+  }
+
+  createDirectory(path: string) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.createDirectory(path)
+  }
+
+  removeDirectory(path: string) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.removeDirectory(path)
+  }
+
+  renameFile(from: string, to: string) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.renameFile(from, to)
   }
 
   /** Read the vehicle's stored mission (or fence, or rally). */

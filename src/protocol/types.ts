@@ -182,6 +182,11 @@ export type EngineRequest =
   | { op: 'clearMission'; missionType: number }
   | { op: 'listFiles'; path: string }
   | { op: 'downloadFile'; path: string }
+  | { op: 'uploadFile'; path: string; bytes: Uint8Array }
+  | { op: 'removeFile'; path: string }
+  | { op: 'createDirectory'; path: string }
+  | { op: 'removeDirectory'; path: string }
+  | { op: 'renameFile'; from: string; to: string }
 
 /** Messages into the protocol worker. */
 export type EngineCommand =

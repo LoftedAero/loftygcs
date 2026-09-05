@@ -202,6 +202,19 @@ design decisions are recorded there and in code comments.
   importing it at all. A file's elevation is always AMSL, so it is only used directly in the
   AMSL frame; converting it to a relative one needs a surveyed home, and without one the
   editor's default altitude is used rather than a guess.
+- **Writing over MAVFTP is nothing like reading it.** There is no burst *write*, and ArduPilot
+  serves one FTP request at a time, so a file goes up at 239 bytes a round trip — about 8 kB/s
+  against the 700 kB/s a burst read manages, which is why the Files screen shows the size
+  before an upload and a progress bar during it, and why anything over a couple of megabytes is
+  refused rather than attempted. Two things learned from SITL rather than guessed: every
+  `WriteFile` must carry the session `CreateFile` handed back (zero is a different session and
+  the writes go nowhere), and **the FTP root is not an ordinary directory** — it is a merged
+  view of the real filesystem and the virtual mounts (`@ROMFS`, `@SYS`, `@PARAM`), and a file
+  created there never comes back in the listing. So `services/vehicle-files.ts` opens at `/APM`
+  (hardware) or the SITL working directory, and the screen refuses to upload while the root is
+  showing rather than offering a transfer that silently does nothing. The write path has no
+  fallback to hide a mistake, so it is covered by a SITL integration test that creates a
+  directory, writes 1,500 bytes, reads them back byte for byte, renames and deletes.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

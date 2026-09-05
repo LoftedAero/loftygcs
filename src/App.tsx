@@ -23,6 +23,7 @@ import TuningTab from './ui/tabs/tuning/TuningTab'
 import OsdTab from './ui/tabs/osd/OsdTab'
 import ParamsTab from './ui/tabs/params/ParamsTab'
 import LogsTab from './ui/tabs/logs/LogsTab'
+import FilesTab from './ui/tabs/files/FilesTab'
 import InspectorTab from './ui/tabs/inspector/InspectorTab'
 import FlightTab from './ui/tabs/flight/FlightTab'
 import MissionTab from './ui/tabs/mission/MissionTab'
@@ -58,6 +59,8 @@ function SetupContent() {
       return <ParamsTab />
     case 'logs':
       return <LogsTab />
+    case 'files':
+      return <FilesTab />
     case 'inspector':
       return <InspectorTab />
   }

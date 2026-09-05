@@ -92,6 +92,26 @@ export class WorkerClient {
     return this.request({ op: 'downloadFile', path }) as Promise<Uint8Array>
   }
 
+  uploadFile(path: string, bytes: Uint8Array): Promise<void> {
+    return this.request({ op: 'uploadFile', path, bytes }) as Promise<void>
+  }
+
+  removeFile(path: string): Promise<void> {
+    return this.request({ op: 'removeFile', path }) as Promise<void>
+  }
+
+  createDirectory(path: string): Promise<void> {
+    return this.request({ op: 'createDirectory', path }) as Promise<void>
+  }
+
+  removeDirectory(path: string): Promise<void> {
+    return this.request({ op: 'removeDirectory', path }) as Promise<void>
+  }
+
+  renameFile(from: string, to: string): Promise<void> {
+    return this.request({ op: 'renameFile', from, to }) as Promise<void>
+  }
+
   clearMission(missionType = 0): Promise<void> {
     return this.request({ op: 'clearMission', missionType }) as Promise<void>
   }

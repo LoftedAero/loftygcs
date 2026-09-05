@@ -355,6 +355,79 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
   )
 
   it(
+    'writes, reads back and deletes a file over MAVFTP',
+    async () => {
+      // The write path has no burst mode and no fallback, so nothing about
+      // it is exercised by the download test: CreateFile hands back a
+      // session that every WriteFile has to use, the offsets are absolute,
+      // and a real autopilot is the only thing that will complain if any of
+      // that is wrong. A scripted fake agrees with whatever we wrote.
+      const events: ProtocolEvent[] = []
+      let socket: net.Socket | null = null
+      const engine = new ProtocolEngine((out) => {
+        if (out.t === 'tx') socket?.write(out.bytes)
+        else if (out.t === 'evt') events.push(out.evt)
+      })
+      socket = await connectVehicle(engine, events, (s) => (socket = s))
+
+      // Bigger than one 239-byte chunk, and not a repeating pattern: a
+      // chunking bug that reordered or dropped a block would still produce
+      // the right length.
+      // Bigger than one 239-byte chunk, and not a repeating pattern: a
+      // chunking bug that reordered or dropped a block would still produce
+      // the right length.
+      const content = new Uint8Array(1500).map((_, i) => (i * 37 + (i >> 3)) & 0xff)
+      // In a directory this test makes, not at the root. ArduPilot's FTP
+      // root is a merged view of the mounts (@ROMFS, @SYS) beside the real
+      // filesystem, and a file created there does not come back in the
+      // listing -- found here rather than assumed. Real hardware has the
+      // same shape with the card at /APM.
+      const dir = '/loftgcs-ftp-test'
+      const path = `${dir}/written.bin`
+
+      try {
+        await engine.createDirectory(dir)
+        await engine.uploadFile(path, content)
+
+        // It is really there, with the size we wrote.
+        const listing = await engine.listFiles(dir)
+        const entry = listing.find((e) => e.name === 'written.bin')
+        expect(entry).toBeDefined()
+        expect(entry!.size).toBe(content.length)
+
+        // And it is really what we wrote, byte for byte.
+        const back = await engine.downloadFile(path)
+        expect(back).toEqual(content)
+
+        // Progress was reported on the way up, or a slow write looks hung.
+        const sent = events.filter((e) => e.t === 'fileProgress' && e.path === path)
+        expect(sent.length).toBeGreaterThan(0)
+
+        // Rename, which packs two paths into one payload -- the only
+        // opcode that does.
+        await engine.renameFile(path, `${dir}/moved.bin`)
+        const renamed = await engine.listFiles(dir)
+        expect(renamed.map((e) => e.name)).toContain('moved.bin')
+        expect(renamed.map((e) => e.name)).not.toContain('written.bin')
+
+        await engine.removeFile(`${dir}/moved.bin`)
+        await engine.removeDirectory(dir)
+        // A directory that is gone cannot be listed; that is the proof.
+        await expect(engine.listFiles(dir)).rejects.toThrow()
+      } finally {
+        // Never leave anything behind: SITL's working directory is the
+        // checkout, and the next run should start clean whatever failed.
+        await engine.removeFile(path).catch(() => {})
+        await engine.removeFile(`${dir}/moved.bin`).catch(() => {})
+        await engine.removeDirectory(dir).catch(() => {})
+        engine.stop()
+        socket?.destroy()
+      }
+    },
+    120000,
+  )
+
+  it(
     'round trips a geofence and rally points through real ArduPilot',
     async () => {
       const events: ProtocolEvent[] = []

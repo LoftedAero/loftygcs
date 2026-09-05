@@ -42,6 +42,21 @@ async function handleRequest(cmd: Extract<EngineCommand, { t: 'req' }>) {
       case 'downloadFile':
         data = await engine.downloadFile(cmd.path)
         break
+      case 'uploadFile':
+        await engine.uploadFile(cmd.path, cmd.bytes)
+        break
+      case 'removeFile':
+        await engine.removeFile(cmd.path)
+        break
+      case 'createDirectory':
+        await engine.createDirectory(cmd.path)
+        break
+      case 'removeDirectory':
+        await engine.removeDirectory(cmd.path)
+        break
+      case 'renameFile':
+        await engine.renameFile(cmd.from, cmd.to)
+        break
     }
     self.postMessage({ t: 'res', id: cmd.id, ok: true, data })
   } catch (err) {

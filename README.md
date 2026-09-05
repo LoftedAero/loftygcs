@@ -124,7 +124,7 @@ before more readouts multiply; the inspector helps debug everything after it).
 | ~~6~~ | ~~Offline maps / tile prefetch~~ | done — Mission ▸ Offline maps; panning online also fills the cache |
 | ~~7~~ | ~~Terrain elevation in planning~~ | done — ground under the altitude profile, and the clearance it leaves |
 | ~~8~~ | ~~KML / GPX import & export~~ | done — what a shape becomes depends on which plan is on screen |
-| 9 | MAVFTP file browser | Rides the existing FTP stack; unlocks Lua/fonts/terrain files |
+| ~~9~~ | ~~MAVFTP file browser~~ | done — Setup ▸ Files; upload, download, rename, delete |
 | 10 | Version-matched parameter metadata | Standalone service upgrade |
 | 11 | Camera & gimbal control | MAVLink camera/gimbal protocols; SITL can simulate a mount |
 | 12 | Physical joystick support | Last of the queue; needs careful SITL-first safety work |

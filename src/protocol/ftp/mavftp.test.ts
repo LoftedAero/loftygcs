@@ -272,3 +272,124 @@ describe('burst reads', () => {
     expect(saw).toContain(FtpOp.ReadFile)
   })
 })
+
+/**
+ * A device that accepts writes, keeping what it is sent so the test can
+ * compare it with what was meant. It also records the raw requests, which
+ * is how the offsets and the rename payload get checked -- those are the
+ * parts a receiving autopilot would notice and a mock would not.
+ */
+function writableDevice({ failAt = -1 } = {}) {
+  const written = new Map<number, Uint8Array>()
+  const seen: { opcode: number; offset: number; data: Uint8Array; session: number }[] = []
+  let terminated = false
+  const client: MavFtpClient = new MavFtpClient((payload) => {
+    const req = decodeFtpPacket(payload)
+    seen.push({ opcode: req.opcode, offset: req.offset, data: req.data, session: req.session })
+    const reply = (opcode: number, data?: Uint8Array, session = req.session) =>
+      queueMicrotask(() =>
+        client.handlePayload(
+          encodeFtpPacket({
+            seq: (req.seq + 1) & 0xffff,
+            session,
+            opcode,
+            offset: req.offset,
+            ...(data ? { data } : {}),
+          }),
+        ),
+      )
+    switch (req.opcode) {
+      case FtpOp.ResetSessions:
+        return reply(FtpOp.Ack)
+      case FtpOp.CreateFile:
+        return reply(FtpOp.Ack, undefined, 3)
+      case FtpOp.WriteFile:
+        if (req.offset === failAt) {
+          return reply(FtpOp.Nak, new Uint8Array([FtpError.FailErrno]))
+        }
+        written.set(req.offset, req.data.slice())
+        return reply(FtpOp.Ack)
+      case FtpOp.TerminateSession:
+        terminated = true
+        return reply(FtpOp.Ack)
+      case FtpOp.RemoveFile:
+      case FtpOp.CreateDirectory:
+      case FtpOp.RemoveDirectory:
+      case FtpOp.Rename:
+        return reply(FtpOp.Ack)
+    }
+  }, 50)
+  const assembled = () => {
+    const offsets = [...written.keys()].sort((a, b) => a - b)
+    const total = offsets.reduce((n, o) => n + written.get(o)!.length, 0)
+    const out = new Uint8Array(total)
+    for (const o of offsets) out.set(written.get(o)!, o)
+    return out
+  }
+  return { client, seen, assembled, wasTerminated: () => terminated }
+}
+
+describe('writing a file to the vehicle', () => {
+  it('arrives byte for byte', async () => {
+    // Bigger than one chunk on purpose: 239 is the payload limit, and an
+    // off-by-one in the chunking corrupts a Lua script silently.
+    const file = new Uint8Array(1000).map((_, i) => (i * 31) & 0xff)
+    const dev = writableDevice()
+    await dev.client.writeFile('/APM/scripts/test.lua', file)
+    expect(dev.assembled()).toEqual(file)
+  })
+
+  it('writes at absolute offsets, in order', async () => {
+    const dev = writableDevice()
+    await dev.client.writeFile('/x', new Uint8Array(600))
+    const writes = dev.seen.filter((r) => r.opcode === FtpOp.WriteFile)
+    expect(writes.map((w) => w.offset)).toEqual([0, 239, 478])
+    expect(writes.map((w) => w.data.length)).toEqual([239, 239, 122])
+    // Every write goes to the session CreateFile handed back, not zero.
+    expect(writes.every((w) => w.session === 3)).toBe(true)
+  })
+
+  it('reports progress ending at the file size', async () => {
+    const dev = writableDevice()
+    const progress: number[] = []
+    await dev.client.writeFile('/x', new Uint8Array(500), (sent) => progress.push(sent))
+    expect(progress.at(-1)).toBe(500)
+    expect([...progress].sort((a, b) => a - b)).toEqual(progress)
+  })
+
+  it('creates an empty file rather than sending nothing', async () => {
+    const dev = writableDevice()
+    await dev.client.writeFile('/empty.txt', new Uint8Array(0))
+    expect(dev.seen.some((r) => r.opcode === FtpOp.CreateFile)).toBe(true)
+    expect(dev.seen.some((r) => r.opcode === FtpOp.WriteFile)).toBe(false)
+  })
+
+  it('closes the session even when a write fails', async () => {
+    // A session left open is one of the four the vehicle has; leaking them
+    // makes the next transfer fail for a reason nobody can see.
+    const dev = writableDevice({ failAt: 239 })
+    await expect(dev.client.writeFile('/x', new Uint8Array(600))).rejects.toThrow()
+    expect(dev.wasTerminated()).toBe(true)
+  })
+})
+
+describe('the other filesystem operations', () => {
+  const text = (d: Uint8Array) => new TextDecoder().decode(d)
+
+  it('sends a rename as two paths in one payload', async () => {
+    const dev = writableDevice()
+    await dev.client.rename('/APM/a.lua', '/APM/b.lua')
+    const req = dev.seen.find((r) => r.opcode === FtpOp.Rename)!
+    expect(text(req.data)).toBe('/APM/a.lua\0/APM/b.lua')
+  })
+
+  it('sends the path for a delete, and uses the directory opcode for one', async () => {
+    const dev = writableDevice()
+    await dev.client.removeFile('/APM/a.lua')
+    await dev.client.removeDirectory('/APM/old')
+    await dev.client.createDirectory('/APM/new')
+    expect(text(dev.seen.find((r) => r.opcode === FtpOp.RemoveFile)!.data)).toBe('/APM/a.lua')
+    expect(text(dev.seen.find((r) => r.opcode === FtpOp.RemoveDirectory)!.data)).toBe('/APM/old')
+    expect(text(dev.seen.find((r) => r.opcode === FtpOp.CreateDirectory)!.data)).toBe('/APM/new')
+  })
+})

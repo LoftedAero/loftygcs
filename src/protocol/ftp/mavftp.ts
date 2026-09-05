@@ -315,6 +315,69 @@ export class MavFtpClient {
     })
   }
 
+  /** Create (or truncate) a file for writing. Returns the session id. */
+  async createFile(path: string): Promise<number> {
+    const reply = await this.request(FtpOp.CreateFile, 0, 0, new TextEncoder().encode(path))
+    return reply.session
+  }
+
+  /** Write one chunk at an absolute offset. */
+  async writeChunk(session: number, offset: number, data: Uint8Array): Promise<void> {
+    await this.request(FtpOp.WriteFile, session, offset, data)
+  }
+
+  /**
+   * Write a whole file, one chunk at a time.
+   *
+   * No burst equivalent exists in the other direction, and pipelining does
+   * not work: ArduPilot serves one FTP request at a time and times the rest
+   * out -- the same thing that makes pipelined reads useless. So a script
+   * or a font goes up at 239 bytes a round trip, which is fine for the
+   * kilobytes those actually are and is why nothing larger is offered.
+   */
+  async writeFile(
+    path: string,
+    bytes: Uint8Array,
+    onProgress?: (sent: number, total: number) => void,
+  ): Promise<void> {
+    await this.resetSessions()
+    const session = await this.createFile(path)
+    try {
+      for (let at = 0; at < bytes.length; at += FTP_MAX_DATA) {
+        await this.writeChunk(session, at, bytes.subarray(at, at + FTP_MAX_DATA))
+        onProgress?.(Math.min(at + FTP_MAX_DATA, bytes.length), bytes.length)
+      }
+      // An empty file still has to be created, which CreateFile already did.
+      if (bytes.length === 0) onProgress?.(0, 0)
+    } finally {
+      await this.terminate(session)
+    }
+  }
+
+  async removeFile(path: string): Promise<void> {
+    await this.request(FtpOp.RemoveFile, 0, 0, new TextEncoder().encode(path))
+  }
+
+  async createDirectory(path: string): Promise<void> {
+    await this.request(FtpOp.CreateDirectory, 0, 0, new TextEncoder().encode(path))
+  }
+
+  async removeDirectory(path: string): Promise<void> {
+    await this.request(FtpOp.RemoveDirectory, 0, 0, new TextEncoder().encode(path))
+  }
+
+  /** Rename or move. The two paths travel in one payload, null separated. */
+  async rename(from: string, to: string): Promise<void> {
+    const encoder = new TextEncoder()
+    const a = encoder.encode(from)
+    const b = encoder.encode(to)
+    const data = new Uint8Array(a.length + 1 + b.length)
+    data.set(a, 0)
+    data[a.length] = 0
+    data.set(b, a.length + 1)
+    await this.request(FtpOp.Rename, 0, 0, data)
+  }
+
   async terminate(session: number): Promise<void> {
     try {
       await this.request(FtpOp.TerminateSession, session, 0)

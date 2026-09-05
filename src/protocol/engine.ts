@@ -379,6 +379,38 @@ export class ProtocolEngine {
     })
   }
 
+  /**
+   * Write a file to the vehicle -- a Lua script, an OSD font, a terrain
+   * tile. Slower than a download by an order of magnitude: there is no
+   * burst write, and ArduPilot serves one FTP request at a time, so this is
+   * 239 bytes a round trip and the progress bar is not decoration.
+   */
+  async uploadFile(path: string, bytes: Uint8Array): Promise<void> {
+    let lastAt = 0
+    await this.ftp.writeFile(path, bytes, (sent, total) => {
+      const now = Date.now()
+      if (sent < total && now - lastAt < PROGRESS_INTERVAL_MS) return
+      lastAt = now
+      this.emit({ t: 'evt', evt: { t: 'fileProgress', path, got: sent, total } })
+    })
+  }
+
+  removeFile(path: string): Promise<void> {
+    return this.ftp.removeFile(path)
+  }
+
+  createDirectory(path: string): Promise<void> {
+    return this.ftp.createDirectory(path)
+  }
+
+  removeDirectory(path: string): Promise<void> {
+    return this.ftp.removeDirectory(path)
+  }
+
+  renameFile(from: string, to: string): Promise<void> {
+    return this.ftp.rename(from, to)
+  }
+
   downloadMission(missionType: number): Promise<MissionItem[]> {
     return this.mission.download(missionType, (got, total) =>
       this.emit({ t: 'evt', evt: { t: 'missionProgress', got, total, dir: 'read' } }),
