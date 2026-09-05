@@ -183,7 +183,12 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
           <LaField label="Parameters" htmlFor="sim-params">
             <LaSelect
               id="sim-params"
-              value={params.kind}
+              // A .parm and an eeprom.bin are two kinds behind one option:
+              // the select has no "eeprom" entry, and a value matching no
+              // option makes the browser display the first one instead --
+              // so picking an EEPROM used to leave "Wipe to defaults" on
+              // screen while the launch correctly used the file.
+              value={params.kind === 'eeprom' ? 'file' : params.kind}
               disabled={locked}
               onChange={(e) => {
                 const kind = e.target.value

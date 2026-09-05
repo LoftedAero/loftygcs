@@ -312,14 +312,39 @@ describe('choosing what to launch', () => {
   it('tells a parameter list from a stored image when one is picked', async () => {
     pickedParams = 'C:/rf/flightaxis/eeprom.bin'
     openTray()
-    fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'file' } })
+    const select = () => screen.getByLabelText('Parameters') as HTMLSelectElement
+    fireEvent.change(select(), { target: { value: 'file' } })
     await waitFor(() => expect(useSimStore.getState().params.kind).toBe('eeprom'))
     expect(screen.getByText(/copied in whole/i)).toBeTruthy()
 
     pickedParams = 'C:/rf/f35.parm'
-    fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'file' } })
+    fireEvent.change(select(), { target: { value: 'file' } })
     await waitFor(() => expect(useSimStore.getState().params.kind).toBe('file'))
     expect(screen.getByText(/with a wipe so it takes/i)).toBeTruthy()
+  })
+
+  it('shows the file it was given, for both kinds of file', async () => {
+    // The store being right is not the same as the control being right:
+    // 'eeprom' matches no option, and a select whose value matches nothing
+    // displays its *first* option -- so this read "Wipe to defaults" while
+    // the launch correctly used the EEPROM. Assert what is on screen.
+    const select = () => screen.getByLabelText('Parameters') as HTMLSelectElement
+    for (const [file, kind] of [
+      ['C:/rf/flightaxis/eeprom.bin', 'eeprom'],
+      ['C:/rf/f35.parm', 'file'],
+    ] as const) {
+      pickedParams = file
+      useSimStore.setState({ params: { kind: 'wipe' } })
+      cleanup()
+      // The tray's open state lives in the ui store and outlives the
+      // unmount, so without this the next click closes it again.
+      useUiStore.setState({ simTrayOpen: false })
+      openTray()
+      fireEvent.change(select(), { target: { value: 'file' } })
+      await waitFor(() => expect(useSimStore.getState().params.kind).toBe(kind))
+      expect(select().value).toBe('file')
+      expect(select().selectedOptions[0]!.textContent).toBe(file.split('/').pop())
+    }
   })
 
   it('keeps stored parameters when asked, and says what that means', async () => {
