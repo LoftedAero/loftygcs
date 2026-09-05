@@ -136,6 +136,15 @@ design decisions are recorded there and in code comments.
   heartbeat arrive" is binary, needs no MAVLink parsing, and cannot pass for the wrong reason.
   `SYSID_THISMAV` looks like the obvious marker and is not — it does not reach the heartbeat
   from a defaults file, so a test built on it can only ever pass.
+- **The inspector is the one place raw traffic reaches React state, and only because it is not
+  raw** (`protocol/engine.ts` + `stores/inspector-store.ts`). The engine counts every received
+  message always — one map upsert beside a decode that already happened — but builds snapshots
+  only while `setInspecting(true)`, so the store updates at 2.5 Hz however hard the link runs.
+  Rows are keyed on (sysid, compid, msgid), not msgid alone: a gimbal's ATTITUDE and the
+  autopilot's are different conversations, and the inspector deliberately shows the GCS's own
+  echoed traffic that the vehicle logic drops, because seeing your own heartbeat come back is
+  how a UDP loop gets diagnosed. Only messages in this app's dialect can ever appear — MAVLink
+  folds each message's definition into its CRC, so an unknown msgid cannot survive framing.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

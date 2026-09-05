@@ -461,6 +461,111 @@
   background: var(--la-blue);
 }
 
+/* ── MAVLink inspector ──
+   A table to scan beside one detail pane -- the same two-column shape the
+   Logs and OSD screens use, sized the way .log-screen is: flex:1 inside the
+   scrolling content pane, min-height:0 so the table scrolls rather than the
+   window. Numbers are tabular so a changing rate does not make the column
+   breathe. */
+.inspector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--app-col-w);
+  gap: var(--la-space-4);
+  min-height: 0;
+  flex: 1;
+}
+.inspector__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-height: 0;
+}
+.inspector__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-4);
+  flex: none;
+}
+.inspector__bar .la-input {
+  max-width: 260px;
+}
+.inspector__total {
+  margin-left: auto;
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.inspector__scroll {
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+}
+.inspector__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-sm);
+}
+.inspector__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--la-surface-2);
+  text-align: left;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  padding: var(--la-space-2) var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+}
+.inspector__table td {
+  padding: var(--la-space-1) var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-ink);
+  cursor: pointer;
+}
+.inspector__table th.num,
+.inspector__table td.num,
+.inspector__fields td.num {
+  text-align: right;
+}
+.inspector__table tbody tr:hover td {
+  background: var(--la-surface-2);
+}
+.inspector__table tbody tr.is-selected td {
+  background: var(--la-blue-soft);
+}
+.inspector__detail {
+  min-height: 0;
+  overflow-y: auto;
+}
+.inspector__fields {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-xs);
+}
+.inspector__fields td {
+  padding: 2px 0;
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-ink-2);
+  vertical-align: top;
+  word-break: break-all;
+}
+.inspector__fields td:first-child {
+  color: var(--la-ink);
+  padding-right: var(--la-space-3);
+}
+
 /* ── Simulator tray ──
    In the bar rather than as a mode: a simulator is something you switch on
    before flying or planning, not a third thing to do. The dot is the part

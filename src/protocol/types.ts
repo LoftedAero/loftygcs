@@ -14,6 +14,27 @@ export interface MavFrame {
 
 export type FieldValue = number | bigint | string | number[]
 
+/**
+ * One message type from one sender, as the inspector sees it.
+ *
+ * Keyed by (sysid, compid, msgid) rather than msgid alone: a gimbal's
+ * ATTITUDE and the autopilot's ATTITUDE are different conversations, and
+ * seeing your own GCS traffic echoed back is exactly the diagnostic a UDP
+ * loop hides when senders are collapsed together.
+ */
+export interface InspectorRow {
+  sysid: number
+  compid: number
+  msgid: number
+  msgName: string
+  /** Messages received since the link opened. */
+  count: number
+  /** Arrival rate, smoothed. */
+  hz: number
+  /** The most recent message's decoded fields. */
+  fields: Record<string, FieldValue>
+}
+
 export interface DecodedMessage {
   msgid: number
   msgName: string
@@ -46,6 +67,7 @@ export type ProtocolEvent =
    */
   | { t: 'fields'; at: number; values: Record<string, number> }
   | { t: 'statustext'; severity: number; text: string }
+  | { t: 'inspector'; rows: InspectorRow[] }
   | { t: 'commandAck'; command: number; result: number }
   | { t: 'linkStats'; stats: LinkStats }
   | { t: 'paramProgress'; got: number; total: number; source: 'ftp' | 'stream' }
@@ -150,6 +172,7 @@ export type EngineCommand =
   | { t: 'start' }
   | { t: 'stop' }
   | { t: 'send'; msgName: string; fields: Record<string, FieldValue> }
+  | { t: 'inspect'; on: boolean }
   | ({ t: 'req'; id: number } & EngineRequest)
 
 /** Messages out of the protocol worker. */

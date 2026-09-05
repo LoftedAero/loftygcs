@@ -69,6 +69,9 @@ self.onmessage = (e: MessageEvent<EngineCommand>) => {
     case 'send':
       engine.send(cmd.msgName, cmd.fields)
       break
+    case 'inspect':
+      engine.setInspecting(cmd.on)
+      break
     case 'req':
       void handleRequest(cmd)
       break

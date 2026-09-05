@@ -38,6 +38,12 @@ const STREAM_RATE_HZ = 4
 /** Smallest gap between file-transfer progress events, in milliseconds. */
 const PROGRESS_INTERVAL_MS = 100
 
+// Inspector snapshots. 400 ms is fast enough that values visibly move and
+// slow enough that a snapshot of every message type costs nothing. The EMA
+// keeps a 1 Hz message from reading as 0 and 2.5 Hz on alternate windows.
+const INSPECT_FLUSH_MS = 400
+const INSPECT_EMA = 0.3
+
 export class ProtocolEngine {
   private framer = new MavFramer()
   private seq = 0
@@ -50,6 +56,22 @@ export class ProtocolEngine {
   private vehicleCompid = 1
   private streamsRequested = false
   private lastStats = { frames: 0, droppedBytes: 0, badFrames: 0 }
+  // Always counted -- one map upsert per message is free next to the decode
+  // that already happened -- but only snapshotted while someone is looking.
+  private inspectRows = new Map<
+    string,
+    {
+      sysid: number
+      compid: number
+      msgid: number
+      msgName: string
+      count: number
+      prevCount: number
+      hz: number | null
+      fields: Record<string, FieldValue>
+    }
+  >()
+  private inspectTimer: ReturnType<typeof setInterval> | null = null
 
   // MAVFTP is a fast path, not a requirement: a 500 ms op timeout makes the
   // capability probe fail fast on firmware without it, instead of the
@@ -90,6 +112,8 @@ export class ProtocolEngine {
     this.lastHeartbeatAt = -1
     this.vehicleSysid = null
     this.streamsRequested = false
+    this.setInspecting(false)
+    this.inspectRows.clear()
     this.ftp.abort('link closed')
     this.paramStream.abort('link closed')
     this.commands.abort('link closed')
@@ -111,6 +135,57 @@ export class ProtocolEngine {
     }
   }
 
+  /** Watch (or stop watching) everything on the link. */
+  setInspecting(on: boolean) {
+    if (on && this.inspectTimer === null) {
+      this.inspectTimer = setInterval(() => this.flushInspector(), INSPECT_FLUSH_MS)
+      this.flushInspector()
+    } else if (!on && this.inspectTimer !== null) {
+      clearInterval(this.inspectTimer)
+      this.inspectTimer = null
+    }
+  }
+
+  private recordForInspector(msg: DecodedMessage) {
+    const key = `${msg.sysid}:${msg.compid}:${msg.msgid}`
+    const row = this.inspectRows.get(key)
+    if (row) {
+      row.count++
+      row.fields = msg.fields
+    } else {
+      this.inspectRows.set(key, {
+        sysid: msg.sysid,
+        compid: msg.compid,
+        msgid: msg.msgid,
+        msgName: msg.msgName,
+        count: 1,
+        prevCount: 0,
+        hz: null,
+        fields: msg.fields,
+      })
+    }
+  }
+
+  private flushInspector() {
+    const dt = INSPECT_FLUSH_MS / 1000
+    const rows = []
+    for (const r of this.inspectRows.values()) {
+      const instant = (r.count - r.prevCount) / dt
+      r.prevCount = r.count
+      r.hz = r.hz === null ? instant : r.hz * (1 - INSPECT_EMA) + instant * INSPECT_EMA
+      rows.push({
+        sysid: r.sysid,
+        compid: r.compid,
+        msgid: r.msgid,
+        msgName: r.msgName,
+        count: r.count,
+        hz: r.hz,
+        fields: r.fields,
+      })
+    }
+    this.emit({ t: 'evt', evt: { t: 'inspector', rows } })
+  }
+
   send(msgName: string, fields: Record<string, FieldValue>) {
     const bytes = encodeFrame(msgName, fields, this.seq++ & 0xff, GCS_SYSID, GCS_COMPID)
     this.emit({ t: 'tx', bytes })
@@ -120,6 +195,7 @@ export class ProtocolEngine {
     // Before the switch: every message contributes to the generic field set,
     // including the ones handled specially below.
     collectFields(msg, this.fieldValues)
+    this.recordForInspector(msg)
     // Ignore our own reflected traffic (UDP loops and some bridges echo).
     if (msg.sysid === GCS_SYSID) return
 

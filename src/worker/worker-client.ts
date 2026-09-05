@@ -109,6 +109,10 @@ export class WorkerClient {
     this.worker.postMessage({ t: 'rx', bytes } satisfies EngineCommand, [bytes.buffer])
   }
 
+  setInspecting(on: boolean) {
+    this.post({ t: 'inspect', on })
+  }
+
   send(msgName: string, fields: Record<string, FieldValue>) {
     this.post({ t: 'send', msgName, fields })
   }

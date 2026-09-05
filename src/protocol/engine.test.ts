@@ -7,7 +7,14 @@ import type { EngineOutput } from './types'
 function vehicleHeartbeat(seq = 0) {
   return encodeFrame(
     'HEARTBEAT',
-    { type: 2, autopilot: 3, baseMode: 81 | 128, customMode: 6, systemStatus: 4, mavlinkVersion: 3 },
+    {
+      type: 2,
+      autopilot: 3,
+      baseMode: 81 | 128,
+      customMode: 6,
+      systemStatus: 4,
+      mavlinkVersion: 3,
+    },
     seq,
     1,
     1, // sysid 1, compid 1: the autopilot
@@ -97,10 +104,116 @@ describe('ProtocolEngine', () => {
     engine.start()
     engine.pushBytes(vehicleHeartbeat())
     vi.advanceTimersByTime(1000)
-    const stats = events().filter((e) => e.t === 'linkStats').at(-1)
+    const stats = events()
+      .filter((e) => e.t === 'linkStats')
+      .at(-1)
     expect(stats).toBeDefined()
     if (stats?.t === 'linkStats') {
       expect(stats.stats.heartbeatAgeMs).toBeGreaterThanOrEqual(0)
     }
+  })
+})
+
+describe('the inspector', () => {
+  let outputs: EngineOutput[]
+  let engine: ProtocolEngine
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    outputs = []
+    engine = new ProtocolEngine((o) => outputs.push(o))
+    engine.start()
+  })
+  afterEach(() => {
+    engine.stop()
+    vi.useRealTimers()
+  })
+
+  const rows = () => {
+    const evts = outputs.filter((o) => o.t === 'evt' && o.evt.t === 'inspector')
+    const last = evts[evts.length - 1]
+    return last && last.t === 'evt' && last.evt.t === 'inspector' ? last.evt.rows : []
+  }
+  const attitude = (seq: number) =>
+    encodeFrame(
+      'ATTITUDE',
+      { timeBootMs: seq, roll: 0.1, pitch: 0, yaw: 1.5, rollspeed: 0, pitchspeed: 0, yawspeed: 0 },
+      seq,
+      1,
+      1,
+    )
+
+  it('says nothing until someone is watching', () => {
+    engine.pushBytes(vehicleHeartbeat(0))
+    vi.advanceTimersByTime(2000)
+    expect(rows()).toHaveLength(0)
+  })
+
+  it('reports every message type with its count, rate and last fields', () => {
+    engine.setInspecting(true)
+    for (let i = 0; i < 8; i++) engine.pushBytes(attitude(i))
+    engine.pushBytes(vehicleHeartbeat(8))
+    vi.advanceTimersByTime(500)
+
+    const att = rows().find((r) => r.msgName === 'ATTITUDE')!
+    expect(att.count).toBe(8)
+    expect(att.sysid).toBe(1)
+    expect(att.compid).toBe(1)
+    // The freshest payload rides along, decoded.
+    expect(att.fields['yaw']).toBeCloseTo(1.5, 5)
+    expect(rows().find((r) => r.msgName === 'HEARTBEAT')!.count).toBe(1)
+  })
+
+  it('converges the rate onto the true arrival rate', () => {
+    engine.setInspecting(true)
+    // 10 Hz for four seconds of fake time: four messages per 400 ms window.
+    let seq = 0
+    for (let w = 0; w < 10; w++) {
+      for (let i = 0; i < 4; i++) engine.pushBytes(attitude(seq++))
+      vi.advanceTimersByTime(400)
+    }
+    const att = rows().find((r) => r.msgName === 'ATTITUDE')!
+    expect(att.hz).toBeGreaterThan(8)
+    expect(att.hz).toBeLessThan(12)
+  })
+
+  it('keeps senders apart, echoes included', () => {
+    engine.setInspecting(true)
+    engine.pushBytes(vehicleHeartbeat(0))
+    // Our own heartbeat coming back at us -- a UDP loop. The vehicle logic
+    // ignores it; the inspector must show it, because seeing your own echo
+    // is exactly how a loop is diagnosed.
+    engine.pushBytes(
+      encodeFrame(
+        'HEARTBEAT',
+        { type: 6, autopilot: 8, baseMode: 0, customMode: 0, systemStatus: 4, mavlinkVersion: 3 },
+        0,
+        255,
+        190,
+      ),
+    )
+    vi.advanceTimersByTime(500)
+    const hb = rows().filter((r) => r.msgName === 'HEARTBEAT')
+    expect(hb).toHaveLength(2)
+    expect(hb.map((r) => r.sysid).sort()).toEqual([1, 255])
+  })
+
+  it('stops the snapshots when told, and forgets the link on stop', () => {
+    engine.setInspecting(true)
+    engine.pushBytes(vehicleHeartbeat(0))
+    vi.advanceTimersByTime(500)
+    const before = outputs.length
+    engine.setInspecting(false)
+    vi.advanceTimersByTime(2000)
+    expect(
+      outputs.filter((o, i) => i >= before && o.t === 'evt' && o.evt.t === 'inspector'),
+    ).toHaveLength(0)
+
+    // A new link is a new story: counts do not leak across connections.
+    engine.stop()
+    engine.start()
+    engine.setInspecting(true)
+    vi.advanceTimersByTime(500)
+    expect(rows()).toHaveLength(0)
   })
 })

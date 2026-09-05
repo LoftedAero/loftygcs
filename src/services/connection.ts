@@ -3,6 +3,7 @@
 // connection-store and vehicle-store; the UI calls connect()/disconnect()
 // and reads the stores.
 import { TransportManager } from '../transport'
+import { useInspectorStore } from '../stores/inspector-store'
 import type { TransportOptions } from '../transport/Transport'
 import { WorkerClient } from '../worker/worker-client'
 import type { MissionItem, ProtocolEvent, TelemetryDelta } from '../protocol/types'
@@ -142,6 +143,9 @@ class ConnectionService {
         }
         return
       }
+      case 'inspector':
+        useInspectorStore.getState().applyRows(evt.rows)
+        return
       case 'statustext':
         useVehicleStore
           .getState()
@@ -170,7 +174,11 @@ class ConnectionService {
       case 'magCalReport':
         useCalStore
           .getState()
-          .magCalReport({ calStatus: evt.calStatus, fitness: evt.fitness, autosaved: evt.autosaved })
+          .magCalReport({
+            calStatus: evt.calStatus,
+            fitness: evt.fitness,
+            autosaved: evt.autosaved,
+          })
         return
       case 'commandAck':
         // Command tracking arrives with the calibration wizards (Phase 3).
@@ -265,6 +273,11 @@ class ConnectionService {
   }
 
   /** Run a MAV_CMD, resolving with the MAV_RESULT code (0 = accepted). */
+  /** Watch (or stop watching) raw link traffic; costs nothing while off. */
+  setInspecting(on: boolean): void {
+    this.worker?.setInspecting(on)
+  }
+
   runCommand(command: number, params: number[] = [], timeoutMs?: number): Promise<number> {
     const worker = this.worker
     if (!worker) return Promise.reject(new Error('not connected'))

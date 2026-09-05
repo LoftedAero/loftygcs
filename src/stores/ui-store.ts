@@ -38,6 +38,10 @@ export const TABS = [
   { id: 'osd', label: 'OSD' },
   { id: 'parameters', label: 'Parameters' },
   { id: 'logs', label: 'Logs' },
+  // After Logs, deliberately: the rail above is the bring-up sequence and
+  // the inspector is not a step in it -- it is the X-ray you reach for when
+  // a step misbehaves.
+  { id: 'inspector', label: 'Inspector' },
 ] as const
 
 export type TabId = (typeof TABS)[number]['id']
