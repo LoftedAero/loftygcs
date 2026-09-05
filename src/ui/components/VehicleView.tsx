@@ -3,7 +3,9 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import quadUrl from '../../models/quad_x.gltf?url'
 import planeUrl from '../../models/airplane.gltf?url'
+import f35bUrl from '../../models/f35b.glb?url'
 import type { VehicleClass } from '../../protocol/modes'
+import type { KnownAirframe } from '../../protocol/airframe'
 
 // A live 3D airframe, the way Betaflight's setup tab shows one. Models are
 // Betaflight's own (see src/models/ATTRIBUTION.md).
@@ -42,10 +44,13 @@ export interface Attitude {
 
 export default function VehicleView({
   vehicle,
+  airframe,
   attitude,
   className,
 }: {
   vehicle: VehicleClass
+  /** A specific aircraft, when the vehicle named one we have a model for. */
+  airframe?: KnownAirframe | null
   /** A function so the scene can sample at frame rate without re-rendering. */
   attitude: () => Attitude
   className?: string
@@ -106,7 +111,7 @@ export default function VehicleView({
 
     let disposed = false
     new GLTFLoader().load(
-      vehicle === 'copter' ? quadUrl : planeUrl,
+      airframe === 'f35b' ? f35bUrl : vehicle === 'copter' ? quadUrl : planeUrl,
       (gltf) => {
         if (disposed) return
         const model = gltf.scene
@@ -181,7 +186,10 @@ export default function VehicleView({
       })
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement)
     }
-  }, [vehicle])
+    // airframe as well as vehicle: the scene is built once per model, and
+    // a vehicle that announces itself as an F-35B after the first frame
+    // would otherwise keep whatever was loaded before it said so.
+  }, [vehicle, airframe])
 
   return <div ref={mountRef} className={className ?? 'vehicle-view'} />
 }

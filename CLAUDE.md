@@ -132,7 +132,22 @@ design decisions are recorded there and in code comments.
   centered, labeled, canceled, -ize verbs). Third-party text is the exception and stays
   verbatim: the GPL LICENSE, dependency names, and identifiers from external specs (MAVLink's
   own `MAV_RESULT_CANCELLED` keeps its spelling; only our rendered label is Americanized).
-- **3D models** (`src/models/`) are Betaflight Configurator's, unmodified. The biplane is
+- **The vehicle draws itself when it says what it is** (`protocol/airframe.ts`). ArduPilot
+  announces its frame at boot -- "QuadPlane Frame: F-35B" -- to both STATUSTEXT and a MSG
+  record, so one matcher serves the live view and the log replay. Match `Frame:` and the name
+  after it, never the surrounding phrase: 4.2.2 writes "QuadPlane Frame: F-35B" and 4.6.3
+  writes "QuadPlane initialised, Frame: F-35B", so matching the current wording would miss
+  every log that already exists. The live value is *latched* in `vehicle-store` as the banner
+  goes past, because the status feed is a capped ring the line scrolls out of. `KnownAirframe`
+  grows one aircraft at a time and never by pattern: each entry needs a model this repo may
+  ship, and a loose matcher would put the wrong aeroplane on someone else's screen.
+
+- **3D models** (`src/models/`) are Betaflight Configurator's, unmodified, except `f35b.glb`,
+  which is Lofted Aero's own CAD (STEP -> FreeCAD tessellation -> Blender decimate to ~5k
+  triangles -> GLB) and so needs no in-app credit. Every model is authored to one convention
+  -- span on X, nose toward +Y, up on Z, once a glTF importer has flattened it -- because both
+  renderers apply the same rotation to whatever they load; check a new one against the biplane
+  numerically rather than by eye. The biplane is
   CC-BY-4.0 and its credit must stay visible in the app (Overview, under the model), not just
   in the repo — see `src/models/ATTRIBUTION.md`. The quad is GPL-3.0, usable only because this
   app is GPL-3.0. Imported with `?url`; the demo build inlines them via `assetsInlineLimit`.

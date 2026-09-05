@@ -14,19 +14,21 @@ const GPS_FIX_NAMES = ['No GPS', 'No fix', '2D fix', '3D fix', 'DGPS', 'RTK floa
 // airframe turning with the vehicle, instruments and vital signs beside it.
 export default function LiveVehiclePanel() {
   const mavType = useVehicleStore((s) => s.vehicleType)
+  const airframe = useVehicleStore((s) => s.airframe)
   return (
     <div className="live-panel">
       <LaCard title="Attitude" className="live-panel__model">
         <AttitudeReadout />
         <VehicleView
           vehicle={vehicleClass(mavType)}
+          airframe={airframe}
           attitude={() => ({
             roll: telemetryRings.rollRad.latest(),
             pitch: telemetryRings.pitchRad.latest(),
             yaw: telemetryRings.yawRad.latest(),
           })}
         />
-        <p className="la-card__note model-credit">
+        <p className="la-card__note model-credit" hidden={airframe === 'f35b'}>
           Aircraft model:{' '}
           <a
             href="https://sketchfab.com/3d-models/low-poly-biplane-755175daea384176813e7dc90b2245a5"
@@ -113,11 +115,7 @@ function GpsCard() {
   const lon = useVehicleStore((s) => s.lonDeg)
   return (
     <LaCard title="GPS">
-      <Stat
-        label="3D fix"
-        value={fix >= 3 ? 'Yes' : 'No'}
-        tone={fix >= 3 ? 'ok' : 'bad'}
-      />
+      <Stat label="3D fix" value={fix >= 3 ? 'Yes' : 'No'} tone={fix >= 3 ? 'ok' : 'bad'} />
       <Stat label="Fix type" value={GPS_FIX_NAMES[fix] ?? String(fix)} />
       <Stat label="Satellites" value={String(sats)} />
       <Stat label="HDOP" value={hdop > 0 ? hdop.toFixed(2) : '—'} />
@@ -137,13 +135,12 @@ function SystemCard() {
     <LaCard title="System">
       <Stat label="Vehicle" value={v.vehicleName || '—'} />
       <Stat label="Flight mode" value={v.modeName || '—'} />
-      <Stat
-        label="Armed"
-        value={v.armed ? 'Armed' : 'Disarmed'}
-        tone={v.armed ? 'bad' : 'ok'}
-      />
+      <Stat label="Armed" value={v.armed ? 'Armed' : 'Disarmed'} tone={v.armed ? 'bad' : 'ok'} />
       <Stat label="Battery" value={v.batteryV > 0 ? `${v.batteryV.toFixed(2)} V` : '—'} />
-      <Stat label="Current" value={v.batteryA >= 0 ? `${v.batteryA.toFixed(1)} A` : 'not measured'} />
+      <Stat
+        label="Current"
+        value={v.batteryA >= 0 ? `${v.batteryA.toFixed(1)} A` : 'not measured'}
+      />
       <Stat label="Remaining" value={v.batteryPct >= 0 ? `${v.batteryPct} %` : '—'} />
       <Stat label="Link" value={stats ? `${stats.rxCount} msg/s` : '—'} />
       {prearm && <p className="la-hint la-hint--error">{prearm.text}</p>}
@@ -172,7 +169,9 @@ function SensorCard() {
       ) : (
         readings.map((r) => {
           const t = SENSOR_TONE[r.state]
-          return <Stat key={r.id} label={r.label} value={t.text} {...(t.tone ? { tone: t.tone } : {})} />
+          return (
+            <Stat key={r.id} label={r.label} value={t.text} {...(t.tone ? { tone: t.tone } : {})} />
+          )
         })
       )}
     </LaCard>

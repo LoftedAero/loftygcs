@@ -20,6 +20,16 @@ replacing the model, and add one anywhere else the biplane appears.
 
 The upstream notice is kept verbatim in `airplane.license.txt`.
 
+## f35b.glb — Lofted Aero, own work
+
+Generated from `F-35B Solid Model.STEP`, the SolidWorks assembly for Lofted Aero's own
+3D-printed F-35B. Tessellated with FreeCAD, decimated to ~5,000 triangles in Blender, and
+re-oriented to the convention the biplane already uses (span on X, nose toward +Y, up on Z)
+so the two are interchangeable to the renderers. No third-party geometry, so nothing here
+needs a credit line in the app — unlike the biplane below.
+
+The pipeline is in the commit that added it; the source CAD is not in this repo.
+
 ## quad_x.gltf — GPL-3.0
 
 Ships in betaflight-configurator with no separate model licence, so it falls under that

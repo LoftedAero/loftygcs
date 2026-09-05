@@ -3,8 +3,10 @@ import { LaButton, LaHint } from '../../components/La'
 import { flightPath, type FlightPath } from '../../../protocol/log-path'
 import { useLogStore } from '../../../stores/log-store'
 import { vehicleClassFromLog } from '../../../protocol/log-modes'
+import { airframeFromLog } from '../../../protocol/airframe'
 import quadModelUrl from '../../../models/quad_x.gltf?url'
 import planeModelUrl from '../../../models/airplane.gltf?url'
+import f35bModelUrl from '../../../models/f35b.glb?url'
 
 // The 3D replay: fly the log back, on a globe you can orbit.
 //
@@ -139,7 +141,10 @@ export default function LogReplay() {
   // Which airframe flew, from the log's own firmware banner -- a plane
   // replayed as a quadcopter is a small lie that undermines the rest.
   const isPlane = log ? vehicleClassFromLog(log) === 'plane' : false
-  const modelUrl = isPlane ? planeModelUrl : quadModelUrl
+  // ArduPilot names the airframe in its boot banner, so a log flown by an
+  // aircraft we have a model for gets drawn as itself.
+  const airframe = log ? airframeFromLog(log) : null
+  const modelUrl = airframe === 'f35b' ? f35bModelUrl : isPlane ? planeModelUrl : quadModelUrl
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(5)
   const [at, setAt] = useState(0)
@@ -420,10 +425,11 @@ export default function LogReplay() {
         <p className="log-replay__note">
           {path.samples.length.toLocaleString()} positions from {path.source}
           {!path.hasAttitude && ' · no attitude in this log'}
-          {path.groundAlt !== null && ` · heights above launch (${path.groundAlt.toFixed(0)} m AMSL)`}
+          {path.groundAlt !== null &&
+            ` · heights above launch (${path.groundAlt.toFixed(0)} m AMSL)`}
           {/* CC-BY requires the credit to travel with the model, not to sit
               on one other screen. See src/models/ATTRIBUTION.md. */}
-          {isPlane && (
+          {isPlane && airframe !== 'f35b' && (
             <>
               {' · biplane by '}
               <a
@@ -436,8 +442,8 @@ export default function LogReplay() {
               {', CC-BY-4.0, recoloured'}
             </>
           )}
-          {diagnostic && ` · ${diagnostic}`} · imagery © Esri, Maxar, Earthstar Geographics ·
-          tiles fetched for this area; the log itself stays on this machine
+          {diagnostic && ` · ${diagnostic}`} · imagery © Esri, Maxar, Earthstar Geographics · tiles
+          fetched for this area; the log itself stays on this machine
         </p>
       )}
     </div>
