@@ -380,3 +380,66 @@ describe('choosing what to launch', () => {
     expect(screen.getByRole('button', { name: /start simulator/i })).toBeTruthy()
   })
 })
+
+describe('saved flying fields', () => {
+  it('remembers a location by name and puts it back', async () => {
+    openTray()
+    const home = screen.getByLabelText('Home location')
+    // A field, with the runway heading that lines the scenery up.
+    fireEvent.change(home, { target: { value: '40.1234, -88.5678, 220, 90' } })
+    fireEvent.change(screen.getByLabelText('Field name'), { target: { value: 'Eli Field' } })
+    fireEvent.click(screen.getByRole('button', { name: /save field/i }))
+    await waitFor(() => expect(useSimStore.getState().fields['Eli Field']).toBeTruthy())
+
+    fireEvent.change(home, { target: { value: '' } })
+    const picker = screen.getByLabelText('Flying field') as HTMLSelectElement
+    fireEvent.change(picker, { target: { value: 'Eli Field' } })
+    // The heading comes back with it -- that is the point of saving one.
+    expect((screen.getByLabelText('Home location') as HTMLInputElement).value).toBe(
+      '40.1234, -88.5678, 220, 90',
+    )
+  })
+
+  it('shows which saved field the box is holding', async () => {
+    useSimStore.setState({ fields: { 'Eli Field': '40.1, -88.5, 220, 90' } })
+    openTray()
+    fireEvent.change(screen.getByLabelText('Home location'), {
+      target: { value: '40.1, -88.5, 220, 90' },
+    })
+    expect((screen.getByLabelText('Flying field') as HTMLSelectElement).value).toBe('Eli Field')
+    // And says "Custom" when it is not one of them, rather than lying about
+    // which field you are at.
+    fireEvent.change(screen.getByLabelText('Home location'), { target: { value: '51.5, -0.1' } })
+    expect((screen.getByLabelText('Flying field') as HTMLSelectElement).value).toBe('')
+  })
+
+  it('forgets one when asked', async () => {
+    useSimStore.setState({ fields: { 'Eli Field': '40.1, -88.5, 220, 90' } })
+    openTray()
+    fireEvent.change(screen.getByLabelText('Home location'), {
+      target: { value: '40.1, -88.5, 220, 90' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /forget Eli Field/i }))
+    await waitFor(() => expect(useSimStore.getState().fields['Eli Field']).toBeUndefined())
+  })
+
+  it('offers no picker before any field is saved', () => {
+    useSimStore.setState({ fields: {} })
+    openTray()
+    expect(screen.queryByLabelText('Flying field')).toBeNull()
+  })
+})
+
+describe('launching onto RealFlight before RealFlight is up', () => {
+  it('says the simulator is waiting rather than reporting a failure', () => {
+    openTray()
+    // After mounting: subscribing to the simulator's events resets the phase
+    // to idle, which clears this flag -- correctly, since a fresh session is
+    // not waiting on anything.
+    act(() => useSimStore.setState({ waitingForRealFlight: true }))
+    // It really is running: SITL binds its port and retries the SOAP
+    // connection for as long as it lives. It just has nothing to say yet.
+    expect(screen.getByText(/waiting for RealFlight/i)).toBeTruthy()
+    expect(useSimStore.getState().error).toBeNull()
+  })
+})

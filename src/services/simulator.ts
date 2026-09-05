@@ -40,9 +40,17 @@ export async function startSimulator(launch: SimLaunch): Promise<void> {
   const store = useSimStore.getState()
   store.setPhase('starting')
   try {
-    const port = await bridge.sim.start(launch)
+    const { port, waitingForRealFlight } = await bridge.sim.start(launch)
     await refreshSimStatus()
     useSimStore.getState().setPhase('running')
+    if (waitingForRealFlight) {
+      // Connecting now would attach to a port that answers nothing and time
+      // out waiting for a heartbeat, which reads as a broken simulator
+      // rather than as RealFlight not being up. The simulator is running and
+      // will pick RealFlight up whenever it appears; connect then.
+      useSimStore.getState().setWaitingForRealFlight(true)
+      return
+    }
     await connectionService.connect({ kind: 'tcp', host: SIM_HOST, port })
   } catch (err) {
     useSimStore.getState().fail(err instanceof Error ? err.message : 'simulator failed to start')

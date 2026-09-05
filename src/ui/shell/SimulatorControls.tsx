@@ -58,6 +58,11 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
   const setPhysics = useSimStore((s) => s.setPhysics)
   const params = useSimStore((s) => s.params)
   const setParams = useSimStore((s) => s.setParams)
+  const fields = useSimStore((s) => s.fields)
+  const saveField = useSimStore((s) => s.saveField)
+  const deleteField = useSimStore((s) => s.deleteField)
+  const waitingForRealFlight = useSimStore((s) => s.waitingForRealFlight)
+  const [fieldName, setFieldName] = useState('')
 
   const busy = phase === 'installing' || phase === 'starting'
   const running = phase === 'running' || status?.running != null
@@ -70,6 +75,10 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
   const locked = busy || running
 
   const paramsFile = params.kind === 'file' || params.kind === 'eeprom' ? params.path : null
+  const fieldNames = Object.keys(fields).sort((a, b) => a.localeCompare(b))
+  // Which saved field the box currently holds, so the select shows it and
+  // "Forget" knows what it is offering to forget.
+  const matchingField = fieldNames.find((n) => fields[n] === homeText.trim()) ?? null
 
   const chooseBuild = async () => {
     const picked = await window.loftgcs?.sim.pickBuild()
@@ -222,6 +231,23 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
           {/* Home is read at boot, so this is deliberately not a live
               setting: changing it takes effect the next time the simulator
               starts. Disabled while one is running, to say so. */}
+          {fieldNames.length > 0 && (
+            <LaField label="Flying field" htmlFor="sim-field">
+              <LaSelect
+                id="sim-field"
+                value={matchingField ?? ''}
+                disabled={locked}
+                onChange={(e) => setHomeText(fields[e.target.value] ?? '')}
+              >
+                <option value="">Custom…</option>
+                {fieldNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </LaSelect>
+            </LaField>
+          )}
           <LaField label="Home location" htmlFor="sim-home">
             <LaInput
               id="sim-home"
@@ -239,7 +265,41 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
             <LaHint>
               Latitude and longitude, and optionally an altitude in meters and a heading in degrees.
               Empty boots at CMAC, ArduPilot&rsquo;s usual test field.
+              {physics.kind === 'flightaxis' &&
+                ' With RealFlight the heading is what lines its runway up with the map, so it is' +
+                  ' worth getting right.'}
             </LaHint>
+          )}
+          {home && (
+            <div className="la-row">
+              <LaInput
+                type="text"
+                placeholder="Name this field"
+                aria-label="Field name"
+                disabled={locked}
+                value={fieldName}
+                onChange={(e) => setFieldName(e.target.value)}
+              />
+              <LaButton
+                variant="ghost"
+                disabled={locked || !fieldName.trim()}
+                onClick={() => {
+                  saveField(fieldName)
+                  setFieldName('')
+                }}
+              >
+                Save field
+              </LaButton>
+              {matchingField && (
+                <LaButton
+                  variant="ghost"
+                  disabled={locked}
+                  onClick={() => deleteField(matchingField)}
+                >
+                  Forget {matchingField}
+                </LaButton>
+              )}
+            </div>
           )}
           <div className="la-row">
             {/* Plan at your field on the map, then boot the simulator there.
@@ -311,6 +371,13 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
           )}
           {connected && !running && (
             <LaHint>Disconnect the current vehicle before starting the simulator.</LaHint>
+          )}
+          {waitingForRealFlight && (
+            <LaHint>
+              The simulator is running and waiting for RealFlight. It sends no telemetry until
+              RealFlight is exchanging data, so connect once RealFlight is up with Simulation
+              &rsaquo; Settings &rsaquo; Physics &rsaquo; &ldquo;RealFlight Link enabled&rdquo;.
+            </LaHint>
           )}
         </>
       )}

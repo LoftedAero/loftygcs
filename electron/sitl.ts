@@ -56,12 +56,28 @@ export function registerSitlIpc(getWindow: () => BrowserWindow | null) {
     // retries the SOAP connection forever without ever printing its
     // readiness banner, so the failure is otherwise a thirty-second hang
     // and a timeout that never mentions RealFlight.
+    // RealFlight does not have to be up first, and refusing to launch
+    // without it was wrong. SITL binds its GCS port and prints its
+    // readiness banner in about 40 ms whether or not anything is listening
+    // on 18083, and its socket_creator thread retries the SOAP connection
+    // for as long as it runs -- so starting the simulator and then starting
+    // RealFlight is a perfectly good order to do things in.
+    //
+    // What it does *not* do is send any MAVLink until FlightAxis is
+    // exchanging data: the vehicle's update() returns early with no sample,
+    // so a GCS attaches to a silent port and times out waiting for a
+    // heartbeat. That is worth saying in advance, because "connected, no
+    // heartbeat" does not point at RealFlight on its own.
+    let waitingForRealFlight = false
     if (launch.physics?.kind === 'flightaxis') {
       const host = launch.physics.host || FLIGHTAXIS_HOST
-      if (!(await flightAxisReachable(host))) {
-        throw new Error(
-          `Nothing is listening on ${host}:${FLIGHTAXIS_PORT}. Start RealFlight and turn on ` +
-            'Simulation › Settings › Physics › "RealFlight Link enabled", then try again.',
+      waitingForRealFlight = !(await flightAxisReachable(host))
+      if (waitingForRealFlight) {
+        send(
+          'sim:log',
+          `Nothing is listening on ${host}:${FLIGHTAXIS_PORT} yet. The simulator will start ` +
+            'and wait for it. Turn on Simulation > Settings > Physics > "RealFlight Link ' +
+            'enabled", then connect.\n',
         )
       }
     }
@@ -87,7 +103,7 @@ export function registerSitlIpc(getWindow: () => BrowserWindow | null) {
       stopSim()
       throw err
     }
-    return SITL_PORT
+    return { port: SITL_PORT, waitingForRealFlight }
   })
 
   ipcMain.handle('sim:stop', () => stopSim())

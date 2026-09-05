@@ -77,10 +77,14 @@ export interface LoftGcsBridge {
     status(): Promise<SimStatus>
     install(vehicle: string): Promise<void>
     /**
-     * Spawns SITL and resolves with the TCP port once it is accepting.
+     * Spawns SITL and resolves once it is accepting on the TCP port.
      * Home is taken at boot; moving it later means restarting.
+     *
+     * `waitingForRealFlight` says the simulator started but nothing is on
+     * RealFlight's SOAP port yet, so it will not talk MAVLink until
+     * something is -- the launch succeeded, the vehicle is just mute.
      */
-    start(launch: SimLaunch): Promise<number>
+    start(launch: SimLaunch): Promise<{ port: number; waitingForRealFlight: boolean }>
     stop(): Promise<void>
     /** Native file pickers: SITL needs a path, not a file's contents. */
     pickBuild(): Promise<SimBuildChoice | null>

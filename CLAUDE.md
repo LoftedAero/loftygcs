@@ -115,11 +115,21 @@ design decisions are recorded there and in code comments.
   `flightaxis/eeprom.bin`, so pointing at the executable finds the parameters with no further
   instruction. The FlightAxis host is dropped from that name (a colon cannot be a Windows
   directory, and it is the same aircraft whichever machine draws it).
-- **RealFlight is reached by `--model flightaxis[:host]`** over SOAP on port 18083, and the
-  app probes that port before launching. Without the probe the failure is a thirty-second hang
-  and a timeout that never mentions RealFlight, because SITL retries the connection forever
-  without printing its readiness banner. The setting people forget is Simulation > Settings >
-  Physics > "RealFlight Link enabled", so the error names it.
+- **RealFlight is reached by `--model flightaxis[:host]`** over SOAP on port 18083, and it does
+  *not* have to be running first. SITL binds its GCS port and prints its readiness banner in
+  about 40 ms either way, and ArduPilot's `socket_creator` thread retries the SOAP connection
+  for as long as the process lives — so "start the simulator, then start RealFlight" is a
+  supported order and the app must not refuse it. What SITL will not do is send any MAVLink
+  until FlightAxis is exchanging data (`update()` returns early with no sample), so a GCS
+  attaches to a silent port and times out. The app therefore probes 18083 to *warn* and to skip
+  an auto-connect that cannot succeed, never to block the launch. The setting people forget is
+  Simulation > Settings > Physics > "RealFlight Link enabled".
+- **With FlightAxis, `--home` places the whole RealFlight field on Earth.** `SIM_Aircraft` sets
+  `origin = home`, and FlightAxis adds RealFlight's local coordinates to it, so home decides
+  both where the scenery sits and — through the yaw — which way its runway points. That is why
+  saved flying fields carry a heading. RealFlight itself has no geodetic reference: its content
+  archives contain no latitude or longitude at all, so those numbers can only come from the
+  user, and none may be shipped pre-filled.
 - **SITL says nothing about a defaults file it could not open** — not for a missing file, not
   for a bad path. Do not look for an error; there is none. When a launch-path change needs
   proving, the probe that works is `SERIAL0_PROTOCOL -1`, which switches MAVLink off: "did a

@@ -395,19 +395,49 @@ describe.runIf(process.env.SITL === '1')('launching the real simulator', () => {
     expect(readFileSync(path.join(work, 'eeprom.bin')).equals(shipped)).toBe(false)
   }, 90000)
 
-  it('accepts the flightaxis model rather than rejecting it', async () => {
-    // RealFlight is not here, so the vehicle sits retrying SOAP and never
-    // reports ready. What is provable without RealFlight is that SITL took
-    // the model: an unknown one makes it print the models it knows and exit.
+  it('starts on flightaxis with no RealFlight listening', async () => {
+    // This is why the app no longer refuses to launch without RealFlight.
+    // The simulator comes up, binds its GCS port and announces itself in
+    // milliseconds; ArduPilot's socket_creator thread then retries the SOAP
+    // connection for as long as the process runs, so starting RealFlight
+    // afterwards is a supported order.
     let out = ''
     const proc = spawnSim(dir, { vehicle: 'plane', physics: { kind: 'flightaxis' } })
     child = proc
     proc.stdout?.on('data', (d: Buffer) => (out += d.toString()))
     proc.stderr?.on('data', (d: Buffer) => (out += d.toString()))
-    await new Promise((r) => setTimeout(r, 4000))
+    await waitForReady(proc, 20000)
     expect(out).not.toMatch(/You must specify a vehicle model/)
     expect(proc.exitCode).toBeNull()
-  }, 20000)
+  }, 30000)
+
+  it('accepts a GCS but says nothing until RealFlight is there', async () => {
+    // The other half, and the reason the launch still warns. A GCS attaches
+    // to a port that answers nothing, because the vehicle's update() returns
+    // early with no sample -- so "connected, no heartbeat" is the symptom,
+    // and it does not point at RealFlight on its own.
+    child = spawnSim(dir, { vehicle: 'plane', physics: { kind: 'flightaxis' } })
+    await waitForReady(child, 20000)
+    const beat = await new Promise<boolean>((resolve) => {
+      const sock = createConnection({ host: '127.0.0.1', port: 5760 })
+      const timer = setTimeout(() => {
+        sock.destroy()
+        resolve(false)
+      }, 8000)
+      sock.on('data', (d: Buffer) => {
+        if (d.includes(0xfd) || d.includes(0xfe)) {
+          clearTimeout(timer)
+          sock.destroy()
+          resolve(true)
+        }
+      })
+      sock.on('error', () => {
+        clearTimeout(timer)
+        resolve(false)
+      })
+    })
+    expect(beat).toBe(false)
+  }, 40000)
 })
 
 // A build from outside the managed install, which is the case the PATH
