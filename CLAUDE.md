@@ -229,6 +229,20 @@ design decisions are recorded there and in code comments.
   *bits* (0,1,2) — so the field wins whenever both are present. The version is rounded *down*
   to the newest published release that is not newer. `NET=1 npm test` runs the live check
   against the real server, which is the only thing that catches a path change.
+- **Which mount protocol to send depends on the firmware, and the answer codes matter.**
+  ArduPilot carries three generations and answers all of them, so `protocol/gimbal.ts` picks by
+  version: DO_GIMBAL_MANAGER_PITCHYAW (1000) from 4.2 on, DO_MOUNT_CONTROL (205) below it and
+  when the vehicle never said. They are not interchangeable — 205 is pitch, *roll*, yaw, so yaw
+  in param2 rolls the camera instead of turning it, and only the newer one carries the lock
+  flags that decide whether the camera holds an earth heading or follows the nose. Every one of
+  these commands is answered even with `MNT1_TYPE` at zero, and the MAV_RESULT is the only
+  difference between "pointed" and "no mount configured" — so `services/camera.ts` verifies the
+  ack and reports it, and treats UNSUPPORTED on IMAGE_START_CAPTURE as the cue to fall back to
+  ArduPilot's own DO_DIGICAM_CONTROL trigger. Two things measured against SITL: current
+  firmware DENIES a request for MOUNT_STATUS (158) and accepts one for
+  GIMBAL_DEVICE_ATTITUDE_STATUS (285), which is why the modern decode is the one that matters;
+  and a mount cannot be configured in a SITL test at all, because `MNT1_TYPE` needs a reboot
+  and the runner launches with `-w` and a defaults file, so nothing survives one.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

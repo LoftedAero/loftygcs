@@ -74,6 +74,13 @@ export interface VehicleSnapshot {
    */
   firmware: FirmwareVersion | null
   capabilities: number
+  /**
+   * Where the camera mount says it is pointed, or null when there is none.
+   *
+   * Null is the useful state: it is how the Fly screen tells a vehicle with
+   * no gimbal from one whose gimbal is not answering.
+   */
+  gimbal: { rollDeg: number; pitchDeg: number; yawDeg: number } | null
   statusTexts: StatusText[]
 }
 
@@ -115,6 +122,7 @@ const EMPTY: VehicleSnapshot = {
   sensorsHealth: 0,
   firmware: null,
   capabilities: 0,
+  gimbal: null,
   statusTexts: [],
 }
 

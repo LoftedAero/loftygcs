@@ -442,6 +442,59 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
   )
 
   it(
+    'speaks the mount and camera protocols this firmware actually has',
+    async () => {
+      // What a scripted fake cannot answer: which generation of the mount
+      // protocol this firmware understands, and what it says when there is
+      // nothing to point. Both matter -- ArduPilot answers all of them even
+      // with MNT1_TYPE at zero, and the *code* it answers with is the only
+      // difference between "pointed" and "no mount configured".
+      //
+      // A configured mount is deliberately not tested here: MNT1_TYPE needs
+      // a reboot, and the SITL runner wipes parameters on every launch (-w
+      // with a defaults file) so nothing survives one. The angle decode is
+      // covered by gimbal.test.ts against known quaternions instead.
+      const events: ProtocolEvent[] = []
+      let socket: net.Socket | null = null
+      const engine = new ProtocolEngine((out) => {
+        if (out.t === 'tx') socket?.write(out.bytes)
+        else if (out.t === 'evt') events.push(out.evt)
+      })
+      socket = await connectVehicle(engine, events, (s) => (socket = s))
+
+      try {
+        const params = await engine.downloadParams()
+        expect(params.params.find((p) => p.name === 'MNT1_TYPE')?.value).toBe(0)
+
+        // MAV_RESULT: 0 accepted, 3 unsupported, 4 failed. The distinction
+        // is the whole point -- 4 means "understood, but there is no mount",
+        // where 3 would mean this firmware has never heard of the command
+        // and the station should be sending the older one.
+        const pitchYaw = await engine.runCommand(1000, [-45, 0, 0, 0, 8, 0, 0], 8000)
+        expect(pitchYaw).toBe(4)
+        const mountControl = await engine.runCommand(205, [-45, 0, 0, 0, 0, 0, 2], 8000)
+        expect(mountControl).toBe(4)
+        // Same for the camera: understood, nothing to trigger.
+        expect(await engine.runCommand(2000, [0, 0, 1, 0, 0, 0, 0], 8000)).toBe(4)
+
+        // Which status message to decode is not a matter of preference.
+        // Asking for MOUNT_STATUS (158) is DENIED by this firmware -- the
+        // message is gone -- while GIMBAL_DEVICE_ATTITUDE_STATUS (285) is
+        // accepted. Both decoders are kept for older vehicles, but this is
+        // why the modern one is the one that matters.
+        const modern = await engine.runCommand(511, [285, 200000, 0, 0, 0, 0, 0], 8000)
+        const legacy = await engine.runCommand(511, [158, 200000, 0, 0, 0, 0, 0], 8000)
+        expect(modern).toBe(0)
+        expect(legacy).not.toBe(0)
+      } finally {
+        engine.stop()
+        socket?.destroy()
+      }
+    },
+    120000,
+  )
+
+  it(
     'round trips a geofence and rally points through real ArduPilot',
     async () => {
       const events: ProtocolEvent[] = []

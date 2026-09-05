@@ -580,6 +580,45 @@
   color: var(--la-ink-3);
 }
 
+/* ── Camera and gimbal ──
+   The recessed strip the flight controls' second tier uses, repeated: this
+   is the same rank of control -- something you nudge while the aircraft is
+   up there -- and it sits directly under them. */
+.camera-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  padding: var(--la-space-2) var(--la-space-3);
+  background: var(--la-surface-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  flex: none;
+}
+.camera-panel__row {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  flex-wrap: wrap;
+}
+.camera-panel__label {
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  min-width: 56px;
+}
+.camera-panel__readout,
+.camera-panel__status {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.camera-panel__readout {
+  margin-left: auto;
+}
+
 /* ── Vehicle files ──
    The inspector's two-column shape, for the same reason: a list to scan
    beside the actions that act on what you picked. Names are monospace so a

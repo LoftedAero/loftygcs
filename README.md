@@ -126,7 +126,7 @@ before more readouts multiply; the inspector helps debug everything after it).
 | ~~8~~ | ~~KML / GPX import & export~~ | done — what a shape becomes depends on which plan is on screen |
 | ~~9~~ | ~~MAVFTP file browser~~ | done — Setup ▸ Files; upload, download, rename, delete |
 | ~~10~~ | ~~Version-matched parameter metadata~~ | done — and the vehicle now says which firmware it is |
-| 11 | Camera & gimbal control | MAVLink camera/gimbal protocols; SITL can simulate a mount |
+| ~~11~~ | ~~Camera & gimbal control~~ | done — Fly ▸ View ▸ Camera; the protocol follows the firmware version |
 | 12 | Physical joystick support | Last of the queue; needs careful SITL-first safety work |
 
 Deferred, revisit after the list above: ADS-B traffic display, BLHeli/AM32 ESC passthrough,

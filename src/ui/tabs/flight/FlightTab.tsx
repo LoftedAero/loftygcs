@@ -14,6 +14,7 @@ import PlotPanel from './PlotPanel'
 import FieldPicker from './FieldPicker'
 import StatusList from './StatusList'
 import PreflightPanel from './PreflightPanel'
+import CameraPanel from './CameraPanel'
 import VideoSourceModal from './VideoSourceModal'
 
 // The flight screen, arranged as Mission Planner arranges it: one panel
@@ -89,6 +90,9 @@ export default function FlightTab() {
           them is switched off. */}
       <div className="flight-grid__below">
         <FlightControls onVideo={() => setVideoOpen(true)} />
+        {/* Under the commands, above the messages: it is a control, but a
+            second-tier one that most aircraft do not have. */}
+        {layout.showCamera && <CameraPanel />}
         {layout.showMessages && (
           <LogPane
             pane={layout.logPane}

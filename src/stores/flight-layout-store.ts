@@ -33,6 +33,8 @@ export interface FlightLayoutState {
   showMessages: boolean
   /** The plot strip above the map. */
   showPlot: boolean
+  /** Camera and gimbal controls, for the vehicles that have one. */
+  showCamera: boolean
   /** Which telemetry fields the plot is drawing. */
   plotFields: string[]
   /** Last HUD video source, so it does not have to be retyped. */
@@ -49,7 +51,14 @@ export interface FlightLayoutState {
   setRatio: (r: number) => void
   swap: () => void
   toggle: (
-    key: 'showMap' | 'showHud' | 'showMessages' | 'showPlot' | 'hudHorizon' | 'hudOverlays',
+    key:
+      | 'showMap'
+      | 'showHud'
+      | 'showMessages'
+      | 'showPlot'
+      | 'showCamera'
+      | 'hudHorizon'
+      | 'hudOverlays',
   ) => void
   togglePlotField: (name: string) => void
   setLogPane: (pane: 'messages' | 'status' | 'preflight') => void
@@ -66,6 +75,7 @@ interface Persisted {
   showHud: boolean
   showMessages: boolean
   showPlot: boolean
+  showCamera: boolean
   plotFields: string[]
   logPane: 'messages' | 'status' | 'preflight'
   plotAxisField: string | null
@@ -83,6 +93,7 @@ const DEFAULTS: Persisted = {
   showHud: true,
   showMessages: true,
   showPlot: false,
+  showCamera: false,
   plotFields: [],
   logPane: 'messages',
   plotAxisField: null,
@@ -129,6 +140,7 @@ function snapshot(s: FlightLayoutState): Persisted {
     showHud: s.showHud,
     showMessages: s.showMessages,
     showPlot: s.showPlot,
+    showCamera: s.showCamera,
     plotFields: s.plotFields,
     logPane: s.logPane,
     plotAxisField: s.plotAxisField,

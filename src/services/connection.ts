@@ -242,6 +242,9 @@ class ConnectionService {
         p.pitchRad = d.pitchRad
         p.yawRad = d.yawRad
         break
+      case 'gimbal':
+        p.gimbal = { rollDeg: d.rollDeg, pitchDeg: d.pitchDeg, yawDeg: d.yawDeg }
+        break
       case 'position':
         telemetryRings.latDeg.push(d.latDeg)
         telemetryRings.lonDeg.push(d.lonDeg)

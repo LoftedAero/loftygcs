@@ -94,6 +94,11 @@ export default function LayoutMenu({ onVideo }: LayoutMenuProps) {
             checked={layout.showPlot}
             onChange={() => layout.toggle('showPlot')}
           />
+          <LaSwitch
+            label="Camera"
+            checked={layout.showCamera}
+            onChange={() => layout.toggle('showCamera')}
+          />
 
           <p className="layout-menu__heading">HUD layers</p>
           <LaSwitch

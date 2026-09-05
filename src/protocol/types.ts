@@ -107,6 +107,8 @@ export interface FirmwareVersion {
 
 export type TelemetryDelta =
   | { k: 'attitude'; rollRad: number; pitchRad: number; yawRad: number }
+  /** Where the camera mount says it is pointed, in degrees. */
+  | { k: 'gimbal'; rollDeg: number; pitchDeg: number; yawDeg: number }
   | {
       k: 'position'
       latDeg: number

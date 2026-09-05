@@ -2,6 +2,7 @@
 // app can trust: degrees, meters, volts -- never the wire's centidegrees,
 // millimeters, or centiamps. All unit conversion happens here and nowhere
 // else.
+import { attitudeFromMountStatus, attitudeFromQuaternion } from './gimbal'
 import type { DecodedMessage, TelemetryDelta } from './types'
 
 /** One message can carry several facts -- SYS_STATUS is both power and sensors. */
@@ -52,6 +53,24 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           seq: null,
           wpDistM: f.wpDist as number,
           altErrorM: f.altError as number,
+        },
+      ]
+    // Two generations of the same fact. The modern message carries a
+    // quaternion, the old one three centidegree fields in an unusual order;
+    // a vehicle sends one or the other, never both.
+    case 'GIMBAL_DEVICE_ATTITUDE_STATUS': {
+      const at = attitudeFromQuaternion((f.q as number[]) ?? [])
+      return at ? [{ k: 'gimbal', ...at }] : []
+    }
+    case 'MOUNT_STATUS':
+      return [
+        {
+          k: 'gimbal',
+          ...attitudeFromMountStatus(
+            f.pointingA as number,
+            f.pointingB as number,
+            f.pointingC as number,
+          ),
         },
       ]
     case 'SYS_STATUS':
