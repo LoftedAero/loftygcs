@@ -172,13 +172,11 @@ class ConnectionService {
         useCalStore.getState().magCalProgress(evt.pct, evt.calStatus)
         return
       case 'magCalReport':
-        useCalStore
-          .getState()
-          .magCalReport({
-            calStatus: evt.calStatus,
-            fitness: evt.fitness,
-            autosaved: evt.autosaved,
-          })
+        useCalStore.getState().magCalReport({
+          calStatus: evt.calStatus,
+          fitness: evt.fitness,
+          autosaved: evt.autosaved,
+        })
         return
       case 'commandAck':
         // Command tracking arrives with the calibration wizards (Phase 3).
@@ -229,6 +227,13 @@ class ConnectionService {
       case 'rc':
         p.rcChannels = d.channels
         p.rcRssi = d.rssi
+        break
+      case 'missionProgress':
+        // Each message fills its own half; a null leaves the last value
+        // standing rather than blanking a readout that is still true.
+        if (d.seq !== null) p.missionSeq = d.seq
+        if (d.wpDistM !== null) p.wpDistM = d.wpDistM
+        if (d.altErrorM !== null) p.altErrorM = d.altErrorM
         break
       case 'sensors':
         p.sensorsPresent = d.present

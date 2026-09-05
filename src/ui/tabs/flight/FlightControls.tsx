@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useMissionStore } from '../../../stores/mission-store'
+import { formatEta, missionProgress } from './mission-progress'
 import { useUnits } from '../../../stores/preferences-store'
 import {
   distanceLabel,
@@ -85,6 +87,10 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
   const relAltM = useVehicleStore((s) => s.relAltM)
   const groundspeedMs = useVehicleStore((s) => s.groundspeedMs)
   const units = useUnits()
+  const missionSeq = useVehicleStore((s) => s.missionSeq)
+  const wpDistM = useVehicleStore((s) => s.wpDistM)
+  const planItems = useMissionStore((s) => s.plan.items)
+  const progress = missionProgress(missionSeq, planItems, wpDistM, groundspeedMs)
   const isCopter = vehicleClass(vehicleType) === 'copter'
 
   const [status, setStatus] = useState('')
@@ -228,6 +234,25 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
           there, then the occasional command, then arranging the window.
           Ordered by how often a hand goes to them. */}
       <div className="flight-controls__secondary">
+        {/* What the vehicle says about its own progress, ahead of the
+            controls: it is read while flying, not operated. */}
+        {progress.position !== null && (
+          <span className="flight-progress" title="Mission item the vehicle is flying">
+            <span className="flight-progress__label">WP</span>
+            <span className="flight-progress__value">{progress.position}</span>
+            {progress.commandName && (
+              <span className="flight-progress__name">{progress.commandName}</span>
+            )}
+            {wpDistM !== null && (
+              <span className="flight-progress__value">
+                {formatDistance(wpDistM, units.distance, 0)} {distanceLabel(units.distance)}
+              </span>
+            )}
+            {progress.etaS !== null && (
+              <span className="flight-progress__eta">{formatEta(progress.etaS)}</span>
+            )}
+          </span>
+        )}
         {/* Typed in the reader's units and converted on the way out: the
             vehicle is commanded in SI whatever the box says. */}
         <Field

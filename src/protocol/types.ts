@@ -106,6 +106,23 @@ export type TelemetryDelta =
   | { k: 'gps'; fixType: number; satellites: number; hdop: number }
   | { k: 'rc'; channels: number[]; rssi: number }
   | { k: 'sensors'; present: number; enabled: number; health: number }
+  /**
+   * Where the vehicle is in its mission, as the vehicle sees it.
+   *
+   * Two messages, kept as one fact because they answer one question and
+   * either can arrive without the other: MISSION_CURRENT says which item is
+   * being flown, NAV_CONTROLLER_OUTPUT says how far away it is. A field is
+   * null when the message carrying it has not arrived.
+   */
+  | {
+      k: 'missionProgress'
+      /** Sequence number of the item being flown, 0 being home. */
+      seq: number | null
+      /** Straight-line distance to that item, in metres. */
+      wpDistM: number | null
+      /** Metres the vehicle is above (positive) or below its target. */
+      altErrorM: number | null
+    }
 
 export interface LinkStats {
   /** Packets parsed OK since the last report. */

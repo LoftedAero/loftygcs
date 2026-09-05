@@ -40,6 +40,20 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           climbMs: f.climb as number,
         },
       ]
+    // ArduPilot sends MISSION_CURRENT on every item change and repeats it;
+    // NAV_CONTROLLER_OUTPUT streams while a navigation mode is flying. Each
+    // fills in its own half and leaves the other alone.
+    case 'MISSION_CURRENT':
+      return [{ k: 'missionProgress', seq: f.seq as number, wpDistM: null, altErrorM: null }]
+    case 'NAV_CONTROLLER_OUTPUT':
+      return [
+        {
+          k: 'missionProgress',
+          seq: null,
+          wpDistM: f.wpDist as number,
+          altErrorM: f.altError as number,
+        },
+      ]
     case 'SYS_STATUS':
       return [
         {

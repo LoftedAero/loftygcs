@@ -50,6 +50,16 @@ export interface VehicleSnapshot {
    * with everything else: a different vehicle is a different aircraft.
    */
   airframe: KnownAirframe | null
+  /**
+   * Mission progress, as reported rather than inferred.
+   *
+   * The vehicle is the authority on which item it is flying: a plan uploaded
+   * from this GCS can differ from the one aboard, and guessing from position
+   * would be wrong exactly when it matters. Null means it has not said.
+   */
+  missionSeq: number | null
+  wpDistM: number | null
+  altErrorM: number | null
   sensorsPresent: number
   sensorsEnabled: number
   sensorsHealth: number
@@ -86,6 +96,9 @@ const EMPTY: VehicleSnapshot = {
   rcChannels: [],
   rcRssi: -1,
   airframe: null,
+  missionSeq: null,
+  wpDistM: null,
+  altErrorM: null,
   sensorsPresent: 0,
   sensorsEnabled: 0,
   sensorsHealth: 0,

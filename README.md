@@ -119,7 +119,7 @@ before more readouts multiply; the inspector helps debug everything after it).
 | ~~1~~ | ~~Log analysis link-outs (MAGFit / FilterReview / PIDReview)~~ | done — plus Hardware Report, gated by what each log contains |
 | ~~2~~ | ~~MAVLink inspector~~ | done — Setup ▸ Inspector; counts always, snapshots only while watched |
 | ~~3~~ | ~~Display unit preferences (ft/m, kts/m/s)~~ | done — and the Preferences dialog language will live in |
-| 4 | Mission progress on the Fly screen (current item, distance, ETA) | Felt every flight; small |
+| ~~4~~ | ~~Mission progress on the Fly screen~~ | done — plus the plan drawn on the flying map |
 | 5 | Pre-arm / pre-flight panel | Distills SYS_STATUS + PreArm into "why won't it arm" |
 | 6 | Offline maps / tile prefetch | Map infrastructure; the cache also serves #7 |
 | 7 | Terrain elevation in planning | Rides the tile cache for elevation data |

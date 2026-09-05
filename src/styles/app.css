@@ -463,6 +463,41 @@
   background: var(--la-blue);
 }
 
+/* Mission progress on the Fly screen: read while flying, so it sits on the
+   controls strip but reads as a readout rather than a control -- no border,
+   no fill, monospace numbers that do not jump as they count down. */
+.flight-progress {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--la-space-2);
+  padding-right: var(--la-space-3);
+  border-right: 1px solid var(--la-line);
+  margin-right: var(--la-space-1);
+  white-space: nowrap;
+}
+.flight-progress__label {
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--la-ink-3);
+}
+.flight-progress__value {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-ink);
+}
+.flight-progress__name {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+}
+.flight-progress__eta {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-blue);
+}
+
 /* Preferences: sections rather than a flat list of controls, because the
    settings still to land here (language, and what follows) are sections too
    and a list that grows into groups later reorganizes under the user. */

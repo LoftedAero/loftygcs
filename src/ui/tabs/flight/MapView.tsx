@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useVehicleStore } from '../../../stores/vehicle-store'
+import { useMissionStore } from '../../../stores/mission-store'
+import { createMissionOverlay, type MissionOverlay } from './mission-overlay'
 import {
   BASE_LAYERS,
   layerById,
@@ -75,6 +77,7 @@ export default function MapView({
   const mapRef = useRef<L.Map | null>(null)
   const markerRef = useRef<L.Marker | null>(null)
   const trailRef = useRef<L.Polyline | null>(null)
+  const missionRef = useRef<MissionOverlay | null>(null)
   const tileRef = useRef<L.TileLayer | null>(null)
   const targetRef = useRef<L.Marker | null>(null)
   const homeRef = useRef<L.Marker | null>(null)
@@ -100,6 +103,8 @@ export default function MapView({
       })
     })
     trailRef.current = L.polyline([], { color: '#4684C5', weight: 3, opacity: 0.85 }).addTo(map)
+    // Under the vehicle and its trail: the plan is context, not the subject.
+    missionRef.current = createMissionOverlay(map)
     mapRef.current = map
 
     // Leaflet caches its container's size and only watches the window, so any
@@ -121,6 +126,7 @@ export default function MapView({
       mapRef.current = null
       markerRef.current = null
       trailRef.current = null
+      missionRef.current = null
       tileRef.current = null
       targetRef.current = null
       homeRef.current = null
@@ -171,6 +177,24 @@ export default function MapView({
       }
     })
     return unsub
+  }, [])
+
+  useEffect(() => {
+    const draw = () => {
+      missionRef.current?.update(
+        useMissionStore.getState().plan.items,
+        useVehicleStore.getState().missionSeq,
+      )
+    }
+    draw()
+    // Two sources, one drawing: the plan changes when it is edited or read
+    // back from the vehicle, the current item changes as it is flown.
+    const unsubPlan = useMissionStore.subscribe(draw)
+    const unsubSeq = useVehicleStore.subscribe(draw)
+    return () => {
+      unsubPlan()
+      unsubSeq()
+    }
   }, [])
 
   useEffect(() => {
