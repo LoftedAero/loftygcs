@@ -106,7 +106,39 @@ These layering rules are enforced by ESLint (`import/no-restricted-paths`).
 | 5 | Flight screen: live map, HUD, arm/mode/takeoff, guided click-to-go | done (SITL flies) |
 | 6 | Mission planning: waypoints, survey grids, geofences and rally points | done (SITL-validated) |
 | 7 | Log review: MAVFTP download, dataflash parser, plots with expressions, record table, 3D replay | done (112 flown logs, 9 firmware versions) |
-| later | Joystick, signing UI, multi-vehicle, version-matched param metadata | — |
+
+### Toward feature-complete
+
+Triaged 2026-09-05 against Mission Planner, QGroundControl and Betaflight Configurator.
+Tackled **one at a time, in this order** — ordered so infrastructure lands before the
+features that ride on it (the tile cache serves terrain data too; unit preferences come
+before more readouts multiply; the inspector helps debug everything after it).
+
+| # | Feature | Why this position |
+| --- | --- | --- |
+| 1 | Log analysis link-outs (MAGFit / FilterReview / PIDReview) | Smallest item; closes an old roadmap promise |
+| 2 | MAVLink inspector | Early because it aids debugging every feature after it |
+| 3 | Display unit preferences (ft/m, kts/m/s) | Before new readout surfaces multiply |
+| 4 | Mission progress on the Fly screen (current item, distance, ETA) | Felt every flight; small |
+| 5 | Pre-arm / pre-flight panel | Distills SYS_STATUS + PreArm into "why won't it arm" |
+| 6 | Offline maps / tile prefetch | Map infrastructure; the cache also serves #7 |
+| 7 | Terrain elevation in planning | Rides the tile cache for elevation data |
+| 8 | KML / GPX import & export | Planning I/O; imported plans get terrain-checked by #7 |
+| 9 | MAVFTP file browser | Rides the existing FTP stack; unlocks Lua/fonts/terrain files |
+| 10 | Version-matched parameter metadata | Standalone service upgrade |
+| 11 | Camera & gimbal control | MAVLink camera/gimbal protocols; SITL can simulate a mount |
+| 12 | Physical joystick support | Last of the queue; needs careful SITL-first safety work |
+
+Deferred, revisit after the list above: ADS-B traffic display, BLHeli/AM32 ESC passthrough,
+shareable aircraft config bundles.
+
+### Non-goals
+
+Decided 2026-09-05, so they are not relitigated by default: PX4 support (this is an
+ArduPilot GCS throughout), multi-vehicle, telemetry-log (tlog) recording/replay, RTK/NTRIP
+injection, MAVLink signing UI, voice announcements, Follow Me, corridor and structure scan
+patterns, built-in FFT analysis (WebTools link-outs cover it), image geotagging, serial/u-center
+passthrough, on-screen virtual joystick, antenna tracker.
 
 Remaining hardware checks before calling v1 phases fully closed are in
 [docs/hardware-checklist.md](docs/hardware-checklist.md) — flashing on a sacrificial board,
