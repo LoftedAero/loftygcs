@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import { fieldUnit, parseDataflash, type ParsedLog } from '../protocol/dataflash'
+import {
+  fieldUnit,
+  getSeries,
+  parseDataflash,
+  type ParsedLog,
+  type Series,
+} from '../protocol/dataflash'
+import { evaluateExpression, expressionError } from '../protocol/log-expression'
 
 // The log being reviewed, and what is being looked at in it.
 //
@@ -9,10 +16,45 @@ import { fieldUnit, parseDataflash, type ParsedLog } from '../protocol/dataflash
 // to lose. A log large enough to be a problem should move the parse into a
 // worker before it moves it out of memory.
 
-export type LogView = 'plot' | 'table' | 'replay' | 'both'
+/**
+ * What occupies the upper half of the screen.
+ *
+ * The replay is always there. 'none' gives it the whole window, which is
+ * the state a log opens in: until you have asked for a number, a flight is
+ * a thing you watch. Plotting a field opens the plot above it, and the
+ * table takes the same space when you want records instead of curves.
+ */
+export type UpperPane = 'none' | 'plot' | 'table'
 
 /** Fraction of the height given to the plot in the split view. */
 const SPLIT_KEY = 'loftgcs.logs.split'
+
+const PRESETS_KEY = 'loftgcs.logs.presets'
+
+/**
+ * Saved plot setups.
+ *
+ * Kept per browser rather than beside the log: the interesting ones are
+ * "the six fields I always check first", which belong to the person doing
+ * the checking and not to any one flight.
+ */
+function loadPresets(): Record<string, SelectedField[]> {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : null
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, SelectedField[]>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function savePresets(presets: Record<string, SelectedField[]>): void {
+  try {
+    localStorage.setItem(PRESETS_KEY, JSON.stringify(presets))
+  } catch {
+    // Not remembering a preset is a nuisance, never a failure.
+  }
+}
 
 function loadSplit(): number {
   try {
@@ -27,10 +69,17 @@ function loadSplit(): number {
 /** How many y axes the plot will draw at once. */
 export const MAX_AXES = 4
 
-/** One field selected for plotting. */
+/**
+ * One trace on the plot: either a field, or an expression over fields.
+ *
+ * An expression carries its source text and shows it as its name -- there
+ * is no better label for "ATT.DesRoll - ATT.Roll" than itself.
+ */
 export interface SelectedField {
   message: string
   field: string
+  /** Set when this trace is computed rather than read. */
+  expression?: string
   /** Which y axis it is drawn against, 0-based. */
   axis: number
   /** Trace color. Unset means the default for its position in the list. */
@@ -126,7 +175,7 @@ interface LogState {
    */
   rawBytes: Uint8Array | null
   status: LogStatus
-  view: LogView
+  upper: UpperPane
   /** Fields drawn on the plot, in the order they were added. */
   selected: SelectedField[]
   /** Which message the table is showing; null means pick one. */
@@ -145,9 +194,17 @@ interface LogState {
   setStatus(status: LogStatus): void
   loadBytes(name: string, bytes: Uint8Array): void
   clear(): void
-  setView(view: LogView): void
+  setUpper(pane: UpperPane): void
   /** Add or remove a field. The axis is chosen for it; see defaultAxis. */
   toggleField(field: { message: string; field: string }): void
+  /** Plot a computed expression. Returns the problem, or null. */
+  addExpression(source: string): string | null
+
+  /** Saved plot setups, by name. */
+  presets: Record<string, SelectedField[]>
+  savePreset(name: string): void
+  loadPreset(name: string): void
+  deletePreset(name: string): void
   /** Move a plotted field to another axis. */
   setFieldAxis(field: { message: string; field: string }, axis: number): void
   /** Recolor a plotted field. */
@@ -196,16 +253,46 @@ interface LogState {
 
 const key = (f: { message: string; field: string }) => `${f.message}.${f.field}`
 
+/**
+ * The samples behind one trace, whether it was read or computed.
+ *
+ * Expressions are evaluated on demand rather than stored: the result is a
+ * pure function of the log and the text, and caching it would mean deciding
+ * when it goes stale. Logs are already in memory, so the arithmetic costs
+ * a few milliseconds.
+ */
+export function traceSeries(log: ParsedLog, f: SelectedField): Series | null {
+  if (!f.expression) return getSeries(log, f.message, f.field)
+  try {
+    const r = evaluateExpression(log, f.expression)
+    return { message: '', field: f.expression, unit: '', time: r.time, values: r.values }
+  } catch {
+    // A log that lacks a field the expression names -- the trace simply
+    // is not there, and PlottedFields says so beside its name.
+    return null
+  }
+}
+
+/** True when the expression actually reads something out of the log. */
+function referencesIn(log: ParsedLog, text: string): boolean {
+  try {
+    return evaluateExpression(log, text).references.length > 0
+  } catch {
+    return false
+  }
+}
+
 export const useLogStore = create<LogState>((set, get) => ({
   log: null,
   rawBytes: null,
   status: { kind: 'empty' },
-  view: 'plot',
+  upper: 'none',
   selected: [],
   tableMessage: null,
   search: '',
   shadeModes: true,
   timeWindow: null,
+  presets: loadPresets(),
   playhead: null,
   seekTo: null,
   split: loadSplit(),
@@ -239,14 +326,20 @@ export const useLogStore = create<LogState>((set, get) => ({
         // a guess at what the reader came for, and a wrong guess is a field
         // to remove before starting rather than a head start.
         selected: [],
+        upper: 'none',
         timeWindow: null,
-  playhead: null,
-  seekTo: null,
-  split: loadSplit(),
+        playhead: null,
+        seekTo: null,
+        split: loadSplit(),
         tableMessage: firstPresent(log, ['MODE', 'MSG', 'ATT']),
       })
     } catch (err) {
-      set({ status: { kind: 'error', text: err instanceof Error ? err.message : 'could not read that file' } })
+      set({
+        status: {
+          kind: 'error',
+          text: err instanceof Error ? err.message : 'could not read that file',
+        },
+      })
     }
   },
 
@@ -258,17 +351,20 @@ export const useLogStore = create<LogState>((set, get) => ({
       rawBytes: null,
       status: { kind: 'empty' },
       selected: [],
+      upper: 'none',
       timeWindow: null,
-  playhead: null,
-  seekTo: null,
-  split: loadSplit(),
+      playhead: null,
+      seekTo: null,
+      split: loadSplit(),
       tableMessage: null,
       search: '',
     })
   },
 
-  setView(view) {
-    set({ view })
+  setUpper(upper) {
+    // Opening a pane for the first time splits the window evenly; after
+    // that the divider is wherever the user last put it.
+    set((s) => (s.upper === 'none' && upper !== 'none' ? { upper, split: 0.5 } : { upper }))
   },
 
   toggleField(field) {
@@ -277,14 +373,63 @@ export const useLogStore = create<LogState>((set, get) => ({
     const without = selected.filter((f) => key(f) !== k)
     if (without.length !== selected.length) {
       set({ selected: without })
+      if (without.length === 0 && get().upper === 'plot') set({ upper: 'none' })
       return
     }
+    // Asking for a field is asking to see it, so the plot opens itself.
+    if (get().upper !== 'plot') get().setUpper('plot')
     const unit = log ? fieldUnit(log, field.message, field.field) : ''
     const existing = selected.map((f) => ({
       axis: f.axis,
       unit: log ? fieldUnit(log, f.message, f.field) : '',
     }))
     set({ selected: [...selected, { ...field, axis: defaultAxis(existing, unit) }] })
+  },
+
+  addExpression(source) {
+    const { log, selected } = get()
+    if (!log) return 'Open a log first.'
+    const text = source.trim()
+    if (!text) return 'Type an expression, like ATT.DesRoll - ATT.Roll.'
+    if (selected.some((f) => f.expression === text)) return 'That expression is already plotted.'
+    const problem = expressionError(log, text)
+    if (problem) return problem
+    if (!referencesIn(log, text)) return 'That has no fields in it, so there is nothing to plot.'
+    // Expressions carry no unit -- the arithmetic could have produced
+    // anything -- so they take the next free axis rather than joining one
+    // by a unit they do not have.
+    const existing = selected.map((f) => ({
+      axis: f.axis,
+      unit: f.expression ? '' : fieldUnit(log, f.message, f.field),
+    }))
+    if (get().upper !== 'plot') get().setUpper('plot')
+    set({
+      selected: [
+        ...get().selected,
+        { message: '', field: text, expression: text, axis: defaultAxis(existing, '') },
+      ],
+    })
+    return null
+  },
+
+  savePreset(name) {
+    const presets = { ...get().presets, [name.trim()]: get().selected.map((f) => ({ ...f })) }
+    set({ presets })
+    savePresets(presets)
+  },
+
+  loadPreset(name) {
+    const preset = get().presets[name]
+    if (!preset) return
+    set({ selected: preset.map((f) => ({ ...f })) })
+    if (preset.length > 0) get().setUpper('plot')
+  },
+
+  deletePreset(name) {
+    const presets = { ...get().presets }
+    delete presets[name]
+    set({ presets })
+    savePresets(presets)
   },
 
   setFieldColor(field, color) {
@@ -325,6 +470,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   clearFields() {
     set({ selected: [] })
+    if (get().upper === 'plot') set({ upper: 'none' })
   },
 
   setTableMessage(tableMessage) {

@@ -10,6 +10,7 @@
 
 import { connectionService } from './connection'
 import { useLogStore, type VehicleLog } from '../stores/log-store'
+import { serializeParamFile } from '../protocol/param-file'
 
 /**
  * Where logs live, most likely first.
@@ -103,7 +104,28 @@ export async function downloadVehicleLog(log: VehicleLog): Promise<void> {
 
 /** Save the log currently open to a file, so it need not be fetched twice. */
 export function saveOpenLog(name: string, bytes: Uint8Array): void {
-  const blob = new Blob([bytes as unknown as BlobPart], { type: 'application/octet-stream' })
+  download(name, bytes, 'application/octet-stream')
+}
+
+/**
+ * Write the parameters a log carries out as a .param file.
+ *
+ * The same format the Parameters screen imports and exports, so a
+ * configuration recovered from a flight can be compared against a vehicle
+ * or loaded onto one -- which is most of why anyone wants it. It is the
+ * configuration the aircraft was flying under, not whatever it holds now.
+ */
+export function saveLogParams(logName: string, params: ReadonlyMap<string, number>): void {
+  const entries = [...params.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, value]) => ({ name, value }))
+  const base = logName.replace(/\.[^.]+$/, '')
+  download(`${base}.param`, serializeParamFile(entries), 'text/plain')
+}
+
+/** Hand a blob to the browser as a download. */
+function download(name: string, data: string | Uint8Array, type: string): void {
+  const blob = new Blob([data as unknown as BlobPart], { type })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

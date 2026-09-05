@@ -1,9 +1,15 @@
 import { useState } from 'react'
 import { LaButton, LaHint } from '../../components/La'
-import { fieldUnit, getSeries, seriesStats } from '../../../protocol/dataflash'
+import { fieldUnit, seriesStats } from '../../../protocol/dataflash'
 import { fieldLabel } from '../../../protocol/log-labels'
 import { logEnd } from '../../../protocol/log-modes'
-import { MAX_AXES, TRACE_COLORS, traceColor, useLogStore } from '../../../stores/log-store'
+import {
+  MAX_AXES,
+  TRACE_COLORS,
+  traceColor,
+  traceSeries,
+  useLogStore,
+} from '../../../stores/log-store'
 
 // What is on the plot, and which y axis each trace is drawn against.
 //
@@ -47,10 +53,12 @@ export default function PlottedFields() {
 
       {selected.map((f, i) => {
         const id = `${f.message}.${f.field}`
-        const named = fieldLabel(log.params, f.message, f.field)
-        const unit = fieldUnit(log, f.message, f.field)
+        // An expression is its own name and has no unit: the arithmetic
+        // could have turned metres into anything.
+        const named = f.expression ? null : fieldLabel(log.params, f.message, f.field)
+        const unit = f.expression ? '' : fieldUnit(log, f.message, f.field)
         const color = traceColor(f, i)
-        const series = getSeries(log, f.message, f.field)
+        const series = traceSeries(log, f)
         // Over the visible window, not the whole log: the number worth
         // reading is the one for what is on screen.
         const stats = series
@@ -67,13 +75,13 @@ export default function PlottedFields() {
                 aria-expanded={picking === id}
                 onClick={() => setPicking(picking === id ? null : id)}
               />
-              <span className="plotted__name">
-                {f.message}.{f.field}
+              <span className="plotted__name" title={f.expression ?? undefined}>
+                {f.expression ?? `${f.message}.${f.field}`}
               </span>
               <button
                 type="button"
                 className="fence-item__x"
-                aria-label={`Remove ${f.message}.${f.field}`}
+                aria-label={`Remove ${f.expression ?? `${f.message}.${f.field}`}`}
                 onClick={() => toggleField(f)}
               >
                 ✕
@@ -96,10 +104,12 @@ export default function PlottedFields() {
                 ))}
               </div>
             )}
-            <div className="plotted__meta">
-              {named && <span className="plotted__fn">{named}</span>}
-              {unit && <span className="plotted__unit">{unit}</span>}
-            </div>
+            {(named || unit) && (
+              <div className="plotted__meta">
+                {named && <span className="plotted__fn">{named}</span>}
+                {unit && <span className="plotted__unit">{unit}</span>}
+              </div>
+            )}
             {stats && stats.count > 0 && (
               <dl className="plotted__stats">
                 <div>

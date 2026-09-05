@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
-import { defaultAxis, isSelected, MAX_AXES, useLogStore } from './log-store'
+import { getSeries } from '../protocol/dataflash'
+import { defaultAxis, isSelected, MAX_AXES, traceSeries, useLogStore } from './log-store'
 
 const bytes = new Uint8Array(gunzipSync(readFileSync('src/test-fixtures/copter-sitl.bin.gz')))
 const store = () => useLogStore.getState()
@@ -58,6 +59,143 @@ describe('choosing fields to plot', () => {
     expect(isSelected(useLogStore.getState(), { message: 'RCOU', field: 'C1' })).toBe(true)
     // Same field name, different message: not the same series.
     expect(isSelected(useLogStore.getState(), { message: 'RCIN', field: 'C1' })).toBe(false)
+  })
+})
+
+describe('the upper pane follows what was asked for', () => {
+  beforeEach(() => store().loadBytes('flight.bin', bytes))
+
+  it('opens on the replay alone, with no pane above it', () => {
+    expect(store().upper).toBe('none')
+  })
+
+  it('opens the plot when a field is picked, and closes it with the last one', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    expect(store().upper).toBe('plot')
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    // Nothing left to plot means nothing to look at: back to the replay.
+    expect(store().upper).toBe('none')
+  })
+
+  it('leaves the table alone when a field is removed from under it', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().setUpper('table')
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    expect(store().upper).toBe('table')
+  })
+
+  it('splits the window evenly the first time a pane opens', () => {
+    store().setSplit(0.8)
+    store().setUpper('none')
+    store().setUpper('plot')
+    expect(store().split).toBe(0.5)
+    // But not again -- after that the divider stays where it was put.
+    store().setSplit(0.3)
+    store().setUpper('table')
+    expect(store().split).toBe(0.3)
+  })
+})
+
+describe('plotting an expression', () => {
+  beforeEach(() => {
+    store().loadBytes('flight.bin', bytes)
+    store().clearFields()
+  })
+
+  it('adds a computed trace and opens the plot for it', () => {
+    expect(store().addExpression('ATT.DesRoll - ATT.Roll')).toBeNull()
+    expect(store().upper).toBe('plot')
+    expect(store().selected[0]).toMatchObject({ expression: 'ATT.DesRoll - ATT.Roll' })
+  })
+
+  it('computes its samples on demand', () => {
+    store().addExpression('BARO.Alt * 2')
+    const s = traceSeries(store().log!, store().selected[0]!)!
+    const alt = getSeries(store().log!, 'BARO', 'Alt')!
+    expect(s.values.length).toBe(alt.values.length)
+    expect(s.values[5]).toBeCloseTo(alt.values[5]! * 2, 9)
+  })
+
+  it('names the problem rather than adding a broken trace', () => {
+    expect(store().addExpression('ATT.Nope + 1')).toMatch(/no ATT\.Nope/)
+    expect(store().addExpression('2 + 2')).toMatch(/nothing to plot/)
+    expect(store().addExpression('   ')).toMatch(/Type an expression/)
+    expect(store().selected).toEqual([])
+    // And none of that opened a plot with nothing on it.
+    expect(store().upper).toBe('none')
+  })
+
+  it('refuses the same expression twice', () => {
+    expect(store().addExpression('ATT.Roll * 2')).toBeNull()
+    expect(store().addExpression('  ATT.Roll * 2  ')).toMatch(/already plotted/)
+    expect(store().selected).toHaveLength(1)
+  })
+
+  it('gives an expression its own axis rather than a unit it does not have', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().addExpression('ATT.DesRoll - ATT.Roll')
+    expect(store().selected[1]!.axis).not.toBe(store().selected[0]!.axis)
+  })
+
+  it('removes it again by the same toggle a field uses', () => {
+    store().addExpression('ATT.Roll * 2')
+    store().toggleField(store().selected[0]!)
+    expect(store().selected).toEqual([])
+  })
+})
+
+describe('saved plot setups', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    useLogStore.setState({ presets: {} })
+    store().loadBytes('flight.bin', bytes)
+    store().clearFields()
+  })
+
+  it('brings back the fields, axes, colors and expressions', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().addExpression('ATT.DesRoll - ATT.Roll')
+    store().setFieldColor({ message: 'ATT', field: 'Roll' }, '#123456')
+    store().setFieldAxis({ message: 'ATT', field: 'Roll' }, 2)
+    store().savePreset('attitude')
+
+    store().clearFields()
+    expect(store().selected).toEqual([])
+    store().loadPreset('attitude')
+    expect(store().selected).toHaveLength(2)
+    expect(store().selected[0]).toMatchObject({ field: 'Roll', color: '#123456', axis: 2 })
+    expect(store().selected[1]!.expression).toBe('ATT.DesRoll - ATT.Roll')
+    expect(store().upper).toBe('plot')
+  })
+
+  it('survives the store being rebuilt, which is the whole point', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().savePreset('attitude')
+    expect(JSON.parse(localStorage.getItem('loftgcs.logs.presets')!)).toHaveProperty('attitude')
+  })
+
+  it('replaces a preset saved under a name already used', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().savePreset('one')
+    store().toggleField({ message: 'ATT', field: 'Pitch' })
+    store().savePreset('one')
+    expect(Object.keys(store().presets)).toEqual(['one'])
+    expect(store().presets['one']).toHaveLength(2)
+  })
+
+  it('forgets one when deleted', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().savePreset('one')
+    store().deletePreset('one')
+    expect(store().presets).toEqual({})
+    expect(JSON.parse(localStorage.getItem('loftgcs.logs.presets')!)).toEqual({})
+  })
+
+  it('keeps its presets when a log is closed', () => {
+    store().toggleField({ message: 'ATT', field: 'Roll' })
+    store().savePreset('one')
+    store().clear()
+    expect(Object.keys(store().presets)).toEqual(['one'])
   })
 })
 

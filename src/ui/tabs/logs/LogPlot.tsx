@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getSeries, type Series } from '../../../protocol/dataflash'
+import { type Series } from '../../../protocol/dataflash'
 import { fieldLabel } from '../../../protocol/log-labels'
-import { MAX_AXES, traceColor, useLogStore } from '../../../stores/log-store'
+import { MAX_AXES, traceColor, traceSeries, useLogStore } from '../../../stores/log-store'
 import { modeSpans, type ModeSpan } from '../../../protocol/log-modes'
 
 // The time-series plot, drawn on a canvas.
@@ -61,10 +61,7 @@ export function axisRanges(
   for (const s of series) {
     const r = rangeOf(s, view)
     const have = out.get(s.axis)
-    out.set(
-      s.axis,
-      have ? { min: Math.min(have.min, r.min), max: Math.max(have.max, r.max) } : r,
-    )
+    out.set(s.axis, have ? { min: Math.min(have.min, r.min), max: Math.max(have.max, r.max) } : r)
   }
   for (const [axis, r] of out) {
     if (r.min === r.max) out.set(axis, { min: r.min - 1, max: r.max + 1 })
@@ -97,7 +94,7 @@ export default function LogPlot() {
     if (!log) return []
     return selected
       .map((f, i) => {
-        const s = getSeries(log, f.message, f.field)
+        const s = traceSeries(log, f)
         return s ? { ...s, axis: f.axis, color: traceColor(f, i) } : null
       })
       .filter((s): s is PlottedSeries => s !== null)
@@ -160,8 +157,8 @@ export default function LogPlot() {
     <div className="log-plot" ref={wrapRef}>
       {series.length === 0 && (
         <p className="log-plot__hint app-placeholder">
-          Pick a field on the left to plot it. Fields are grouped by the message that carries
-          them, and RC and servo channels are named by what they do on this aircraft.
+          Pick a field on the left to plot it. Fields are grouped by the message that carries them,
+          and RC and servo channels are named by what they do on this aircraft.
         </p>
       )}
       <canvas
@@ -261,14 +258,17 @@ function Legend({
   return (
     <div className="log-legend">
       {series.map((s) => {
-        const named = params ? fieldLabel(params, s.message, s.field) : null
+        // An expression has no message, so it is named by its own text --
+        // and there is no servo function to look up for arithmetic.
+        const label = s.message ? `${s.message}.${s.field}` : s.field
+        const named = params && s.message ? fieldLabel(params, s.message, s.field) : null
         const at = cursor !== null ? sampleAt(s, cursor) : null
         return (
-          <span key={`${s.message}.${s.field}`} className="log-legend__item">
+          <span key={label} className="log-legend__item">
             <span className="log-legend__swatch" style={{ background: s.color }} />
             <span className="log-legend__axis">Y{s.axis + 1}</span>
             <span className="log-legend__name">
-              {s.message}.{s.field}
+              {label}
               {/* The whole point of the labels: "RCOU.C3" means nothing,
                   "RCOU.C3 (Motor 3)" means everything. */}
               {named && <em className="log-legend__fn"> {named}</em>}
@@ -279,7 +279,9 @@ function Legend({
           </span>
         )
       })}
-      {cursor !== null && view && <span className="log-legend__time">t = {cursor.toFixed(2)} s</span>}
+      {cursor !== null && view && (
+        <span className="log-legend__time">t = {cursor.toFixed(2)} s</span>
+      )}
     </div>
   )
 }

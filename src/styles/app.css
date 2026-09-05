@@ -3609,6 +3609,72 @@ body.is-splitting .flight-map {
   pointer-events: none;
 }
 
+/* Typing a trace the log does not contain, under the list of the ones it
+   does: the field names an expression needs are the ones just above it. */
+.log-expr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+  flex: none;
+  padding-top: var(--la-space-2);
+  border-top: 1px solid var(--la-line);
+}
+.log-expr__examples {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.log-expr__example {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 2px var(--la-space-1);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-blue);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.log-expr__example:hover {
+  background: var(--la-bg);
+}
+
+/* A saved plot setup: load it by name, or throw it away. */
+.preset {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+}
+.preset__load {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  padding: var(--la-space-1) var(--la-space-2);
+  cursor: pointer;
+  font-size: var(--la-size-xs);
+  color: var(--la-ink);
+  text-align: left;
+}
+.preset__load:hover {
+  border-color: var(--la-blue);
+}
+.preset__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* One plotted field, and the y axis it is drawn against. */
 .plotted {
   padding: var(--la-space-2);

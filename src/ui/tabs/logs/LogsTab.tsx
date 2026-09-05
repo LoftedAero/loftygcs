@@ -2,8 +2,10 @@ import { useRef, useState } from 'react'
 import { LaButton, LaHint, LaSwitch } from '../../components/La'
 import { useLogStore } from '../../../stores/log-store'
 import { openLogFile } from '../../../services/log-file'
-import { saveOpenLog } from '../../../services/log-download'
+import { saveLogParams, saveOpenLog } from '../../../services/log-download'
 import VehicleLogs from './VehicleLogs'
+import ExpressionInput from './ExpressionInput'
+import PlotPresets from './PlotPresets'
 import PlottedFields from './PlottedFields'
 import LogPlot from './LogPlot'
 import LogTable from './LogTable'
@@ -14,9 +16,9 @@ import Divider from '../../components/Divider'
 // Reviewing a flight log.
 //
 //   ┌─────────┬────────────────────┬──────────┐
-//   │ fields  │ plot, or the       │ open,    │
-//   │ to plot │ record table       │ download,│
-//   │         │                    │ view     │
+//   │ fields  │ plot, or the table │ open,    │
+//   │ to plot ├────────────────────┤ download,│
+//   │         │ 3D replay          │ view     │
 //   └─────────┴────────────────────┴──────────┘
 //
 // Three columns, the shape the OSD screen uses: the long list of things you
@@ -26,6 +28,13 @@ import Divider from '../../components/Divider'
 // setting to adjust, and six hundred fields squeezed into the actions
 // column left no room for the actions.
 //
+// The replay owns the middle column and a log opens straight into it, full
+// height: before you have asked for a number, a flight is a thing you
+// watch. Plotting a field splits the space and puts the plot above it; the
+// table takes that same upper half when you want records instead of curves.
+// So the view follows what you asked for rather than being a mode to
+// remember to switch.
+//
 // Everything happens in the page: a log is never uploaded anywhere, which is
 // worth saying out loud since the browser tools people currently use for
 // this make a point of the same promise.
@@ -33,8 +42,8 @@ import Divider from '../../components/Divider'
 export default function LogsTab() {
   const log = useLogStore((s) => s.log)
   const status = useLogStore((s) => s.status)
-  const view = useLogStore((s) => s.view)
-  const setView = useLogStore((s) => s.setView)
+  const upper = useLogStore((s) => s.upper)
+  const setUpper = useLogStore((s) => s.setUpper)
   const shadeModes = useLogStore((s) => s.shadeModes)
   const split = useLogStore((s) => s.split)
   const setSplit = useLogStore((s) => s.setSplit)
@@ -55,28 +64,24 @@ export default function LogsTab() {
 
   return (
     <div className="log-screen">
-      <div
-        className={
-          log && (view === 'plot' || view === 'both') ? 'log-body log-body--fields' : 'log-body'
-        }
-      >
-        {log && (view === 'plot' || view === 'both') && (
+      <div className={log ? 'log-body log-body--fields' : 'log-body'}>
+        {/* Always beside an open log, whichever pane is up: picking a
+            field is how the plot gets opened in the first place, so hiding
+            the list until there is a plot leaves no way in. */}
+        {log && (
           <aside className="log-fields">
             <h3 className="app-col__head">Fields</h3>
             <FieldPicker />
+            <ExpressionInput />
           </aside>
         )}
 
         <div className="log-main">
           {!log ? (
             <Welcome status={status} busy={busy} onOpen={() => void open()} />
-          ) : view === 'plot' ? (
-            <LogPlot />
-          ) : view === 'replay' ? (
+          ) : upper === 'none' ? (
             <LogReplay />
-          ) : view === 'both' ? (
-            // Plot above, replay below, the way plot.ardupilot.org stacks
-            // them -- and a drag on either sends the other to that instant.
+          ) : (
             <div
               className="log-split"
               ref={mainRef}
@@ -87,9 +92,7 @@ export default function LogsTab() {
                 } as React.CSSProperties
               }
             >
-              <div className="log-split__pane">
-                <LogPlot />
-              </div>
+              <div className="log-split__pane">{upper === 'plot' ? <LogPlot /> : <LogTable />}</div>
               <Divider
                 orientation="horizontal"
                 containerRef={mainRef}
@@ -100,8 +103,6 @@ export default function LogsTab() {
                 <LogReplay />
               </div>
             </div>
-          ) : (
-            <LogTable />
           )}
         </div>
 
@@ -125,6 +126,15 @@ export default function LogsTab() {
                 >
                   Save to file
                 </LaButton>
+                <LaButton
+                  variant="secondary"
+                  size="block"
+                  disabled={!log.params.size}
+                  title="Write the parameters recorded in this log to a .param file"
+                  onClick={() => saveLogParams(describe(status) || 'log', log.params)}
+                >
+                  Save parameters ({log.params.size})
+                </LaButton>
                 <LaButton variant="ghost" size="block" onClick={clear}>
                   Close log
                 </LaButton>
@@ -138,21 +148,27 @@ export default function LogsTab() {
             <>
               <section className="app-col__group">
                 <h3 className="app-col__head">View</h3>
-                <div className="log-viewswitch" role="tablist" aria-label="View">
-                  {(['plot', 'both', 'replay', 'table'] as const).map((v) => (
+                <div className="log-viewswitch" role="radiogroup" aria-label="Upper pane">
+                  {(
+                    [
+                      ['none', '3D only'],
+                      ['plot', 'Plot'],
+                      ['table', 'Table'],
+                    ] as const
+                  ).map(([id, label]) => (
                     <button
-                      key={v}
+                      key={id}
                       type="button"
-                      role="tab"
-                      aria-selected={view === v}
-                      className={`log-viewswitch__btn${view === v ? ' is-active' : ''}`}
-                      onClick={() => setView(v)}
+                      role="radio"
+                      aria-checked={upper === id}
+                      className={`log-viewswitch__btn${upper === id ? ' is-active' : ''}`}
+                      onClick={() => setUpper(id)}
                     >
-                      {v === 'plot' ? 'Plot' : v === 'both' ? 'Both' : v === 'replay' ? '3D' : 'Table'}
+                      {label}
                     </button>
                   ))}
                 </div>
-                {(view === 'plot' || view === 'both') && (
+                {upper === 'plot' && (
                   <>
                     <LaSwitch
                       label="Shade by flight mode"
@@ -162,13 +178,14 @@ export default function LogsTab() {
                     {/* Gestures are not discoverable by looking at a canvas. */}
                     <LaHint>
                       Drag across the plot to zoom to that stretch. Shift-drag pans, the wheel
-                      zooms, and a double-click puts it all back.
+                      zooms, a double-click puts it all back, and a click sends the replay there.
                     </LaHint>
                   </>
                 )}
               </section>
 
-              {(view === 'plot' || view === 'both') && <PlottedFields />}
+              <PlottedFields />
+              <PlotPresets />
             </>
           )}
         </aside>
@@ -190,8 +207,8 @@ function Welcome({
     <div className="log-welcome">
       <h2 className="log-welcome__title">Flight logs</h2>
       <p className="app-placeholder">
-        Open a dataflash <code>.bin</code> to plot it and read its records. Parsing happens in
-        this window — the log is not uploaded anywhere.
+        Open a dataflash <code>.bin</code> to plot it and read its records. Parsing happens in this
+        window — the log is not uploaded anywhere.
       </p>
       <p className="app-placeholder">
         RC and servo channels are named by what they do on the aircraft that flew, read from the
