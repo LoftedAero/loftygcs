@@ -51,15 +51,17 @@ Two options, and they are not interchangeable:
 - **Simulator** (desktop only): downloads and runs real ArduPilot SITL, then connects over TCP.
   This is the actual firmware — ~1400 parameters over MAVFTP, real arming checks, real mode
   logic. Prebuilt SITL binaries exist for Windows only; on macOS and Linux run `sim_vehicle.py`
-  yourself and use *Connect to a running simulator*. Both live on the Overview tab.
+  yourself and use *Connect to a running simulator*. Demo mode is in the connection menu;
+  the simulator is in the app bar's **Simulator** tray, which carries a dot while one is
+  running.
 
 There is no browser option for real SITL: ArduPilot has no WebAssembly build, and the artifact
 sandbox blocks the WebSocket a remote simulator would need.
 
 ## Navigation
 
-Two levels. The top level is a **mode** — *Setup*, *Fly*, *Mission*, or *Simulator* — chosen
-from the app bar; the latter three are full-window, so only Setup carries a tab rail. The
+Two levels. The top level is a **mode** — *Setup*, *Fly*, or *Mission* — chosen
+from the app bar; the latter two are full-window, so only Setup carries a tab rail. The
 rail runs in bring-up order: Overview, Firmware, Configuration, Ports, Sensors, Radio,
 Flight modes, Outputs, Power, Failsafes, Tuning, OSD, Parameters, Logs. Ports sits ahead of
 Sensors on purpose — serial protocol assignment decides whether the external compass and GPS

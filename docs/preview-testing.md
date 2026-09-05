@@ -150,16 +150,16 @@ Radio** and **Setup ▸ Sensors** — the calibration flows are the ones designe
 to be better than what you are used to, so they are the ones where being
 told "this is confusing" is most valuable.
 
-The desktop app can also run a real ArduPilot simulator for you: **Simulator
-▸ Install**, then **Start**, then connect over TCP to `127.0.0.1:5760`.
+The desktop app can also run a real ArduPilot simulator for you: open the
+**Simulator** tray in the app bar, then **Install**, then **Start** — it
+connects itself. The dot on that button stays lit while one is running.
 
 ---
 
 ## What is missing, so you don't report it
 
-- **Log download and analysis** is not built — the Logs tab is a placeholder.
-- **Geofences and rally points** are not in the mission editor yet.
-- **Survey and grid patterns** are not built.
+- **The 3D log replay's attitude has only been checked against a hovering copter.** The
+  aircraft should bank the way it did; if it does not, that is worth reporting.
 - **The app does not update itself.** You will be sent a new build.
 - Firmware flashing is written but has never run against a real board.
 

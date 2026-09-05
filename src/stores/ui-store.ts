@@ -6,11 +6,15 @@ import { useParamStore } from './param-store'
 // full-window. Both Mission Planner and QGC
 // arrived at the same split, because configuring and operating an aircraft
 // are different activities that want different screens.
+//
+// The simulator used to be a fourth mode and is not one: it is something
+// you switch on before doing one of these, not an activity in itself. It
+// lives in the app bar's tray (SimTray) so it stays reachable from whatever
+// screen the work is on.
 export const MODES = [
   { id: 'setup', label: 'Setup' },
   { id: 'fly', label: 'Fly' },
   { id: 'mission', label: 'Mission' },
-  { id: 'simulator', label: 'Simulator' },
 ] as const
 
 export type ModeId = (typeof MODES)[number]['id']
@@ -53,6 +57,16 @@ interface UiState {
   connectModalOpen: boolean
   setConnectModalOpen: (open: boolean) => void
 
+  /**
+   * The app bar's simulator tray.
+   *
+   * In the store rather than inside SimTray because other screens send
+   * people to it -- Overview's "Run a simulator…" used to be a mode switch,
+   * and pointing at the tray keeps that route working.
+   */
+  simTrayOpen: boolean
+  setSimTrayOpen: (open: boolean) => void
+
   /** Non-null while a navigation is waiting on staged parameter edits. */
   pendingNav: PendingNav | null
   /** Go where the user asked, guard already satisfied. */
@@ -83,6 +97,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   activeTab: 'overview',
   connectModalOpen: false,
   setConnectModalOpen: (connectModalOpen) => set({ connectModalOpen }),
+  simTrayOpen: false,
+  setSimTrayOpen: (simTrayOpen) => set({ simTrayOpen }),
   pendingNav: null,
 
   setMode: (mode) => {

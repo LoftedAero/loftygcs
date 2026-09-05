@@ -24,7 +24,6 @@ import ParamsTab from './ui/tabs/params/ParamsTab'
 import LogsTab from './ui/tabs/logs/LogsTab'
 import FlightTab from './ui/tabs/flight/FlightTab'
 import MissionTab from './ui/tabs/mission/MissionTab'
-import SimulatorTab from './ui/tabs/simulator/SimulatorTab'
 
 function SetupContent() {
   const activeTab = useUiStore((s) => s.activeTab)
@@ -76,7 +75,6 @@ export default function App() {
           {mode === 'setup' && (guideActive ? <GuideRunner /> : <SetupContent />)}
           {mode === 'fly' && <FlightTab />}
           {mode === 'mission' && <MissionTab />}
-          {mode === 'simulator' && <SimulatorTab />}
         </div>
       </main>
       <ActionBar />

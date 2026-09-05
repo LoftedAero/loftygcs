@@ -82,11 +82,35 @@ describe('the connection menu adapts to what the environment can do', () => {
   })
 
   it('offers them in the desktop app, which can open sockets', () => {
-    // The bar alone, not the whole app: a bare object is enough to say
-    // "Electron is here" for this question, but not enough to be the bridge
-    // the Simulator card would go on to call.
-    ;(window as unknown as Record<string, unknown>).loftgcs = {}
+    // A bare object used to be enough to say "Electron is here", because
+    // nothing in the bar called the bridge. The simulator tray does, so the
+    // fake has to carry the part of the surface it uses -- a fake thinner
+    // than the contract is a test that passes for the wrong reason.
+    ;(window as unknown as Record<string, unknown>).loftgcs = {
+      sim: {
+        status: () =>
+          Promise.resolve({
+            supported: true,
+            vehicles: [],
+            installed: [],
+            running: null,
+            port: 5760,
+          }),
+        onProgress: () => () => {},
+        onLog: () => () => {},
+        onExit: () => () => {},
+      },
+    }
     render(<AppBar />)
     expect(options()).toEqual(['USB serial', 'TCP', 'UDP', 'WebSocket', 'Demo'])
+  })
+
+  it('shows the simulator tray, dark, until something is running', () => {
+    render(<AppBar />)
+    // The dot is the reason the tray earns bar space: a SITL left running
+    // in the background is otherwise invisible from every screen.
+    const btn = screen.getByRole('button', { name: /simulator/i })
+    expect(btn.querySelector('.app-simtray__dot--off')).not.toBeNull()
+    expect(btn.getAttribute('title')).toMatch(/not running/i)
   })
 })

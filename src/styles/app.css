@@ -461,6 +461,104 @@
   background: var(--la-blue);
 }
 
+/* ── Simulator tray ──
+   In the bar rather than as a mode: a simulator is something you switch on
+   before flying or planning, not a third thing to do. The dot is the part
+   that earns the space -- one running in the background is easy to forget,
+   and it is visible from every screen. */
+.app-simtray {
+  position: relative;
+  flex: none;
+}
+.app-simtray__btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  height: 30px;
+  padding: 0 var(--la-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--la-radius-sm);
+  background: transparent;
+  color: var(--app-onbar-text);
+  font: inherit;
+  font-size: var(--la-size-sm);
+  cursor: pointer;
+  transition: background var(--la-ease), color var(--la-ease);
+}
+.app-simtray__btn:hover,
+.app-simtray__btn.is-open {
+  background: var(--app-onbar-hover);
+  color: #fff;
+}
+.app-simtray__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+.app-simtray__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--app-onbar-text);
+  opacity: 0.45;
+}
+/* Status only, never an action -- the house color rule. */
+.app-simtray__dot--ok {
+  background: var(--la-ok);
+  opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--la-ok) 30%, transparent);
+}
+.app-simtray__dot--busy {
+  background: var(--la-warn);
+  opacity: 1;
+}
+.app-simtray__dot--bad {
+  background: var(--la-bad);
+  opacity: 1;
+}
+
+.app-simtray__panel {
+  position: absolute;
+  top: calc(100% + var(--la-space-2));
+  /* Anchored to the button's right edge: it sits mid-bar, and a panel
+     hanging left of it would run off a narrow window. */
+  right: 0;
+  z-index: 600;
+  width: 320px;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  padding: var(--la-space-3);
+  background: var(--la-surface);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  box-shadow: var(--la-shadow-2);
+  color: var(--la-ink);
+}
+/* --la-ink, not --la-charcoal: charcoal is the app bar's *background* and
+   dark mode sends it the other way, which would print this heading in
+   near-black on a near-black panel. */
+.app-simtray__head {
+  margin: 0;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  color: var(--la-ink);
+}
+.app-simtray__note {
+  margin: 0;
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+}
+/* The panel is its own surface, so a row of buttons in it wraps rather
+   than pushing the panel wider than the bar it hangs from. */
+.app-simtray__panel .la-row {
+  flex-wrap: wrap;
+  gap: var(--la-space-2);
+}
+
 /* Top-level mode switch, in the app bar. Not orange: the bar already has
    one primary action (Connect), and two competing oranges would make
    neither read as the action. The active segment inverts instead. */

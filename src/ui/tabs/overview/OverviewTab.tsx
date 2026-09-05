@@ -10,7 +10,7 @@ import LiveVehiclePanel from './LiveVehiclePanel'
 // stays a status screen rather than another form.
 export default function OverviewTab() {
   const phase = useConnectionStore((s) => s.phase)
-  const setMode = useUiStore((s) => s.setMode)
+  const setSimTrayOpen = useUiStore((s) => s.setSimTrayOpen)
   const connected = phase === 'connected' || phase === 'linkLost'
 
   if (!connected) {
@@ -19,8 +19,8 @@ export default function OverviewTab() {
         <p className="app-placeholder">
           A cross-platform ground station for ArduPilot: guided setup and calibration in the style
           of the Betaflight and iNAV configurators, growing toward full Mission Planner feature
-          depth. Connect a flight controller over USB, or over the network from the desktop app —
-          or try it with no hardware at all:
+          depth. Connect a flight controller over USB, or over the network from the desktop app — or
+          try it with no hardware at all:
         </p>
         <div className="la-row">
           <LaButton
@@ -29,7 +29,7 @@ export default function OverviewTab() {
           >
             Start demo mode
           </LaButton>
-          <LaButton variant="ghost" onClick={() => setMode('simulator')}>
+          <LaButton variant="ghost" onClick={() => setSimTrayOpen(true)}>
             Run a simulator…
           </LaButton>
         </div>

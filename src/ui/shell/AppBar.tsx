@@ -4,6 +4,7 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { useVehicleStore } from '../../stores/vehicle-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
+import SimTray from './SimTray'
 import ThemeToggle from './ThemeToggle'
 import { hasIpLinks } from '../../env'
 import type { TransportKind } from '../../transport/Transport'
@@ -80,10 +81,15 @@ export default function AppBar() {
 
   return (
     <header className="la-appbar">
-      <img className="la-appbar__logo la-appbar__logo--badge" src={BRAND.iconPath} alt={BRAND.name} />
+      <img
+        className="la-appbar__logo la-appbar__logo--badge"
+        src={BRAND.iconPath}
+        alt={BRAND.name}
+      />
       <span className="la-appbar__title">{BRAND.name}</span>
       <ModeSwitch />
       <span className="la-appbar__spacer"></span>
+      <SimTray />
       <ThemeToggle />
       <LaReadout wide placeholder="Not connected" value={status} />
       <LaSelect

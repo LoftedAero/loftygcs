@@ -32,10 +32,16 @@ design decisions are recorded there and in code comments.
   `electron/preload.ts`, mirrored by `src/types/loftgcs.d.ts` — change them together.
 - **Branding**: app identity lives in `src/brand.ts` only ("Loft GCS" is a working name).
 - **Navigation** (`src/stores/ui-store.ts`): two levels. Top level is a *mode* — Setup, Fly,
-  Mission, Simulator — switched from the app bar; only Setup has the tab rail, and the others
+  Mission — switched from the app bar; only Setup has the tab rail, and the others
   (plus a running guide) take the whole window. The rail order is the bring-up sequence, and Ports
   deliberately precedes Sensors because SERIALn_PROTOCOL gates compass/GPS detection.
   The mode switch is never orange: Connect owns the app bar's one primary action.
+  **The simulator was a fourth mode and is not one** — it is something you switch on before
+  flying or planning, not an activity in itself, so it lives in the app bar's tray
+  (`ui/shell/SimTray.tsx`). Its open state is in `ui-store` because other screens send people
+  to it. The dot is the part that earns the bar space: a SITL left running in the background
+  is otherwise invisible, and the cost of forgetting is a mystery TCP connection or a second
+  simulator that will not bind.
 - **The actions column** (`.app-col` in `app.css`): every screen that edits something has a
   fixed-width column on the right holding what you *do*, beside the thing you are doing it to.
   Mission, Parameters and OSD share one set of classes so they cannot drift — they each grew a
@@ -139,7 +145,7 @@ binding it** — Windows lets a second bind succeed over a listening socket, so 
 "free" and you end up talking to the *previous* simulator at its own home; the runner instead
 gives up after three immediate exits and says so. `SITL=1 npm test` runs the integration suite against
 it (`src/protocol/*.integration.test.ts`, `electron/sitl-core.test.ts`). The desktop app can
-also install and run SITL itself — Overview > Simulator (`electron/sitl-core.ts`).
+also install and run SITL itself — the app bar's Simulator tray (`electron/sitl-core.ts`).
 
 ## Video test source
 

@@ -1,22 +1,25 @@
-import { useEffect, useState } from 'react'
-import { LaButton, LaCard, LaField, LaHint, LaInput, LaSelect } from '../../components/La'
-import { useSimStore } from '../../../stores/sim-store'
-import { useConnectionStore } from '../../../stores/connection-store'
-import { useMissionStore } from '../../../stores/mission-store'
-import { CMAC_HOME, parseHome } from '../../../sim-home'
+import { useState } from 'react'
+import { LaButton, LaField, LaHint, LaInput, LaSelect } from '../components/La'
+import { useSimStore } from '../../stores/sim-store'
+import { useConnectionStore } from '../../stores/connection-store'
+import { useMissionStore } from '../../stores/mission-store'
+import { CMAC_HOME, parseHome } from '../../sim-home'
 import {
   connectExternalSimulator,
   installSimulator,
-  simulatorAvailable,
   startSimulator,
   stopSimulator,
-  subscribeSimEvents,
-} from '../../../services/simulator'
+} from '../../services/simulator'
 
 // Run real ArduPilot instead of the built-in demo vehicle. Desktop only --
 // a browser cannot start a process, and there is no WebAssembly build of
 // ArduPilot to run in the page instead.
-export default function SimulatorCard() {
+//
+// The event subscription lives in SimTray, not here: the panel unmounts
+// every time it is dismissed, and a simulator that stopped reporting its
+// state because nobody had the tray open would be worse than no tray.
+
+export default function SimulatorControls({ onStarted }: { onStarted?: () => void }) {
   const status = useSimStore((s) => s.status)
   const phase = useSimStore((s) => s.phase)
   const progress = useSimStore((s) => s.progress)
@@ -26,10 +29,6 @@ export default function SimulatorCard() {
   const homeText = useSimStore((s) => s.homeText)
   const setHomeText = useSimStore((s) => s.setHomeText)
   const plannedHome = useMissionStore((s) => s.plan.home)
-
-  useEffect(() => subscribeSimEvents(), [])
-
-  if (!simulatorAvailable()) return null
 
   const busy = phase === 'installing' || phase === 'starting'
   const running = phase === 'running' || status?.running != null
@@ -44,14 +43,14 @@ export default function SimulatorCard() {
   const home = 'home' in parsed ? parsed.home : null
 
   return (
-    <LaCard
-      title="Simulator"
-      note={
-        status?.supported
-          ? 'Runs the real ArduPilot firmware locally — the full parameter set, real arming checks, and real flight modes.'
-          : 'Prebuilt SITL binaries are published for Windows only. Run sim_vehicle.py yourself and connect to it below.'
-      }
-    >
+    <>
+      <h3 className="app-simtray__head">Simulator</h3>
+      <p className="app-simtray__note">
+        {status?.supported
+          ? 'Real ArduPilot firmware, running locally — the full parameter set, real arming checks, real mode logic.'
+          : 'Prebuilt SITL binaries are published for Windows only. Run sim_vehicle.py yourself and connect to it below.'}
+      </p>
+
       {status?.supported && (
         <>
           <LaField label="Vehicle" htmlFor="sim-vehicle">
@@ -87,8 +86,8 @@ export default function SimulatorCard() {
             <LaHint error>{homeError}</LaHint>
           ) : (
             <LaHint>
-              Latitude and longitude, and optionally an altitude in meters and a heading in
-              degrees. Empty boots at CMAC, ArduPilot&rsquo;s usual test field.
+              Latitude and longitude, and optionally an altitude in meters and a heading in degrees.
+              Empty boots at CMAC, ArduPilot&rsquo;s usual test field.
             </LaHint>
           )}
           <div className="la-row">
@@ -129,7 +128,12 @@ export default function SimulatorCard() {
               <LaButton
                 variant="secondary"
                 disabled={busy || connected || !home}
-                onClick={() => void startSimulator(vehicle, home ?? undefined)}
+                onClick={() => {
+                  void startSimulator(vehicle, home ?? undefined)
+                  // Out of the way: what happens next is on the screen
+                  // behind this panel, not in it.
+                  onStarted?.()
+                }}
               >
                 {phase === 'starting' ? 'Starting…' : 'Start simulator'}
               </LaButton>
@@ -153,17 +157,21 @@ export default function SimulatorCard() {
           )}
         </>
       )}
+
       <div className="la-row">
         <LaButton
           variant="ghost"
           disabled={connected}
           title="Attach to a SITL you started yourself, on TCP 5760"
-          onClick={() => void connectExternalSimulator()}
+          onClick={() => {
+            void connectExternalSimulator()
+            onStarted?.()
+          }}
         >
           Connect to a running simulator
         </LaButton>
       </div>
       <LaHint error>{error}</LaHint>
-    </LaCard>
+    </>
   )
 }
