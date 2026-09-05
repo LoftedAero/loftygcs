@@ -145,6 +145,20 @@ design decisions are recorded there and in code comments.
   echoed traffic that the vehicle logic drops, because seeing your own heartbeat come back is
   how a UDP loop gets diagnosed. Only messages in this app's dialect can ever appear — MAVLink
   folds each message's definition into its CRC, so an unknown msgid cannot survive framing.
+- **Units convert at the edge and nowhere else** (`src/units.ts`, `stores/preferences-store.ts`).
+  Everything inside the app is SI because MAVLink is; feet and knots exist only in what a screen
+  shows and what a keyboard just produced. A field that displays a stored value converts on the
+  way out and back on the way in, and the stored number never moves — a units bug that reaches a
+  mission altitude is a flying-into-terrain bug, which is why there is a round-trip test for
+  exactly that. Climb rate has no control of its own: aviation reads it in ft/min wherever
+  distance is in feet, whatever the airspeed unit, so it follows the distance choice. HUD tape
+  steps change with the unit too, or the imperial tape scrolls three times too fast to read.
+- **User preferences are one versioned document, not a key per setting** (`preferences-store`).
+  Unknown keys are ignored and missing ones fall back, so adding a preference needs no migration
+  and an older build reading a newer store still works; only *reinterpreting* an existing key
+  bumps VERSION. The dialog is sectioned for the same reason — language is a section, and a flat
+  list that grows into groups later reorganizes under the user. Theme stays in `theme-store`
+  because it must be applied before first paint by an inline script; the dialog edits it there.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

@@ -15,7 +15,16 @@
 // Text is lifted off the background with a soft shadow rather than a hard
 // outline -- an outline at these sizes is what made the old HUD look thick.
 
-import { compassTicks, tapeTicks, type ArmReadiness } from './hud-draw'
+import { compassTicks, tapeTicks, type ArmReadiness, tapeStep } from './hud-draw'
+import {
+  formatSpeed,
+  formatVerticalSpeed,
+  speedLabel,
+  toDistance,
+  toSpeed,
+  verticalSpeedLabel,
+  type UnitPrefs,
+} from '../../../units'
 
 const SKY_TOP = '#1D5F9E'
 const SKY_LOW = '#79B9E8'
@@ -48,6 +57,8 @@ export interface HudState {
   relAltM: number
   climbMs: number
   throttlePct: number
+  /** What the reader has asked to see; the numbers above stay SI. */
+  units: UnitPrefs
   batteryText: string
   linkText: string
   modeName: string
@@ -181,8 +192,35 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   const tapeH = Math.max(80, (h - ribbonH) * 0.52)
   const tapeTop = Math.max(ribbonH + gap, cy - tapeH / 2)
   const tapeBottom = tapeTop + tapeH
-  paintTape(ctx, gap, tapeTop, tapeW, tapeH, st.airspeedMs, 5, s, 'left', write)
-  paintTape(ctx, w - tapeW - gap, tapeTop, tapeW, tapeH, st.relAltM, 10, s, 'right', write)
+  // Converted here rather than upstream: the tapes, the readouts under them
+  // and their labels all have to agree, and one conversion point is how
+  // they cannot drift apart.
+  const spd = st.units.speed
+  const dst = st.units.distance
+  paintTape(
+    ctx,
+    gap,
+    tapeTop,
+    tapeW,
+    tapeH,
+    toSpeed(st.airspeedMs, spd),
+    tapeStep('speed', spd),
+    s,
+    'left',
+    write,
+  )
+  paintTape(
+    ctx,
+    w - tapeW - gap,
+    tapeTop,
+    tapeW,
+    tapeH,
+    toDistance(st.relAltM, dst),
+    tapeStep('altitude', dst),
+    s,
+    'right',
+    write,
+  )
 
   paintAircraft(ctx, cx, cy, s)
 
@@ -193,10 +231,10 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   const u2 = u1 + 15 * s
   const left = gap
   const right = w - gap
-  pair('AS', st.airspeedMs.toFixed(1), left, u1, 'left')
-  pair('GS', st.groundspeedMs.toFixed(1), left, u2, 'left')
-  const vs = st.climbMs
-  pair('V/S', `${vs >= 0 ? '+' : ''}${vs.toFixed(1)}`, right, u1, 'right')
+  pair('AS', `${formatSpeed(st.airspeedMs, spd)} ${speedLabel(spd)}`, left, u1, 'left')
+  pair('GS', `${formatSpeed(st.groundspeedMs, spd)} ${speedLabel(spd)}`, left, u2, 'left')
+  const vs = formatVerticalSpeed(st.climbMs, dst)
+  pair('V/S', `${st.climbMs >= 0 ? '+' : ''}${vs} ${verticalSpeedLabel(dst)}`, right, u1, 'right')
   pair('THR', `${st.throttlePct.toFixed(0)}%`, right, u2, 'right')
 
   // The corners: battery bottom left, mode bottom right, link top right,
@@ -594,7 +632,11 @@ function paintTape(
         String(Math.round(t.value)),
         side === 'left' ? x + w - len - 4 * s : x + len + 4 * s,
         ty + 3.5 * s,
-        { size: 10 * s, color: 'rgba(255,255,255,0.85)', align: side === 'left' ? 'right' : 'left' },
+        {
+          size: 10 * s,
+          color: 'rgba(255,255,255,0.85)',
+          align: side === 'left' ? 'right' : 'left',
+        },
       )
     }
   }

@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { useUnits } from '../../../stores/preferences-store'
+import { distanceLabel, toDistance } from '../../../units'
 import { useMissionStore } from '../../../stores/mission-store'
 import { legStats, hasCoords } from '../../../protocol/mission-plan'
 import { commandSpec } from '../../../protocol/mission-commands'
@@ -22,6 +24,7 @@ const PAD = { left: 44, right: 16, top: 22, bottom: 22 }
 
 export default function AltitudeProfile() {
   const theme = useThemeStore((s) => s.resolved)
+  const units = useUnits()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const plan = useMissionStore((s) => s.plan)
   const selected = useMissionStore((s) => s.selected)
@@ -105,10 +108,14 @@ export default function AltitudeProfile() {
         }
       }
       ctx.textAlign = 'left'
-      ctx.fillText('m', 6, PAD.top)
+      ctx.fillText(distanceLabel(units.distance), 6, PAD.top)
       ctx.textAlign = 'right'
       ctx.textBaseline = 'top'
-      ctx.fillText(`${Math.round(maxD)} m`, PAD.left + plotW, PAD.top + plotH + 5)
+      ctx.fillText(
+        `${Math.round(toDistance(maxD, units.distance))} ${distanceLabel(units.distance)}`,
+        PAD.left + plotW,
+        PAD.top + plotH + 5,
+      )
 
       if (pts.length === 0) {
         pointsRef.current = []
@@ -151,7 +158,7 @@ export default function AltitudeProfile() {
     return () => observer.disconnect()
     // See LogPlot: the palette is read inside the draw, so the theme has
     // to be a dependency or the canvas keeps its last paint.
-  }, [plan, selected, theme])
+  }, [plan, selected, theme, units])
 
   return (
     <canvas

@@ -287,31 +287,31 @@
 :root[data-theme='dark'] {
   /* Brand, lifted for a dark ground. Orange keeps its hue and gains a
      little lightness; the "deep" and "soft" roles swap purpose. */
-  --la-orange: #F7A343;
-  --la-orange-deep: #FFB863; /* now the *lighter* one: legible on dark */
-  --la-orange-soft: #3A2A14; /* a wash to sit behind text, not a tint */
-  --la-gold: #FFD166;
-  --la-blue: #5B9BD9;
-  --la-blue-deep: #8FC0EE;
-  --la-blue-soft: #17293A;
+  --la-orange: #f7a343;
+  --la-orange-deep: #ffb863; /* now the *lighter* one: legible on dark */
+  --la-orange-soft: #3a2a14; /* a wash to sit behind text, not a tint */
+  --la-gold: #ffd166;
+  --la-blue: #5b9bd9;
+  --la-blue-deep: #8fc0ee;
+  --la-blue-soft: #17293a;
   /* The app bar. Lighter than the window behind it, because on a dark
      theme elevation reads as lightness. */
-  --la-charcoal: #26272B;
+  --la-charcoal: #26272b;
 
   /* Neutrals, the ramp inverted. */
-  --la-ink: #E8E9ED;
-  --la-ink-2: #B4B6BE;
-  --la-ink-3: #8A8D96;
+  --la-ink: #e8e9ed;
+  --la-ink-2: #b4b6be;
+  --la-ink-3: #8a8d96;
   --la-line: #303238;
-  --la-line-strong: #43464E;
-  --la-surface: #1C1D21;
+  --la-line-strong: #43464e;
+  --la-surface: #1c1d21;
   --la-surface-2: #232429;
   --la-bg: #131417;
 
   /* Semantic. Both are lifted: the light-mode green and red are chosen to
      be legible on white and go muddy on black. */
-  --la-ok: #4ECB71;
-  --la-bad: #FF6B6B;
+  --la-ok: #4ecb71;
+  --la-bad: #ff6b6b;
 
   /* Shadows do almost nothing on a dark ground, so they carry less of the
      work and a border carries more. Kept, deepened, for the modal and the
@@ -340,12 +340,12 @@
 
   /* Status chips: pale pill with dark text is unreadable inverted. */
   & .la-led--ok .la-led__dot {
-    background: #14301C;
-    color: #79E098;
+    background: #14301c;
+    color: #79e098;
   }
   & .la-led--bad .la-led__dot {
-    background: #3A1A1A;
-    color: #FF8F88;
+    background: #3a1a1a;
+    color: #ff8f88;
   }
   /* The scrim needs to be darker than the window it covers, and the window
      is already nearly black. */
@@ -439,7 +439,9 @@
   background: transparent;
   color: var(--app-onbar-text);
   cursor: pointer;
-  transition: background var(--la-ease), color var(--la-ease);
+  transition:
+    background var(--la-ease),
+    color var(--la-ease);
 }
 .app-theme-toggle:hover {
   background: var(--app-onbar-hover);
@@ -459,6 +461,28 @@
   height: 4px;
   border-radius: 50%;
   background: var(--la-blue);
+}
+
+/* Preferences: sections rather than a flat list of controls, because the
+   settings still to land here (language, and what follows) are sections too
+   and a list that grows into groups later reorganizes under the user. */
+.prefs__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+.prefs__group + .prefs__group {
+  margin-top: var(--la-space-5);
+  padding-top: var(--la-space-4);
+  border-top: 1px solid var(--la-line);
+}
+.prefs__head {
+  margin: 0;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
 }
 
 /* ── MAVLink inspector ──
@@ -597,7 +621,9 @@
   padding: var(--la-space-2) var(--la-space-4);
   border-radius: var(--la-radius-sm);
   cursor: default;
-  transition: background var(--la-ease), color var(--la-ease);
+  transition:
+    background var(--la-ease),
+    color var(--la-ease);
 }
 .app-simtray__btn:hover {
   background: var(--app-onbar-hover);
@@ -703,7 +729,9 @@
   padding: var(--la-space-2) var(--la-space-4);
   border-radius: var(--la-radius-sm);
   cursor: default;
-  transition: background var(--la-ease), color var(--la-ease);
+  transition:
+    background var(--la-ease),
+    color var(--la-ease);
 }
 
 .app-modes__item:hover {
@@ -761,7 +789,9 @@
   border-left: 3px solid transparent;
   border-radius: var(--la-radius-sm);
   cursor: default;
-  transition: background var(--la-ease), color var(--la-ease);
+  transition:
+    background var(--la-ease),
+    color var(--la-ease);
 }
 
 .app-nav__item:hover {
@@ -918,7 +948,9 @@
   color: var(--la-ink-2);
   font: inherit;
   cursor: pointer;
-  transition: background var(--la-ease), color var(--la-ease);
+  transition:
+    background var(--la-ease),
+    color var(--la-ease);
 }
 .mission-palette__btn:hover {
   background: var(--la-surface-2);
@@ -1204,11 +1236,11 @@
 .param-row {
   display: grid;
   grid-template-columns:
-    minmax(180px, 250px)   /* parameter name */
-    112px                  /* the number, always present */
-    52px                   /* its unit, beside the number it qualifies */
-    minmax(150px, 230px)   /* options dropdown, or the bits button */
-    minmax(0, 1fr);        /* decoded value, description, range */
+    minmax(180px, 250px) /* parameter name */
+    112px /* the number, always present */
+    52px /* its unit, beside the number it qualifies */
+    minmax(150px, 230px) /* options dropdown, or the bits button */
+    minmax(0, 1fr); /* decoded value, description, range */
   align-items: center;
   gap: var(--la-space-3);
   padding: var(--la-space-1) var(--la-space-3);
@@ -1586,7 +1618,9 @@
 }
 .stick-diagram__knob {
   fill: var(--la-ink-3);
-  transition: cx var(--la-ease), cy var(--la-ease);
+  transition:
+    cx var(--la-ease),
+    cy var(--la-ease);
 }
 .stick-diagram__knob.is-active {
   fill: var(--la-blue);
@@ -2381,7 +2415,6 @@
   height: var(--la-space-2);
   cursor: row-resize;
 }
-
 
 /* --- The lower pane: messages or the field list ---------------------- */
 

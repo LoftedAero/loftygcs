@@ -139,3 +139,24 @@ export function linkLabel(rcRssi: number, packetsPerSec: number | undefined): st
   }
   return parts.join('  ')
 }
+
+/**
+ * How far apart a tape's labelled ticks sit, in the unit being shown.
+ *
+ * A tape spans seven steps, so the step decides how much sky the pilot sees
+ * at once. Ten metres of altitude and ten feet are not the same amount of
+ * sky, so the number has to change with the unit or the imperial tape
+ * scrolls three times too fast to read.
+ */
+export function tapeStep(kind: 'speed' | 'altitude', unit: string): number {
+  if (kind === 'altitude') return unit === 'ft' ? 25 : 10
+  switch (unit) {
+    case 'kmh':
+      return 20
+    case 'kts':
+    case 'mph':
+      return 10
+    default:
+      return 5
+  }
+}

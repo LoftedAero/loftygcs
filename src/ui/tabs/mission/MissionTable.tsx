@@ -1,4 +1,6 @@
 import { LaButton, LaInput, LaSelect } from '../../components/La'
+import { useUnits } from '../../../stores/preferences-store'
+import { distanceLabel, formatDistance, fromDistance, toDistance } from '../../../units'
 import { useMissionStore } from '../../../stores/mission-store'
 import { legStats, hasCoords, type PlanItem } from '../../../protocol/mission-plan'
 import {
@@ -17,6 +19,7 @@ import {
 // is where Mission Planner loses people.
 
 export default function MissionTable() {
+  const units = useUnits()
   const plan = useMissionStore((s) => s.plan)
   const editing = useMissionStore((s) => s.editing)
   const selected = useMissionStore((s) => s.selected)
@@ -53,13 +56,23 @@ export default function MissionTable() {
       <table className="mission-table__grid">
         <thead>
           <tr>
-            <th scope="col" className="mission-table__num">#</th>
+            <th scope="col" className="mission-table__num">
+              #
+            </th>
             <th scope="col">Command</th>
             <th scope="col">Frame</th>
-            <th scope="col" className="mission-table__num">Alt</th>
-            <th scope="col" colSpan={4}>Parameters</th>
-            <th scope="col" className="mission-table__num">Dist</th>
-            <th scope="col"><span className="mission-table__sr">Actions</span></th>
+            <th scope="col" className="mission-table__num">
+              Alt ({distanceLabel(units.distance)})
+            </th>
+            <th scope="col" colSpan={4}>
+              Parameters
+            </th>
+            <th scope="col" className="mission-table__num">
+              Dist
+            </th>
+            <th scope="col">
+              <span className="mission-table__sr">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -107,6 +120,7 @@ function Row({
   onRemove: () => void
   onMove: (to: number) => void
 }) {
+  const units = useUnits()
   const spec = commandSpec(item.command)
   const params = spec?.params ?? []
 
@@ -161,8 +175,8 @@ function Row({
             num
             type="number"
             aria-label={`Item ${seq} altitude`}
-            value={round(item.z)}
-            onChange={(e) => onChange({ z: Number(e.target.value) })}
+            value={round(toDistance(item.z, units.distance))}
+            onChange={(e) => onChange({ z: fromDistance(Number(e.target.value), units.distance) })}
           />
         )}
       </td>
@@ -211,7 +225,11 @@ function Row({
       })}
 
       <td className="mission-table__num mission-table__dist">
-        {hasCoords(item) ? `${legM.toFixed(0)} m` : <span className="mission-table__dash">—</span>}
+        {hasCoords(item) ? (
+          `${formatDistance(legM, units.distance, 0)} ${distanceLabel(units.distance)}`
+        ) : (
+          <span className="mission-table__dash">—</span>
+        )}
       </td>
 
       <td className="mission-table__actions">
@@ -233,12 +251,7 @@ function Row({
         >
           ↓
         </LaButton>
-        <LaButton
-          variant="ghost"
-          size="sm"
-          aria-label={`Delete item ${seq}`}
-          onClick={onRemove}
-        >
+        <LaButton variant="ghost" size="sm" aria-label={`Delete item ${seq}`} onClick={onRemove}>
           ✕
         </LaButton>
       </td>

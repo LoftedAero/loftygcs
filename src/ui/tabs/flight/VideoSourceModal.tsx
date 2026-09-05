@@ -43,7 +43,11 @@ export default function VideoSourceModal({ open, url, onUrl, onClose }: VideoSou
             Close
           </LaButton>
           {status.state === 'idle' || status.state === 'error' ? (
-            <LaButton variant="primary" disabled={!desktop || draft.trim() === ''} onClick={connect}>
+            <LaButton
+              variant="primary"
+              disabled={!desktop || draft.trim() === ''}
+              onClick={connect}
+            >
               Connect
             </LaButton>
           ) : (
@@ -86,17 +90,16 @@ export default function VideoSourceModal({ open, url, onUrl, onClose }: VideoSou
 
       {!desktop && (
         <LaHint error>
-          Network video needs the desktop app. A browser cannot open an RTSP or raw UDP stream,
-          and neither can be reached from a page.
+          Network video needs the desktop app. A browser cannot open an RTSP or raw UDP stream, and
+          neither can be reached from a page.
         </LaHint>
       )}
       {status.text && <LaHint error={status.state === 'error'}>{status.text}</LaHint>}
 
       <p className="app-placeholder">
-        H.264 only, which is what essentially every airborne camera and companion computer
-        produces. Credentials go in the URL —{' '}
-        <code>rtsp://user:pass@host:554/stream</code> — and are sent as an authentication header
-        rather than in the request itself.
+        H.264 only, which is what essentially every airborne camera and companion computer produces.
+        Credentials go in the URL — <code>rtsp://user:pass@host:554/stream</code> — and are sent as
+        an authentication header rather than in the request itself.
       </p>
     </LaModal>
   )

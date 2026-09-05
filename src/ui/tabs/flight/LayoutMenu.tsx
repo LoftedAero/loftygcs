@@ -74,8 +74,16 @@ export default function LayoutMenu({ onVideo }: LayoutMenuProps) {
       {open && pos && (
         <div className="layout-menu__panel" role="menu" style={{ left: pos.left, top: pos.top }}>
           <p className="layout-menu__heading">Panels</p>
-          <LaSwitch label="Map" checked={layout.showMap} onChange={() => layout.toggle('showMap')} />
-          <LaSwitch label="HUD" checked={layout.showHud} onChange={() => layout.toggle('showHud')} />
+          <LaSwitch
+            label="Map"
+            checked={layout.showMap}
+            onChange={() => layout.toggle('showMap')}
+          />
+          <LaSwitch
+            label="HUD"
+            checked={layout.showHud}
+            onChange={() => layout.toggle('showHud')}
+          />
           <LaSwitch
             label="Messages"
             checked={layout.showMessages}

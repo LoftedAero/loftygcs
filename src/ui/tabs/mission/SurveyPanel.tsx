@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useUnits } from '../../../stores/preferences-store'
+import { distanceLabel, fromDistance, toDistance } from '../../../units'
 import { LaButton, LaField, LaHint, LaInput } from '../../components/La'
 import { useMissionStore } from '../../../stores/mission-store'
 import { polygonAreaM2, surveyGrid } from '../../../protocol/survey'
@@ -17,6 +19,7 @@ import { polygonAreaM2, surveyGrid } from '../../../protocol/survey'
 // tried against a live preview before committing to the waypoints.
 
 export default function SurveyPanel() {
+  const units = useUnits()
   const survey = useMissionStore((s) => s.survey)
   const setOptions = useMissionStore((s) => s.setSurveyOptions)
   const cancel = useMissionStore((s) => s.cancelSurvey)
@@ -60,8 +63,7 @@ export default function SurveyPanel() {
 
       {survey.polygon.length < 3 ? (
         <LaHint>
-          Click the map to drop corners — three at least. Drag one to move it, or use Undo
-          corner.
+          Click the map to drop corners — three at least. Drag one to move it, or use Undo corner.
         </LaHint>
       ) : (
         <p className="app-col__note">
@@ -72,14 +74,21 @@ export default function SurveyPanel() {
         </p>
       )}
 
-      <LaField label="Line spacing" unit="m" htmlFor="survey-spacing" stacked>
+      <LaField
+        label="Line spacing"
+        unit={distanceLabel(units.distance)}
+        htmlFor="survey-spacing"
+        stacked
+      >
         <LaInput
           num
           id="survey-spacing"
           type="number"
           min={1}
-          value={survey.options.spacingM}
-          onChange={(e) => setOptions({ spacingM: Number(e.target.value) })}
+          value={Math.round(toDistance(survey.options.spacingM, units.distance))}
+          onChange={(e) =>
+            setOptions({ spacingM: fromDistance(Number(e.target.value), units.distance) })
+          }
         />
       </LaField>
       <LaField label="Angle" unit="° from north" htmlFor="survey-angle" stacked>
@@ -91,24 +100,33 @@ export default function SurveyPanel() {
           onChange={(e) => setOptions({ angleDeg: Number(e.target.value) })}
         />
       </LaField>
-      <LaField label="Overshoot" unit="m" htmlFor="survey-overshoot" stacked>
+      <LaField
+        label="Overshoot"
+        unit={distanceLabel(units.distance)}
+        htmlFor="survey-overshoot"
+        stacked
+      >
         <LaInput
           num
           id="survey-overshoot"
           type="number"
           min={0}
-          value={survey.options.overshootM}
-          onChange={(e) => setOptions({ overshootM: Number(e.target.value) })}
+          value={Math.round(toDistance(survey.options.overshootM, units.distance))}
+          onChange={(e) =>
+            setOptions({ overshootM: fromDistance(Number(e.target.value), units.distance) })
+          }
         />
       </LaField>
-      <LaField label="Altitude" unit="m" htmlFor="survey-alt" stacked>
+      <LaField label="Altitude" unit={distanceLabel(units.distance)} htmlFor="survey-alt" stacked>
         <LaInput
           num
           id="survey-alt"
           type="number"
           min={0}
-          value={survey.altM}
-          onChange={(e) => setOptions({ altM: Number(e.target.value) })}
+          value={Math.round(toDistance(survey.altM, units.distance))}
+          onChange={(e) =>
+            setOptions({ altM: fromDistance(Number(e.target.value), units.distance) })
+          }
         />
       </LaField>
 
@@ -134,8 +152,8 @@ export default function SurveyPanel() {
         Cancel survey
       </LaButton>
       <LaHint>
-        The passes become ordinary waypoints you can edit. The area itself is not kept, so set
-        the spacing before generating.
+        The passes become ordinary waypoints you can edit. The area itself is not kept, so set the
+        spacing before generating.
       </LaHint>
     </section>
   )

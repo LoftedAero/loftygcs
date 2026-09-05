@@ -39,8 +39,7 @@ export default function FlightTab() {
     return (
       <LaCard title="Flight" note="Connect a vehicle (or start demo mode) to fly.">
         <p className="app-placeholder">
-          Live map with vehicle trail, artificial horizon, status messages, and guided
-          click-to-go.
+          Live map with vehicle trail, artificial horizon, status messages, and guided click-to-go.
         </p>
       </LaCard>
     )

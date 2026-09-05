@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useUnits } from '../../../stores/preferences-store'
+import { distanceLabel, fromDistance, toDistance } from '../../../units'
 import { LaButton, LaField, LaHint, LaInput } from '../../components/La'
 import { rallyDirty, useMissionStore } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
@@ -12,6 +14,7 @@ import { readRally, writeRally } from '../../../services/geofence'
 // adds a point, the same way a click adds a waypoint in Mission.
 
 export default function RallyPanel() {
+  const units = useUnits()
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const rally = useMissionStore((s) => s.rally)
   const synced = useMissionStore((s) => s.rallySynced)
@@ -104,14 +107,21 @@ export default function RallyPanel() {
             {/* Relative to home, always: ArduPilot stores rally altitudes
                 that way, and an AMSL number typed here would arrive as a
                 very different height. */}
-            <LaField label="Altitude above home" unit="m" htmlFor={`ra-${p.uid}`} stacked>
+            <LaField
+              label="Altitude above home"
+              unit={distanceLabel(units.distance)}
+              htmlFor={`ra-${p.uid}`}
+              stacked
+            >
               <LaInput
                 num
                 id={`ra-${p.uid}`}
                 type="number"
                 min={0}
-                value={p.altM}
-                onChange={(e) => update(p.uid, { altM: Number(e.target.value) })}
+                value={Math.round(toDistance(p.altM, units.distance))}
+                onChange={(e) =>
+                  update(p.uid, { altM: fromDistance(Number(e.target.value), units.distance) })
+                }
               />
             </LaField>
           </div>

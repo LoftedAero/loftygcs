@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useVehicleStore } from '../../../stores/vehicle-store'
-import { BASE_LAYERS, layerById, loadBaseLayer, saveBaseLayer, type BaseLayerId } from './map-layers'
+import {
+  BASE_LAYERS,
+  layerById,
+  loadBaseLayer,
+  saveBaseLayer,
+  type BaseLayerId,
+} from './map-layers'
 
 // Imperative Leaflet: the map, marker, and trail update outside React's
 // render cycle -- a marker that re-rendered through the virtual DOM at

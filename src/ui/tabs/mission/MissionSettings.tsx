@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useUnits } from '../../../stores/preferences-store'
+import { distanceLabel, fromDistance, toDistance } from '../../../units'
 import { LaButton, LaField, LaHint, LaInput, LaSelect } from '../../components/La'
 import { useMissionStore } from '../../../stores/mission-store'
 import { useParamStore } from '../../../stores/param-store'
@@ -33,6 +35,7 @@ const RADIUS_PARAMS = [
 ]
 
 export default function MissionSettings() {
+  const units = useUnits()
   const defaults = useMissionStore((s) => s.defaults)
   const setDefaults = useMissionStore((s) => s.setDefaults)
   const home = useMissionStore((s) => s.plan.home)
@@ -49,13 +52,20 @@ export default function MissionSettings() {
             <div className="app-col__mono">
               {(home.x / 1e7).toFixed(7)}, {(home.y / 1e7).toFixed(7)}
             </div>
-            <LaField label="Altitude" unit="m AMSL" htmlFor="mission-home-alt" stacked>
+            <LaField
+              label="Altitude"
+              unit={`${distanceLabel(units.distance)} AMSL`}
+              htmlFor="mission-home-alt"
+              stacked
+            >
               <LaInput
                 num
                 id="mission-home-alt"
                 type="number"
-                value={Math.round(home.z)}
-                onChange={(e) => setHome({ ...home, z: Number(e.target.value) })}
+                value={Math.round(toDistance(home.z, units.distance))}
+                onChange={(e) =>
+                  setHome({ ...home, z: fromDistance(Number(e.target.value), units.distance) })
+                }
               />
             </LaField>
           </>
@@ -67,30 +77,35 @@ export default function MissionSettings() {
           size="block"
           disabled={!connected}
           onClick={() => {
-            setHomeNote(
-              homeFromVehicle() ? null : 'The vehicle has no position fix to copy yet.',
-            )
+            setHomeNote(homeFromVehicle() ? null : 'The vehicle has no position fix to copy yet.')
           }}
         >
           Use vehicle position
         </LaButton>
         {homeNote && <LaHint error>{homeNote}</LaHint>}
         <LaHint>
-          Relative altitudes are measured from here. The vehicle replaces it with its own
-          position when it arms, so this is a planning reference.
+          Relative altitudes are measured from here. The vehicle replaces it with its own position
+          when it arms, so this is a planning reference.
         </LaHint>
       </section>
 
       <section className="app-col__group">
         <h3 className="app-col__head">General settings</h3>
-        <LaField label="Default altitude" unit="m" htmlFor="mission-alt" stacked>
+        <LaField
+          label="Default altitude"
+          unit={distanceLabel(units.distance)}
+          htmlFor="mission-alt"
+          stacked
+        >
           <LaInput
             num
             id="mission-alt"
             type="number"
             min={0}
-            value={defaults.altM}
-            onChange={(e) => setDefaults({ altM: Number(e.target.value) })}
+            value={Math.round(toDistance(defaults.altM, units.distance))}
+            onChange={(e) =>
+              setDefaults({ altM: fromDistance(Number(e.target.value), units.distance) })
+            }
           />
         </LaField>
         <LaField label="Altitude mode" htmlFor="mission-frame" stacked>

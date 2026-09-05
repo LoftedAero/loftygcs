@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import {
-  MISSION_COMMANDS,
-  commandSpec,
-} from '../../../protocol/mission-commands'
+import { MISSION_COMMANDS, commandSpec } from '../../../protocol/mission-commands'
 import { useMissionStore } from '../../../stores/mission-store'
 
 // The add-an-item palette: a vertical strip down the left edge of the map,

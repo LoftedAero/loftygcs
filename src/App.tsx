@@ -2,6 +2,7 @@ import AppBar from './ui/shell/AppBar'
 import NavRail from './ui/shell/NavRail'
 import ActionBar from './ui/shell/ActionBar'
 import ConnectModal from './ui/shell/ConnectModal'
+import PreferencesModal from './ui/shell/PreferencesModal'
 import SerialChooserModal from './ui/shell/SerialChooserModal'
 import PreviewNotice from './ui/shell/PreviewNotice'
 import UnsavedChangesModal from './ui/shell/UnsavedChangesModal'
@@ -82,6 +83,7 @@ export default function App() {
       </main>
       <ActionBar />
       <ConnectModal />
+      <PreferencesModal />
       <SerialChooserModal />
       <UnsavedChangesModal />
       {/* Last, so it sits over everything on first run. */}

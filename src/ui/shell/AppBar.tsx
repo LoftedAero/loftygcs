@@ -47,6 +47,7 @@ export default function AppBar() {
   const vehicleArmed = useVehicleStore((s) => s.armed)
   const vehiclePresent = useVehicleStore((s) => s.present)
   const setConnectModalOpen = useUiStore((s) => s.setConnectModalOpen)
+  const setPreferencesOpen = useUiStore((s) => s.setPreferencesOpen)
 
   const busy = phase === 'opening' || phase === 'handshaking'
 
@@ -90,6 +91,15 @@ export default function AppBar() {
       <ModeSwitch />
       <span className="la-appbar__spacer"></span>
       <SimTray />
+      <button
+        type="button"
+        className="app-theme-toggle"
+        title="Preferences — units, appearance"
+        aria-label="Preferences"
+        onClick={() => setPreferencesOpen(true)}
+      >
+        <GearIcon />
+      </button>
       <ThemeToggle />
       <LaReadout wide placeholder="Not connected" value={status} />
       <LaSelect
@@ -124,5 +134,27 @@ export default function AppBar() {
         Disconnect
       </LaButton>
     </header>
+  )
+}
+
+/** A gear, drawn rather than imported: eight teeth on a ring. */
+function GearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="-12 -12 24 24" aria-hidden="true">
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+        <rect
+          key={a}
+          x="-1.7"
+          y="-9.6"
+          width="3.4"
+          height="4.2"
+          rx="0.8"
+          fill="currentColor"
+          transform={`rotate(${a})`}
+        />
+      ))}
+      <circle r="6.4" fill="none" stroke="currentColor" strokeWidth="2.6" />
+      <circle r="2.2" fill="currentColor" />
+    </svg>
   )
 }

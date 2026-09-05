@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { telemetryRings } from '../../../services/telemetry-ring'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
+import { usePreferencesStore } from '../../../stores/preferences-store'
 import { SENSOR_BITS } from '../../../protocol/sensors'
 import { armReadiness, batteryLabel, isFailsafe, linkLabel } from './hud-draw'
 import { paintHud } from './hud-paint'
@@ -46,10 +47,7 @@ export default function Hud({ horizon, overlays, onContextMenu }: HudProps) {
   // Whether there is a picture behind the canvas. A ref, read inside the
   // frame, so a stream starting does not re-render anything.
   const videoBehind = useRef(false)
-  useEffect(
-    () => videoService.onStatus((s) => (videoBehind.current = s.state === 'playing')),
-    [],
-  )
+  useEffect(() => videoService.onStatus((s) => (videoBehind.current = s.state === 'playing')), [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -83,6 +81,9 @@ export default function Hud({ horizon, overlays, onContextMenu }: HudProps) {
         groundspeedMs: v.groundspeedMs,
         relAltM: v.relAltM,
         climbMs: v.climbMs,
+        // Read per frame like the stores above it: a property read, no
+        // subscription, and no re-render when the choice changes.
+        units: usePreferencesStore.getState().units,
         throttlePct: v.throttlePct,
         batteryText: batteryLabel(v.batteryV, v.batteryA, v.batteryPct),
         // rxCount is already the count over the last second, so it is the

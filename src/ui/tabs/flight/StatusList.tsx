@@ -39,9 +39,7 @@ export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
   const needle = filter.trim().toLowerCase()
   const shown = useMemo(
     () =>
-      needle
-        ? namesRef.current.filter((n) => n.toLowerCase().includes(needle))
-        : namesRef.current,
+      needle ? namesRef.current.filter((n) => n.toLowerCase().includes(needle)) : namesRef.current,
     // namesRef is deliberately not a dependency: it is a ref, and the
     // version check above is what makes this recompute.
     [needle, version.current],

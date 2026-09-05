@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useUnits } from '../../../stores/preferences-store'
+import { distanceLabel, fromDistance, toDistance } from '../../../units'
 import { LaButton, LaField, LaHint, LaInput } from '../../components/La'
 import { fenceDirty, useMissionStore, type FenceTool } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
@@ -23,6 +25,7 @@ const TOOLS: { id: FenceTool; label: string; hint: string }[] = [
 ]
 
 export default function FencePanel() {
+  const units = useUnits()
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const fence = useMissionStore((s) => s.fence)
   const synced = useMissionStore((s) => s.fenceSynced)
@@ -95,7 +98,9 @@ export default function FencePanel() {
         </LaButton>
         {/* Writing an empty fence is how a fence is removed, so say it --
             clearing the screen alone leaves the vehicle still enforcing. */}
-        <LaHint>Clearing only changes the screen. Write to remove the fence from the vehicle.</LaHint>
+        <LaHint>
+          Clearing only changes the screen. Write to remove the fence from the vehicle.
+        </LaHint>
       </section>
 
       <section className="app-col__group">
@@ -124,9 +129,7 @@ export default function FencePanel() {
             </LaButton>
           </>
         )}
-        {tool && !drawingPolygon && (
-          <LaHint>Click the map to place it.</LaHint>
-        )}
+        {tool && !drawingPolygon && <LaHint>Click the map to place it.</LaHint>}
       </section>
 
       <section className="app-col__group">
@@ -159,14 +162,23 @@ export default function FencePanel() {
               </button>
             </div>
             {s.kind === 'circle' ? (
-              <LaField label="Radius" unit="m" htmlFor={`r-${s.uid}`} stacked>
+              <LaField
+                label="Radius"
+                unit={distanceLabel(units.distance)}
+                htmlFor={`r-${s.uid}`}
+                stacked
+              >
                 <LaInput
                   num
                   id={`r-${s.uid}`}
                   type="number"
                   min={1}
-                  value={s.radiusM}
-                  onChange={(e) => updateShape(s.uid, { radiusM: Number(e.target.value) })}
+                  value={Math.round(toDistance(s.radiusM, units.distance))}
+                  onChange={(e) =>
+                    updateShape(s.uid, {
+                      radiusM: fromDistance(Number(e.target.value), units.distance),
+                    })
+                  }
                 />
               </LaField>
             ) : (

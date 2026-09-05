@@ -64,11 +64,7 @@ export default function MissionTab() {
         >
           <div className="mission-map-area">
             {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
-            <MissionMap
-              tool={tool}
-              onPlaced={() => setTool(null)}
-              onFirstItem={setFirstAt}
-            />
+            <MissionMap tool={tool} onPlaced={() => setTool(null)} onFirstItem={setFirstAt} />
           </div>
 
           <Divider

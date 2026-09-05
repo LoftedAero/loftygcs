@@ -317,12 +317,10 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
             L.marker([q.x / 1e7, q.y / 1e7], { icon: vertexIcon(color), draggable: true })
               .on('dragend', (e) => {
                 const t = (e.target as L.Marker).getLatLng()
-                useMissionStore
-                  .getState()
-                  .moveShapeVertex(shape.uid, i, {
-                    x: Math.round(t.lat * 1e7),
-                    y: Math.round(t.lng * 1e7),
-                  })
+                useMissionStore.getState().moveShapeVertex(shape.uid, i, {
+                  x: Math.round(t.lat * 1e7),
+                  y: Math.round(t.lng * 1e7),
+                })
               })
               .addTo(layer)
           })
@@ -354,7 +352,8 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
     // shape until Finish says so, and drawing it closed would claim it is.
     if (fenceDraft.length > 0) {
       const line = fenceDraft.map((q) => [q.x / 1e7, q.y / 1e7] as L.LatLngTuple)
-      if (line.length > 1) L.polyline(line, { color: FENCE_IN, weight: 2, dashArray: '4 4' }).addTo(layer)
+      if (line.length > 1)
+        L.polyline(line, { color: FENCE_IN, weight: 2, dashArray: '4 4' }).addTo(layer)
       fenceDraft.forEach((q) => {
         L.marker([q.x / 1e7, q.y / 1e7], { icon: vertexIcon(FENCE_IN) }).addTo(layer)
       })

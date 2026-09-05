@@ -1,4 +1,13 @@
 import { useState } from 'react'
+import { useUnits } from '../../../stores/preferences-store'
+import {
+  distanceLabel,
+  formatDistance,
+  formatSpeed,
+  fromDistance,
+  fromSpeed,
+  speedLabel,
+} from '../../../units'
 import { LaButton, LaModal, LaSelect } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
@@ -75,6 +84,7 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
   const armed = useVehicleStore((s) => s.armed)
   const relAltM = useVehicleStore((s) => s.relAltM)
   const groundspeedMs = useVehicleStore((s) => s.groundspeedMs)
+  const units = useUnits()
   const isCopter = vehicleClass(vehicleType) === 'copter'
 
   const [status, setStatus] = useState('')
@@ -204,7 +214,7 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
             void takeoff(TAKEOFF_ALT_M).then(report('Takeoff')).catch(fail('Takeoff'))
           }}
         >
-          Takeoff {TAKEOFF_ALT_M} m
+          Takeoff {formatDistance(TAKEOFF_ALT_M, units.distance, 0)} {distanceLabel(units.distance)}
         </LaButton>
         <LaButton variant="secondary" disabled={!connected} onClick={() => jump('Auto')}>
           Auto
@@ -218,26 +228,32 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
           there, then the occasional command, then arranging the window.
           Ordered by how often a hand goes to them. */}
       <div className="flight-controls__secondary">
+        {/* Typed in the reader's units and converted on the way out: the
+            vehicle is commanded in SI whatever the box says. */}
         <Field
           id="fc-speed"
           label="Speed"
-          unit="m/s"
+          unit={speedLabel(units.speed)}
           value={speed}
-          placeholder={groundspeedMs ? groundspeedMs.toFixed(0) : '—'}
+          placeholder={groundspeedMs ? formatSpeed(groundspeedMs, units.speed, 0) : '—'}
           onChange={setSpeed}
           disabled={!connected}
-          onSet={() => void changeSpeed(Number(speed)).then(report('Speed')).catch(fail('Speed'))}
+          onSet={() =>
+            void changeSpeed(fromSpeed(Number(speed), units.speed))
+              .then(report('Speed'))
+              .catch(fail('Speed'))
+          }
         />
         <Field
           id="fc-alt"
           label="Altitude"
-          unit="m"
+          unit={distanceLabel(units.distance)}
           value={alt}
-          placeholder={relAltM ? relAltM.toFixed(0) : '—'}
+          placeholder={relAltM ? formatDistance(relAltM, units.distance, 0) : '—'}
           onChange={setAlt}
           disabled={!connected}
           onSet={() => {
-            setGuidedAltitude(Number(alt))
+            setGuidedAltitude(fromDistance(Number(alt), units.distance))
             setStatus('Altitude: sent')
           }}
         />

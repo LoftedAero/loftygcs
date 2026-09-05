@@ -2,7 +2,12 @@ import { useState } from 'react'
 import { LaButton, LaHint } from '../../components/La'
 import { isDirty, useMissionStore } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
-import { openFromFile, readFromVehicle, saveToFile, writeToVehicle } from '../../../services/mission'
+import {
+  openFromFile,
+  readFromVehicle,
+  saveToFile,
+  writeToVehicle,
+} from '../../../services/mission'
 
 // File in, file out, vehicle in, vehicle out -- and one badge saying whether
 // the screen and the aircraft agree.
@@ -82,12 +87,7 @@ export default function MissionToolbar() {
         Save to file
       </LaButton>
 
-      <LaButton
-        variant="ghost"
-        size="block"
-        disabled={working || items === 0}
-        onClick={clear}
-      >
+      <LaButton variant="ghost" size="block" disabled={working || items === 0} onClick={clear}>
         Clear mission
       </LaButton>
 

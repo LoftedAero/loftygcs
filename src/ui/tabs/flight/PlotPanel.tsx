@@ -285,7 +285,9 @@ export default function PlotPanel({
         </button>
       </div>
       <canvas ref={canvasRef} className="plot-panel__canvas" />
-      <p className="plot-panel__axis" ref={axisRef}>each series scaled to its own range</p>
+      <p className="plot-panel__axis" ref={axisRef}>
+        each series scaled to its own range
+      </p>
     </div>
   )
 }

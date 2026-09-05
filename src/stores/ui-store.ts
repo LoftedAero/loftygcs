@@ -61,6 +61,10 @@ interface UiState {
   connectModalOpen: boolean
   setConnectModalOpen: (open: boolean) => void
 
+  /** Units, appearance, and whatever else belongs to the person. */
+  preferencesOpen: boolean
+  setPreferencesOpen: (open: boolean) => void
+
   /**
    * The app bar's simulator tray.
    *
@@ -101,6 +105,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   activeTab: 'overview',
   connectModalOpen: false,
   setConnectModalOpen: (connectModalOpen) => set({ connectModalOpen }),
+  preferencesOpen: false,
+  setPreferencesOpen: (preferencesOpen) => set({ preferencesOpen }),
   simTrayOpen: false,
   setSimTrayOpen: (simTrayOpen) => set({ simTrayOpen }),
   pendingNav: null,
