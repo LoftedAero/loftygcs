@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import MissionMap from './MissionMap'
 import MissionTable from './MissionTable'
 import MissionSettings from './MissionSettings'
+import OfflineMapsPanel from './OfflineMapsPanel'
+import type { LatLonBounds } from '../../../services/tile-math'
 import SurveyPanel from './SurveyPanel'
 import PlanKindSwitch from './PlanKindSwitch'
 import FencePanel from './FencePanel'
@@ -33,6 +35,7 @@ import { useMissionStore } from '../../../stores/mission-store'
 // where Mission Planner keeps them, and the column had room the map did not.
 
 export default function MissionTab() {
+  const [view, setView] = useState<{ bounds: LatLonBounds; zoom: number } | null>(null)
   // Which command the next map click places. Null means the default, which
   // is a waypoint -- see MissionMap for why clicking does something rather
   // than nothing.
@@ -64,7 +67,12 @@ export default function MissionTab() {
         >
           <div className="mission-map-area">
             {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
-            <MissionMap tool={tool} onPlaced={() => setTool(null)} onFirstItem={setFirstAt} />
+            <MissionMap
+              tool={tool}
+              onPlaced={() => setTool(null)}
+              onFirstItem={setFirstAt}
+              onView={setView}
+            />
           </div>
 
           <Divider
@@ -111,6 +119,9 @@ export default function MissionTab() {
           )}
           {editing === 'fence' && <FencePanel />}
           {editing === 'rally' && <RallyPanel />}
+          {/* Last in the column: preparing for a field with no signal is
+              something you do once, after the plan is what you want. */}
+          <OfflineMapsPanel bounds={view?.bounds ?? null} zoom={view?.zoom ?? 15} />
         </aside>
       </div>
 

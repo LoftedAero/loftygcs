@@ -159,6 +159,18 @@ design decisions are recorded there and in code comments.
   bumps VERSION. The dialog is sectioned for the same reason — language is a section, and a flat
   list that grows into groups later reorganizes under the user. Theme stays in `theme-store`
   because it must be applied before first paint by an inline script; the dialog edits it there.
+- **Offline maps are a cache under the tile layer, not a separate map.** Leaflet's `TileLayer`
+  sets `img.src` and lets the browser fetch, which leaves nowhere to consult a store — so
+  `CachedTileLayer` overrides `createTile` (`ui/tabs/flight/cached-tile-layer.ts`) and both maps
+  are built through `createCachedTileLayer`. A network tile is stored on the way past, so
+  panning the field before takeoff fills the cache for free and the prefetch button only has
+  gaps left to fill. Three things it is easy to get wrong: the blob URL is revoked on
+  `img.onload`, not on tile removal, or every tile leaks for the session; a prefetch must clamp
+  to the layer's `maxNativeZoom`, since asking for three levels past what the server has
+  downloads three levels of nothing; and `services/tile-cache.ts` never throws — a database
+  that will not open (private browsing, storage denied) has to degrade to plain network
+  fetching rather than break a map someone is flying with. Concurrency stays at six because
+  these are public tile servers used keyless, and courtesy is the condition of that.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

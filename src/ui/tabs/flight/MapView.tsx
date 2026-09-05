@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useMissionStore } from '../../../stores/mission-store'
 import { createMissionOverlay, type MissionOverlay } from './mission-overlay'
+import { createCachedTileLayer } from './cached-tile-layer'
 import {
   BASE_LAYERS,
   layerById,
@@ -139,11 +140,9 @@ export default function MapView({
     if (!map) return
     const spec = layerById(base)
     tileRef.current?.remove()
-    tileRef.current = L.tileLayer(spec.url, {
-      maxZoom: spec.maxZoom,
-      maxNativeZoom: spec.maxNativeZoom,
-      attribution: spec.attribution,
-    }).addTo(map)
+    // Reads the offline cache first and stores what it fetches, so panning
+    // around the field before takeoff builds the cache for free.
+    tileRef.current = createCachedTileLayer(spec).addTo(map)
     // Behind the trail and markers, whichever order they were added in.
     tileRef.current.setZIndex(0)
     saveBaseLayer(base)

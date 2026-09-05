@@ -1,0 +1,104 @@
+// Which tiles cover a piece of the world.
+//
+// Web Mercator (EPSG:3857), the scheme every slippy map uses: at zoom z the
+// world is a 2^z square of 256 px tiles, x running west to east and y north
+// to south. The latitude formula is the part worth writing down rather than
+// half-remembering -- it is a Gudermannian, not a linear scale, which is why
+// Greenland looks like Africa.
+//
+// Pure and dependency-free so it can be tested without a map, a browser, or
+// a network.
+
+export interface TileCoord {
+  z: number
+  x: number
+  y: number
+}
+
+export interface LatLonBounds {
+  north: number
+  south: number
+  east: number
+  west: number
+}
+
+/** Web Mercator cannot represent the poles; every map clamps here. */
+export const MAX_LAT = 85.05112878
+
+export function lonToTileX(lon: number, z: number): number {
+  return ((lon + 180) / 360) * 2 ** z
+}
+
+export function latToTileY(lat: number, z: number): number {
+  const clamped = Math.min(MAX_LAT, Math.max(-MAX_LAT, lat))
+  const rad = (clamped * Math.PI) / 180
+  return ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * 2 ** z
+}
+
+/**
+ * Every tile covering the bounds, across a zoom range.
+ *
+ * Counts grow by four with each zoom level, so the caller is expected to ask
+ * how many before asking for them: a field-sized box from z14 to z19 is a
+ * few thousand tiles, and the same box to z21 is tens of thousands, which is
+ * a different conversation with someone's data plan.
+ */
+export function tilesForBounds(
+  bounds: LatLonBounds,
+  minZoom: number,
+  maxZoom: number,
+): TileCoord[] {
+  const out: TileCoord[] = []
+  for (let z = minZoom; z <= maxZoom; z++) {
+    const max = 2 ** z - 1
+    // North is a smaller y than south, so the two swap on the way in.
+    const x0 = Math.max(0, Math.floor(lonToTileX(bounds.west, z)))
+    const x1 = Math.min(max, Math.floor(lonToTileX(bounds.east, z)))
+    const y0 = Math.max(0, Math.floor(latToTileY(bounds.north, z)))
+    const y1 = Math.min(max, Math.floor(latToTileY(bounds.south, z)))
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) out.push({ z, x, y })
+    }
+  }
+  return out
+}
+
+/** How many tiles that would be, without building the list. */
+export function countTiles(bounds: LatLonBounds, minZoom: number, maxZoom: number): number {
+  let total = 0
+  for (let z = minZoom; z <= maxZoom; z++) {
+    const max = 2 ** z - 1
+    const x0 = Math.max(0, Math.floor(lonToTileX(bounds.west, z)))
+    const x1 = Math.min(max, Math.floor(lonToTileX(bounds.east, z)))
+    const y0 = Math.max(0, Math.floor(latToTileY(bounds.north, z)))
+    const y1 = Math.min(max, Math.floor(latToTileY(bounds.south, z)))
+    total += (x1 - x0 + 1) * (y1 - y0 + 1)
+  }
+  return total
+}
+
+/**
+ * A rough size for that many tiles.
+ *
+ * Satellite tiles run 15-25 KB of JPEG; 20 KB is the middle of that and the
+ * number is only ever used to warn someone before a long download, so a
+ * figure that is right to within a factor of two is worth more than a
+ * precise one that requires fetching everything to compute.
+ */
+export const BYTES_PER_TILE = 20_000
+
+/** Bytes as something to read: "48 MB", "920 KB". */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${Math.round(bytes / (1024 * 1024))} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+}
+
+/** The URL for one tile, filling a Leaflet-style template. */
+export function tileUrl(template: string, t: TileCoord): string {
+  return template
+    .replace('{z}', String(t.z))
+    .replace('{x}', String(t.x))
+    .replace('{y}', String(t.y))
+}

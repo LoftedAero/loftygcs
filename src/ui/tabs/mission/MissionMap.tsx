@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { LatLonBounds } from '../../../services/tile-math'
+import { createCachedTileLayer } from '../flight/cached-tile-layer'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMissionStore } from '../../../stores/mission-store'
@@ -34,6 +36,13 @@ export interface MissionMapProps {
    * click asks rather than guesses.
    */
   onFirstItem: (at: { x: number; y: number }) => void
+  /**
+   * The area currently on screen, for anything that acts on it -- the
+   * offline-map download is the first. Fired on settle rather than on every
+   * frame of a pan, because nothing acting on it needs to see the middle of
+   * a drag.
+   */
+  onView?: (view: { bounds: LatLonBounds; zoom: number }) => void
 }
 
 /** Numbered waypoint pin. Orange when selected, blue otherwise. */
@@ -122,7 +131,7 @@ function homeIcon(selected: boolean): L.DivIcon {
   })
 }
 
-export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapProps) {
+export default function MissionMap({ tool, onPlaced, onFirstItem, onView }: MissionMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileRef = useRef<L.TileLayer | null>(null)
@@ -218,14 +227,34 @@ export default function MissionMap({ tool, onPlaced, onFirstItem }: MissionMapPr
     if (!map) return
     const spec = layerById(base)
     tileRef.current?.remove()
-    tileRef.current = L.tileLayer(spec.url, {
-      maxZoom: spec.maxZoom,
-      maxNativeZoom: spec.maxNativeZoom,
-      attribution: spec.attribution,
-    }).addTo(map)
+    // Reads the offline cache first and stores what it fetches, so panning
+    // around the field before takeoff builds the cache for free.
+    tileRef.current = createCachedTileLayer(spec).addTo(map)
     tileRef.current.setZIndex(0)
     saveBaseLayer(base)
   }, [base])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !onView) return
+    const report = () => {
+      const b = map.getBounds()
+      onView({
+        bounds: {
+          north: b.getNorth(),
+          south: b.getSouth(),
+          east: b.getEast(),
+          west: b.getWest(),
+        },
+        zoom: map.getZoom(),
+      })
+    }
+    report()
+    map.on('moveend zoomend', report)
+    return () => {
+      map.off('moveend zoomend', report)
+    }
+  }, [onView, centered])
 
   // Redraw the whole plan on change. A mission is tens of markers, not
   // thousands, and rebuilding is far simpler to keep correct than diffing --
