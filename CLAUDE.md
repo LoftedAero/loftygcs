@@ -243,6 +243,20 @@ design decisions are recorded there and in code comments.
   GIMBAL_DEVICE_ATTITUDE_STATUS (285), which is why the modern decode is the one that matters;
   and a mount cannot be configured in a SITL test at all, because `MNT1_TYPE` needs a reboot
   and the runner launches with `-w` and a defaults file, so nothing survives one.
+- **The joystick is the one feature that can fly the aircraft, so it is built around failure.**
+  ArduPilot reads RC_CHANNELS_OVERRIDE exactly as it reads a receiver — there is no separate
+  simulated path, and a stuck override is a stuck stick. Hence: it is off at every start and
+  nothing persists it; it refuses to start unless the sticks are centered and the throttle is
+  down (`sticksAreSafe`, because the pad is usually on a desk under something); and it stops
+  itself on window blur, tab hide, unplug and link loss. The rule that is easiest to get wrong
+  is that **stopping means sending zeros, not going quiet** — a vehicle whose override stream
+  stops holds the last value until its own RC failsafe notices, so `RELEASE` is sent three
+  times over. Two more: an unmapped channel goes out as 65535 ("no change"), never as 1500,
+  because centering an unmapped channel drives a flight-mode switch to its middle position; and
+  a throttle gets no center deadzone, which would be a dead patch mid-travel. Proven against
+  SITL both ways — the override reaches the vehicle's RC_CHANNELS *and* the release hands them
+  back — because the encoder accepts any field name and a wrong one produces a well-formed
+  message full of zeros that a fake would happily accept.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

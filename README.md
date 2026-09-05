@@ -127,10 +127,10 @@ before more readouts multiply; the inspector helps debug everything after it).
 | ~~9~~ | ~~MAVFTP file browser~~ | done — Setup ▸ Files; upload, download, rename, delete |
 | ~~10~~ | ~~Version-matched parameter metadata~~ | done — and the vehicle now says which firmware it is |
 | ~~11~~ | ~~Camera & gimbal control~~ | done — Fly ▸ View ▸ Camera; the protocol follows the firmware version |
-| 12 | Physical joystick support | Last of the queue; needs careful SITL-first safety work |
+| ~~12~~ | ~~Physical joystick support~~ | done — opt-in every session, releases on focus loss, unplug or link drop |
 
-Deferred, revisit after the list above: ADS-B traffic display, BLHeli/AM32 ESC passthrough,
-shareable aircraft config bundles.
+All twelve are done. Deferred, and the next things to consider: ADS-B traffic display,
+BLHeli/AM32 ESC passthrough, shareable aircraft config bundles.
 
 ### Non-goals
 

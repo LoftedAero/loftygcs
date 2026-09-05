@@ -495,6 +495,87 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
   )
 
   it(
+    'flies the sticks: an RC override reaches the vehicle and is handed back',
+    async () => {
+      // The only check that proves the override actually works. The encoder
+      // takes whatever field names it is given, so a wrong one -- chan1_raw
+      // for chan1Raw -- produces a well-formed message full of zeros that a
+      // fake would accept and a real vehicle would read as a failsafe.
+      //
+      // Handing control back is checked too, and it is the half that
+      // matters: a station that stops sending leaves the vehicle holding
+      // the last stick position until its own RC failsafe notices.
+      const events: ProtocolEvent[] = []
+      let socket: net.Socket | null = null
+      const engine = new ProtocolEngine((out) => {
+        if (out.t === 'tx') socket?.write(out.bytes)
+        else if (out.t === 'evt') events.push(out.evt)
+      })
+      socket = await connectVehicle(engine, events, (s) => (socket = s))
+
+      const latest = (field: string): number | undefined => {
+        for (let i = events.length - 1; i >= 0; i--) {
+          const e = events[i]
+          if (e?.t === 'fields' && e.values[field] !== undefined) return e.values[field]
+        }
+        return undefined
+      }
+      const override = (channels: number[]) => {
+        const fields: Record<string, number> = { targetSystem: 1, targetComponent: 1 }
+        channels.forEach((v, i) => (fields[`chan${i + 1}Raw`] = v))
+        engine.send('RC_CHANNELS_OVERRIDE', fields)
+      }
+
+      try {
+        await waitFor(
+          () => latest('RC_CHANNELS.chan1Raw') !== undefined,
+          20000,
+          'the RC_CHANNELS stream',
+        )
+        const before = latest('RC_CHANNELS.chan1Raw')!
+
+        // Four distinct values, none of them the resting one, so no channel
+        // can pass by accident.
+        const wanted = [1234, 1345, 1456, 1567, 0, 0, 0, 0]
+        const held = setInterval(() => override(wanted), 100)
+        try {
+          await waitFor(
+            () =>
+              latest('RC_CHANNELS.chan1Raw') === 1234 &&
+              latest('RC_CHANNELS.chan2Raw') === 1345 &&
+              latest('RC_CHANNELS.chan3Raw') === 1456 &&
+              latest('RC_CHANNELS.chan4Raw') === 1567,
+            20000,
+            'the vehicle to read the overridden sticks',
+          )
+        } finally {
+          clearInterval(held)
+        }
+
+        // Zero is the release, and it is the message that has to arrive:
+        // the channel must go back to what the simulated receiver says.
+        for (let i = 0; i < 3; i++) {
+          override([0, 0, 0, 0, 0, 0, 0, 0])
+          await new Promise((r) => setTimeout(r, 60))
+        }
+        await waitFor(
+          () => latest('RC_CHANNELS.chan1Raw') === before,
+          20000,
+          'the vehicle to take its sticks back',
+        )
+      } finally {
+        // Whatever happened above, do not leave a simulator flying on a
+        // stale override.
+        for (let i = 0; i < 3; i++) override([0, 0, 0, 0, 0, 0, 0, 0])
+        await new Promise((r) => setTimeout(r, 200))
+        engine.stop()
+        socket?.destroy()
+      }
+    },
+    120000,
+  )
+
+  it(
     'round trips a geofence and rally points through real ArduPilot',
     async () => {
       const events: ProtocolEvent[] = []

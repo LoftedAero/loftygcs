@@ -619,6 +619,108 @@
   margin-left: auto;
 }
 
+/* ── Joystick ──
+   The camera strip's shape, with one difference that is not decoration: the
+   channel bars are the only way to see a stuck stick, so they are wide
+   enough to read at a glance and the center mark is drawn on every one. */
+.joystick-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  padding: var(--la-space-2) var(--la-space-3);
+  background: var(--la-surface-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  flex: none;
+}
+.joystick-panel__row {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+  flex-wrap: wrap;
+}
+.joystick-panel__label {
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  min-width: 56px;
+}
+.joystick-panel__pad,
+.joystick-panel__live {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+}
+.joystick-panel__live {
+  color: var(--la-bad);
+  font-weight: 600;
+}
+.joystick-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.joystick-bar__name {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  min-width: 52px;
+}
+.joystick-bar__track {
+  position: relative;
+  width: 96px;
+  height: 8px;
+  border-radius: var(--la-radius-sm);
+  background: var(--la-line);
+  overflow: hidden;
+}
+.joystick-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--la-blue);
+}
+.joystick-bar__mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--la-surface);
+}
+.joystick-bar__value {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: right;
+}
+.joystick-setup {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-sm);
+  margin-bottom: var(--la-space-3);
+}
+.joystick-setup th {
+  text-align: left;
+  font-size: var(--la-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--la-ink-3);
+  padding-bottom: var(--la-space-1);
+}
+.joystick-setup td {
+  padding: var(--la-space-1) var(--la-space-2) var(--la-space-1) 0;
+  vertical-align: middle;
+}
+.joystick-setup td.num,
+.joystick-setup th.num {
+  text-align: right;
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Vehicle files ──
    The inspector's two-column shape, for the same reason: a list to scan
    beside the actions that act on what you picked. Names are monospace so a

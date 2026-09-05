@@ -35,6 +35,8 @@ export interface FlightLayoutState {
   showPlot: boolean
   /** Camera and gimbal controls, for the vehicles that have one. */
   showCamera: boolean
+  /** Gamepad control. Whether the *panel* is shown; taking control is not persisted. */
+  showJoystick: boolean
   /** Which telemetry fields the plot is drawing. */
   plotFields: string[]
   /** Last HUD video source, so it does not have to be retyped. */
@@ -57,6 +59,7 @@ export interface FlightLayoutState {
       | 'showMessages'
       | 'showPlot'
       | 'showCamera'
+      | 'showJoystick'
       | 'hudHorizon'
       | 'hudOverlays',
   ) => void
@@ -76,6 +79,7 @@ interface Persisted {
   showMessages: boolean
   showPlot: boolean
   showCamera: boolean
+  showJoystick: boolean
   plotFields: string[]
   logPane: 'messages' | 'status' | 'preflight'
   plotAxisField: string | null
@@ -94,6 +98,7 @@ const DEFAULTS: Persisted = {
   showMessages: true,
   showPlot: false,
   showCamera: false,
+  showJoystick: false,
   plotFields: [],
   logPane: 'messages',
   plotAxisField: null,
@@ -141,6 +146,7 @@ function snapshot(s: FlightLayoutState): Persisted {
     showMessages: s.showMessages,
     showPlot: s.showPlot,
     showCamera: s.showCamera,
+    showJoystick: s.showJoystick,
     plotFields: s.plotFields,
     logPane: s.logPane,
     plotAxisField: s.plotAxisField,
