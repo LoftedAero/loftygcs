@@ -127,8 +127,8 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     if (CAN_LETTER_SPACE && o.spacing) ctx.letterSpacing = `${o.spacing}px`
     // A soft shadow rather than an outline: legible over sky, ground or
     // video, without the thickness a stroke adds at these sizes. Kept light
-    // -- a heavy one reads as a glow, which is worst on the coloured state
-    // text where the dark halo muddies the colour it surrounds.
+    // -- a heavy one reads as a glow, which is worst on the colored state
+    // text where the dark halo muddies the color it surrounds.
     ctx.shadowColor = 'rgba(0, 0, 0, 0.55)'
     ctx.shadowBlur = (o.shadow ?? 2.6) * s
     ctx.shadowOffsetY = 1
@@ -186,7 +186,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
 
   paintRibbon(ctx, w, ribbonH, st.headingDeg, s, write)
 
-  // Short tapes centred on the horizon, as Mission Planner has them. The
+  // Short tapes centered on the horizon, as Mission Planner has them. The
   // height that frees up is what the speeds and the vertical speed sit in,
   // directly under the bar each belongs to.
   const tapeH = Math.max(80, (h - ribbonH) * 0.52)
@@ -250,7 +250,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   })
   write(st.linkText, right, ribbonH + 18 * s, { size: corner, align: 'right' })
 
-  // State, centred and unmissable. Sits above the horizon centre so the
+  // State, centered and unmissable. Sits above the horizon center so the
   // aircraft symbol stays readable underneath it.
   const stateY = cy - Math.min(w, h) * 0.17
   if (!st.armed) {
@@ -472,7 +472,7 @@ function paintBank(
   ctx.restore()
 }
 
-/** The fixed aircraft reference: wings either side of a centre mark. */
+/** The fixed aircraft reference: wings either side of a center mark. */
 function paintAircraft(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number) {
   ctx.save()
   ctx.translate(cx, cy)
@@ -491,7 +491,7 @@ function paintAircraft(ctx: CanvasRenderingContext2D, cx: number, cy: number, s:
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)'
     ctx.lineWidth = 5.5 * s
   }
-  // Wings either side of a centre vee. They nearly meet on purpose: with a
+  // Wings either side of a center vee. They nearly meet on purpose: with a
   // wide gap the vee reads as a stray mark rather than as the nose of one
   // symbol.
   wing(() => {
@@ -530,7 +530,7 @@ function paintRibbon(
   const pxPerDeg = w / 2 / halfSpan
   // Labels that would land under the heading box are dropped rather than
   // drawn behind it. The margin allows for the label's own width: excluding
-  // only its centre leaves a "150" showing as "50".
+  // only its center leaves a "150" showing as "50".
   const boxHalf = 22 * s + 14 * s
   ctx.save()
   ctx.fillStyle = PANEL

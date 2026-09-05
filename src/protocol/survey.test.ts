@@ -18,7 +18,7 @@ const deg = (lat: number, lon: number): GeoPoint => ({
   y: Math.round(lon * 1e7),
 })
 
-/** A square `m` metres on a side, near SITL's home. */
+/** A square `m` meters on a side, near SITL's home. */
 function square(m: number): GeoPoint[] {
   const dLat = m / 111320
   const dLon = m / (111320 * Math.cos((HOME.lat * Math.PI) / 180))
@@ -31,7 +31,7 @@ function square(m: number): GeoPoint[] {
 }
 
 describe('polygonAreaM2', () => {
-  it('measures a square in real square metres', () => {
+  it('measures a square in real square meters', () => {
     // The whole reason the geometry is done in a local projection: computed
     // in raw degrees this comes out wrong by the cosine of the latitude.
     expect(polygonAreaM2(square(200))).toBeGreaterThan(200 * 200 * 0.97)
@@ -152,7 +152,7 @@ describe('surveyGrid', () => {
     const r = surveyGrid(square(300), opts)
     expect(r.lengthM).toBeCloseTo(pathLengthM(r.points), 0)
     // Sanity: covering 300 m at 50 m spacing is 6 passes of 300 m plus the
-    // turns, so a few kilometres rather than a few hundred metres.
+    // turns, so a few kilometers rather than a few hundred meters.
     expect(r.lengthM).toBeGreaterThan(1800)
     expect(r.lengthM).toBeLessThan(4000)
   })

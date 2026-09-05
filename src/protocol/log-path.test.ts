@@ -57,7 +57,7 @@ describe('reading a path out of a real log', () => {
     expect(path.problems).toEqual([])
   })
 
-  it('produces degrees and metres, not raw log units', () => {
+  it('produces degrees and meters, not raw log units', () => {
     const first = flightPath(real).samples[0]!
     // Canberra, and the field elevation there.
     expect(first.lat).toBeCloseTo(-35.36, 1)

@@ -208,7 +208,7 @@ describe('buildWrites', () => {
     expect(find('RC5_TRIM')).toBeUndefined()
   })
 
-  it('trims the sticks to centre but the throttle to its bottom', () => {
+  it('trims the sticks to center but the throttle to its bottom', () => {
     // ArduPilot reads throttle as a range from MIN to MAX with no neutral,
     // so a mid-stick trim there is meaningless at best.
     expect(find('RC1_TRIM')).toBe(1500)

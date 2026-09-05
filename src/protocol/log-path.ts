@@ -15,7 +15,7 @@
 //   GPS  is the raw receiver, used last: it is what the EKF was fed, not
 //        what the EKF concluded, and it jumps.
 //
-// Everything here is degrees and metres, matching what the parser already
+// Everything here is degrees and meters, matching what the parser already
 // scaled the columns to.
 
 import { getSeries, type ParsedLog } from './dataflash'
@@ -25,10 +25,10 @@ export interface PathSample {
   time: number
   lat: number
   lon: number
-  /** Metres above mean sea level, as the log reports it. */
+  /** Meters above mean sea level, as the log reports it. */
   alt: number
   /**
-   * Metres above the launch point.
+   * Meters above the launch point.
    *
    * The one to draw on a globe with no terrain, where the rendered ground
    * sits at ellipsoid height zero: an AMSL track at a field 584 m up floats

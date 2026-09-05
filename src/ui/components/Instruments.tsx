@@ -54,7 +54,7 @@ export function AttitudeIndicator() {
     // 1.7 px per degree keeps roughly +-35 degrees of pitch in the dial.
     ctx.translate(0, ((pitch * 180) / Math.PI) * 1.7)
 
-    // Sky and ground keep their colours in both themes: an attitude
+    // Sky and ground keep their colors in both themes: an attitude
     // indicator that went dark would stop reading as one. Only the face,
     // bezel and lettering follow the window.
     ctx.fillStyle = '#7FB2E5'

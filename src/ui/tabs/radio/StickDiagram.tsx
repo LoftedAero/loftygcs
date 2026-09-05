@@ -11,11 +11,11 @@ import { STICK_SPECS } from './radio-cal'
 
 const GATE_R = 26
 const KNOB_R = 9
-/** How far the knob sits from centre when a step calls for full deflection. */
+/** How far the knob sits from center when a step calls for full deflection. */
 const THROW = GATE_R - KNOB_R - 2
 
 export interface StickDiagramProps {
-  /** The function being identified, or null to draw both sticks centred. */
+  /** The function being identified, or null to draw both sticks centered. */
   active: StickFunction | null
   /** Live stick positions, -1..1, when the mapping is known. */
   live?: { left: { x: number; y: number }; right: { x: number; y: number } } | undefined
@@ -45,7 +45,7 @@ export default function StickDiagram({ active, live }: StickDiagramProps) {
       aria-label={
         spec
           ? `Move the ${spec.label.toLowerCase()} stick ${spec.maxDirection}`
-          : 'Transmitter sticks centred'
+          : 'Transmitter sticks centered'
       }
     >
       {/* Body */}
@@ -66,7 +66,7 @@ export default function StickDiagram({ active, live }: StickDiagramProps) {
               r={GATE_R}
               className={`stick-diagram__gate${isActive ? ' is-active' : ''}`}
             />
-            {/* Cross-hairs give the eye a centre to judge deflection against */}
+            {/* Cross-hairs give the eye a center to judge deflection against */}
             <line x1={cx - 7} y1={cy} x2={cx + 7} y2={cy} className="stick-diagram__cross" />
             <line x1={cx} y1={cy - 7} x2={cx} y2={cy + 7} className="stick-diagram__cross" />
             {isActive && spec && (

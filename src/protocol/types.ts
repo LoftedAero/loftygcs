@@ -142,9 +142,9 @@ export type TelemetryDelta =
       k: 'missionProgress'
       /** Sequence number of the item being flown, 0 being home. */
       seq: number | null
-      /** Straight-line distance to that item, in metres. */
+      /** Straight-line distance to that item, in meters. */
       wpDistM: number | null
-      /** Metres the vehicle is above (positive) or below its target. */
+      /** Meters the vehicle is above (positive) or below its target. */
       altErrorM: number | null
     }
 

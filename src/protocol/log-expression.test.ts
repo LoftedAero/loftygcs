@@ -163,8 +163,8 @@ describe('against a real log', () => {
   })
 
   it('converts units the way someone actually would', () => {
-    const metres = getSeries(real, 'BARO', 'Alt')!
+    const meters = getSeries(real, 'BARO', 'Alt')!
     const feet = evaluateExpression(real, 'BARO.Alt * 3.28084')
-    expect(feet.values[10]).toBeCloseTo(metres.values[10]! * 3.28084, 6)
+    expect(feet.values[10]).toBeCloseTo(meters.values[10]! * 3.28084, 6)
   })
 })

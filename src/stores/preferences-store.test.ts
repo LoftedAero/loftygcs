@@ -74,7 +74,7 @@ describe('what the vehicle is commanded, whatever is displayed', () => {
     }
   })
 
-  it('sends metres per second however the speed box is labelled', () => {
+  it('sends meters per second however the speed box is labelled', () => {
     // 30 knots typed into the guided speed box is 15.43 m/s on the wire.
     expect(fromSpeed(30, 'kts')).toBeCloseTo(15.4333, 3)
     expect(fromSpeed(toSpeed(12, 'mph'), 'mph')).toBeCloseTo(12, 10)

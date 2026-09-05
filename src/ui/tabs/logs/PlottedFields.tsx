@@ -54,7 +54,7 @@ export default function PlottedFields() {
       {selected.map((f, i) => {
         const id = `${f.message}.${f.field}`
         // An expression is its own name and has no unit: the arithmetic
-        // could have turned metres into anything.
+        // could have turned meters into anything.
         const named = f.expression ? null : fieldLabel(log.params, f.message, f.field)
         const unit = f.expression ? '' : fieldUnit(log, f.message, f.field)
         const color = traceColor(f, i)

@@ -10,7 +10,7 @@ import type { BaseLayer } from './map-layers'
 // and a network tile is stored on the way past, so ordinary panning around
 // the field before takeoff builds the cache for free.
 //
-// Everything degrades to the stock behaviour: no cache, or a cache that
+// Everything degrades to the stock behavior: no cache, or a cache that
 // errors, just means every tile comes from the network as before.
 
 class CachedTileLayer extends L.TileLayer {

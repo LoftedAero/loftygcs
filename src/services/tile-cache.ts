@@ -8,7 +8,7 @@ import { tileUrl, type TileCoord } from './tile-math'
 // layer/z/x/y.
 //
 // Nothing here throws at the caller. A cache that cannot open is a map that
-// fetches from the network, which is exactly the behaviour before this
+// fetches from the network, which is exactly the behavior before this
 // existed -- so every failure falls back to that rather than breaking a map
 // someone is flying with.
 

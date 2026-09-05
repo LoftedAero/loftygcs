@@ -323,7 +323,7 @@
 }
 
 /* The handful of places the system sheet hardcodes a light value. Each is
-   a colour it could not express as a token, so each has to be repeated
+   a color it could not express as a token, so each has to be repeated
    here -- and each is a line that would disappear if dark mode graduated
    into the canonical sheet. */
 :root[data-theme='dark'] {
@@ -464,7 +464,7 @@
 }
 
 /* Preflight: the answer to "why won't it arm", reasons first. Semantic
-   colour only -- green/amber/red are status here and never actions. */
+   color only -- green/amber/red are status here and never actions. */
 .preflight {
   padding: var(--la-space-3);
   overflow-y: auto;
@@ -1983,7 +1983,7 @@
   /* A range broken across two lines reads as two numbers. */
   white-space: nowrap;
 }
-/* A clash is a fault, so it is named in the row as well as coloured. */
+/* A clash is a fault, so it is named in the row as well as colored. */
 .rc-review tr.is-bad td {
   color: var(--la-bad);
   font-weight: 600;
@@ -2764,7 +2764,7 @@
   color: var(--la-ink-3);
   font: 600 var(--la-size-sm) / 1 var(--la-font);
   cursor: pointer;
-  /* The active tab is marked by a rule in the brand colour, the same way the
+  /* The active tab is marked by a rule in the brand color, the same way the
      nav rail marks its active item. */
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -3174,7 +3174,7 @@ body.is-splitting .flight-map {
   width: 100%;
   height: 100%;
 }
-/* Connection progress and failures, over the video area. Bottom-centre so
+/* Connection progress and failures, over the video area. Bottom-center so
    the instruments drawn above keep the middle of the picture. */
 .video-layer__note {
   position: absolute;
@@ -3528,7 +3528,7 @@ body.is-splitting .flight-map {
   border-color: var(--la-blue);
 }
 
-/* Panel toggles left, preview centre, global settings right. The point of
+/* Panel toggles left, preview center, global settings right. The point of
    the arrangement is that the whole tab fits without scrolling: the panel
    list scrolls inside its own pane, and the preview is capped by viewport
    height rather than allowed to grow with the column. */

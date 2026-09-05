@@ -35,7 +35,7 @@ export function isPrearmMessage(text: string): boolean {
  * Distil a status feed into the current reasons.
  *
  * `now` and `staleAfterMs` are passed rather than read from the clock so the
- * behaviour is testable, and because "stale" is a display decision: a reason
+ * behavior is testable, and because "stale" is a display decision: a reason
  * last heard two minutes ago has almost certainly been fixed, and leaving it
  * up is how a checklist becomes something people ignore.
  */

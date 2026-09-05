@@ -17,7 +17,7 @@ import {
   screenGrid,
 } from './osd-layout'
 
-// The whole OSD tab: panel toggles left, screen preview centre, global
+// The whole OSD tab: panel toggles left, screen preview center, global
 // settings right -- Betaflight's arrangement, which exists to put everything
 // on one screen without scrolling. The list scrolls inside its own pane and
 // the preview is capped by viewport height so the rest never moves.

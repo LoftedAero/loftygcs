@@ -227,7 +227,7 @@ export default function LogPlot() {
           const at = toTime(e.clientX)
           if (at === null) return
           // Zoom about the pointer, so the thing under it stays put --
-          // zooming about the centre makes you chase what you were reading.
+          // zooming about the center makes you chase what you were reading.
           const factor = e.deltaY > 0 ? 1.2 : 1 / 1.2
           const t0 = at - (at - view.t0) * factor
           const t1 = at + (view.t1 - at) * factor
@@ -492,8 +492,8 @@ function draw(
   }
 
   // Where the 3D replay has got to: solid, charcoal, with a marker at the
-  // top. Not orange -- that is the first trace colour, and a playhead the
-  // same colour as the line it crosses disappears into it.
+  // top. Not orange -- that is the first trace color, and a playhead the
+  // same color as the line it crosses disappears into it.
   if (playhead !== null && playhead >= view.t0 && playhead <= view.t1) {
     const x = Math.round(xOf(playhead)) + 0.5
     ctx.strokeStyle = '#2D2D2F'

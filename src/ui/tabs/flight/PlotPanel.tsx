@@ -103,7 +103,7 @@ export default function PlotPanel({
 
       // Grid and labels come from the theme rather than being fixed: a
       // near-black grid line is invisible on a dark ground, and the series
-      // colours below are chosen to read on both.
+      // colors below are chosen to read on both.
       const gridColor = token('--la-line', '#E1E2E6')
       const labelColor = token('--la-ink-3', '#82828A')
 
@@ -196,7 +196,7 @@ export default function PlotPanel({
       })
 
       // Y labels last, now that the owning series' range is known. Drawn in
-      // its colour, because with every series on its own scale the numbers
+      // its color, because with every series on its own scale the numbers
       // would otherwise be anyone's guess.
       const owner = legend.find((e) => e.name === axisRefName.current) ?? legend[0]
       if (owner) {

@@ -115,7 +115,7 @@ export default function VehicleView({
       (gltf) => {
         if (disposed) return
         const model = gltf.scene
-        // Normalize: centre on the origin, then scale so the bounding sphere
+        // Normalize: center on the origin, then scale so the bounding sphere
         // has radius 1. Both models then frame identically however they were
         // authored, and the camera maths above needs no per-model constants.
         const box = new THREE.Box3().setFromObject(model)

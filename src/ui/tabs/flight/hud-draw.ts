@@ -46,14 +46,14 @@ export function armReadiness(
 export interface Tick {
   /** The value this tick marks. */
   value: number
-  /** Where it sits relative to the centre, in tick-units above centre. */
+  /** Where it sits relative to the center, in tick-units above center. */
   offset: number
   /** Major ticks carry a number; minor ticks are just a line. */
   major: boolean
 }
 
 /**
- * Ticks for a vertical tape centred on `value`.
+ * Ticks for a vertical tape centered on `value`.
  *
  * Generated from a rounded anchor rather than from the live value, so the
  * marks hold still and the tape slides past them. Ticks anchored to the value
@@ -84,7 +84,7 @@ const CARDINALS: [number, string][] = [
 ]
 
 export interface CompassTick {
-  /** Degrees from the centre of the ribbon, negative to the left. */
+  /** Degrees from the center of the ribbon, negative to the left. */
   offset: number
   label: string
   major: boolean
@@ -103,9 +103,9 @@ export function angleDelta(a: number, b: number): number {
  */
 export function compassTicks(heading: number, halfSpanDeg: number, step = 15): CompassTick[] {
   const out: CompassTick[] = []
-  const centre = Math.round(heading / step) * step
+  const center = Math.round(heading / step) * step
   const reach = Math.ceil(halfSpanDeg / step) * step
-  for (let d = centre - reach; d <= centre + reach; d += step) {
+  for (let d = center - reach; d <= center + reach; d += step) {
     const bearing = ((d % 360) + 360) % 360
     const offset = angleDelta(heading, d)
     if (Math.abs(offset) > halfSpanDeg) continue
@@ -144,7 +144,7 @@ export function linkLabel(rcRssi: number, packetsPerSec: number | undefined): st
  * How far apart a tape's labelled ticks sit, in the unit being shown.
  *
  * A tape spans seven steps, so the step decides how much sky the pilot sees
- * at once. Ten metres of altitude and ten feet are not the same amount of
+ * at once. Ten meters of altitude and ten feet are not the same amount of
  * sky, so the number has to change with the unit or the imperial tape
  * scrolls three times too fast to read.
  */

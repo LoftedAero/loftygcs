@@ -1,6 +1,6 @@
 // Design tokens, resolved for canvas drawing.
 //
-// Canvas has no var(): every colour has to reach it as a string, so the
+// Canvas has no var(): every color has to reach it as a string, so the
 // tokens must be read out of the document. Doing that inside a draw call
 // forces a style recalculation, which at sixty frames a second on several
 // instruments is real work for a value that changes about twice a year.

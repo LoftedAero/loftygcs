@@ -116,7 +116,7 @@ describe.runIf(process.env.SITL === '1')('mission progress against SITL', () => 
     expect(withDist.length).toBeGreaterThan(0)
 
     // A distance the vehicle actually flies: the square's legs are about
-    // 100 m, so anything past a few kilometres means the decode is wrong.
+    // 100 m, so anything past a few kilometers means the decode is wrong.
     for (const d of withDist) {
       if (d.k !== 'missionProgress' || d.wpDistM === null) continue
       expect(d.wpDistM).toBeGreaterThanOrEqual(0)

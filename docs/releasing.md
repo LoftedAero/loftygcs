@@ -124,7 +124,7 @@ not as the recommended path.
 
 Verified in WSL Ubuntu: both formats build, the `.deb` carries the right
 metadata and `StartupWMClass`, and the app launches with `sandbox: true`
-intact. Not verified: behaviour on 24.04 specifically, which is the case the
+intact. Not verified: behavior on 24.04 specifically, which is the case the
 `postinst` exists to handle.
 
 `desktopName` sits at the **top level** of package.json, not under

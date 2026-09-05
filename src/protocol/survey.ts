@@ -1,11 +1,11 @@
 // Survey grids: covering a polygon with a lawnmower path.
 //
-// The geometry is done in local metres, not degrees. A degree of longitude is
+// The geometry is done in local meters, not degrees. A degree of longitude is
 // 111 km at the equator and 55 km at 60 degrees of latitude, so a grid
 // computed in raw lat/lon comes out sheared -- the passes are not parallel and
-// the spacing is not the spacing that was asked for. Projecting to metres
-// about the polygon's own centre, solving there and projecting back keeps the
-// spacing true over the few kilometres a survey actually spans.
+// the spacing is not the spacing that was asked for. Projecting to meters
+// about the polygon's own center, solving there and projecting back keeps the
+// spacing true over the few kilometers a survey actually spans.
 //
 // Kept apart from the map component because "does this path cover the
 // polygon" has a right answer, and one far easier to ask of a function than
@@ -17,7 +17,7 @@ export interface GeoPoint {
   y: number
 }
 
-/** Metres east and north of the projection origin. */
+/** Meters east and north of the projection origin. */
 interface LocalPoint {
   e: number
   n: number
@@ -26,12 +26,12 @@ interface LocalPoint {
 const EARTH_R = 6378137
 
 export interface SurveyOptions {
-  /** Distance between adjacent passes, metres. */
+  /** Distance between adjacent passes, meters. */
   spacingM: number
   /** Direction of the passes, degrees clockwise from north. */
   angleDeg: number
   /**
-   * How far each pass runs past the polygon edge, metres. A camera wants the
+   * How far each pass runs past the polygon edge, meters. A camera wants the
    * aircraft settled and level before the boundary, and a multirotor wants
    * room to turn round; both are answered by flying past it.
    */
@@ -64,7 +64,7 @@ function toGeo(p: LocalPoint, origin: GeoPoint): GeoPoint {
   return { x: Math.round(origin.x + dLat * 1e7), y: Math.round(origin.y + dLon * 1e7) }
 }
 
-/** Signed area in local metres; the sign is the winding order. */
+/** Signed area in local meters; the sign is the winding order. */
 function signedArea(poly: readonly LocalPoint[]): number {
   let a = 0
   for (let i = 0; i < poly.length; i++) {
@@ -75,7 +75,7 @@ function signedArea(poly: readonly LocalPoint[]): number {
   return a / 2
 }
 
-/** Area of the polygon in square metres, whichever way it is wound. */
+/** Area of the polygon in square meters, whichever way it is wound. */
 export function polygonAreaM2(poly: readonly GeoPoint[]): number {
   if (poly.length < 3) return 0
   const origin = centroid(poly)
@@ -109,7 +109,7 @@ export interface SurveyResult {
   points: GeoPoint[]
   /** Number of passes across the area. */
   passes: number
-  /** Total ground distance of the path, metres. */
+  /** Total ground distance of the path, meters. */
   lengthM: number
   /** Why there is no path, when there is none. */
   problem?: string
@@ -210,7 +210,7 @@ export function surveyGrid(polygon: readonly GeoPoint[], opts: SurveyOptions): S
   return { points, passes, lengthM: pathLengthM(points) }
 }
 
-/** Ground distance along a path, metres. */
+/** Ground distance along a path, meters. */
 export function pathLengthM(points: readonly GeoPoint[]): number {
   let total = 0
   for (let i = 1; i < points.length; i++) {

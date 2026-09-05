@@ -90,7 +90,7 @@ export const STICK_SPECS: Record<StickFunction, StickSpec> = {
   },
 }
 
-/** A stick has to move at least this far from centre to count as deflected. */
+/** A stick has to move at least this far from center to count as deflected. */
 export const MIN_DEFLECTION_US = 180
 /** ...and beat the next-liveliest channel by this much, so a twitchy channel
  *  or a bit of trim drift cannot win the vote. */
@@ -106,7 +106,7 @@ export interface Deflection {
 }
 
 /**
- * Which channel the user just moved, relative to a centred reference.
+ * Which channel the user just moved, relative to a centered reference.
  *
  * Returns null while nothing is clearly deflected -- the wizard uses that to
  * keep its Next button disabled rather than guessing from noise.

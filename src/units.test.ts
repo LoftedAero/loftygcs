@@ -29,10 +29,10 @@ describe('distance', () => {
     expect(toDistance(100, 'm')).toBe(100)
   })
 
-  it('round-trips through the reader and back to metres', () => {
+  it('round-trips through the reader and back to meters', () => {
     for (const unit of ['m', 'ft'] as DistanceUnit[]) {
-      for (const metres of [0, 1, 3.5, 120, 5280.25, -17]) {
-        expect(fromDistance(toDistance(metres, unit), unit)).toBeCloseTo(metres, 10)
+      for (const meters of [0, 1, 3.5, 120, 5280.25, -17]) {
+        expect(fromDistance(toDistance(meters, unit), unit)).toBeCloseTo(meters, 10)
       }
     }
   })
@@ -75,7 +75,7 @@ describe('vertical speed', () => {
     expect(verticalSpeedLabel('ft')).toBe('ft/min')
   })
 
-  it('stays metres per second in metric', () => {
+  it('stays meters per second in metric', () => {
     expect(toVerticalSpeed(2.5, 'm')).toBe(2.5)
     expect(verticalSpeedLabel('m')).toBe('m/s')
   })

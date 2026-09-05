@@ -439,7 +439,7 @@ export default function LogReplay() {
               >
                 lord_syrup
               </a>
-              {', CC-BY-4.0, recoloured'}
+              {', CC-BY-4.0, recolored'}
             </>
           )}
           {diagnostic && ` · ${diagnostic}`} · imagery © Esri, Maxar, Earthstar Geographics · tiles

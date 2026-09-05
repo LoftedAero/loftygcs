@@ -1,6 +1,6 @@
 // Turning the vehicle's numbers into the reader's units.
 //
-// Everything inside this app is SI, because MAVLink is: metres, metres per
+// Everything inside this app is SI, because MAVLink is: meters, meters per
 // second, radians. That never changes -- conversion happens at the edge, on
 // the way to a screen and on the way back from a keyboard, and nothing in
 // between ever holds feet. A units bug that reaches a mission altitude is a
@@ -41,12 +41,12 @@ const SPEED: Record<SpeedUnit, { perUnit: number; label: string }> = {
 
 // ---------------------------------------------------------------- distance
 
-/** Metres to the reader's distance unit. */
-export function toDistance(metres: number, unit: DistanceUnit): number {
-  return metres / DISTANCE[unit].perUnit
+/** Meters to the reader's distance unit. */
+export function toDistance(meters: number, unit: DistanceUnit): number {
+  return meters / DISTANCE[unit].perUnit
 }
 
-/** The reader's distance unit back to metres -- the only value we store. */
+/** The reader's distance unit back to meters -- the only value we store. */
 export function fromDistance(value: number, unit: DistanceUnit): number {
   return value * DISTANCE[unit].perUnit
 }
@@ -95,12 +95,12 @@ export function verticalSpeedLabel(unit: DistanceUnit): string {
  *
  * The precision follows the unit rather than the number: a foot is a third
  * of a metre and a knot is about two, so the same number of decimals in a
- * bigger unit shows *less* than it did in metres. Feet and knots therefore
- * drop a decimal that metres keep, and nothing here ever shows more
+ * bigger unit shows *less* than it did in meters. Feet and knots therefore
+ * drop a decimal that meters keep, and nothing here ever shows more
  * precision than the sensor behind it has.
  */
-export function formatDistance(metres: number, unit: DistanceUnit, decimals?: number): string {
-  const v = toDistance(metres, unit)
+export function formatDistance(meters: number, unit: DistanceUnit, decimals?: number): string {
+  const v = toDistance(meters, unit)
   return v.toFixed(decimals ?? (unit === 'ft' ? 0 : Math.abs(v) < 100 ? 1 : 0))
 }
 

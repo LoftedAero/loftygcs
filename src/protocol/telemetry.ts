@@ -96,7 +96,7 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           k: 'gps',
           fixType: f.fixType as number,
           satellites: f.satellitesVisible as number,
-          // eph is centimetres of horizontal spread; HDOP is the familiar form.
+          // eph is centimeters of horizontal spread; HDOP is the familiar form.
           hdop: (f.eph as number) / 100,
         },
       ]

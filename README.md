@@ -159,5 +159,5 @@ This work is based on ["Low-Poly Biplane"](https://sketchfab.com/3d-models/low-p
 by [lord_syrup](https://sketchfab.com/lord_syrup) licensed under
 [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/), used here with its colors changed.
 
-The multirotor model ships in betaflight-configurator with no separate model licence, so it
+The multirotor model ships in betaflight-configurator with no separate model license, so it
 falls under that project's GPL-3.0 — which is usable here only because this app is GPL-3.0 too.

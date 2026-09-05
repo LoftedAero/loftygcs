@@ -112,7 +112,7 @@ describe('reading a directory listing', () => {
  * A device that answers BurstReadFile the way ArduPilot does: one request,
  * a stream of packets, the last one flagged complete.
  *
- * `mode` picks the misbehaviour to test against.
+ * `mode` picks the misbehavior to test against.
  */
 function burstDevice(
   file: Uint8Array,
