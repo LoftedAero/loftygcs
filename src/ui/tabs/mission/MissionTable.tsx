@@ -37,13 +37,10 @@ export default function MissionTable() {
               edit, so pointing at it from a fence would be pointing at
               nothing. */}
           {editing === 'mission' ? (
-            <>
-              No items yet. Use <strong>Add</strong> above the map to place a takeoff and some
-              waypoints, or read the mission off the vehicle.
-            </>
+            <>No items yet. Click the map to add one.</>
           ) : (
             <>
-              No mission items. Switch back to <strong>Mission</strong> to plan a route.
+              No mission items. Switch to <strong>Mission</strong> to plan a route.
             </>
           )}
         </p>

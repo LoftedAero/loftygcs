@@ -21,9 +21,6 @@
      OSD all grew one independently and all picked a different number; this is
      the one they share. Change it here and every screen moves together. */
   --app-col-w: 280px;
-  /* The mission item pane with nothing in it: its header and the one line
-     that says where to click, and no more. */
-  --app-mission-collapsed: 82px;
   /* The log field list. Matches the OSD panel list's 262px. */
   --app-log-fields-w: 262px;
 }
@@ -1289,14 +1286,22 @@
    tells a new user where to click. The gap row collapses with it because
    there is no divider to make room for.
 
-   `auto` is not enough: the pane is a flex column whose body is
-   `flex: 1; min-height: 0`, so it resolves to nothing. The row is sized to
-   the header plus the empty line instead. */
+   Two rows, not three: the divider is not rendered while the plan is
+   empty, so the pane auto-places into whichever row is second. Leaving the
+   three-row template here put it in the zero-height gap row, where only an
+   explicit min-height could hold it open -- and that height then clipped
+   the empty line whenever the window was narrow enough to wrap it.
+
+   Sized to the content, so it fits at any width. `auto` needs help from the
+   rule below: the table pane is `flex: 1; min-height: 0` and would
+   otherwise contribute nothing to it. */
 .mission-main.is-collapsed {
-  grid-template-rows: minmax(0, 1fr) 0 var(--app-mission-collapsed);
+  grid-template-rows: minmax(0, 1fr) auto;
 }
-.mission-main.is-collapsed .mission-lower {
-  min-height: var(--app-mission-collapsed);
+.mission-main.is-collapsed .mission-table {
+  flex: none;
+  min-height: auto;
+  overflow: visible;
 }
 
 .mission-map-area {
