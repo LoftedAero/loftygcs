@@ -57,15 +57,22 @@ class CoverageLayer extends L.GridLayer {
   createTile(coords: L.Coords, done: L.DoneCallback): HTMLElement {
     const cell = document.createElement('div')
     cell.className = 'tile-coverage tile-coverage--pending'
+    // classList surgery, never a className assignment: by the time the cache
+    // answers, Leaflet has added its own classes to this element -- among
+    // them `leaflet-tile`, which carries the position:absolute that puts the
+    // square on its tile. Assigning className wiped them, and every resolved
+    // cell fell out of the grid into a pile at the layer's origin: marks in
+    // the wrong places, and none where they belonged.
     void hasTile(this.layerId, { z: coords.z, x: coords.x, y: coords.y }).then(
       (stored) => {
-        cell.className = 'tile-coverage ' + (stored ? 'is-stored' : 'is-missing')
+        cell.classList.remove('tile-coverage--pending')
+        cell.classList.add(stored ? 'is-stored' : 'is-missing')
         done(undefined, cell)
       },
       () => {
         // No cache to ask: say nothing rather than paint the whole view as
         // missing, which would be a lie about a map that works fine.
-        cell.className = 'tile-coverage'
+        cell.classList.remove('tile-coverage--pending')
         done(undefined, cell)
       },
     )

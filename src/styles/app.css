@@ -677,17 +677,25 @@
 .tile-coverage.is-missing {
   background-image: repeating-linear-gradient(
     45deg,
-    rgba(214, 48, 49, 0.28) 0,
-    rgba(214, 48, 49, 0.28) 3px,
-    rgba(214, 48, 49, 0) 3px,
-    rgba(214, 48, 49, 0) 9px
+    color-mix(in srgb, var(--la-bad) 28%, transparent) 0,
+    color-mix(in srgb, var(--la-bad) 28%, transparent) 3px,
+    transparent 3px,
+    transparent 9px
   );
-  box-shadow: inset 0 0 0 1px rgba(214, 48, 49, 0.35);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--la-bad) 35%, transparent);
 }
-/* Stored squares get a hairline and nothing else: enough to show the grid
-   the download works in, not enough to read the map through. */
+/* Stored squares: a solid green line on a light casing, and the faintest
+   wash. The first cut was a 35%-opacity hairline and the second a solid
+   line alone -- both vanished over satellite imagery, because fields and
+   tree cover are exactly this green. The casing is the map-maker's halo
+   trick: a line that must survive arbitrary ground gets a rim of the
+   opposite lightness. Still light enough to read the map through, which
+   the hatched squares deliberately are not. */
 .tile-coverage.is-stored {
-  box-shadow: inset 0 0 0 1px rgba(47, 174, 78, 0.35);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--la-ok) 90%, transparent),
+    inset 0 0 0 3.5px color-mix(in srgb, var(--app-on-dark) 70%, transparent);
+  background: color-mix(in srgb, var(--la-ok) 8%, transparent);
 }
 
 /* ── Joystick ──
