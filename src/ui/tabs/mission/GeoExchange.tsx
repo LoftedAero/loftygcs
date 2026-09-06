@@ -100,7 +100,7 @@ export default function GeoExchange() {
   return (
     <>
       <section className="app-col__group">
-        <h3 className="app-col__head">Files</h3>
+        <h3 className="app-col__head">Import/export</h3>
 
         <LaButton variant="secondary" size="block" disabled={busy} onClick={onImport}>
           Import KML or GPX
@@ -132,12 +132,12 @@ export default function GeoExchange() {
 
       {/* The mission's own format, in its own section *below* the shared one
           rather than above it -- which is where it was, and which pushed
-          Files down the column on one plan out of three. Same three buttons
+          the shared group down the column on one plan out of three. Same three buttons
           in the same place on all three is worth more here than leading with
           the format that keeps everything. */}
       {editing === 'mission' && (
         <section className="app-col__group">
-          <h3 className="app-col__head">Mission file</h3>
+          <h3 className="app-col__head">Load/save</h3>
           <LaButton
             variant="secondary"
             size="block"

@@ -79,10 +79,10 @@ design decisions are recorded there and in code comments.
   holding only what is peculiar to their plan. The order is fixed and the reasons are separate:
   vehicle actions, then file actions, then settings (the documented order), then the *list* —
   shapes or rally points — because a list is the only section that grows and anything under it
-  moves down the column every time something is added. The Files group is the same three
-  interchange buttons in the same place on all three; the mission's own `.waypoints` pair is a
-  *second* section under it rather than two extra buttons inside it, which is what kept Files
-  from starting at the same height on one plan out of three. Offline maps is pinned to the foot
+  moves down the column every time something is added. The Import/export group is the same
+  three interchange buttons in the same place on all three; the mission's own `.waypoints` pair
+  is a *second* section under it (Load/save) rather than two extra buttons inside it, which is
+  what kept the shared group from starting at the same height on one plan out of three. Offline maps is pinned to the foot
   (`.mission-side__foot`) rather than left at the end of that flow: it is the one section that is
   not about the plan at all, and it should not move when the switch is flipped. **What you draw
   with lives on the map, not in the column**: `ItemPalette` and `FencePalette` are the same strip
