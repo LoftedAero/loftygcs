@@ -190,7 +190,10 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
             }}
           >
             <FromVehicleIcon />
-            <span className="mission-palette__label">From vehicle</span>
+            {/* One word, so the tile is exactly a palette button's box --
+                "From vehicle" wrapped to two lines and made it taller than
+                everything it sits beside. The sentence is on the title. */}
+            <span className="mission-palette__label">Vehicle</span>
           </button>
         </div>
       )}

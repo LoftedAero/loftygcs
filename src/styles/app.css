@@ -1066,7 +1066,12 @@
   /* Anchored to the button's right edge: it sits mid-bar, and a panel
      hanging left of it would run off a narrow window. */
   right: 0;
-  z-index: 600;
+  /* Above the map, which is the thing it most often hangs over. Leaflet's
+     own control corners are z-index 1000 and its marker pane 600 -- the same
+     600 this had, which at a tie hands the paint to whichever comes later in
+     the document, and the map comes later than the app bar. Below the 2000
+     modals sit at, because a modal is still the front. */
+  z-index: 1500;
   width: 320px;
   max-height: min(70vh, 560px);
   overflow-y: auto;
@@ -1401,12 +1406,15 @@
 }
 
 /* Home's alternative, floated beside the armed button as one more tile of
-   the same strip. Fixed and placed from the button's rect for the reason the
-   More menu is: the palette is a scroll box, and an absolutely positioned
-   child of one is clipped to it. */
+   the same strip -- so the card is the tile: no padding of its own, which is
+   what made it 72px against the strip's 62 and read as a panel rather than a
+   button. Fixed and placed from the button's rect for the reason the More
+   menu is: the palette is a scroll box, and an absolutely positioned child of
+   one is clipped to it. */
 .mission-palette--flyout {
   position: fixed;
   z-index: 901;
+  padding: 0;
   max-height: none;
   overflow: visible;
 }

@@ -619,6 +619,17 @@ function homePopup(home: PlanHome, unit: DistanceUnit): HTMLElement {
   hint.textContent = 'Relative altitudes are measured from here.'
   el.append(hint)
 
+  // The only way back to no home at all. Dragging the marker moves it and
+  // "From vehicle" replaces it, but nothing removed it -- and an unwanted
+  // home is written to the vehicle as mission item 0 like any other.
+  const remove = document.createElement('button')
+  remove.type = 'button'
+  remove.className = 'la-btn la-btn--ghost la-btn--block'
+  remove.textContent = 'Remove home'
+  remove.title = 'Plan without a home position'
+  remove.addEventListener('click', () => useMissionStore.getState().setHome(null))
+  el.append(remove)
+
   input.addEventListener('change', () => {
     const value = Number(input.value)
     if (!Number.isFinite(value)) return
