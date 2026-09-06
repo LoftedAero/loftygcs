@@ -269,6 +269,22 @@ export default function MissionMap({
 
   useEffect(() => {
     const map = mapRef.current
+    if (!map) return
+    const report = () => {
+      const c = map.getCenter()
+      useMissionStore
+        .getState()
+        .setMapCenter({ x: Math.round(c.lat * 1e7), y: Math.round(c.lng * 1e7) })
+    }
+    report()
+    map.on('moveend zoomend', report)
+    return () => {
+      map.off('moveend zoomend', report)
+    }
+  }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
     if (!map || !onView) return
     const report = () => {
       const b = map.getBounds()

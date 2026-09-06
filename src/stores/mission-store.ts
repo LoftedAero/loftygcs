@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import {
+  hasCoords,
   newUid,
   planFromItems,
   plansDiffer,
@@ -102,6 +103,16 @@ export interface MissionState {
   transfer: TransferState
   /** Where the plan came from, for the title bar. */
   sourceName: string | null
+  /**
+   * The middle of what the map is showing, degrees * 1e7.
+   *
+   * Kept here so an item added from the *table* has somewhere to go: with
+   * no neighbors and no home there is no other reference, and a waypoint
+   * at latitude zero is a mission to the Gulf of Guinea rather than one
+   * you can see and drag.
+   */
+  mapCenter: { x: number; y: number } | null
+  setMapCenter(at: { x: number; y: number }): void
   /** Fraction of the height given to the map, above the items list. */
   split: number
   setSplit(ratio: number): void
@@ -155,6 +166,11 @@ export interface MissionState {
 
   setPlan(plan: MissionPlan, opts?: { synced?: boolean; name?: string }): void
   addItem(command: number, at?: { x: number; y: number }): string
+  /**
+   * Insert after the item at `index` -- what the row's + button does, and
+   * how items are added without touching the map. -1 appends.
+   */
+  addItemAfter(index: number, command?: number): string
   updateItem(uid: string, patch: Partial<Omit<PlanItem, 'uid'>>): void
   removeItem(uid: string): void
   moveItem(uid: string, toIndex: number): void
@@ -164,6 +180,39 @@ export interface MissionState {
   setTransfer(t: TransferState): void
   markSynced(): void
   clear(): void
+}
+
+/**
+ * Where an item added from the table goes on the map.
+ *
+ * Between its neighbors when it has two, so inserting into a leg puts the
+ * new waypoint on that leg rather than on top of one end. Otherwise it
+ * takes the position it follows -- an item stacked exactly on its
+ * predecessor is obvious and one drag from right, where a waypoint at
+ * latitude zero is a mission that flies to the Gulf of Guinea.
+ */
+function insertPosition(
+  plan: MissionPlan,
+  index: number,
+  fallback: { x: number; y: number } | null,
+): { x: number; y: number } {
+  const located = (i: number) => {
+    const it = plan.items[i]
+    return it && hasCoords(it) ? it : null
+  }
+  const at = index < 0 ? plan.items.length - 1 : index
+  let before: { x: number; y: number } | null = null
+  for (let i = at; i >= 0 && !before; i--) before = located(i)
+  before = before ?? plan.home
+  const after = located(at + 1)
+  if (before && after) {
+    return {
+      x: Math.round((before.x + after.x) / 2),
+      y: Math.round((before.y + after.y) / 2),
+    }
+  }
+  if (before) return { x: before.x, y: before.y }
+  return fallback ?? { x: 0, y: 0 }
 }
 
 /** A survey area under construction, and how it should be flown. */
@@ -183,6 +232,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   selected: null,
   transfer: { kind: 'idle' },
   sourceName: null,
+  mapCenter: null,
   split: loadSplit(),
   survey: null,
   editing: 'mission',
@@ -370,6 +420,12 @@ export const useMissionStore = create<MissionState>((set, get) => ({
     })
   },
 
+  setMapCenter(at) {
+    const now = get().mapCenter
+    if (now && now.x === at.x && now.y === at.y) return
+    set({ mapCenter: at })
+  },
+
   setSplit(ratio) {
     // Clamped so the divider cannot be dragged until one pane has no usable
     // height -- a map or a table you have to drag back out of is worse than
@@ -417,6 +473,29 @@ export const useMissionStore = create<MissionState>((set, get) => ({
     const items = command === 22 ? [item, ...plan.items] : [...plan.items, item]
     set({ plan: { ...plan, items }, selected: uid })
     return uid
+  },
+
+  addItemAfter(index, command = 16) {
+    const { plan, defaults } = get()
+    const spec = commandSpec(command)
+    const at = insertPosition(plan, index, get().mapCenter)
+    const item: PlanItem = {
+      uid: newUid(),
+      frame: defaults.frame,
+      command,
+      autocontinue: 1,
+      param1: 0,
+      param2: 0,
+      param3: 0,
+      param4: 0,
+      x: spec?.location === false ? 0 : at.x,
+      y: spec?.location === false ? 0 : at.y,
+      z: spec?.altitude === false ? 0 : defaults.altM,
+    }
+    const items = [...plan.items]
+    items.splice(index < 0 ? items.length : index + 1, 0, item)
+    set({ plan: { ...plan, items }, selected: item.uid })
+    return item.uid
   },
 
   updateItem(uid, patch) {

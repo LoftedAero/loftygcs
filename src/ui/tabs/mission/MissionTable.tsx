@@ -1,4 +1,4 @@
-import { LaButton, LaInput, LaSelect } from '../../components/La'
+import { LaButton, LaInput, LaLinkButton, LaSelect } from '../../components/La'
 import { useUnits } from '../../../stores/preferences-store'
 import { distanceLabel, formatDistance, fromDistance, toDistance } from '../../../units'
 import { useMissionStore } from '../../../stores/mission-store'
@@ -27,6 +27,7 @@ export default function MissionTable() {
   const update = useMissionStore((s) => s.updateItem)
   const remove = useMissionStore((s) => s.removeItem)
   const move = useMissionStore((s) => s.moveItem)
+  const addAfter = useMissionStore((s) => s.addItemAfter)
   const stats = legStats(plan)
 
   if (plan.items.length === 0) {
@@ -37,7 +38,10 @@ export default function MissionTable() {
               edit, so pointing at it from a fence would be pointing at
               nothing. */}
           {editing === 'mission' ? (
-            <>No items yet. Click the map to add one.</>
+            <>
+              No items yet. Click the map, or{' '}
+              <LaLinkButton onClick={() => addAfter(-1)}>add a waypoint</LaLinkButton>.
+            </>
           ) : (
             <>
               No mission items. Switch to <strong>Mission</strong> to plan a route.
@@ -105,6 +109,7 @@ export default function MissionTable() {
               onChange={(patch) => update(it.uid, patch)}
               onRemove={() => remove(it.uid)}
               onMove={(to) => move(it.uid, to)}
+              onAddBelow={() => addAfter(i)}
             />
           ))}
         </tbody>
@@ -124,6 +129,7 @@ function Row({
   onChange,
   onRemove,
   onMove,
+  onAddBelow,
 }: {
   item: PlanItem
   seq: number
@@ -135,6 +141,7 @@ function Row({
   onChange: (patch: Partial<Omit<PlanItem, 'uid'>>) => void
   onRemove: () => void
   onMove: (to: number) => void
+  onAddBelow: () => void
 }) {
   const units = useUnits()
   const spec = commandSpec(item.command)
@@ -270,6 +277,18 @@ function Row({
           onClick={() => onMove(index + 1)}
         >
           ↓
+        </LaButton>
+        {/* A waypoint under this one, without going to the map. It lands
+            between its neighbors, so inserting into a leg puts it on that
+            leg rather than on top of an end. */}
+        <LaButton
+          variant="ghost"
+          size="sm"
+          aria-label={`Add a waypoint after item ${seq}`}
+          title="Add a waypoint below"
+          onClick={onAddBelow}
+        >
+          +
         </LaButton>
         <LaButton variant="ghost" size="sm" aria-label={`Delete item ${seq}`} onClick={onRemove}>
           ✕
