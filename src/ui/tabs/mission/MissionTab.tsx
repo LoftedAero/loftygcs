@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import MissionMap from './MissionMap'
 import MissionTable from './MissionTable'
 import MissionSettings from './MissionSettings'
+import NewItemDefaults from './NewItemDefaults'
 import TerrainWarning from './TerrainWarning'
 import OfflineMapsPanel from './OfflineMapsPanel'
 import type { LatLonBounds } from '../../../services/tile-math'
@@ -108,6 +109,12 @@ export default function MissionTab() {
               <h3 className="mission-lower__title">
                 Items {items > 0 && <span className="mission-lower__count">{items}</span>}
               </h3>
+              {/* Beside the rows they stamp, not in the settings column:
+                  every row below carries whatever these two said when it was
+                  placed, and that is easier to believe when both are in one
+                  glance. Only on the mission -- a fence has no altitude and
+                  a rally point sets its own. */}
+              {editing === 'mission' && <NewItemDefaults />}
               <span className="la-grow" />
               {/* Centered between the count and the switch: it is the one
                   thing on this header that is a problem, and it reads as

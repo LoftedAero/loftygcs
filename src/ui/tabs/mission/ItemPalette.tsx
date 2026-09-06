@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { MISSION_COMMANDS, commandSpec } from '../../../protocol/mission-commands'
 import { useMissionStore } from '../../../stores/mission-store'
+import { useConnectionStore } from '../../../stores/connection-store'
+import { homeFromVehicle } from '../../../services/mission'
 
 // The add-an-item palette: a vertical strip down the left edge of the map,
 // the way QGroundControl arranges it.
@@ -38,6 +40,7 @@ const MENU_MAX_H = 320
 
 export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
   const addItem = useMissionStore((s) => s.addItem)
+  const connected = useConnectionStore((s) => s.phase === 'connected')
   const startSurvey = useMissionStore((s) => s.startSurvey)
   const cancelSurvey = useMissionStore((s) => s.cancelSurvey)
   const surveying = useMissionStore((s) => s.survey !== null)
@@ -148,6 +151,28 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
       >
         <HomeIcon />
         <span className="mission-palette__label">Home</span>
+      </button>
+
+      {/* Beside the tool that places home by hand, because at the field it
+          is the same job done the easy way -- and it has to be reachable
+          before a home exists, which rules out putting it on the marker
+          with the altitude. Nothing copies the vehicle's home on its own. */}
+      <button
+        type="button"
+        className="mission-palette__btn"
+        disabled={!connected}
+        title={
+          connected
+            ? "Put planned home at the vehicle's position"
+            : 'Connect a vehicle to copy its position'
+        }
+        onClick={() => {
+          onTool(null)
+          homeFromVehicle()
+        }}
+      >
+        <FromVehicleIcon />
+        <span className="mission-palette__label">From vehicle</span>
       </button>
 
       <div className="mission-palette__more" ref={moreRef}>
@@ -277,6 +302,19 @@ function SurveyIcon() {
     <svg {...box} aria-hidden="true">
       <path d="M4 5h16v14H4z" {...stroke} />
       <path d="M7 5v14M12 5v14M17 5v14" {...stroke} strokeDasharray="2 3" />
+    </svg>
+  )
+}
+
+// A home under a fix: the same roof as the Home tool, with the satellite
+// crosshair that says where the position came from.
+function FromVehicleIcon() {
+  return (
+    <svg {...box} aria-hidden="true">
+      <path d="M4 12.5 12 6l8 6.5" {...stroke} />
+      <path d="M6.5 11.5V20h11v-8.5" {...stroke} />
+      <circle cx="12" cy="15.5" r="1.6" fill="currentColor" />
+      <path d="M12 2.5v2M8.5 3.5l1 1.7M15.5 3.5l-1 1.7" {...stroke} />
     </svg>
   )
 }

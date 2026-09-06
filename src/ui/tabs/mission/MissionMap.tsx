@@ -7,7 +7,9 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMissionStore } from '../../../stores/mission-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
-import { hasCoords } from '../../../protocol/mission-plan'
+import { useUnits } from '../../../stores/preferences-store'
+import { distanceLabel, fromDistance, toDistance, type DistanceUnit } from '../../../units'
+import { hasCoords, type PlanHome } from '../../../protocol/mission-plan'
 import { commandSpec } from '../../../protocol/mission-commands'
 import { DEFAULT_TOOL, HOME_TOOL } from './ItemPalette'
 import { surveyGrid } from '../../../protocol/survey'
@@ -316,17 +318,27 @@ export default function MissionMap({
   const fenceDraft = useMissionStore((s) => s.fenceDraft)
   const rally = useMissionStore((s) => s.rally)
   const selectedShape = useMissionStore((s) => s.selectedShape)
+  const units = useUnits()
+  // Whether home's popup was open when the plan last changed. Every edit
+  // rebuilds the whole layer, and clearing it closes the popup -- so the
+  // flag is read before the clear and used to reopen afterwards, or typing
+  // an altitude would dismiss the field it was typed into.
+  const homePopupRef = useRef(false)
   useEffect(() => {
     const map = mapRef.current
     const layer = layerRef.current
     if (!map || !layer) return
+    const reopenHome = homePopupRef.current
     layer.clearLayers()
 
     const route: L.LatLngExpression[] = []
     if (plan.home) {
       const pos: L.LatLngExpression = [plan.home.x / 1e7, plan.home.y / 1e7]
       route.push(pos)
-      L.marker(pos, { icon: homeIcon(selected === 'home'), draggable: true })
+      // Home's altitude is edited here rather than in the settings column.
+      // It is a property of a point on the map, and every other point on
+      // this map is edited by touching it.
+      const homeMarker = L.marker(pos, { icon: homeIcon(selected === 'home'), draggable: true })
         .on('click', () => useMissionStore.getState().select('home'))
         .on('dragend', (e) => {
           const p = (e.target as L.Marker).getLatLng()
@@ -337,7 +349,11 @@ export default function MissionMap({
             z: store.plan.home?.z ?? 0,
           })
         })
-        .addTo(layer)
+        .on('popupopen', () => (homePopupRef.current = true))
+        .on('popupclose', () => (homePopupRef.current = false))
+      homeMarker.bindPopup(homePopup(plan.home, units.distance), { minWidth: 190 })
+      homeMarker.addTo(layer)
+      if (reopenHome) homeMarker.openPopup()
     }
 
     plan.items.forEach((it, i) => {
@@ -518,7 +534,7 @@ export default function MissionMap({
         })
       }
     }
-  }, [plan, selected, survey, editing, fence, fenceDraft, rally, selectedShape, centered])
+  }, [plan, selected, survey, editing, fence, fenceDraft, rally, selectedShape, centered, units])
 
   // The vehicle, when there is one, so the plan can be seen against it.
   useEffect(() => {
@@ -561,4 +577,62 @@ export default function MissionMap({
       </div>
     </div>
   )
+}
+
+/**
+ * The home marker's popup: where it is, and how high that is.
+ *
+ * Built as DOM rather than rendered, because the layer it lives in is
+ * imperative Leaflet and mounting a React root per marker to hold one number
+ * field would be the more surprising of the two.
+ *
+ * The altitude commits on change, not on every keystroke: each commit
+ * rebuilds the layer, and a field that rebuilt itself per character would
+ * lose the caret mid-number.
+ */
+function homePopup(home: PlanHome, unit: DistanceUnit): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'map-popup'
+
+  const coords = document.createElement('div')
+  coords.className = 'app-col__mono'
+  coords.textContent = `${(home.x / 1e7).toFixed(7)}, ${(home.y / 1e7).toFixed(7)}`
+  el.append(coords)
+
+  const row = document.createElement('label')
+  row.className = 'map-popup__row'
+  const name = document.createElement('span')
+  name.className = 'la-field__unit'
+  name.textContent = 'Altitude'
+  const input = document.createElement('input')
+  input.type = 'number'
+  input.className = 'la-input la-input--num map-popup__num'
+  input.value = String(Math.round(toDistance(home.z, unit)))
+  const suffix = document.createElement('span')
+  suffix.className = 'la-field__unit'
+  suffix.textContent = `${distanceLabel(unit)} AMSL`
+  row.append(name, input, suffix)
+  el.append(row)
+
+  const hint = document.createElement('p')
+  hint.className = 'la-hint'
+  hint.textContent = 'Relative altitudes are measured from here.'
+  el.append(hint)
+
+  input.addEventListener('change', () => {
+    const value = Number(input.value)
+    if (!Number.isFinite(value)) return
+    const store = useMissionStore.getState()
+    const current = store.plan.home
+    if (!current) return
+    store.setHome({ ...current, z: fromDistance(value, unit) })
+  })
+
+  // The map owns the keyboard and the drag gesture, so a field inside it
+  // pans on arrow keys and starts a drag on a swipe unless both are stopped
+  // here.
+  L.DomEvent.disableClickPropagation(el)
+  L.DomEvent.disableScrollPropagation(el)
+  L.DomEvent.on(input, 'keydown', L.DomEvent.stopPropagation)
+  return el
 }

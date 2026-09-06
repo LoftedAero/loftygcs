@@ -1474,6 +1474,57 @@
   text-transform: uppercase;
   color: var(--la-ink-2);
 }
+/* Default altitude and frame, on the item list's header. Compact on purpose:
+   this is a header, and two full labeled fields here would have been taller
+   than the bar they sit in. The names are carried by one label and the
+   select's own short options -- "Rel", "AMSL", "Terrain" -- which are the
+   same words the rows below show. */
+.mission-defaults {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  margin-left: var(--la-space-3);
+}
+.mission-defaults__label,
+.mission-defaults__unit {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  white-space: nowrap;
+}
+.mission-defaults__alt {
+  width: 64px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.mission-defaults__frame {
+  width: 92px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+/* A Leaflet popup holding real controls, not a caption. The map owns the
+   keyboard and the drag, so anything interactive in one has to stop both --
+   see homePopup() in MissionMap. */
+.map-popup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-width: 170px;
+}
+.map-popup__row {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+}
+.map-popup__num {
+  width: 72px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.map-popup .la-hint {
+  margin: 0;
+}
+
 /* The terrain warning, on the header beside the switch for the drawing it
    refers to. Red because it is the one thing here that is a problem. */
 .mission-lower__warn,
@@ -1495,17 +1546,18 @@
   margin-left: var(--la-space-1);
 }
 
-/* Twice the height it started at, when the pane has room for it. At 98px
-   the ground and the flown line were within a few pixels of each other on
-   a normal mission, which is a picture that cannot answer the question it
-   is drawn for.
+/* Twice the height it started at, less a fifth. At 98px the ground and the
+   flown line were within a few pixels of each other on a normal mission,
+   which is a picture that cannot answer the question it is drawn for; 196
+   answered it with room to spare and took more of the pane than the reading
+   needed, so it is trimmed back to 157.
 
-   Capped against the pane rather than fixed: 196px of a 244px pane leaves
-   the table eleven pixels, so the profile takes what it can up to that and
+   Capped against the pane rather than fixed: a fixed 157px of a 200px pane
+   leaves the table nothing, so the profile takes what it can up to that and
    grows to the full height as the divider is dragged down. */
 .mission-profile {
   flex: none;
-  height: min(196px, 60%);
+  height: min(157px, 48%);
   width: 100%;
   border-bottom: 1px solid var(--la-line);
   cursor: pointer;

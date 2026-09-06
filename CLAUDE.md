@@ -88,7 +88,15 @@ design decisions are recorded there and in code comments.
   with lives on the map, not in the column**: `ItemPalette` and `FencePalette` are the same strip
   with the same classes and the same arm/disarm behavior, because a fence screen whose tools were
   full-width text buttons in the far column looked like a different application from the mission
-  screen beside it. Three copies had already drifted — Clear in two
+  screen beside it. The column is for what *persists* — vehicle actions, files, and the handful of
+  vehicle parameters mission planning needs. Things that are not that went where they belong:
+  home is a point on the map, so its altitude is edited from its own marker's popup and
+  "From vehicle" is a palette button (it has to work before a home exists, which the popup
+  cannot); default altitude and altitude frame stamp the *next* item placed, so they sit on the
+  item list's header beside the rows they produced. A Leaflet popup holding real controls must
+  stop click, scroll and keydown propagation or the map pans on arrow keys and drags on a swipe;
+  and because every plan edit rebuilds the marker layer, an open popup has to be noted before the
+  clear and reopened after, or typing an altitude dismisses the field it was typed into. Three copies had already drifted — Clear in two
   different places, a failed transfer in a hint on one screen and a note on another, progress
   shown on one of the three — none of it decided. **Clearing always asks**, because clearing the
   screen and clearing the aircraft are different acts and an empty plan cannot show which
