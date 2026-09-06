@@ -166,9 +166,7 @@ export default function OfflineMapsPanel({
           deepest level the choices collapse into the same download -- which
           looked like a broken selector until the clamp said so out loud. */}
       {bounds && Math.floor(zoom) + extra > layer.maxNativeZoom && (
-        <LaHint>
-          Imagery ends at zoom {layer.maxNativeZoom}; deeper choices add nothing here.
-        </LaHint>
+        <LaHint>Imagery ends at zoom {layer.maxNativeZoom}.</LaHint>
       )}
 
       {running ? (
@@ -197,20 +195,20 @@ export default function OfflineMapsPanel({
             disabled={!bounds || count === 0}
             title={
               bounds
-                ? `Zoom ${minZoom} to ${maxZoom} over the current view`
+                ? `Zoom ${minZoom} to ${maxZoom} over this view; already-stored tiles are skipped`
                 : 'Move the map to the area you want'
             }
             onClick={() => void start()}
           >
             Download {count.toLocaleString()} tiles
           </LaButton>
-          {/* The warning that earns this panel its space. */}
+          {/* The size warning is the one line that earns permanent space --
+              it is read before a decision. That the download skips stored
+              tiles and which zooms it sweeps answer questions nobody has
+              asked yet, so they wait on the button's title. */}
           <LaHint>
             About {formatBytes(count * BYTES_PER_TILE)}
-            {terrainForArea > 0
-              ? `, plus ${terrainForArea} elevation ${terrainForArea === 1 ? 'tile' : 'tiles'}`
-              : ''}
-            . Tiles already stored are skipped.
+            {terrainForArea > 0 ? ', elevation included' : ''}.
           </LaHint>
         </>
       )}
@@ -224,26 +222,20 @@ export default function OfflineMapsPanel({
         checked={coverage}
         onChange={(e) => onCoverage(e.target.checked)}
       />
-      {coverage && <LaHint>Red hatching: not stored. Green outline: stored.</LaHint>}
+      {coverage && <LaHint>Red: missing. Green: stored.</LaHint>}
 
       <LaHint>
         Stored: {stats.count.toLocaleString()} tiles, {formatBytes(stats.bytes)}.
       </LaHint>
 
-      {/* Red only for a hole in the prep -- some elevation stored, some not,
-          which is a stopped download or a moved view. None at all just means
-          nothing has asked for this ground yet (the profile fetches what a
-          mission needs, the download fetches the rest), and painting that as
-          a fault made an untouched field read as a broken one. */}
-      {bounds && terrain !== null && (
-        <LaHint error={terrain.stored > 0 && terrain.stored < terrain.total}>
-          {terrain.total === 0
-            ? 'Zoom in for elevation.'
-            : terrain.stored === terrain.total
-              ? `Elevation for this view is stored too (${terrain.total} ${terrain.total === 1 ? 'tile' : 'tiles'}).`
-              : terrain.stored === 0
-                ? 'No elevation stored for this view yet. The download includes it.'
-                : `Elevation: ${terrain.total - terrain.stored} of ${terrain.total} tiles missing.`}
+      {/* One elevation state gets a line, and it is the one that is a
+          problem: a partial store, the hole in prep someone thinks is done.
+          None stored is answered by "elevation included" on the download,
+          fully stored by silence -- a status line per state read like a
+          debug log. */}
+      {bounds && terrain !== null && terrain.stored > 0 && terrain.stored < terrain.total && (
+        <LaHint error>
+          Elevation: {terrain.total - terrain.stored} of {terrain.total} tiles missing here.
         </LaHint>
       )}
 
