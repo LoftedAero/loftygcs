@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LaButton, LaHint, LaModal } from '../../components/La'
+import { LaButton, LaModal } from '../../components/La'
 import { useMissionStore, type PlanKind } from '../../../stores/mission-store'
 import { openFromFile, saveToFile } from '../../../services/mission'
 import {
@@ -22,10 +22,11 @@ import type { GeoShape } from '../../../services/geo-file'
 // fence half of this was written and could not be reached, because the
 // toolbar holding it renders only while editing the mission.
 //
-// The mission's own .waypoints pair leads, because a native format keeps
-// everything and an interchange format keeps what it can. Only the mission
-// has one here: ArduPilot's .fence and .rally files are not read or written
-// yet, so those two plans travel as KML.
+// The three interchange buttons are the same three in the same place on
+// every plan; the mission's own .waypoints pair is a second section under
+// them, so it adds to the column rather than moving it. Only the mission has
+// one: ArduPilot's .fence and .rally files are not read or written yet, so
+// those two plans travel as KML.
 
 const WORD: Record<PlanKind, string> = {
   mission: 'mission',
@@ -97,11 +98,46 @@ export default function GeoExchange() {
   }
 
   return (
-    <section className="app-col__group">
-      <h3 className="app-col__head">Files</h3>
+    <>
+      <section className="app-col__group">
+        <h3 className="app-col__head">Files</h3>
 
+        <LaButton variant="secondary" size="block" disabled={busy} onClick={onImport}>
+          Import KML or GPX
+        </LaButton>
+        <LaButton
+          variant="ghost"
+          size="block"
+          disabled={busy || !can.kml}
+          onClick={() => saveKml(exchangeName(sourceName, editing, 'kml'))}
+        >
+          Export KML
+        </LaButton>
+        {/* Greyed rather than absent on a fence, where GPX has no way to
+            express an area: a button that vanishes between plans reads as a
+            feature someone lost, where a dead one reads as a format that
+            cannot do it. Its title says which. */}
+        <LaButton
+          variant="ghost"
+          size="block"
+          disabled={busy || !can.gpx}
+          title={editing === 'fence' ? 'GPX has no way to hold an area' : undefined}
+          onClick={() => saveGpx(exchangeName(sourceName, editing, 'gpx'))}
+        >
+          Export GPX
+        </LaButton>
+
+        {note && <p className={`app-col__note${note.error ? ' is-error' : ''}`}>{note.text}</p>}
+      </section>
+
+      {/* The mission's own format, in its own section *below* the shared one
+          rather than above it -- which is where it was, and which pushed
+          Files down the column on one plan out of three. Same three buttons
+          in the same place on all three is worth more here than leading with
+          the format that keeps everything. */}
       {editing === 'mission' && (
-        <>
+        <section className="app-col__group">
+          <h3 className="app-col__head">Mission file</h3>
           <LaButton
             variant="secondary"
             size="block"
@@ -118,34 +154,8 @@ export default function GeoExchange() {
           >
             Save to file
           </LaButton>
-        </>
+        </section>
       )}
-
-      <LaButton variant="secondary" size="block" disabled={busy} onClick={onImport}>
-        Import KML or GPX
-      </LaButton>
-      <LaButton
-        variant="ghost"
-        size="block"
-        disabled={busy || !can.kml}
-        onClick={() => saveKml(exchangeName(sourceName, editing, 'kml'))}
-      >
-        Export KML
-      </LaButton>
-      <LaButton
-        variant="ghost"
-        size="block"
-        disabled={busy || !can.gpx}
-        onClick={() => saveGpx(exchangeName(sourceName, editing, 'gpx'))}
-      >
-        Export GPX
-      </LaButton>
-      {/* Greyed rather than absent, so the reason is on the screen instead
-          of leaving someone hunting for a button that was there a moment
-          ago on another plan. */}
-      {editing === 'fence' && <LaHint>GPX has no way to hold an area.</LaHint>}
-
-      {note && <p className={`app-col__note${note.error ? ' is-error' : ''}`}>{note.text}</p>}
 
       {ask?.kind === 'fence' && (
         <LaModal
@@ -187,7 +197,7 @@ export default function GeoExchange() {
           onCancel={() => setAsk(null)}
         />
       )}
-    </section>
+    </>
   )
 }
 
