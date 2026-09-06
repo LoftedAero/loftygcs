@@ -11,7 +11,9 @@ import { LaField, LaHint, LaInput } from '../../components/La'
 // adds a point, the same way a click adds a waypoint in Mission.
 //
 // Read, write and clear are in PlanActions above, shared with the other two
-// plans, so this is only the list.
+// plans, so this is only the list -- and it sits at the foot of the column,
+// below the file buttons, so that adding a point does not push the buttons
+// above it down the column while you work.
 
 export default function RallyPanel() {
   const units = useUnits()

@@ -76,7 +76,16 @@ design decisions are recorded there and in code comments.
   nothing — so `validateFence` runs before upload and names the shape itself.
   **The column is one skeleton for all three**: `PlanActions` (read, write, clear, the badge and
   the transfer note) and `GeoExchange` (files) render outside the per-plan panels, which are left
-  holding only what is peculiar to their plan. Three copies had already drifted — Clear in two
+  holding only what is peculiar to their plan. The order is fixed and the reasons are separate:
+  vehicle actions, then file actions, then settings (the documented order), then the *list* —
+  shapes or rally points — because a list is the only section that grows and anything under it
+  moves down the column every time something is added. Offline maps is pinned to the foot
+  (`.mission-side__foot`) rather than left at the end of that flow: it is the one section that is
+  not about the plan at all, and it should not move when the switch is flipped. **What you draw
+  with lives on the map, not in the column**: `ItemPalette` and `FencePalette` are the same strip
+  with the same classes and the same arm/disarm behavior, because a fence screen whose tools were
+  full-width text buttons in the far column looked like a different application from the mission
+  screen beside it. Three copies had already drifted — Clear in two
   different places, a failed transfer in a hint on one screen and a note on another, progress
   shown on one of the three — none of it decided. **Clearing always asks**, because clearing the
   screen and clearing the aircraft are different acts and an empty plan cannot show which

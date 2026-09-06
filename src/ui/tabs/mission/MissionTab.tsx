@@ -12,6 +12,7 @@ import RallyPanel from './RallyPanel'
 import PlanActions from './PlanActions'
 import GeoExchange from './GeoExchange'
 import ItemPalette from './ItemPalette'
+import FencePalette from './FencePalette'
 import AltitudeProfile from './AltitudeProfile'
 import Divider from '../../components/Divider'
 import { LaButton, LaModal, LaSwitch } from '../../components/La'
@@ -79,6 +80,9 @@ export default function MissionTab() {
         >
           <div className="mission-map-area">
             {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
+            {/* The same strip for the fence, so drawing a boundary and
+                placing a waypoint are the same gesture on the same screen. */}
+            {editing === 'fence' && <FencePalette />}
             <MissionMap
               tool={tool}
               onPlaced={() => setTool(null)}
@@ -134,20 +138,20 @@ export default function MissionTab() {
               plans, so they are one component in one place rather than a
               copy per panel that drifts. */}
             <PlanActions />
+            {/* Also outside the three panels: a file means whichever plan is
+                selected, so the buttons have to exist on all of them. */}
+            <GeoExchange />
             {editing === 'mission' && (
               <>
-                {/* Above the settings: while an area is being drawn it is what
-                  the map clicks mean, so it should be the first thing in
-                  reach. */}
                 <SurveyPanel />
                 <MissionSettings />
               </>
             )}
+            {/* The lists come last, above the pinned foot: they are the only
+                sections that grow, and a list with buttons under it moves
+                those buttons down the column every time something is added. */}
             {editing === 'fence' && <FencePanel />}
             {editing === 'rally' && <RallyPanel />}
-            {/* Also outside the three panels: a file means whichever plan is
-                selected, so the buttons have to exist on all of them. */}
-            <GeoExchange />
           </div>
 
           {/* Pinned to the foot rather than left at the end of the flow. It

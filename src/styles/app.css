@@ -1376,6 +1376,17 @@
   outline: none;
   box-shadow: var(--la-ring);
 }
+/* The fence's Finish button before an area has three corners. Shown rather
+   than hidden: appearing at the third click reads as the button arriving
+   from nowhere, where a greyed one has been saying what it wants all along. */
+.mission-palette__btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mission-palette__btn:disabled:hover {
+  background: none;
+  color: var(--la-ink-2);
+}
 /* Armed is a working state, so it is blue -- orange stays the one primary
    action per region, which on the map is nothing. */
 .mission-palette__btn.is-armed {
