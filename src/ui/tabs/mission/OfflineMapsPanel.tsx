@@ -66,6 +66,14 @@ export default function OfflineMapsPanel({
   const abortRef = useRef<AbortController | null>(null)
 
   const [terrain, setTerrain] = useState<{ stored: number; total: number } | null>(null)
+  /**
+   * What the last thing to happen was.
+   *
+   * A download that ends by putting the button back the way it was is
+   * indistinguishable from one that never ran. The stored count does move,
+   * but nobody watches a number they were not told to look at.
+   */
+  const [outcome, setOutcome] = useState<string | null>(null)
 
   const refresh = () => void cacheStats().then(setStats)
   useEffect(refresh, [])
@@ -94,6 +102,9 @@ export default function OfflineMapsPanel({
   const maxZoom = Math.min(layer.maxNativeZoom, Math.floor(zoom) + extra)
   const minZoom = Math.max(1, Math.min(Math.floor(zoom), maxZoom))
   const count = bounds ? countTiles(bounds, minZoom, maxZoom) : 0
+  // What the download would actually fetch: past the area cap this is zero,
+  // and promising "plus elevation" there would be a promise it cannot keep.
+  const terrainForArea = bounds ? terrainTilesForArea(bounds).length : 0
   const running = progress !== null
 
   const start = async () => {
@@ -103,6 +114,7 @@ export default function OfflineMapsPanel({
     const total = tiles.length + terrain.length
     const controller = new AbortController()
     abortRef.current = controller
+    setOutcome(null)
     setProgress({ done: 0, total, cached: 0, failed: 0 })
     const shift = (offset: number) => (p: PrefetchProgress) =>
       setProgress({ ...p, total, done: offset + p.done })
@@ -116,8 +128,15 @@ export default function OfflineMapsPanel({
         controller.signal,
       )
     }
+    const stopped = controller.signal.aborted
     abortRef.current = null
     setProgress(null)
+    setOutcome(
+      stopped
+        ? 'Stopped. What had already arrived is kept.'
+        : `Stored ${tiles.length.toLocaleString()} map tiles` +
+            (terrain.length > 0 ? ` and ${terrain.length} elevation tiles.` : '.'),
+    )
     refresh()
   }
 
@@ -176,8 +195,11 @@ export default function OfflineMapsPanel({
           </LaButton>
           {/* The warning that earns this panel its space. */}
           <LaHint>
-            About {formatBytes(count * BYTES_PER_TILE)}, plus elevation for the area. Tiles already
-            stored are skipped.
+            About {formatBytes(count * BYTES_PER_TILE)}
+            {terrainForArea > 0
+              ? `, plus ${terrainForArea} elevation ${terrainForArea === 1 ? 'tile' : 'tiles'}`
+              : ''}
+            . Tiles already stored are skipped.
           </LaHint>
         </>
       )}
@@ -205,18 +227,27 @@ export default function OfflineMapsPanel({
         online saves what it draws, so this only fills the gaps.
       </LaHint>
 
-      {terrain && terrain.total > 0 && (
-        <LaHint error={terrain.stored === 0}>
-          {terrain.stored === terrain.total
-            ? 'Elevation for this view is stored too.'
-            : `Elevation: ${terrain.total - terrain.stored} of ${terrain.total} tiles missing — the profile needs these to draw the ground.`}
+      {bounds && terrain !== null && (
+        <LaHint error={terrain.total > 0 && terrain.stored === 0}>
+          {terrain.total === 0
+            ? 'Elevation covers a smaller area than this — zoom in until a field fills the map, and it will be fetched with the tiles.'
+            : terrain.stored === terrain.total
+              ? `Elevation for this view is stored too (${terrain.total} ${terrain.total === 1 ? 'tile' : 'tiles'}).`
+              : `Elevation: ${terrain.total - terrain.stored} of ${terrain.total} tiles missing — the profile needs these to draw the ground.`}
         </LaHint>
       )}
+
+      {outcome && <p className="app-col__note">{outcome}</p>}
       <LaButton
         variant="ghost"
         size="block"
         disabled={running || stats.count === 0}
-        onClick={() => void clearCache().then(refresh)}
+        onClick={() =>
+          void clearCache().then(() => {
+            setOutcome('Cleared. Everything will come from the network again.')
+            refresh()
+          })
+        }
       >
         Clear stored maps
       </LaButton>

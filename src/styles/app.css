@@ -1324,11 +1324,13 @@
 .mission-palette__more {
   position: relative;
 }
+/* Fixed, and placed from the button's own rect: the palette above is a
+   scroll box, and an absolutely positioned child of one is clipped to it --
+   which left this menu present in the DOM and invisible on screen. Same
+   shape as the flight screen's View menu, for the same reason. */
 .mission-palette__menu {
-  position: absolute;
-  left: calc(100% + var(--la-space-2));
-  bottom: 0;
-  z-index: 501;
+  position: fixed;
+  z-index: 901;
   width: 210px;
   max-height: 320px;
   overflow-y: auto;

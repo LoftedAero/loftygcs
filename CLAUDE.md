@@ -275,6 +275,14 @@ design decisions are recorded there and in code comments.
   SITL both ways — the override reaches the vehicle's RC_CHANNELS *and* the release hands them
   back — because the encoder accepts any field name and a wrong one produces a well-formed
   message full of zeros that a fake would happily accept.
+- **A flyout inside a scroll box has to be `position: fixed`.** The mission palette and the
+  flight screen's View menu both float a menu out of a strip that scrolls, and an absolutely
+  positioned child of an `overflow: auto` ancestor is clipped to it — which left the palette's
+  "More" menu present in the DOM, twenty-one items and all, and entirely invisible. Both now
+  place themselves from the button's own `getBoundingClientRect()` and render fixed. The tell,
+  if it happens again, is that the element measures fine and `elementFromPoint` over it returns
+  something else.
+
 - **The lower pane is where a second thing goes, not a new panel.** Messages, Status,
   Preflight, Camera and Joystick are tabs of one pane (`LOG_PANES` in
   `stores/flight-layout-store.ts`), because they are all the same thing: something you look at

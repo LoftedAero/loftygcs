@@ -33,13 +33,23 @@ interface Entry {
   icon: ReactElement
 }
 
+/** Its `max-height`, for deciding where the top edge goes. */
+const MENU_MAX_H = 320
+
 export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
   const addItem = useMissionStore((s) => s.addItem)
   const startSurvey = useMissionStore((s) => s.startSurvey)
   const cancelSurvey = useMissionStore((s) => s.cancelSurvey)
   const surveying = useMissionStore((s) => s.survey !== null)
   const [moreOpen, setMoreOpen] = useState(false)
+  // Where the flyout goes, in viewport coordinates. It has to be `fixed`:
+  // the palette is a scroll box (it must never outgrow a map dragged short)
+  // and an absolutely positioned child of a scroll box is clipped to it --
+  // which is exactly what happened here. The menu was in the DOM, twenty-one
+  // items and all, and none of it was on screen.
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const moreRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!moreOpen) return
@@ -59,6 +69,23 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
       window.removeEventListener('keydown', esc)
     }
   }, [moreOpen])
+
+  /**
+   * Beside the button, and inside the window.
+   *
+   * Anchored to the button's bottom so it grows upward like the palette it
+   * belongs to, then pushed down if that would take it off the top -- which
+   * it would whenever the map has been dragged short.
+   */
+  const place = () => {
+    const r = buttonRef.current?.getBoundingClientRect()
+    if (!r) return
+    const top = Math.min(
+      Math.max(8, r.bottom - MENU_MAX_H),
+      Math.max(8, window.innerHeight - MENU_MAX_H - 8),
+    )
+    setPos({ left: r.right + 8, top })
+  }
 
   const entries: Entry[] = [
     { id: 22, label: 'Takeoff', icon: <TakeoffIcon /> },
@@ -125,18 +152,26 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
 
       <div className="mission-palette__more" ref={moreRef}>
         <button
+          ref={buttonRef}
           type="button"
           className="mission-palette__btn"
           aria-expanded={moreOpen}
           aria-haspopup="menu"
           title="Every other mission command"
-          onClick={() => setMoreOpen((v) => !v)}
+          onClick={() => {
+            if (!moreOpen) place()
+            setMoreOpen((v) => !v)
+          }}
         >
           <MoreIcon />
           <span className="mission-palette__label">More</span>
         </button>
-        {moreOpen && (
-          <div className="mission-palette__menu" role="menu">
+        {moreOpen && pos && (
+          <div
+            className="mission-palette__menu"
+            role="menu"
+            style={{ left: pos.left, top: pos.top }}
+          >
             {(['nav', 'condition', 'do'] as const).map((cat) => (
               <div key={cat} className="mission-palette__group">
                 <p className="mission-palette__groupname">{CATEGORY[cat]}</p>
