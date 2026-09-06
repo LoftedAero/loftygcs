@@ -347,6 +347,21 @@ design decisions are recorded there and in code comments.
   SITL both ways — the override reaches the vehicle's RC_CHANNELS *and* the release hands them
   back — because the encoder accepts any field name and a wrong one produces a well-formed
   message full of zeros that a fake would happily accept.
+- **A z-index cannot climb out of a stacking context, and `.la-appbar` is one.** The SITL tray's
+  panel hung inside the app bar and opened *behind* the map. Raising its z-index did nothing and
+  could not: `.la-app` is a grid, so `.la-appbar` is a grid item, and a flex/grid item with any
+  z-index is a stacking context — everything inside it is capped at the bar's own level 3, while
+  Leaflet's control corners sit at 1000 in the *root* context, because nothing between the map's
+  panes and the document creates a context at all. The fix is to leave the context: the panel is
+  a `createPortal` to `document.body`, `position: fixed`, placed from the button's own rect and
+  re-placed on resize. Two things that come with a portal: click-away must ask the panel as well
+  as the trigger, since the panel is no longer a descendant of it; and the listener has to be on
+  the **capture** phase, because Leaflet's drag handler calls `stopPropagation` on mousedown, so
+  a bubble-phase listener never hears a click on the one surface the tray most often covers.
+- **Leaflet's own chrome does not follow the app's theme.** Its stylesheet paints popups and
+  tooltips as a white card with near-black text, which in dark mode is a light card on a dark
+  map. The sheet is a dependency and not ours to edit, so `app.css` restates those few rules in
+  `--la-*` tokens (the popup tip is a rotated square: give it the background and nothing else).
 - **A flyout inside a scroll box has to be `position: fixed`.** The mission palette and the
   flight screen's View menu both float a menu out of a strip that scrolls, and an absolutely
   positioned child of an `overflow: auto` ancestor is clipped to it — which left the palette's

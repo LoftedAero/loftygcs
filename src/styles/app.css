@@ -1060,17 +1060,16 @@
   opacity: 1;
 }
 
+/* Fixed, and portaled to the body -- top and right come from the button's
+   own rect. It cannot live in the app bar: `.la-appbar` is a grid item with a
+   z-index, which makes it a stacking context at level 3, and no z-index
+   inside a context can climb out of it. Leaflet's control corners are 1000 in
+   the *root* context, so the panel lost to the map however high it asked to
+   be. Out here 1500 means what it says: above the map, below the 2000 that
+   modals sit at. Anchored to the button's right edge, because it sits mid-bar
+   and a panel hanging left of it would run off a narrow window. */
 .app-simtray__panel {
-  position: absolute;
-  top: calc(100% + var(--la-space-2));
-  /* Anchored to the button's right edge: it sits mid-bar, and a panel
-     hanging left of it would run off a narrow window. */
-  right: 0;
-  /* Above the map, which is the thing it most often hangs over. Leaflet's
-     own control corners are z-index 1000 and its marker pane 600 -- the same
-     600 this had, which at a tie hands the paint to whichever comes later in
-     the document, and the map comes later than the app bar. Below the 2000
-     modals sit at, because a modal is still the front. */
+  position: fixed;
   z-index: 1500;
   width: 320px;
   max-height: min(70vh, 560px);
@@ -1226,6 +1225,28 @@
 /* Fly and Mission own their own layout; the pane just holds them. */
 .app-content--flush {
   padding: var(--la-space-4);
+}
+
+/* Leaflet paints its popups and tooltips from its own sheet -- white card,
+   near-black text, white tip -- which in dark mode is a light-mode card
+   sitting on a dark map. Its sheet is a dependency, not ours to edit, so the
+   tokens are applied over it here. The tip is a rotated square, so it takes
+   the background and nothing else. */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip,
+.leaflet-tooltip {
+  background: var(--la-surface);
+  color: var(--la-ink);
+}
+.leaflet-tooltip {
+  border-color: var(--la-line-strong);
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--la-ink-3);
+}
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: var(--la-ink);
+  background: transparent;
 }
 
 /* --- Mission planning ------------------------------------------------- */

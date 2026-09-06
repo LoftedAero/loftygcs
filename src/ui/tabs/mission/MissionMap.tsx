@@ -152,6 +152,10 @@ export default function MissionMap({
   const vehicleRef = useRef<L.Marker | null>(null)
   const [base, setBase] = useState<BaseLayerId>(loadBaseLayer)
   const [centered, setCentered] = useState(false)
+  // The same fact the state carries, readable from the vehicle subscription,
+  // which is bound once and would otherwise see `false` forever.
+  const centeredRef = useRef(false)
+  centeredRef.current = centered
 
   // Read inside handlers rather than closed over, so the click handler does
   // not have to be rebound every time the armed tool changes.
@@ -523,6 +527,7 @@ export default function MissionMap({
 
     // Frame the mission once, when there first is one to frame.
     if (!centered && route.length > 0) {
+      centeredRef.current = true
       setCentered(true)
       if (route.length === 1) map.setView(route[0]!, 17)
       else {
@@ -542,6 +547,16 @@ export default function MissionMap({
       const map = mapRef.current
       if (!map || (v.latDeg === 0 && v.lonDeg === 0)) return
       const pos: L.LatLngExpression = [v.latDeg, v.lonDeg]
+      // An empty plan has nothing to center on, so the map sat at the world
+      // view and the vehicle was a marker somewhere on it -- drawn, and no
+      // more findable than if it were not. It gets the first fix instead,
+      // which is the field you are standing in. A plan wins if there is one:
+      // the redraw effect below fits to it and sets the same flag.
+      if (!centeredRef.current) {
+        centeredRef.current = true
+        setCentered(true)
+        map.setView(pos, 17)
+      }
       const icon = L.divIcon({
         className: 'vehicle-marker',
         html: `<svg width="28" height="28" viewBox="-14 -14 28 28" style="transform: rotate(${v.headingDeg}deg)">
