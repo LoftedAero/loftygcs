@@ -42,20 +42,32 @@ export type TransferState =
   | { kind: 'error'; text: string }
   | { kind: 'done'; text: string }
 
-const SPLIT_KEY = 'loftgcs.mission.split'
+/**
+ * The divider position, versioned.
+ *
+ * A stored split outranks the default, which is right -- it is a choice
+ * someone made by dragging. But the default changed because the *pane*
+ * changed underneath it: the altitude profile is twice the height it was,
+ * and a split chosen for the old one leaves the new profile squeezed. A
+ * value stored against the old layout is not a preference about this one,
+ * so the key is bumped and everyone starts from the new default once.
+ * Drag it anywhere and that is kept, as before.
+ */
+const SPLIT_KEY = 'loftgcs.mission.split.v2'
+
+/** Enough for the profile at full height with a few rows of list under it. */
+const DEFAULT_SPLIT = 0.55
 
 function loadSplit(): number {
   try {
     const v = Number(localStorage.getItem(SPLIT_KEY))
     if (Number.isFinite(v) && v > 0.15 && v < 0.9) return v
+    // The pane it was chosen for no longer exists; do not carry it over.
+    localStorage.removeItem('loftgcs.mission.split')
   } catch {
     // Storage blocked; the default is a reasonable answer.
   }
-  // Enough for the altitude profile at its full height and a few rows of
-  // the list under it. A third of the screen was right when the pane held
-  // only the table; the profile is twice the height it was, and a pane
-  // sized for the old one squeezed both.
-  return 0.55
+  return DEFAULT_SPLIT
 }
 
 /**
@@ -69,11 +81,7 @@ export type PlanKind = 'mission' | 'fence' | 'rally'
 
 /** What a fence click means, while a fence is being drawn. */
 export type FenceTool =
-  | 'inclusionPolygon'
-  | 'exclusionPolygon'
-  | 'inclusionCircle'
-  | 'exclusionCircle'
-  | 'returnPoint'
+  'inclusionPolygon' | 'exclusionPolygon' | 'inclusionCircle' | 'exclusionCircle' | 'returnPoint'
 
 /** Radius a freshly placed circle gets, in meters. Edited straight after. */
 const NEW_CIRCLE_RADIUS_M = 100
@@ -322,7 +330,6 @@ export const useMissionStore = create<MissionState>((set, get) => ({
     })
   },
 
-
   startSurvey() {
     set({ survey: { polygon: [], options: { ...SURVEY_DEFAULTS }, altM: get().defaults.altM } })
   },
@@ -401,8 +408,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
     // A takeoff belongs first, wherever it was clicked -- it is the one
     // command whose position in the list is not a matter of taste, and an
     // RTL after it is the usual next thought.
-    const items =
-      command === 22 ? [item, ...plan.items] : [...plan.items, item]
+    const items = command === 22 ? [item, ...plan.items] : [...plan.items, item]
     set({ plan: { ...plan, items }, selected: uid })
     return uid
   },
