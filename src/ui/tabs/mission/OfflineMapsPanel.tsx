@@ -148,7 +148,7 @@ export default function OfflineMapsPanel({
     <section className="app-col__group">
       <h3 className="app-col__head">Offline maps</h3>
 
-      <LaField label="Area" htmlFor="offline-zoom">
+      <LaField label="Resolution" htmlFor="offline-zoom">
         <LaSelect
           id="offline-zoom"
           value={String(extra)}
