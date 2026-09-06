@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import MissionMap from './MissionMap'
 import MissionTable from './MissionTable'
 import MissionSettings from './MissionSettings'
-import TerrainPanel from './TerrainPanel'
+import TerrainWarning from './TerrainWarning'
 import OfflineMapsPanel from './OfflineMapsPanel'
 import type { LatLonBounds } from '../../../services/tile-math'
 import SurveyPanel from './SurveyPanel'
@@ -13,7 +13,7 @@ import MissionToolbar from './MissionToolbar'
 import ItemPalette from './ItemPalette'
 import AltitudeProfile from './AltitudeProfile'
 import Divider from '../../components/Divider'
-import { LaButton, LaModal } from '../../components/La'
+import { LaButton, LaModal, LaSwitch } from '../../components/La'
 import { useMissionStore } from '../../../stores/mission-store'
 
 // Mission planning: Mission Planner's shape with QGroundControl's ideas
@@ -103,16 +103,19 @@ export default function MissionTab() {
               <h3 className="mission-lower__title">
                 Items {items > 0 && <span className="mission-lower__count">{items}</span>}
               </h3>
+              {/* Beside the switch that shows the drawing it is about: the
+                  warning is a reason to look at the profile, so it belongs
+                  where the profile is turned on rather than in a section of
+                  its own down the actions column. */}
+              {items > 0 && <TerrainWarning />}
+              <span className="la-grow" />
               {/* Nothing to show and nothing to hide until there are items. */}
               {items > 0 && (
-                <LaButton
-                  variant="ghost"
-                  size="sm"
-                  aria-pressed={showProfile}
-                  onClick={() => setShowProfile((v) => !v)}
-                >
-                  {showProfile ? 'Hide profile' : 'Show profile'}
-                </LaButton>
+                <LaSwitch
+                  label="Show altitude profile"
+                  checked={showProfile}
+                  onChange={(e) => setShowProfile(e.target.checked)}
+                />
               )}
             </div>
             {profileVisible && <AltitudeProfile />}
@@ -131,9 +134,6 @@ export default function MissionTab() {
                   reach. */}
               <SurveyPanel />
               <MissionSettings />
-              {/* Below the settings because it reports on the plan rather
-                  than changing it. */}
-              <TerrainPanel />
             </>
           )}
           {editing === 'fence' && <FencePanel />}

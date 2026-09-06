@@ -70,23 +70,20 @@ export default function MissionSettings() {
             </LaField>
           </>
         ) : (
-          <LaHint>Not set. Use Add ▸ Home, or copy the vehicle's.</LaHint>
+          <LaHint>Not set.</LaHint>
         )}
         <LaButton
           variant="secondary"
           size="block"
           disabled={!connected}
           onClick={() => {
-            setHomeNote(homeFromVehicle() ? null : 'The vehicle has no position fix to copy yet.')
+            setHomeNote(homeFromVehicle() ? null : 'No position fix to copy yet.')
           }}
         >
           Use vehicle position
         </LaButton>
         {homeNote && <LaHint error>{homeNote}</LaHint>}
-        <LaHint>
-          Relative altitudes are measured from here. The vehicle replaces it with its own position
-          when it arms, so this is a planning reference.
-        </LaHint>
+        <LaHint>Relative altitudes are measured from here.</LaHint>
       </section>
 
       <section className="app-col__group">

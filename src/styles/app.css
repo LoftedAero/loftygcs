@@ -1463,15 +1463,38 @@
   text-transform: uppercase;
   color: var(--la-ink-2);
 }
+/* The terrain warning, on the header beside the switch for the drawing it
+   refers to. Red because it is the one thing here that is a problem. */
+.mission-lower__warn,
+.mission-lower__note {
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mission-lower__warn {
+  color: var(--la-bad);
+}
+.mission-lower__note {
+  color: var(--la-ink-3);
+  font-weight: 400;
+}
 .mission-lower__count {
   font-family: var(--la-font-mono);
   color: var(--la-ink-3);
   margin-left: var(--la-space-1);
 }
 
+/* Twice the height it started at, when the pane has room for it. At 98px
+   the ground and the flown line were within a few pixels of each other on
+   a normal mission, which is a picture that cannot answer the question it
+   is drawn for.
+
+   Capped against the pane rather than fixed: 196px of a 244px pane leaves
+   the table eleven pixels, so the profile takes what it can up to that and
+   grows to the full height as the divider is dragged down. */
 .mission-profile {
   flex: none;
-  height: 98px;
+  height: min(196px, 60%);
   width: 100%;
   border-bottom: 1px solid var(--la-line);
   cursor: pointer;
