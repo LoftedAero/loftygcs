@@ -157,9 +157,13 @@ function Row({
           {/* An unknown command keeps its own entry rather than snapping to
               whatever happens to be first in the list. */}
           {!spec && <option value={item.command}>{commandLabel(item.command)}</option>}
+          {/* ArduPilot's own names, as in the palette's More list: anyone
+              reaching into this column is working from the mission command
+              reference, and a friendlier word only makes them guess which
+              of ours is the one they read about. */}
           {MISSION_COMMANDS.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.mavName}
             </option>
           ))}
         </LaSelect>

@@ -254,6 +254,19 @@ design decisions are recorded there and in code comments.
   *bits* (0,1,2) — so the field wins whenever both are present. The version is rounded *down*
   to the newest published release that is not newer. `NET=1 npm test` runs the live check
   against the real server, which is the only thing that catches a path change.
+- **The mission command catalog is checked against the firmware, not against the spec.**
+  `protocol/mission-commands.ts` is hand-written data, and two entries were wrong in ways no
+  type or unit test could see: `DO_GRIPPER` was listed as 212, which is `DO_AUTOTUNE_ENABLE`, so
+  choosing "Gripper" would have started a tuning run in flight; and `CONDITION_CHANGE_ALT` is
+  refused by Copter and Plane alike, so it was a menu entry that could only ever fail on upload.
+  `mission-commands.integration.test.ts` now uploads every command in the catalog to whichever
+  vehicle SITL is serving and fails on any refusal, so run it against *both*
+  (`npm run sitl` and `npm run sitl -- plane`) after touching the list — the two sets differ,
+  and `NAV_SPLINE_WAYPOINT` and `NAV_PAYLOAD_PLACE` are Copter-only. Two traps in the test
+  itself: mission storage is not ready at the first heartbeat and answers every upload "No space
+  on vehicle", which reads exactly like a rejected command; and a `DO_JUMP` to item 0 is
+  rejected as *invalid* rather than unsupported, which looks like a catalog error and is not.
+
 - **Do not gate a feature on a capability bit.** A real flight controller reported no
   MAV_PROTOCOL_CAPABILITY_FTP while serving files perfectly well, and the MAVFTP screen believed
   it and told the user their working feature did not exist. SITL sets the bit, so nothing here
