@@ -156,7 +156,12 @@ export default function OfflineMapsPanel({
           id="offline-zoom"
           value={String(extra)}
           disabled={running}
-          onChange={(e) => setExtra(Number(e.target.value))}
+          onChange={(e) => {
+            setExtra(Number(e.target.value))
+            // The outcome describes a download whose parameters this just
+            // changed; keeping it would also sit on the clamp notice's line.
+            setOutcome(null)
+          }}
         >
           {ZOOM_CHOICES.map((c) => (
             <option key={c.extra} value={c.extra}>
@@ -208,16 +213,6 @@ export default function OfflineMapsPanel({
               (terrainForArea > 0 ? ', elevation included.' : '.')
             : BLANK}
       </LaHint>
-      {/* Slot two: what just happened, or -- with nothing to report -- why
-          the resolution choices collapse near the imagery's deepest level,
-          which looked like a broken selector until said out loud. */}
-      <LaHint>
-        {outcome ??
-          (bounds && Math.floor(zoom) + extra > layer.maxNativeZoom
-            ? `Imagery ends at zoom ${layer.maxNativeZoom}.`
-            : BLANK)}
-      </LaHint>
-
       {/* A tile count cannot answer "will this work when I get there" -- a
           cache can hold five thousand tiles of the wrong valley. The map
           can, so the switch is next to the number rather than instead of
@@ -230,25 +225,39 @@ export default function OfflineMapsPanel({
         <LaSwitch
           label="Show stored tiles"
           checked={coverage}
-          onChange={(e) => onCoverage(e.target.checked)}
+          onChange={(e) => {
+            onCoverage(e.target.checked)
+            // Turning the overlay on hands the outcome's job to the map --
+            // the squares are the result -- and frees the line for the
+            // legend that reads them.
+            if (e.target.checked) setOutcome(null)
+          }}
         />
         <span className="offline-stored__count">
           {stats.count.toLocaleString()} {stats.count === 1 ? 'tile' : 'tiles'} ·{' '}
           {formatBytes(stats.bytes)}
         </span>
       </div>
-      {/* Slot three: the one elevation state that is a problem -- a partial
-          store, the hole in prep someone thinks is done -- and otherwise the
-          overlay's legend while it is on. The warning wins the line: color
-          teaching can wait, a hole in the prep cannot. */}
+      {/* Slot two, shared by everything that is commentary rather than a
+          figure, worst first: the partial-elevation warning (a hole in prep
+          someone thinks is done), what the last download did, why the
+          resolution choices collapse near the imagery's deepest level, and
+          the overlay's legend. These can genuinely co-occur -- a stopped
+          download leaves a warning AND an outcome -- so the order is a
+          ranking, not a claim of exclusivity: the loser is always a line
+          the screen answers some other way, and the stale-outcome cases are
+          cleared at the actions that stale them (the select, the toggle). */}
       <LaHint
         error={!!bounds && terrain !== null && terrain.stored > 0 && terrain.stored < terrain.total}
       >
         {bounds && terrain !== null && terrain.stored > 0 && terrain.stored < terrain.total
           ? `Elevation: ${terrain.total - terrain.stored} of ${terrain.total} tiles missing here.`
-          : coverage
-            ? 'Red: missing. Green: stored.'
-            : BLANK}
+          : (outcome ??
+            (bounds && Math.floor(zoom) + extra > layer.maxNativeZoom
+              ? `Imagery ends at zoom ${layer.maxNativeZoom}.`
+              : coverage
+                ? 'Red: missing. Green: stored.'
+                : BLANK))}
       </LaHint>
       <LaButton
         variant="ghost"
