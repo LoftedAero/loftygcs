@@ -1,5 +1,6 @@
 import L from 'leaflet'
-import { hasTile } from '../../../services/tile-cache'
+import { hasTile, subscribeCacheChanges } from '../../../services/tile-cache'
+import type { BaseLayer } from './map-layers'
 
 // What is, and is not, stored for the field you are looking at.
 //
@@ -13,16 +14,44 @@ import { hasTile } from '../../../services/tile-cache'
 // real tile boundaries at every zoom, and a coverage picture that is a
 // little bit wrong about where the edges are is worse than none.
 //
-// The *gaps* are shaded, not the stored parts. What matters at the field is
-// the hole, and hatching everything you already have would obscure the map
-// underneath to say "fine".
+// The *gaps* are hatched red; stored squares get a green hairline. What
+// matters at the field is the hole, and hatching everything you already
+// have would obscure the map underneath to say "fine".
+//
+// Two lessons, both learned from this overlay being wrong on screen:
+//
+//  - It redraws when the cache changes. Each square answers "is this
+//    stored" at creation, but the cache is written by panning, by the
+//    download, and by the terrain loader, and emptied by Clear -- so a
+//    snapshot kept showing green outlines for tiles that were gone and red
+//    hatch over tiles that had just arrived.
+//
+//  - It takes the base layer's maxNativeZoom. Without it, every square past
+//    the imagery's native zoom hatched red however much was stored -- but
+//    the offline map *works* there, upscaling the stored native tile the
+//    same way the online one does. The overlay must report what the map
+//    will do, and what the map will do is decided by the native tile.
 
 class CoverageLayer extends L.GridLayer {
   private layerId: string
+  private unsubscribe: (() => void) | null = null
 
   constructor(layerId: string, options: L.GridLayerOptions) {
     super(options)
     this.layerId = layerId
+  }
+
+  onAdd(map: L.Map): this {
+    super.onAdd(map)
+    this.unsubscribe = subscribeCacheChanges(() => this.redraw())
+    return this
+  }
+
+  onRemove(map: L.Map): this {
+    this.unsubscribe?.()
+    this.unsubscribe = null
+    super.onRemove(map)
+    return this
   }
 
   createTile(coords: L.Coords, done: L.DoneCallback): HTMLElement {
@@ -44,13 +73,12 @@ class CoverageLayer extends L.GridLayer {
   }
 }
 
-/**
- * An overlay marking the tiles this layer has stored.
- *
- * `maxNativeZoom` is deliberately absent: coverage is about the tiles that
- * exist at *this* zoom, and Leaflet's upscaling would otherwise report a
- * z21 view as covered because z19 is.
- */
-export function createCoverageLayer(layerId: string): L.GridLayer {
-  return new CoverageLayer(layerId, { pane: 'overlayPane', opacity: 1 })
+/** An overlay marking what this layer has stored, kept current as it changes. */
+export function createCoverageLayer(layer: BaseLayer): L.GridLayer {
+  return new CoverageLayer(layer.id, {
+    pane: 'overlayPane',
+    opacity: 1,
+    maxNativeZoom: layer.maxNativeZoom,
+    maxZoom: layer.maxZoom,
+  })
 }

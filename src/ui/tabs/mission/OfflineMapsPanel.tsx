@@ -4,6 +4,7 @@ import {
   cacheStats,
   clearCache,
   prefetchTiles,
+  subscribeCacheChanges,
   type PrefetchProgress,
 } from '../../../services/tile-cache'
 import {
@@ -75,8 +76,16 @@ export default function OfflineMapsPanel({
    */
   const [outcome, setOutcome] = useState<string | null>(null)
 
-  const refresh = () => void cacheStats().then(setStats)
-  useEffect(refresh, [])
+  // Everything numeric on this panel is a view of the cache, and the cache
+  // is written by panning, the download, and the terrain loader, and emptied
+  // by Clear -- none of which this component would otherwise hear about. One
+  // subscription bumps a revision; the stats and the elevation line hang off
+  // it, so what is on screen is what is in the store.
+  const [cacheRev, setCacheRev] = useState(0)
+  useEffect(() => subscribeCacheChanges(() => setCacheRev((n) => n + 1)), [])
+  useEffect(() => {
+    void cacheStats().then(setStats)
+  }, [cacheRev])
 
   // Terrain is a separate question from the map's own coverage: it is one
   // zoom level of very large tiles, so an area can have every scrap of
@@ -94,7 +103,7 @@ export default function OfflineMapsPanel({
     return () => {
       live = false
     }
-  }, [bounds, progress])
+  }, [bounds, cacheRev])
 
   const layer = layerById(loadBaseLayer())
   // Never past what the server actually has: asking for zoom 22 of imagery
@@ -118,9 +127,10 @@ export default function OfflineMapsPanel({
     setProgress({ done: 0, total, cached: 0, failed: 0 })
     const shift = (offset: number) => (p: PrefetchProgress) =>
       setProgress({ ...p, total, done: offset + p.done })
-    await prefetchTiles(layer.id, layer.url, tiles, shift(0), controller.signal)
+    const mapResult = await prefetchTiles(layer.id, layer.url, tiles, shift(0), controller.signal)
+    let terrainResult: PrefetchProgress | null = null
     if (!controller.signal.aborted) {
-      await prefetchTiles(
+      terrainResult = await prefetchTiles(
         TERRAIN_LAYER_ID,
         TERRAIN_URL,
         terrain,
@@ -131,13 +141,7 @@ export default function OfflineMapsPanel({
     const stopped = controller.signal.aborted
     abortRef.current = null
     setProgress(null)
-    setOutcome(
-      stopped
-        ? 'Stopped.'
-        : `Stored ${tiles.length.toLocaleString()} map tiles` +
-            (terrain.length > 0 ? ` and ${terrain.length} elevation tiles.` : '.'),
-    )
-    refresh()
+    setOutcome(stopped ? 'Stopped.' : describeOutcome(mapResult, terrainResult))
   }
 
   return (
@@ -172,7 +176,6 @@ export default function OfflineMapsPanel({
               abortRef.current?.abort()
               abortRef.current = null
               setProgress(null)
-              refresh()
             }}
           >
             Stop
@@ -211,16 +214,9 @@ export default function OfflineMapsPanel({
       <LaSwitch
         label="Show what is stored"
         checked={coverage}
-        onChange={(e) => {
-          onCoverage(e.target.checked)
-          // The stored count is read once on mount, and panning the map
-          // stores what it draws -- so by the time anyone asks to see the
-          // coverage, the number beneath it is usually already stale and
-          // would contradict the squares on screen.
-          if (e.target.checked) refresh()
-        }}
+        onChange={(e) => onCoverage(e.target.checked)}
       />
-      {coverage && <LaHint>Hatched squares are not stored.</LaHint>}
+      {coverage && <LaHint>Red hatching: not stored. Green outline: stored.</LaHint>}
 
       <LaHint>
         Stored: {stats.count.toLocaleString()} tiles, {formatBytes(stats.bytes)}.
@@ -242,14 +238,34 @@ export default function OfflineMapsPanel({
         size="block"
         disabled={running || stats.count === 0}
         onClick={() =>
-          void clearCache().then(() => {
-            setOutcome('Cleared. Everything will come from the network again.')
-            refresh()
-          })
+          void clearCache().then(() =>
+            setOutcome('Cleared. Everything will come from the network again.'),
+          )
         }
       >
         Clear stored maps
       </LaButton>
     </section>
   )
+}
+
+/**
+ * What the download actually did, from what it reports -- never from what it
+ * was asked for. The first version printed "Stored N map tiles" from the
+ * request, which on a dead network was a success message over a cache that
+ * had gained nothing.
+ */
+export function describeOutcome(
+  map: PrefetchProgress,
+  terrain: PrefetchProgress | null,
+): string {
+  const fresh = (p: PrefetchProgress) => p.done - p.failed - p.cached
+  const stored = fresh(map) + (terrain ? fresh(terrain) : 0)
+  const failed = map.failed + (terrain?.failed ?? 0)
+  if (stored === 0 && failed === 0) return 'Everything in this view was already stored.'
+  const parts: string[] = []
+  if (stored > 0) parts.push(`Stored ${stored.toLocaleString()} ${stored === 1 ? 'tile' : 'tiles'}`)
+  if (failed > 0)
+    parts.push(`${failed.toLocaleString()} ${failed === 1 ? 'tile' : 'tiles'} could not be fetched`)
+  return parts.join('; ') + '.'
 }

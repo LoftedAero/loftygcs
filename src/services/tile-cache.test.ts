@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { hasTile, prefetchTiles } from './tile-cache'
+import { clearCache, hasTile, prefetchTiles, putTile, subscribeCacheChanges } from './tile-cache'
 import type { TileCoord } from './tile-math'
 
 // jsdom has no IndexedDB, which is the interesting half of the contract:
@@ -96,5 +96,20 @@ describe('asking what is stored', () => {
     // this of every tile on screen, so a rejection here would be a map
     // full of errors rather than a map with no overlay.
     await expect(hasTile('esri', { z: 15, x: 1, y: 2 })).resolves.toBe(false)
+  })
+})
+
+describe('change notifications on the degraded path', () => {
+  it('announces nothing when there is no store to change', async () => {
+    // With no IndexedDB a write never happens, so firing the listeners
+    // would send every subscriber off to requery a cache that cannot have
+    // changed. Silence is the honest signal here.
+    const heard = vi.fn()
+    const off = subscribeCacheChanges(heard)
+    await putTile('esri', { z: 15, x: 1, y: 1 }, new Blob(['x']))
+    await clearCache()
+    await new Promise((r) => setTimeout(r, 900))
+    expect(heard).not.toHaveBeenCalled()
+    off()
   })
 })

@@ -264,7 +264,7 @@ export default function MissionMap({
     coverRef.current?.remove()
     coverRef.current = null
     if (!coverage) return
-    const layer = createCoverageLayer(layerById(base).id).addTo(map)
+    const layer = createCoverageLayer(layerById(base)).addTo(map)
     layer.setZIndex(1)
     coverRef.current = layer
     return () => {

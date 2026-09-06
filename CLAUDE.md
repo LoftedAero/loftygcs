@@ -221,7 +221,17 @@ design decisions are recorded there and in code comments.
   (`ui/tabs/flight/coverage-layer.ts`) drawing Leaflet's own squares, and it shades the *gaps*:
   hatching what is already stored would obscure the map in order to say it is fine. It asks
   `hasTile`, which reads the key and never materializes the blob, because it asks about every
-  square on screen at once.
+  square on screen at once. Three more rules, each added because the screen was caught lying:
+  **everything that displays cache state subscribes to `subscribeCacheChanges`** (tile-cache's
+  own signal, coalesced for writes, immediate for a clear) — the cache is written by panning,
+  the download, and the terrain loader, and cleared from a fourth place, so a snapshot overlay
+  kept green outlines over tiles that were gone and red hatch over tiles that had just arrived;
+  **the coverage overlay takes the base layer's `maxNativeZoom`**, because past native zoom the
+  offline map upscales the stored native tile and works, and an overlay without it hatched
+  every overzoomed view red however much was stored; and **the download's outcome message is
+  composed from the returned `PrefetchProgress`, never the request** — the first version said
+  "Stored N map tiles" from the request, which on a dead network was a success message over a
+  cache that had gained nothing.
 - **Terrain is a raster, and the datum is the part to get right.** Ground elevation comes from
   Terrarium tiles (`services/terrain.ts`) — an ordinary PNG whose RGB encodes one height, from
   AWS's keyless `elevation-tiles-prod`, which is the same SRTM/NED data ArduPilot's own terrain

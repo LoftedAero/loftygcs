@@ -72,6 +72,46 @@ function tx<T>(
   )
 }
 
+// --- Change notification -------------------------------------------------
+//
+// The cache is written from three places that do not know about each other
+// -- the base layer stores what it draws as you pan, the prefetch stores
+// what it is told to, the terrain loader stores what a profile needs -- and
+// cleared from a fourth. Anything that *shows* cache state (the coverage
+// overlay, the stored-tiles count, the elevation line) is therefore wrong
+// the moment it is drawn unless it is told to look again. Subscribers are
+// told after successful writes, coalesced so a download storing six tiles a
+// second does not redraw an overlay six times a second; a clear notifies
+// immediately, because it is a person's own action and the screen answering
+// a beat later reads as the clear not working.
+
+const listeners = new Set<() => void>()
+let coalesce: ReturnType<typeof setTimeout> | null = null
+
+/** Hear about cache writes and clears. Returns the unsubscribe. */
+export function subscribeCacheChanges(fn: () => void): () => void {
+  listeners.add(fn)
+  return () => {
+    listeners.delete(fn)
+  }
+}
+
+function notify(immediate = false) {
+  if (immediate) {
+    if (coalesce !== null) {
+      clearTimeout(coalesce)
+      coalesce = null
+    }
+    listeners.forEach((fn) => fn())
+    return
+  }
+  if (coalesce !== null) return
+  coalesce = setTimeout(() => {
+    coalesce = null
+    listeners.forEach((fn) => fn())
+  }, 750)
+}
+
 export async function getTile(layerId: string, t: TileCoord): Promise<Blob | null> {
   const rec = (await tx<TileRecord | undefined>('readonly', (s) =>
     s.get(key(layerId, t)),
@@ -95,9 +135,12 @@ export async function hasTile(layerId: string, t: TileCoord): Promise<boolean> {
 }
 
 export async function putTile(layerId: string, t: TileCoord, blob: Blob): Promise<void> {
-  await tx('readwrite', (s) =>
+  const stored = await tx('readwrite', (s) =>
     s.put({ key: key(layerId, t), blob, bytes: blob.size, at: Date.now() } as TileRecord),
   )
+  // Null means the write never happened (no database); announcing a change
+  // that did not occur would make every subscriber requery for nothing.
+  if (stored !== null) notify()
 }
 
 export interface CacheStats {
@@ -137,7 +180,10 @@ export async function cacheStats(): Promise<CacheStats> {
 }
 
 export async function clearCache(): Promise<void> {
-  await tx('readwrite', (s) => s.clear())
+  // clear() resolves with undefined on success, so only null -- the no-database
+  // path -- means nothing changed.
+  const done = await tx('readwrite', (s) => s.clear())
+  if (done !== null) notify(true)
 }
 
 export interface PrefetchProgress {
