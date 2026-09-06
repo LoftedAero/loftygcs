@@ -217,16 +217,23 @@ export default function OfflineMapsPanel({
           cache can hold five thousand tiles of the wrong valley. The map
           can, so the switch is next to the number rather than instead of
           it. */}
-      <LaSwitch
-        label="Show stored tiles"
-        checked={coverage}
-        onChange={(e) => onCoverage(e.target.checked)}
-      />
+      {/* The count shares the toggle's row -- its subject is on the label,
+          so "Stored:" would say it twice. One honest caveat lives here: the
+          number is the whole store, every layer and area, where the overlay
+          paints this view of this base layer. The Clear button below acts on
+          the same whole, which is why the number sits with these controls. */}
+      <div className="offline-stored">
+        <LaSwitch
+          label="Show stored tiles"
+          checked={coverage}
+          onChange={(e) => onCoverage(e.target.checked)}
+        />
+        <span className="offline-stored__count">
+          {stats.count.toLocaleString()} {stats.count === 1 ? 'tile' : 'tiles'} ·{' '}
+          {formatBytes(stats.bytes)}
+        </span>
+      </div>
       {coverage && <LaHint>Red: missing. Green: stored.</LaHint>}
-
-      <LaHint>
-        Stored: {stats.count.toLocaleString()} tiles, {formatBytes(stats.bytes)}.
-      </LaHint>
 
       {/* One elevation state gets a line, and it is the one that is a
           problem: a partial store, the hole in prep someone thinks is done.
