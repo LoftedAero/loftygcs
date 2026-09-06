@@ -162,32 +162,38 @@ export default function MissionToolbar() {
         <LaModal
           open
           narrow
-          title={`What to take from ${choosing.name}`}
+          title={`Import from ${choosing.name}`}
           actions={
-            <div className="la-prompt-actions">
-              {choosing.shapes.map((shape, i) => (
-                <LaButton
-                  key={i}
-                  variant={i === 0 ? 'primary' : 'secondary'}
-                  size="block"
-                  onClick={() => {
-                    setTransfer({ kind: 'done', text: applyGeoShape(shape, choosing.name) })
-                    setChoosing(null)
-                  }}
-                >
-                  {shapeLabel(shape.name, shape.kind, shape.fixes.length)}
-                </LaButton>
-              ))}
-              <LaButton variant="ghost" size="block" onClick={() => setChoosing(null)}>
-                Cancel
-              </LaButton>
-            </div>
+            <LaButton variant="ghost" onClick={() => setChoosing(null)}>
+              Cancel
+            </LaButton>
           }
         >
-          <p className="app-col__note">
-            Each becomes {DESTINATION_WORDS[destinationFor(choosing.shapes[0]!, editing)]}, because
-            that is the plan on screen.
-          </p>
+          {/* A list, not a stack of block buttons. The file holds several
+              shapes and the question is only which one -- where it goes was
+              settled by the plan on screen. */}
+          <p className="la-hint">Pick one.</p>
+          <div className="geo-pick">
+            {choosing.shapes.map((shape, i) => (
+              <button
+                key={i}
+                type="button"
+                className="geo-pick__item"
+                onClick={() => {
+                  setTransfer({ kind: 'done', text: applyGeoShape(shape, choosing.name) })
+                  setChoosing(null)
+                }}
+              >
+                <span className="geo-pick__name">{shape.name ?? KIND_WORDS[shape.kind]}</span>
+                {/* Each row says what it will become, not what it is: a
+                    file can hold a line and an area, and they do not go to
+                    the same place. */}
+                <span className="geo-pick__meta">
+                  {DESTINATION_WORDS[destinationFor(shape, editing)]} · {shape.fixes.length}
+                </span>
+              </button>
+            ))}
+          </div>
         </LaModal>
       )}
     </div>
@@ -195,18 +201,13 @@ export default function MissionToolbar() {
 }
 
 const DESTINATION_WORDS = {
-  waypoints: 'mission waypoints',
-  survey: 'a survey area',
-  fence: 'a fence polygon',
+  waypoints: 'waypoints',
+  survey: 'survey area',
+  fence: 'fence',
   rally: 'rally points',
 } as const
 
-const KIND_WORDS = { track: 'line', points: 'points', polygon: 'shape' } as const
-
-function shapeLabel(name: string | null, kind: keyof typeof KIND_WORDS, count: number): string {
-  const what = `${KIND_WORDS[kind]}, ${count} point${count === 1 ? '' : 's'}`
-  return name ? `${name} — ${what}` : what[0]!.toUpperCase() + what.slice(1)
-}
+const KIND_WORDS = { track: 'Line', points: 'Points', polygon: 'Area' } as const
 
 /** An export name, reusing the loaded one where there was one. */
 function exchangeName(source: string | null, ext: 'kml' | 'gpx'): string {

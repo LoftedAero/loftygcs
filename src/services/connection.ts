@@ -409,21 +409,27 @@ class ConnectionService {
     return worker.uploadMission(items, missionType)
   }
 
-  /** Write every dirty parameter, confirming each against the echo. */
-  async writeDirtyParams(): Promise<{ written: number; failed: string[] }> {
+  /**
+   * Write every dirty parameter, confirming each against the echo.
+   *
+   * The names that went are reported alongside the count: the page has the
+   * metadata and can tell from them whether a reboot is now the next step,
+   * which a number cannot.
+   */
+  async writeDirtyParams(): Promise<{ written: string[]; failed: string[] }> {
     const worker = this.worker
-    if (!worker) return { written: 0, failed: [] }
+    if (!worker) return { written: [], failed: [] }
     const store = useParamStore.getState()
     store.setWriteBusy(true)
     const failed: string[] = []
-    let written = 0
+    const written: string[] = []
     try {
       for (const [name, e] of store.entries) {
         if (!e.dirty) continue
         try {
           const echoed = await worker.setParam(name, e.value, e.mavType)
           useParamStore.getState().confirmWrite(name, echoed)
-          written++
+          written.push(name)
         } catch {
           failed.push(name)
         }

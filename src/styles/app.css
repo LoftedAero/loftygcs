@@ -21,6 +21,9 @@
      OSD all grew one independently and all picked a different number; this is
      the one they share. Change it here and every screen moves together. */
   --app-col-w: 280px;
+  /* The mission item pane with nothing in it: its header and the one line
+     that says where to click, and no more. */
+  --app-mission-collapsed: 82px;
   /* The log field list. Matches the OSD panel list's 262px. */
   --app-log-fields-w: 262px;
 }
@@ -617,6 +620,52 @@
 }
 .camera-panel__readout {
   margin-left: auto;
+}
+
+/* ── Import shape picker ──
+   A list of what is in the file. Rows rather than buttons: a KML with six
+   tracks in it made a dialog of six full-width primary actions, which read
+   as six decisions instead of one list. */
+.geo-pick {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.geo-pick__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-3);
+  padding: var(--la-space-2) var(--la-space-3);
+  border: none;
+  border-bottom: 1px solid var(--la-line);
+  background: var(--la-surface);
+  font: inherit;
+  color: var(--la-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.geo-pick__item:last-child {
+  border-bottom: none;
+}
+.geo-pick__item:hover {
+  background: var(--la-surface-2);
+}
+.geo-pick__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.geo-pick__meta {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  white-space: nowrap;
 }
 
 /* ── Offline coverage overlay ──
@@ -1234,6 +1283,20 @@
     minmax(0, var(--split-bottom, 1fr));
   min-height: 0;
   min-width: 0;
+}
+/* Nothing in the table yet: the map takes the height, and the pane keeps
+   just enough to say so. Not hidden -- the line it shows is the one that
+   tells a new user where to click. The gap row collapses with it because
+   there is no divider to make room for.
+
+   `auto` is not enough: the pane is a flex column whose body is
+   `flex: 1; min-height: 0`, so it resolves to nothing. The row is sized to
+   the header plus the empty line instead. */
+.mission-main.is-collapsed {
+  grid-template-rows: minmax(0, 1fr) 0 var(--app-mission-collapsed);
+}
+.mission-main.is-collapsed .mission-lower {
+  min-height: var(--app-mission-collapsed);
 }
 
 .mission-map-area {

@@ -52,7 +52,9 @@ function loadSplit(): number {
   } catch {
     // Storage blocked; the default is a reasonable answer.
   }
-  return 0.5
+  // Two thirds map, one third table: the table is a list to glance at and
+  // the map is the thing being worked on.
+  return 0.67
 }
 
 // Ground elevation costs a couple of tile fetches and answers the question

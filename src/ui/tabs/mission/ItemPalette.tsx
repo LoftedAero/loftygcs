@@ -172,9 +172,11 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
             role="menu"
             style={{ left: pos.left, top: pos.top }}
           >
+            {/* Grouped but unlabeled: the categories order the list, and
+                naming each one spent three lines apiece saying what the
+                commands underneath already say. */}
             {(['nav', 'condition', 'do'] as const).map((cat) => (
               <div key={cat} className="mission-palette__group">
-                <p className="mission-palette__groupname">{CATEGORY[cat]}</p>
                 {MISSION_COMMANDS.filter((c) => c.category === cat).map((c) => (
                   <button
                     key={c.id}
@@ -204,12 +206,6 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
     </div>
   )
 }
-
-const CATEGORY = {
-  nav: 'Navigation — the vehicle moves',
-  condition: 'Conditions — wait for something',
-  do: 'Actions — run and continue',
-} as const
 
 // Line-art at a common 24-box, stroked in currentColor so the armed state
 // inverts them along with the button.

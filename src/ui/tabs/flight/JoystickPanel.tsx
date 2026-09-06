@@ -100,9 +100,7 @@ export default function JoystickPanel() {
 
       {pads.length > 1 && !pad && (
         <LaHint>
-          {deviceId
-            ? 'That device is no longer attached. Choose another.'
-            : 'Several input devices are attached. Choose the one to fly with — nothing is read until you do.'}
+          {deviceId ? 'That device is no longer attached.' : 'Choose which device to fly with.'}
         </LaHint>
       )}
 
@@ -170,10 +168,7 @@ function SetupModal({
         </LaButton>
       }
     >
-      <p className="la-hint">
-        Move a stick to see which axis it is, then give that axis to a channel. Nothing is sent
-        while this is open.
-      </p>
+      <p className="la-hint">Move a stick to see which axis it is. Nothing is sent from here.</p>
       <table className="joystick-setup">
         <thead>
           <tr>
@@ -234,10 +229,7 @@ function SetupModal({
           }
         />
       </LaField>
-      <LaHint>
-        The throttle keeps its full travel: a deadzone only applies to the axes that rest in the
-        middle.
-      </LaHint>
+      <LaHint>Centered axes only; the throttle keeps its full travel.</LaHint>
     </LaModal>
   )
 }

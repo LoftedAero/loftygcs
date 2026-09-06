@@ -133,7 +133,7 @@ export default function OfflineMapsPanel({
     setProgress(null)
     setOutcome(
       stopped
-        ? 'Stopped. What had already arrived is kept.'
+        ? 'Stopped.'
         : `Stored ${tiles.length.toLocaleString()} map tiles` +
             (terrain.length > 0 ? ` and ${terrain.length} elevation tiles.` : '.'),
     )
@@ -220,20 +220,19 @@ export default function OfflineMapsPanel({
           if (e.target.checked) refresh()
         }}
       />
-      {coverage && <LaHint>Hatched squares are not stored at this zoom; clear ones are.</LaHint>}
+      {coverage && <LaHint>Hatched squares are not stored.</LaHint>}
 
       <LaHint>
-        Stored: {stats.count.toLocaleString()} tiles, {formatBytes(stats.bytes)}. Panning the map
-        online saves what it draws, so this only fills the gaps.
+        Stored: {stats.count.toLocaleString()} tiles, {formatBytes(stats.bytes)}.
       </LaHint>
 
       {bounds && terrain !== null && (
         <LaHint error={terrain.total > 0 && terrain.stored === 0}>
           {terrain.total === 0
-            ? 'Elevation covers a smaller area than this — zoom in until a field fills the map, and it will be fetched with the tiles.'
+            ? 'Zoom in for elevation.'
             : terrain.stored === terrain.total
               ? `Elevation for this view is stored too (${terrain.total} ${terrain.total === 1 ? 'tile' : 'tiles'}).`
-              : `Elevation: ${terrain.total - terrain.stored} of ${terrain.total} tiles missing — the profile needs these to draw the ground.`}
+              : `Elevation: ${terrain.total - terrain.stored} of ${terrain.total} tiles missing.`}
         </LaHint>
       )}
 

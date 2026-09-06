@@ -68,9 +68,14 @@ export interface VehicleSnapshot {
    * What the vehicle said about itself, once, in AUTOPILOT_VERSION.
    *
    * Null until it answers, and for anything that never does. The version
-   * picks matching parameter metadata; the capability bits say what the
-   * link actually supports, which is how a screen can tell "no MAVFTP" from
-   * "MAVFTP is not answering".
+   * picks matching parameter metadata and decides which generation of the
+   * mount protocol to speak.
+   *
+   * The capability bits are kept but deliberately not acted on. A real
+   * flight controller reported no MAVFTP bit while serving files happily,
+   * so a screen that believed them told someone their working feature did
+   * not exist. What an operation actually answers is the only thing worth
+   * gating on.
    */
   firmware: FirmwareVersion | null
   capabilities: number

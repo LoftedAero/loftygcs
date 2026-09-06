@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { LaButton, LaCard, LaHint, LaInput, LaModal } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
-import { useVehicleStore } from '../../../stores/vehicle-store'
 import { parentPath, useFilesStore } from '../../../stores/files-store'
 import {
   downloadEntry,
@@ -47,11 +46,6 @@ export default function FilesTab() {
   const [confirming, setConfirming] = useState<FtpDirEntry | null>(null)
   const [newFolder, setNewFolder] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<{ entry: FtpDirEntry; to: string } | null>(null)
-  // MAV_PROTOCOL_CAPABILITY_FTP. Zero capabilities means the vehicle never
-  // answered AUTOPILOT_VERSION, which is not the same as saying no -- so
-  // this only speaks up when it actually said no.
-  const capabilities = useVehicleStore((s) => s.capabilities)
-  const saysNoFtp = capabilities !== 0 && (capabilities & (1 << 11)) === 0
 
   // Listed on arrival rather than behind a button: an empty screen with a
   // "List" button on it is a screen that has told you nothing.
@@ -68,11 +62,8 @@ export default function FilesTab() {
 
   if (!connected) {
     return (
-      <LaCard title="Files" note="The vehicle's SD card, over MAVFTP.">
-        <p className="app-placeholder">
-          Connect a vehicle and this lists what is on its card — Lua scripts, OSD fonts, terrain
-          tiles — with a way to put files there and take them off.
-        </p>
+      <LaCard title="MAVFTP" note="The files on the vehicle.">
+        <p className="app-placeholder">Connect a vehicle to browse its files.</p>
       </LaCard>
     )
   }
@@ -143,7 +134,6 @@ export default function FilesTab() {
           >
             Open folder
           </LaButton>
-          <LaHint>Double-click a folder to open it.</LaHint>
         </section>
 
         <section className="app-col__group">
@@ -157,7 +147,7 @@ export default function FilesTab() {
           >
             Upload a file…
           </LaButton>
-          {atRoot && <LaHint>Open a folder first: the root is a merged view, not a place.</LaHint>}
+          {atRoot && <LaHint>Open a folder first.</LaHint>}
           <LaButton
             variant="secondary"
             size="block"
@@ -181,13 +171,6 @@ export default function FilesTab() {
               />
             </>
           )}
-          {/* The number nobody guesses right: uploads are a round trip per
-              239 bytes, so a script that copies instantly to an SD card
-              takes visible seconds here. */}
-          <LaHint>
-            Writing has no burst mode, so it runs at about 8 kB a second over USB and far less over
-            a radio.
-          </LaHint>
         </section>
 
         <section className="app-col__group">
@@ -221,11 +204,6 @@ export default function FilesTab() {
           </LaButton>
         </section>
 
-        {saysNoFtp && (
-          <LaHint error>
-            This vehicle does not report MAVFTP support, so there is nothing here to browse.
-          </LaHint>
-        )}
         {status.kind === 'error' && <p className="app-col__note is-error">{status.text}</p>}
         {status.kind === 'done' && <p className="app-col__note">{status.text}</p>}
       </aside>
@@ -256,7 +234,7 @@ export default function FilesTab() {
           <p className="app-col__note">
             {confirming.kind === 'directory'
               ? 'A folder can only be deleted when it is empty.'
-              : 'There is no recycle bin on a flight controller: this is gone for good.'}
+              : 'This cannot be undone.'}
           </p>
         </LaModal>
       )}

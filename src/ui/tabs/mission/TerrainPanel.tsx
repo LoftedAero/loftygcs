@@ -60,16 +60,11 @@ export default function TerrainPanel() {
       {on && terrain.state === 'loading' && <LaHint>Reading elevation…</LaHint>}
 
       {on && terrain.state === 'unavailable' && (
-        <LaHint>
-          No elevation data for this area yet. It downloads with the map, so fetch the area once
-          while there is a connection.
-        </LaHint>
+        <LaHint>No elevation for this area yet — download the map for it.</LaHint>
       )}
 
       {on && terrain.state === 'ready' && home.source === 'none' && (
-        <LaHint>
-          Set a home position — without one there is nothing to measure heights against.
-        </LaHint>
+        <LaHint>Set a home position to measure heights against.</LaHint>
       )}
 
       {on && worst && worst.minM < 0 && (

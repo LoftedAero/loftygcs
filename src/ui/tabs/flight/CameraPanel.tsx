@@ -91,7 +91,7 @@ export default function CameraPanel() {
         <span className="camera-panel__readout">
           {gimbal
             ? `${gimbal.pitchDeg.toFixed(0)}° pitch · ${gimbal.yawDeg.toFixed(0)}° yaw`
-            : 'no mount reporting'}
+            : 'no mount'}
         </span>
       </div>
 

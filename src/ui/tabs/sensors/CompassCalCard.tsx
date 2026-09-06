@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { LaButton, LaCard, LaHint } from '../../components/La'
+import RebootButton from '../../components/RebootButton'
 import { useCalStore } from '../../../stores/cal-store'
 import { connectionService } from '../../../services/connection'
 
@@ -92,6 +93,10 @@ export default function CompassCalCard() {
             <LaButton variant="ghost" onClick={() => useCalStore.getState().magCalReset()}>
               Done
             </LaButton>
+            {/* New offsets are read at boot: a compass that still points
+                wrong after a good calibration is usually one that has not
+                restarted yet. */}
+            {magCal.report.calStatus === 4 && <RebootButton size="sm" />}
           </div>
         </>
       )}

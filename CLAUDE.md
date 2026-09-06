@@ -27,7 +27,11 @@ design decisions are recorded there and in code comments.
   preview, a caption over video, white-on-green chips — must use `--app-on-dark`, never
   `--la-surface`, which is only white by coincidence in the light theme. Orange = the one primary action
   per region; blue = working controls; green/red = status only, never actions. Units go in
-  `.la-field__unit`; validation goes in `.la-hint` beside the control.
+  `.la-field__unit`; validation goes in `.la-hint` beside the control. **Hints are short.** A
+  `.la-hint` says the one thing someone needs at the moment they read it — not why the
+  protocol works that way, not what the alternative would have been. The reasoning belongs in a
+  comment, where it costs the reader nothing; on screen it is noise that trains people to skip
+  the line that does matter.
 - **A renderer reload leaks whatever the main process is holding for it.** Link sockets and the
   video receiver live in the main process and are closed one at a time by the renderer that
   opened them, so a reload throws away the ids and the sockets stay open — and a *bound* one (a
@@ -250,6 +254,13 @@ design decisions are recorded there and in code comments.
   *bits* (0,1,2) — so the field wins whenever both are present. The version is rounded *down*
   to the newest published release that is not newer. `NET=1 npm test` runs the live check
   against the real server, which is the only thing that catches a path change.
+- **Do not gate a feature on a capability bit.** A real flight controller reported no
+  MAV_PROTOCOL_CAPABILITY_FTP while serving files perfectly well, and the MAVFTP screen believed
+  it and told the user their working feature did not exist. SITL sets the bit, so nothing here
+  caught it. The bits are still decoded into `vehicle-store` because they are interesting, and
+  nothing branches on them: what an operation actually answers — an ack, a listing, a NAK — is
+  the only evidence worth acting on.
+
 - **Which mount protocol to send depends on the firmware, and the answer codes matter.**
   ArduPilot carries three generations and answers all of them, so `protocol/gimbal.ts` picks by
   version: DO_GIMBAL_MANAGER_PITCHYAW (1000) from 4.2 on, DO_MOUNT_CONTROL (205) below it and

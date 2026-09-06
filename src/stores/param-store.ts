@@ -34,7 +34,7 @@ interface ParamState {
    * the wrong version's documentation would be lying rather than silent.
    */
   metadataSource: string | null
-  lastWrite: { written: number; failed: string[] } | null
+  lastWrite: { written: string[]; failed: string[] } | null
 
   beginDownload: () => void
   setProgress: (p: { got: number; total: number; source: 'ftp' | 'stream' }) => void
@@ -45,7 +45,7 @@ interface ParamState {
   confirmWrite: (name: string, value: number) => void
   setWriteBusy: (b: boolean) => void
   setMetadata: (m: Record<string, ParamMeta>, source?: string | null) => void
-  setLastWrite: (r: { written: number; failed: string[] } | null) => void
+  setLastWrite: (r: { written: string[]; failed: string[] } | null) => void
   reset: () => void
 }
 

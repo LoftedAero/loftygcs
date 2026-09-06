@@ -34,6 +34,13 @@ import { useMissionStore } from '../../../stores/mission-store'
 //
 // Actions live in the right column rather than a strip along the top: it is
 // where Mission Planner keeps them, and the column had room the map did not.
+//
+// The table starts out of the way. An empty plan is a screen where the map
+// is the only thing worth any height, so the lower pane collapses to its
+// header until the first item exists -- then it takes the remembered split,
+// a third of the height by default, and the divider becomes draggable. The
+// split someone chooses is never overwritten by that: it is the value the
+// pane springs back to.
 
 export default function MissionTab() {
   const [view, setView] = useState<{ bounds: LatLonBounds; zoom: number } | null>(null)
@@ -60,7 +67,7 @@ export default function MissionTab() {
     <div className="mission-screen">
       <div className="mission-body">
         <div
-          className="mission-main"
+          className={`mission-main${items === 0 ? ' is-collapsed' : ''}`}
           ref={mainRef}
           style={
             {
@@ -80,12 +87,16 @@ export default function MissionTab() {
             />
           </div>
 
-          <Divider
-            orientation="horizontal"
-            containerRef={mainRef}
-            ratio={split}
-            onRatio={setSplit}
-          />
+          {/* An empty plan has nothing to resize into, and dragging there
+              would store a split chosen against an empty table. */}
+          {items > 0 && (
+            <Divider
+              orientation="horizontal"
+              containerRef={mainRef}
+              ratio={split}
+              onRatio={setSplit}
+            />
+          )}
 
           <div className="mission-lower">
             <div className="mission-lower__head">
