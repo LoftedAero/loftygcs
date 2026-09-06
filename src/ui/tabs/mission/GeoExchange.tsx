@@ -1,0 +1,234 @@
+import { useState } from 'react'
+import { LaButton, LaHint, LaModal } from '../../components/La'
+import { useMissionStore, type PlanKind } from '../../../stores/mission-store'
+import {
+  applyGeoShapes,
+  destinationFor,
+  exportable,
+  pickGeoFile,
+  saveGpx,
+  saveKml,
+  usableShapes,
+} from '../../../services/geo-import'
+import type { GeoShape } from '../../../services/geo-file'
+
+// KML and GPX, for whichever plan is on screen.
+//
+// It sits outside the three per-plan panels on purpose. The whole design of
+// the import is that the switch above decides what a file means -- a route on
+// Mission, a boundary on Fence, alternates on Rally -- and that rule is
+// nonsense if the buttons only exist on one of them. They did at first: the
+// fence half of this was written and could not be reached, because the
+// toolbar holding it renders only while editing the mission.
+
+const WORD: Record<PlanKind, string> = {
+  mission: 'mission',
+  fence: 'fence',
+  rally: 'rally points',
+}
+
+export default function GeoExchange() {
+  const editing = useMissionStore((s) => s.editing)
+  const sourceName = useMissionStore((s) => s.sourceName)
+  // Subscribed so the export buttons re-evaluate as the plans change --
+  // `exportable` reads the store itself and would otherwise go stale.
+  useMissionStore(
+    (s) =>
+      s.plan.items.length +
+      s.fence.shapes.filter((f) => f.kind === 'polygon').length +
+      s.rally.length,
+  )
+  const can = exportable(editing)
+
+  /**
+   * The two questions an import can raise.
+   *
+   * `fence` is the polygon type, which no file records. `mismatch` is a file
+   * with nothing of the kind being imported -- where the alternative to
+   * asking is doing nothing and not saying why. Everything else applies
+   * without a word.
+   */
+  const [ask, setAsk] = useState<{
+    kind: 'fence' | 'mismatch'
+    name: string
+    shapes: GeoShape[]
+  } | null>(null)
+  const [busy, setBusy] = useState(false)
+  /**
+   * Said here rather than through the store's transfer note, which is drawn
+   * by the mission toolbar -- and that is not on screen while a fence or the
+   * rally points are being edited, which is where half of these imports go.
+   */
+  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null)
+
+  const apply = (shapes: GeoShape[], name: string, opts: Parameters<typeof applyGeoShapes>[2]) => {
+    setNote({ text: applyGeoShapes(shapes, name, opts) })
+    setAsk(null)
+  }
+
+  const onImport = () => {
+    setBusy(true)
+    setNote(null)
+    void pickGeoFile()
+      .then((picked) => {
+        if (!picked) return
+        const dest = destinationFor(editing)
+        const usable = usableShapes(picked.shapes, dest)
+        if (usable.length === 0) {
+          setAsk({ kind: 'mismatch', name: picked.name, shapes: picked.shapes })
+          return
+        }
+        if (dest === 'fence') {
+          setAsk({ kind: 'fence', name: picked.name, shapes: usable })
+          return
+        }
+        setNote({ text: applyGeoShapes(usable, picked.name) })
+      })
+      .catch((err: unknown) =>
+        setNote({ text: err instanceof Error ? err.message : String(err), error: true }),
+      )
+      .finally(() => setBusy(false))
+  }
+
+  return (
+    <section className="app-col__group">
+      <h3 className="app-col__head">Import and export</h3>
+
+      <LaButton variant="secondary" size="block" disabled={busy} onClick={onImport}>
+        Import KML or GPX
+      </LaButton>
+      <LaButton
+        variant="ghost"
+        size="block"
+        disabled={busy || !can.kml}
+        onClick={() => saveKml(exchangeName(sourceName, editing, 'kml'))}
+      >
+        Export KML
+      </LaButton>
+      <LaButton
+        variant="ghost"
+        size="block"
+        disabled={busy || !can.gpx}
+        onClick={() => saveGpx(exchangeName(sourceName, editing, 'gpx'))}
+      >
+        Export GPX
+      </LaButton>
+      {/* Greyed rather than absent, so the reason is on the screen instead
+          of leaving someone hunting for a button that was there a moment
+          ago on another plan. */}
+      {editing === 'fence' && <LaHint>GPX has no way to hold an area.</LaHint>}
+
+      {note && <p className={`app-col__note${note.error ? ' is-error' : ''}`}>{note.text}</p>}
+
+      {ask?.kind === 'fence' && (
+        <LaModal
+          open
+          narrow
+          title={`${ask.shapes.length} ${ask.shapes.length === 1 ? 'area' : 'areas'} from ${ask.name}`}
+          actions={
+            <div className="la-prompt-actions">
+              <LaButton
+                variant="primary"
+                size="block"
+                onClick={() => apply(ask.shapes, ask.name, { inclusive: true })}
+              >
+                Keep the vehicle inside
+              </LaButton>
+              <LaButton
+                variant="secondary"
+                size="block"
+                onClick={() => apply(ask.shapes, ask.name, { inclusive: false })}
+              >
+                Keep the vehicle out
+              </LaButton>
+              <LaButton variant="ghost" size="block" onClick={() => setAsk(null)}>
+                Cancel
+              </LaButton>
+            </div>
+          }
+        >
+          <p className="la-hint">A file cannot say which kind of fence it is.</p>
+        </LaModal>
+      )}
+
+      {ask?.kind === 'mismatch' && (
+        <MismatchPrompt
+          name={ask.name}
+          shapes={ask.shapes}
+          editing={editing}
+          onUse={(shapes, opts) => apply(shapes, ask.name, opts)}
+          onCancel={() => setAsk(null)}
+        />
+      )}
+    </section>
+  )
+}
+
+/**
+ * The file has nothing of the kind being imported.
+ *
+ * Rather than "nothing to import", it names what is in there and offers the
+ * nearest sensible thing -- an area while planning a mission is a survey
+ * boundary, a line while editing a fence is a boundary drawn open.
+ */
+function MismatchPrompt({
+  name,
+  shapes,
+  editing,
+  onUse,
+  onCancel,
+}: {
+  name: string
+  shapes: GeoShape[]
+  editing: PlanKind
+  onUse: (shapes: GeoShape[], opts: Parameters<typeof applyGeoShapes>[2]) => void
+  onCancel: () => void
+}) {
+  const areas = shapes.filter((s) => s.kind === 'polygon')
+  const lines = shapes.filter((s) => s.kind !== 'polygon')
+  const offer =
+    editing === 'fence' && lines.length > 0
+      ? { label: 'Use as a fence anyway', shapes: lines, opts: { as: 'fence' as const } }
+      : editing === 'mission' && areas.length > 0
+        ? { label: 'Use as a survey area', shapes: areas, opts: { as: 'survey' as const } }
+        : null
+
+  return (
+    <LaModal
+      open
+      narrow
+      title={`Nothing for the ${WORD[editing]} in ${name}`}
+      actions={
+        <div className="la-prompt-actions">
+          {offer && (
+            <LaButton
+              variant="primary"
+              size="block"
+              onClick={() => onUse(offer.shapes, offer.opts)}
+            >
+              {offer.label}
+            </LaButton>
+          )}
+          <LaButton variant="ghost" size="block" onClick={onCancel}>
+            Cancel
+          </LaButton>
+        </div>
+      }
+    >
+      <p className="la-hint">
+        {shapes.length === 0
+          ? 'It holds no routes, points or areas.'
+          : editing === 'fence'
+            ? 'It holds lines and points, not closed areas.'
+            : 'It holds closed areas, not routes.'}
+      </p>
+    </LaModal>
+  )
+}
+
+/** An export name, reusing the loaded one where the mission came from a file. */
+function exchangeName(source: string | null, editing: PlanKind, ext: 'kml' | 'gpx'): string {
+  if (editing !== 'mission') return `${editing}.${ext}`
+  if (!source || source === 'Vehicle') return `mission.${ext}`
+  return `${source.replace(/\.[^.]+$/, '')}.${ext}`
+}

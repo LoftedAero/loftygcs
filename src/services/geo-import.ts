@@ -3,8 +3,11 @@ import { newFenceUid } from '../protocol/geofence'
 import { commandLabel } from '../protocol/mission-commands'
 import { useMissionStore, type PlanKind } from '../stores/mission-store'
 import {
+  areasToKml,
   fitPath,
   parseGeoFile,
+  pointsToGpx,
+  pointsToKml,
   routeToGpx,
   routeToKml,
   type ExportPoint,
@@ -256,16 +259,71 @@ function download(text: string, name: string, type: string) {
   useMissionStore.getState().setTransfer({ kind: 'done', text: `Saved ${name}` })
 }
 
-/** The mission as a KML, for Google Earth. */
-export function saveKml(name = 'mission.kml'): void {
-  download(
-    routeToKml(exportRoute(name.replace(/\.kml$/i, ''))),
-    name,
-    'application/vnd.google-earth.kml+xml',
-  )
+/** The fence's polygons, as areas. Circles have no KML equivalent. */
+function exportAreas(name: string) {
+  return useMissionStore
+    .getState()
+    .fence.shapes.filter((s) => s.kind === 'polygon')
+    .map((s, i) => ({
+      name: `${name} ${i + 1}`,
+      points: s.points.map((p) => ({
+        lat: p.x / 1e7,
+        lon: p.y / 1e7,
+        amslM: 0,
+        label: '',
+      })),
+    }))
 }
 
-/** The mission as a GPX route, for handhelds and mapping tools. */
-export function saveGpx(name = 'mission.gpx'): void {
-  download(routeToGpx(exportRoute(name.replace(/\.gpx$/i, ''))), name, 'application/gpx+xml')
+function exportRally(): ExportPoint[] {
+  const base = homeAmsl(useMissionStore.getState().plan) ?? 0
+  return useMissionStore.getState().rally.map((r, i) => ({
+    lat: r.x / 1e7,
+    lon: r.y / 1e7,
+    amslM: base + r.altM,
+    label: `Rally ${i + 1}`,
+  }))
+}
+
+/**
+ * Whether there is anything to write, and whether GPX can hold it.
+ *
+ * GPX has no way to express an area, so a fence has nothing to say in it.
+ * Better to grey the button than to write a file whose contents are a lie
+ * about what a fence is.
+ */
+export function exportable(editing: PlanKind): { kml: boolean; gpx: boolean } {
+  const store = useMissionStore.getState()
+  if (editing === 'fence') {
+    const areas = store.fence.shapes.some((s) => s.kind === 'polygon')
+    return { kml: areas, gpx: false }
+  }
+  if (editing === 'rally') {
+    const any = store.rally.length > 0
+    return { kml: any, gpx: any }
+  }
+  const any = store.plan.items.length > 0
+  return { kml: any, gpx: any }
+}
+
+/** Whatever plan is on screen, as a KML for Google Earth. */
+export function saveKml(name = 'plan.kml'): void {
+  const editing = useMissionStore.getState().editing
+  const stem = name.replace(/\.kml$/i, '')
+  const text =
+    editing === 'fence'
+      ? areasToKml(stem, exportAreas(stem))
+      : editing === 'rally'
+        ? pointsToKml(stem, exportRally())
+        : routeToKml(exportRoute(stem))
+  download(text, name, 'application/vnd.google-earth.kml+xml')
+}
+
+/** The same, as GPX. Fences are not offered; see `exportable`. */
+export function saveGpx(name = 'plan.gpx'): void {
+  const editing = useMissionStore.getState().editing
+  const stem = name.replace(/\.gpx$/i, '')
+  const text =
+    editing === 'rally' ? pointsToGpx(stem, exportRally()) : routeToGpx(exportRoute(stem))
+  download(text, name, 'application/gpx+xml')
 }

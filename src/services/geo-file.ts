@@ -313,6 +313,76 @@ ${marks}
 `
 }
 
+/**
+ * Closed areas -- a geofence, a survey boundary.
+ *
+ * Real `<Polygon>` elements rather than closed lines, so the file comes
+ * back through this parser as areas and can be re-imported onto the fence
+ * it came from. KML closes a ring by repeating its first vertex, which a
+ * fence does not carry, so it is added here.
+ */
+export function areasToKml(name: string, areas: readonly ExportRoute[]): string {
+  const marks = areas
+    .map((area) => {
+      const ring = area.points.length > 0 ? [...area.points, area.points[0]!] : []
+      return (
+        `    <Placemark>\n      <name>${escapeXml(area.name)}</name>\n` +
+        `      <Style><LineStyle><color>ff1d94f7</color><width>3</width></LineStyle>` +
+        `<PolyStyle><color>301d94f7</color></PolyStyle></Style>\n` +
+        `      <Polygon><outerBoundaryIs><LinearRing>` +
+        `<coordinates>${ring.map(coord).join(' ')}</coordinates>` +
+        `</LinearRing></outerBoundaryIs></Polygon>\n    </Placemark>`
+      )
+    })
+    .join('\n')
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${escapeXml(name)}</name>
+${marks}
+  </Document>
+</kml>
+`
+}
+
+/** Loose points -- rally alternates -- as a KML anyone can drop on a map. */
+export function pointsToKml(name: string, points: readonly ExportPoint[]): string {
+  const marks = points
+    .map(
+      (p) =>
+        `    <Placemark>\n      <name>${escapeXml(p.label)}</name>\n` +
+        `      <Point><altitudeMode>absolute</altitudeMode>` +
+        `<coordinates>${coord(p)}</coordinates></Point>\n    </Placemark>`,
+    )
+    .join('\n')
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${escapeXml(name)}</name>
+${marks}
+  </Document>
+</kml>
+`
+}
+
+/** The same points as GPX waypoints. */
+export function pointsToGpx(name: string, points: readonly ExportPoint[]): string {
+  const body = points
+    .map(
+      (p) =>
+        `  <wpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">\n` +
+        `    <ele>${p.amslM.toFixed(1)}</ele>\n` +
+        `    <name>${escapeXml(p.label)}</name>\n  </wpt>`,
+    )
+    .join('\n')
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Loft GCS" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata><name>${escapeXml(name)}</name></metadata>
+${body}
+</gpx>
+`
+}
+
 /** The route as a GPX route, which is what handhelds and trackers import. */
 export function routeToGpx(route: ExportRoute): string {
   const points = route.points

@@ -216,7 +216,14 @@ design decisions are recorded there and in code comments.
   same polygon is a survey area while planning a mission and a geofence while editing the
   fence, and a line is a route in one and a boundary in the other. That is the rule Mission
   mode already follows, and it removes a dialog that would ask a question the screen has
-  answered — only a file holding *several* shapes gets a picker. Parsing lives in `services`
+  answered — only two questions are left to ask, and both are things a file genuinely does not
+  say: which kind of fence a polygon is, and what to do with a file holding nothing of the kind
+  being imported. **The buttons therefore belong to no one plan** — they live in
+  `ui/tabs/mission/GeoExchange.tsx`, rendered outside the three per-plan panels, because they
+  first lived in the mission toolbar, which renders only while `editing === 'mission'`, so the
+  fence half of the import was written and could not be reached. A fence exports as KML only
+  (GPX has no way to express an area) and is written as a real `<Polygon>`, so it comes back
+  through this parser as a fence rather than a route. Parsing lives in `services`
   rather than `protocol` because it needs DOMParser, and a regular expression over KML finds
   CDATA, entities and namespaces one bug report at a time; elements are matched on `localName`
   so `gx:`-prefixed documents work. Three things bite: KML is **lon,lat** and everything else

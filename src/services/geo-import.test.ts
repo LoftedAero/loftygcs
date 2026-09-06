@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useMissionStore } from '../stores/mission-store'
-import { applyGeoShapes, destinationFor, MAX_IMPORT_ITEMS, usableShapes } from './geo-import'
+import {
+  applyGeoShapes,
+  destinationFor,
+  exportable,
+  MAX_IMPORT_ITEMS,
+  usableShapes,
+} from './geo-import'
 import type { GeoFix, GeoShape } from './geo-file'
 
 // These drive the real store, because the whole point of the module is what
@@ -160,5 +166,31 @@ describe('importing into the other two plans', () => {
     expect(useMissionStore.getState().survey?.polygon).toHaveLength(5)
     // The polygon is the input to a survey, not the plan itself.
     expect(useMissionStore.getState().plan.items).toHaveLength(0)
+  })
+})
+
+describe('what there is to export', () => {
+  // The buttons are on all three plans, so each has to answer for itself --
+  // an empty one has nothing to write, and a fence has nothing GPX can say.
+  it('has nothing to offer for an empty plan', () => {
+    for (const plan of ['mission', 'fence', 'rally'] as const) {
+      expect(exportable(plan)).toEqual({ kml: false, gpx: false })
+    }
+  })
+
+  it('offers KML but never GPX for a fence, which has no way to hold an area', () => {
+    useMissionStore.getState().setEditing('fence')
+    applyGeoShapes([shape('polygon', line(5))], 'boundary.kml')
+    expect(exportable('fence')).toEqual({ kml: true, gpx: false })
+  })
+
+  it('offers both for rally points and for a mission', () => {
+    useMissionStore.getState().setEditing('rally')
+    applyGeoShapes([shape('points', line(3))], 'fields.kml')
+    expect(exportable('rally')).toEqual({ kml: true, gpx: true })
+
+    useMissionStore.getState().setEditing('mission')
+    applyGeoShapes([shape('track', line(4))], 'route.gpx')
+    expect(exportable('mission')).toEqual({ kml: true, gpx: true })
   })
 })

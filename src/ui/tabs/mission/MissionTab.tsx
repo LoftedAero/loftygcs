@@ -10,6 +10,7 @@ import PlanKindSwitch from './PlanKindSwitch'
 import FencePanel from './FencePanel'
 import RallyPanel from './RallyPanel'
 import MissionToolbar from './MissionToolbar'
+import GeoExchange from './GeoExchange'
 import ItemPalette from './ItemPalette'
 import AltitudeProfile from './AltitudeProfile'
 import Divider from '../../components/Divider'
@@ -138,6 +139,9 @@ export default function MissionTab() {
           )}
           {editing === 'fence' && <FencePanel />}
           {editing === 'rally' && <RallyPanel />}
+          {/* Outside the three panels above: a KML means whichever plan is
+              selected, so the buttons have to exist on all of them. */}
+          <GeoExchange />
           {/* Last in the column: preparing for a field with no signal is
               something you do once, after the plan is what you want. */}
           <OfflineMapsPanel

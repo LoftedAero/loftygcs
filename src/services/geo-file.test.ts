@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  areasToKml,
   fitPath,
   parseGeoFile,
+  pointsToGpx,
+  pointsToKml,
   routeToGpx,
   routeToKml,
   simplifyPath,
@@ -222,5 +225,49 @@ describe('writing', () => {
 
   it('marks altitudes absolute, or Google Earth lays the route on the ground', () => {
     expect(routeToKml(route)).toContain('<altitudeMode>absolute</altitudeMode>')
+  })
+})
+
+describe('writing a fence and rally points', () => {
+  const area: ExportRoute = {
+    name: 'Field boundary',
+    points: [
+      { lat: 39.95, lon: -105.25, amslM: 0, label: '' },
+      { lat: 39.96, lon: -105.25, amslM: 0, label: '' },
+      { lat: 39.96, lon: -105.24, amslM: 0, label: '' },
+      { lat: 39.95, lon: -105.24, amslM: 0, label: '' },
+    ],
+  }
+
+  it('writes an area this parser reads back as an area', () => {
+    // A closed LineString would come back as a track and re-import onto the
+    // mission rather than the fence it was exported from.
+    const [shape] = parseGeoFile(areasToKml('fence', [area]))
+    expect(shape!.kind).toBe('polygon')
+  })
+
+  it('closes the ring, which a fence does not carry', () => {
+    // KML repeats the first vertex to close a ring; the fence stores four
+    // corners and means four, so the fifth is added on the way out.
+    const kml = areasToKml('fence', [area])
+    expect(kml.match(/-105\.25/g)).toHaveLength(3)
+    const [shape] = parseGeoFile(kml)
+    expect(shape!.fixes[0]!.lat).toBeCloseTo(39.95, 7)
+    expect(shape!.fixes[0]!.lon).toBeCloseTo(-105.25, 7)
+  })
+
+  it('writes rally points as points, in both formats', () => {
+    const points = [
+      { lat: 39.95, lon: -105.25, amslM: 1950, label: 'Rally 1' },
+      { lat: 39.97, lon: -105.2, amslM: 1980, label: 'Rally 2' },
+    ]
+    for (const text of [pointsToKml('rally', points), pointsToGpx('rally', points)]) {
+      const shapes = parseGeoFile(text)
+      const fixes = shapes.flatMap((sh) => sh.fixes)
+      expect(fixes).toHaveLength(2)
+      expect(fixes[1]!.lat).toBeCloseTo(39.97, 7)
+      expect(fixes[1]!.amslM).toBeCloseTo(1980, 1)
+      expect(shapes.every((sh) => sh.kind === 'points')).toBe(true)
+    }
   })
 })
