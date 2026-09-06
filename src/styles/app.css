@@ -1512,6 +1512,36 @@
   width: 100%;
   border-collapse: collapse;
   font-size: var(--la-size-sm);
+  /* Honors the colgroup below; without it the widths are advisory and the
+     parameter columns take whatever is going. */
+  table-layout: fixed;
+}
+/* Everything but the command name is sized for its content: a sequence
+   number, a frame abbreviation, two numbers and three icon buttons. The
+   parameter columns fit the longest label any command uses ("Accept
+   radius", "Heading required") and stop there. What is left over goes to
+   the command names, which are the only thing here that varies in length. */
+.mission-col--seq {
+  width: 34px;
+}
+.mission-col--command {
+  width: auto;
+  min-width: 140px;
+}
+.mission-col--frame {
+  width: 92px;
+}
+.mission-col--alt {
+  width: 88px;
+}
+.mission-col--param {
+  width: 124px;
+}
+.mission-col--dist {
+  width: 76px;
+}
+.mission-col--actions {
+  width: 104px;
 }
 .mission-table__grid th {
   position: sticky;
@@ -1539,7 +1569,7 @@
   white-space: nowrap;
 }
 .mission-table__num .la-input {
-  width: 72px;
+  width: 100%;
 }
 .mission-table__dist {
   color: var(--la-ink-3);
@@ -1547,7 +1577,7 @@
 .mission-table__param .la-input,
 .mission-table__param .la-select {
   width: 100%;
-  min-width: 76px;
+  min-width: 0;
 }
 /* Rows carry a label per parameter, so they are taller than a plain grid;
    trimming the cell padding is what keeps a useful number of them on

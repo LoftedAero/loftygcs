@@ -51,6 +51,25 @@ export default function MissionTable() {
   return (
     <div className="mission-table">
       <table className="mission-table__grid">
+        {/* Fixed widths rather than the browser's guess. Auto layout gives
+            the leftover width to whichever column has the widest content,
+            which here is the four parameter cells -- so a waypoint, the
+            command with the most parameters and the one everybody uses,
+            got four input boxes wide enough for a paragraph. Sized for the
+            longest label instead, with the slack going to the command
+            names, which are the part that can actually run long. */}
+        <colgroup>
+          <col className="mission-col--seq" />
+          <col className="mission-col--command" />
+          <col className="mission-col--frame" />
+          <col className="mission-col--alt" />
+          <col className="mission-col--param" />
+          <col className="mission-col--param" />
+          <col className="mission-col--param" />
+          <col className="mission-col--param" />
+          <col className="mission-col--dist" />
+          <col className="mission-col--actions" />
+        </colgroup>
         <thead>
           <tr>
             <th scope="col" className="mission-table__num">

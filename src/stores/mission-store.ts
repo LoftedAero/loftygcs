@@ -55,8 +55,14 @@ export type TransferState =
  */
 const SPLIT_KEY = 'loftgcs.mission.split.v2'
 
-/** Enough for the profile at full height with a few rows of list under it. */
-const DEFAULT_SPLIT = 0.55
+/**
+ * Where the divider sits before anyone drags it.
+ *
+ * Taken from where this project's own pilot settled it after using the
+ * screen, rounded: the profile at full height with two rows of the list
+ * under it. Guessing at this produced two wrong answers first.
+ */
+const DEFAULT_SPLIT = 0.65
 
 function loadSplit(): number {
   try {
