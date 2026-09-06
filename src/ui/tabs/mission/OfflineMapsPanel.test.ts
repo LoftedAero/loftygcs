@@ -20,16 +20,14 @@ describe('what the download says it did', () => {
   })
 
   it('does not claim success over a dead network', () => {
-    expect(describeOutcome(run(10, 10), null)).toBe('10 tiles could not be fetched.')
+    expect(describeOutcome(run(10, 10), null)).toBe('10 tiles unavailable.')
   })
 
   it('says both when a download was partial', () => {
-    expect(describeOutcome(run(10, 3), null)).toBe('Stored 7 tiles; 3 tiles could not be fetched.')
+    expect(describeOutcome(run(10, 3), null)).toBe('Stored 7 · 3 unavailable.')
   })
 
   it('says so when everything was already there', () => {
-    expect(describeOutcome(run(10, 0, 10), run(1, 0, 1))).toBe(
-      'Everything in this view was already stored.',
-    )
+    expect(describeOutcome(run(10, 0, 10), run(1, 0, 1))).toBe('Everything here is already stored.')
   })
 })

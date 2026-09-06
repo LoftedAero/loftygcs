@@ -39,6 +39,9 @@ import {
 // downloaded for a trip whose terrain profile then reads "no data" would be
 // a download that did not do what it said.
 
+/** Holds an empty slot's line open, so the box never changes height. */
+const BLANK = ' '
+
 /** How far past the current view to fetch, so a small pan stays covered. */
 const ZOOM_CHOICES = [
   { extra: 1, label: 'This view (+1 level)' },
@@ -162,66 +165,67 @@ export default function OfflineMapsPanel({
           ))}
         </LaSelect>
       </LaField>
-      {/* The zoom range clamps to what the imagery actually has, so near its
-          deepest level the choices collapse into the same download -- which
-          looked like a broken selector until the clamp said so out loud. */}
-      {bounds && Math.floor(zoom) + extra > layer.maxNativeZoom && (
-        <LaHint>Imagery ends at zoom {layer.maxNativeZoom}.</LaHint>
-      )}
+      {/* Every optional message lives in one of three fixed slots, blank
+          when it has nothing to say, so the box never changes height as
+          state changes -- a panel pinned to the foot of the column has
+          everything above it move when it grows.
 
+          Slot one, under the button: the figure for the decision at hand.
+          Progress while running; the size estimate otherwise. */}
       {running ? (
-        <>
-          <LaHint>
-            {progress.done} of {progress.total} tiles
-            {progress.failed > 0 && ` · ${progress.failed} unavailable`}
-          </LaHint>
-          <LaButton
-            variant="ghost"
-            size="block"
-            onClick={() => {
-              abortRef.current?.abort()
-              abortRef.current = null
-              setProgress(null)
-            }}
-          >
-            Stop
-          </LaButton>
-        </>
+        <LaButton
+          variant="ghost"
+          size="block"
+          onClick={() => {
+            abortRef.current?.abort()
+            abortRef.current = null
+            setProgress(null)
+          }}
+        >
+          Stop
+        </LaButton>
       ) : (
-        <>
-          <LaButton
-            variant="secondary"
-            size="block"
-            disabled={!bounds || count === 0}
-            title={
-              bounds
-                ? `Zoom ${minZoom} to ${maxZoom} over this view; already-stored tiles are skipped`
-                : 'Move the map to the area you want'
-            }
-            onClick={() => void start()}
-          >
-            Download {count.toLocaleString()} tiles
-          </LaButton>
-          {/* The size warning is the one line that earns permanent space --
-              it is read before a decision. That the download skips stored
-              tiles and which zooms it sweeps answer questions nobody has
-              asked yet, so they wait on the button's title. */}
-          <LaHint>
-            About {formatBytes(count * BYTES_PER_TILE)}
-            {terrainForArea > 0 ? ', elevation included' : ''}.
-          </LaHint>
-        </>
+        <LaButton
+          variant="secondary"
+          size="block"
+          disabled={!bounds || count === 0}
+          title={
+            bounds
+              ? `Zoom ${minZoom} to ${maxZoom} over this view; already-stored tiles are skipped`
+              : 'Move the map to the area you want'
+          }
+          onClick={() => void start()}
+        >
+          Download {count.toLocaleString()} tiles
+        </LaButton>
       )}
+      <LaHint>
+        {running
+          ? `${progress.done.toLocaleString()} of ${progress.total.toLocaleString()} tiles` +
+            (progress.failed > 0 ? ` · ${progress.failed} unavailable` : '')
+          : bounds
+            ? `About ${formatBytes(count * BYTES_PER_TILE)}` +
+              (terrainForArea > 0 ? ', elevation included.' : '.')
+            : BLANK}
+      </LaHint>
+      {/* Slot two: what just happened, or -- with nothing to report -- why
+          the resolution choices collapse near the imagery's deepest level,
+          which looked like a broken selector until said out loud. */}
+      <LaHint>
+        {outcome ??
+          (bounds && Math.floor(zoom) + extra > layer.maxNativeZoom
+            ? `Imagery ends at zoom ${layer.maxNativeZoom}.`
+            : BLANK)}
+      </LaHint>
 
       {/* A tile count cannot answer "will this work when I get there" -- a
           cache can hold five thousand tiles of the wrong valley. The map
           can, so the switch is next to the number rather than instead of
-          it. */}
-      {/* The count shares the toggle's row -- its subject is on the label,
-          so "Stored:" would say it twice. One honest caveat lives here: the
-          number is the whole store, every layer and area, where the overlay
-          paints this view of this base layer. The Clear button below acts on
-          the same whole, which is why the number sits with these controls. */}
+          it. The count shares the toggle's row: its subject is on the label,
+          so "Stored:" would say it twice. The number is the whole store,
+          every layer and area, where the overlay paints this view of this
+          base layer -- acceptable on one row because Clear below acts on the
+          same whole. */}
       <div className="offline-stored">
         <LaSwitch
           label="Show stored tiles"
@@ -233,28 +237,25 @@ export default function OfflineMapsPanel({
           {formatBytes(stats.bytes)}
         </span>
       </div>
-      {coverage && <LaHint>Red: missing. Green: stored.</LaHint>}
-
-      {/* One elevation state gets a line, and it is the one that is a
-          problem: a partial store, the hole in prep someone thinks is done.
-          None stored is answered by "elevation included" on the download,
-          fully stored by silence -- a status line per state read like a
-          debug log. */}
-      {bounds && terrain !== null && terrain.stored > 0 && terrain.stored < terrain.total && (
-        <LaHint error>
-          Elevation: {terrain.total - terrain.stored} of {terrain.total} tiles missing here.
-        </LaHint>
-      )}
-
-      {outcome && <p className="app-col__note">{outcome}</p>}
+      {/* Slot three: the one elevation state that is a problem -- a partial
+          store, the hole in prep someone thinks is done -- and otherwise the
+          overlay's legend while it is on. The warning wins the line: color
+          teaching can wait, a hole in the prep cannot. */}
+      <LaHint
+        error={!!bounds && terrain !== null && terrain.stored > 0 && terrain.stored < terrain.total}
+      >
+        {bounds && terrain !== null && terrain.stored > 0 && terrain.stored < terrain.total
+          ? `Elevation: ${terrain.total - terrain.stored} of ${terrain.total} tiles missing here.`
+          : coverage
+            ? 'Red: missing. Green: stored.'
+            : BLANK}
+      </LaHint>
       <LaButton
         variant="ghost"
         size="block"
         disabled={running || stats.count === 0}
         onClick={() =>
-          void clearCache().then(() =>
-            setOutcome('Cleared. Everything will come from the network again.'),
-          )
+          void clearCache().then(() => setOutcome('Cleared. Tiles will come from the network.'))
         }
       >
         Clear stored maps
@@ -273,10 +274,10 @@ export function describeOutcome(map: PrefetchProgress, terrain: PrefetchProgress
   const fresh = (p: PrefetchProgress) => p.done - p.failed - p.cached
   const stored = fresh(map) + (terrain ? fresh(terrain) : 0)
   const failed = map.failed + (terrain?.failed ?? 0)
-  if (stored === 0 && failed === 0) return 'Everything in this view was already stored.'
-  const parts: string[] = []
-  if (stored > 0) parts.push(`Stored ${stored.toLocaleString()} ${stored === 1 ? 'tile' : 'tiles'}`)
-  if (failed > 0)
-    parts.push(`${failed.toLocaleString()} ${failed === 1 ? 'tile' : 'tiles'} could not be fetched`)
-  return parts.join('; ') + '.'
+  // Terse on purpose: the message lives in a one-line slot, and a sentence
+  // that wraps moves the box the slots exist to hold still.
+  if (stored === 0 && failed === 0) return 'Everything here is already stored.'
+  if (failed === 0) return `Stored ${stored.toLocaleString()} ${stored === 1 ? 'tile' : 'tiles'}.`
+  if (stored === 0) return `${failed.toLocaleString()} tiles unavailable.`
+  return `Stored ${stored.toLocaleString()} · ${failed.toLocaleString()} unavailable.`
 }

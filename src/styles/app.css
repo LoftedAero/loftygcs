@@ -672,15 +672,24 @@
    it costs no request and scales with the tile. */
 /* The stored-tiles toggle and the whole-store count, one row. The count
    keeps a breath of air off the card edge -- right-aligned grey text flush
-   against a border reads as clipped -- and the row may wrap, so a count
-   grown past any estimate drops under the toggle instead of overflowing. */
+   against a border reads as clipped. No wrapping: the box holds a fixed
+   height, so an impossible count clips rather than growing a row. */
 .offline-stored {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--la-space-2);
-  flex-wrap: wrap;
   padding-right: var(--la-space-2);
+  overflow: hidden;
+}
+
+/* The panel's message slots are single lines by contract -- every state's
+   text is written to fit, and the ellipsis is the backstop that keeps a
+   surprise from becoming a taller box. */
+.mission-side__foot .la-hint {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .offline-stored__count {
   font-size: var(--la-size-xs);
