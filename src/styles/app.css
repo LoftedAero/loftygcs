@@ -1568,12 +1568,23 @@
 .mission-table__grid td {
   padding: var(--la-space-1) var(--la-space-2);
   border-bottom: 1px solid var(--la-line);
-  vertical-align: middle;
+  /* Bottom, not middle. A parameter cell is taller than its neighbors
+     because its label sits above the input, so centering every cell put
+     those inputs a label's height lower than the frame and altitude boxes
+     beside them. Aligning on the bottom edge puts every control on one
+     line, whether or not it has a label over it. */
+  vertical-align: bottom;
 }
 .mission-table__num {
   text-align: right;
   font-family: var(--la-font-mono);
   white-space: nowrap;
+}
+/* Read-only figures line up with the text inside the inputs rather than
+   with their frames, which is half a line lower. */
+.mission-table__grid td.mission-table__dist,
+.mission-table__grid td.mission-table__num:not(:has(.la-input)) {
+  padding-bottom: var(--la-space-2);
 }
 .mission-table__num .la-input {
   width: 100%;
