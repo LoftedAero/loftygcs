@@ -51,9 +51,11 @@ function loadSplit(): number {
   } catch {
     // Storage blocked; the default is a reasonable answer.
   }
-  // Two thirds map, one third table: the table is a list to glance at and
-  // the map is the thing being worked on.
-  return 0.67
+  // Enough for the altitude profile at its full height and a few rows of
+  // the list under it. A third of the screen was right when the pane held
+  // only the table; the profile is twice the height it was, and a pane
+  // sized for the old one squeezed both.
+  return 0.55
 }
 
 /**

@@ -103,12 +103,12 @@ export default function MissionTab() {
               <h3 className="mission-lower__title">
                 Items {items > 0 && <span className="mission-lower__count">{items}</span>}
               </h3>
-              {/* Beside the switch that shows the drawing it is about: the
-                  warning is a reason to look at the profile, so it belongs
-                  where the profile is turned on rather than in a section of
-                  its own down the actions column. */}
-              {items > 0 && <TerrainWarning />}
               <span className="la-grow" />
+              {/* Immediately before the switch that shows the drawing it is
+                  about: the warning is a reason to look at the profile, so
+                  it belongs where the profile is turned on rather than in a
+                  section of its own down the actions column. */}
+              {items > 0 && <TerrainWarning />}
               {/* Nothing to show and nothing to hide until there are items. */}
               {items > 0 && (
                 <LaSwitch
