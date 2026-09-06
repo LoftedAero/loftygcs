@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { LaCard } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
-import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
+import {
+  LOG_PANES,
+  useFlightLayoutStore,
+  type LogPane as LogPaneId,
+} from '../../../stores/flight-layout-store'
 import { gotoGuided, setHome, setRoi } from '../../../services/flight'
 import MapView from './MapView'
 import Hud from './Hud'
@@ -91,10 +95,6 @@ export default function FlightTab() {
           them is switched off. */}
       <div className="flight-grid__below">
         <FlightControls onVideo={() => setVideoOpen(true)} />
-        {/* Under the commands, above the messages: it is a control, but a
-            second-tier one that most aircraft do not have. */}
-        {layout.showCamera && <CameraPanel />}
-        {layout.showJoystick && <JoystickPanel />}
         {layout.showMessages && (
           <LogPane
             pane={layout.logPane}
@@ -169,51 +169,50 @@ export default function FlightTab() {
  * sending. Two views of "what is it telling me", so they share one space and
  * a header rather than competing for the screen.
  */
+/**
+ * The lower pane: one thing at a time, chosen by its tab.
+ *
+ * Camera and joystick live here rather than as panels of their own. They
+ * are things you look at in the space under the controls, which is what
+ * this pane is for -- and as separate panels they competed with it for the
+ * same room while being switched on from a menu about window layout.
+ *
+ * Each pane is mounted only while it is showing, which the joystick
+ * depends on: it starts reading the gamepad when it mounts and stops when
+ * it unmounts, so nothing is polled while you are reading messages.
+ */
 function LogPane({
   pane,
   onPane,
   plotted,
   onTogglePlot,
 }: {
-  pane: 'messages' | 'status' | 'preflight'
-  onPane: (p: 'messages' | 'status' | 'preflight') => void
+  pane: LogPaneId
+  onPane: (p: LogPaneId) => void
   plotted: readonly string[]
   onTogglePlot: (name: string) => void
 }) {
   return (
     <div className="log-pane">
       <div className="log-pane__head" role="tablist" aria-label="Lower pane">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={pane === 'messages'}
-          className={`log-pane__tab${pane === 'messages' ? ' is-active' : ''}`}
-          onClick={() => onPane('messages')}
-        >
-          Messages
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={pane === 'status'}
-          className={`log-pane__tab${pane === 'status' ? ' is-active' : ''}`}
-          onClick={() => onPane('status')}
-        >
-          Status
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={pane === 'preflight'}
-          className={`log-pane__tab${pane === 'preflight' ? ' is-active' : ''}`}
-          onClick={() => onPane('preflight')}
-        >
-          Preflight
-        </button>
+        {LOG_PANES.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={pane === tab.id}
+            className={`log-pane__tab${pane === tab.id ? ' is-active' : ''}`}
+            onClick={() => onPane(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
       {pane === 'messages' && <FlightMessages />}
       {pane === 'status' && <StatusList plotted={plotted} onTogglePlot={onTogglePlot} />}
       {pane === 'preflight' && <PreflightPanel />}
+      {pane === 'camera' && <CameraPanel />}
+      {pane === 'joystick' && <JoystickPanel />}
     </div>
   )
 }

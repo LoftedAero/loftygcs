@@ -23,6 +23,17 @@ export type FlightPanel = 'map' | 'hud'
  */
 export const PANEL_ASPECT = 4 / 3
 
+/** The lower pane's tabs, in the order they are shown. */
+export const LOG_PANES = [
+  { id: 'messages', label: 'Messages' },
+  { id: 'status', label: 'Status' },
+  { id: 'preflight', label: 'Preflight' },
+  { id: 'camera', label: 'Camera' },
+  { id: 'joystick', label: 'Joystick' },
+] as const
+
+export type LogPane = (typeof LOG_PANES)[number]['id']
+
 export interface FlightLayoutState {
   /** Fraction of the width taken by the fixed-aspect column. */
   ratio: number
@@ -33,18 +44,22 @@ export interface FlightLayoutState {
   showMessages: boolean
   /** The plot strip above the map. */
   showPlot: boolean
-  /** Camera and gimbal controls, for the vehicles that have one. */
-  showCamera: boolean
-  /** Gamepad control. Whether the *panel* is shown; taking control is not persisted. */
-  showJoystick: boolean
   /** Which telemetry fields the plot is drawing. */
   plotFields: string[]
   /** Last HUD video source, so it does not have to be retyped. */
   videoUrl: string
   /** Which plotted series the Y axis numbers belong to. */
   plotAxisField: string | null
-  /** Whether the lower pane shows messages or the telemetry field list. */
-  logPane: 'messages' | 'status' | 'preflight'
+  /**
+   * What the lower pane is showing.
+   *
+   * Camera and joystick are panes here rather than panels of their own
+   * because that is what they are: a thing you look at in the space under
+   * the controls, one at a time, like the messages and the preflight list.
+   * As separate panels they competed with those for the same room and had
+   * to be found in a menu about window layout.
+   */
+  logPane: LogPane
   /** The artificial horizon. Off leaves the background layer showing. */
   hudHorizon: boolean
   /** Overlay elements drawn on the HUD, so they can be turned off for video. */
@@ -58,13 +73,11 @@ export interface FlightLayoutState {
       | 'showHud'
       | 'showMessages'
       | 'showPlot'
-      | 'showCamera'
-      | 'showJoystick'
       | 'hudHorizon'
       | 'hudOverlays',
   ) => void
   togglePlotField: (name: string) => void
-  setLogPane: (pane: 'messages' | 'status' | 'preflight') => void
+  setLogPane: (pane: LogPane) => void
   setPlotAxisField: (name: string) => void
   setVideoUrl: (url: string) => void
   reset: () => void
@@ -78,10 +91,8 @@ interface Persisted {
   showHud: boolean
   showMessages: boolean
   showPlot: boolean
-  showCamera: boolean
-  showJoystick: boolean
   plotFields: string[]
-  logPane: 'messages' | 'status' | 'preflight'
+  logPane: LogPane
   plotAxisField: string | null
   videoUrl: string
   hudHorizon: boolean
@@ -97,8 +108,6 @@ const DEFAULTS: Persisted = {
   showHud: true,
   showMessages: true,
   showPlot: false,
-  showCamera: false,
-  showJoystick: false,
   plotFields: [],
   logPane: 'messages',
   plotAxisField: null,
@@ -118,6 +127,9 @@ function load(): Persisted {
       ...DEFAULTS,
       ...saved,
       ratio: clampRatio(typeof saved.ratio === 'number' ? saved.ratio : DEFAULTS.ratio),
+      // A pane that no longer exists would render nothing at all, with the
+      // tab strip offering no clue which one is selected.
+      logPane: LOG_PANES.some((t) => t.id === saved.logPane) ? saved.logPane! : DEFAULTS.logPane,
     }
   } catch {
     return DEFAULTS
@@ -145,8 +157,6 @@ function snapshot(s: FlightLayoutState): Persisted {
     showHud: s.showHud,
     showMessages: s.showMessages,
     showPlot: s.showPlot,
-    showCamera: s.showCamera,
-    showJoystick: s.showJoystick,
     plotFields: s.plotFields,
     logPane: s.logPane,
     plotAxisField: s.plotAxisField,

@@ -581,18 +581,18 @@
 }
 
 /* ── Camera and gimbal ──
-   The recessed strip the flight controls' second tier uses, repeated: this
-   is the same rank of control -- something you nudge while the aircraft is
-   up there -- and it sits directly under them. */
+   A pane of the lower pane, beside Messages and Preflight: something you
+   look at in the space under the controls, one at a time. It brings no
+   surface of its own -- the pane already is one. */
 .camera-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--la-space-2);
-  padding: var(--la-space-2) var(--la-space-3);
-  background: var(--la-surface-2);
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  flex: none;
+  gap: var(--la-space-3);
+  padding: var(--la-space-3);
+  /* No surface of its own: it is a pane of the log pane now, and a box
+     inside a box reads as two things rather than one. */
+  min-height: 0;
+  overflow: auto;
 }
 .camera-panel__row {
   display: flex;
@@ -645,18 +645,16 @@
 }
 
 /* ── Joystick ──
-   The camera strip's shape, with one difference that is not decoration: the
+   The camera pane's shape, with one difference that is not decoration: the
    channel bars are the only way to see a stuck stick, so they are wide
    enough to read at a glance and the center mark is drawn on every one. */
 .joystick-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--la-space-2);
-  padding: var(--la-space-2) var(--la-space-3);
-  background: var(--la-surface-2);
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  flex: none;
+  gap: var(--la-space-3);
+  padding: var(--la-space-3);
+  min-height: 0;
+  overflow: auto;
 }
 .joystick-panel__row {
   display: flex;

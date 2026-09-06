@@ -45,7 +45,9 @@ export default function JoystickPanel() {
   return (
     <div className="joystick-panel">
       <div className="joystick-panel__row">
-        <span className="joystick-panel__label">Joystick</span>
+        {/* Not "Joystick": the tab above already says that, and the row
+            underneath it is about which device. */}
+        <span className="joystick-panel__label">Device</span>
 
         {/* One device needs no choosing; several do, and choosing for
             someone is choosing which sticks they are holding. The list is

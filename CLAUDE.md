@@ -275,6 +275,16 @@ design decisions are recorded there and in code comments.
   SITL both ways — the override reaches the vehicle's RC_CHANNELS *and* the release hands them
   back — because the encoder accepts any field name and a wrong one produces a well-formed
   message full of zeros that a fake would happily accept.
+- **The lower pane is where a second thing goes, not a new panel.** Messages, Status,
+  Preflight, Camera and Joystick are tabs of one pane (`LOG_PANES` in
+  `stores/flight-layout-store.ts`), because they are all the same thing: something you look at
+  in the space under the flight controls, one at a time. Camera and joystick began as panels of
+  their own toggled from the View menu, which put "point the camera" in a menu about window
+  layout and had them competing with the pane for the same room. Two consequences worth
+  keeping: a pane is mounted only while it is showing, which is what stops the joystick polling
+  the gamepad while you are reading messages; and a saved pane name is validated on load,
+  because a name that no longer exists renders nothing at all with no clue in the tab strip.
+
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,
