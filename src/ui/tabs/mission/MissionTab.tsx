@@ -125,34 +125,47 @@ export default function MissionTab() {
         </div>
 
         <aside className="mission-side">
-          {/* First, because it decides what everything below it is about. */}
-          <PlanKindSwitch />
-          {/* Read, write and clear are the same three actions on all three
+          {/* Everything that belongs to a plan scrolls; see below for what
+              does not. */}
+          <div className="mission-side__scroll">
+            {/* First, because it decides what everything below it is about. */}
+            <PlanKindSwitch />
+            {/* Read, write and clear are the same three actions on all three
               plans, so they are one component in one place rather than a
               copy per panel that drifts. */}
-          <PlanActions />
-          {editing === 'mission' && (
-            <>
-              {/* Above the settings: while an area is being drawn it is what
+            <PlanActions />
+            {editing === 'mission' && (
+              <>
+                {/* Above the settings: while an area is being drawn it is what
                   the map clicks mean, so it should be the first thing in
                   reach. */}
-              <SurveyPanel />
-              <MissionSettings />
-            </>
-          )}
-          {editing === 'fence' && <FencePanel />}
-          {editing === 'rally' && <RallyPanel />}
-          {/* Also outside the three panels: a file means whichever plan is
-              selected, so the buttons have to exist on all of them. */}
-          <GeoExchange />
-          {/* Last in the column: preparing for a field with no signal is
-              something you do once, after the plan is what you want. */}
-          <OfflineMapsPanel
-            bounds={view?.bounds ?? null}
-            zoom={view?.zoom ?? 15}
-            coverage={coverage}
-            onCoverage={setCoverage}
-          />
+                <SurveyPanel />
+                <MissionSettings />
+              </>
+            )}
+            {editing === 'fence' && <FencePanel />}
+            {editing === 'rally' && <RallyPanel />}
+            {/* Also outside the three panels: a file means whichever plan is
+                selected, so the buttons have to exist on all of them. */}
+            <GeoExchange />
+          </div>
+
+          {/* Pinned to the foot rather than left at the end of the flow. It
+              is the one thing in this column that is not about the plan --
+              the tiles under the map are the same tiles whichever of the
+              three is being edited -- and it should not move when the switch
+              is flipped, which it did: a fence with six shapes is twice the
+              height of a rally list, and this slid down the column with
+              them. It was also below the fold on any window that scrolled,
+              which is most of them. */}
+          <div className="mission-side__foot">
+            <OfflineMapsPanel
+              bounds={view?.bounds ?? null}
+              zoom={view?.zoom ?? 15}
+              coverage={coverage}
+              onCoverage={setCoverage}
+            />
+          </div>
         </aside>
       </div>
 
