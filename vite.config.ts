@@ -85,5 +85,12 @@ export default defineConfig({
     // Stubs for the browser APIs jsdom lacks; see the file for why they are
     // here rather than guarded for in the components themselves.
     setupFiles: ['./src/test-setup.ts'],
+    // One file at a time when SITL is the target. The simulator accepts
+    // exactly one TCP client and exits when it leaves, so files running in
+    // parallel fight over the single slot: whichever loses spends its
+    // thirty-second connect window failing while another holds the socket.
+    // It reads as "could not reach SITL on TCP 5760" -- a message that
+    // sounds like nothing is running when in fact the wrong test is.
+    fileParallelism: process.env.SITL !== '1',
   },
 })

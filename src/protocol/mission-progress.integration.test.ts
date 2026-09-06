@@ -4,14 +4,11 @@
 // the vehicle's own reports of which item it is on and how far away it is.
 // Start SITL first (npm run sitl), then SITL=1 npm test.
 import { describe, expect, it } from 'vitest'
-import net from 'node:net'
-import { once } from 'node:events'
+import type net from 'node:net'
+import { connectSitl } from '../test-fixtures/sitl-client'
 import { ProtocolEngine } from './engine'
 import { messageToDeltas } from './telemetry'
 import type { MissionItem, ProtocolEvent, TelemetryDelta } from './types'
-
-const SITL_HOST = '127.0.0.1'
-const SITL_PORT = 5760
 
 /**
  * A short square near the SITL home at CMAC.
@@ -52,9 +49,9 @@ describe.runIf(process.env.SITL === '1')('mission progress against SITL', () => 
       if (out.t === 'tx') socket?.write(out.bytes)
       else if (out.t === 'evt') events.push(out.evt)
     })
-    socket = net.connect(SITL_PORT, SITL_HOST)
-    socket.on('error', () => {})
-    await once(socket, 'connect')
+    // Retried: the runner relaunches SITL between files, and connecting
+    // into that gap is a race, not a result.
+    socket = await connectSitl()
     socket.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
     engine.start()
 

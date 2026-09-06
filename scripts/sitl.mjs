@@ -300,7 +300,13 @@ if (cmd === 'fetch') {
     running = child
     child.on('exit', () => {
       if (stopping) process.exit(0)
-      if (Date.now() - startedAt < MIN_USEFUL_MS && ++quickExits >= 3) {
+      // Consecutive, which is what "keeps exiting" means. The counter used
+      // to accumulate for the life of the runner, so three short sessions
+      // scattered across a long test run -- each of which had served a
+      // client perfectly well -- eventually killed a healthy supervisor
+      // mid-suite, reporting a port conflict that did not exist.
+      if (Date.now() - startedAt >= MIN_USEFUL_MS) quickExits = 0
+      else if (++quickExits >= 3) {
         unlock()
         console.error(
           `${name} SITL keeps exiting at startup. Is another simulator already on 5760? ` +

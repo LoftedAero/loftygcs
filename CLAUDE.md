@@ -482,7 +482,23 @@ the port, so orphaning was never the problem — duplicate supervisors were. **D
 whether 5760 is free by binding it** — Windows lets a second bind succeed over a listening socket, so the probe says
 "free" and you end up talking to the *previous* simulator at its own home; the runner instead
 gives up after three immediate exits and says so. `SITL=1 npm test` runs the integration suite against
-it (`src/protocol/*.integration.test.ts`, `electron/sitl-core.test.ts`). The desktop app can
+it (`src/protocol/*.integration.test.ts`, `electron/sitl-core.test.ts`) — **one file at a time**,
+because the simulator serves one client and parallel files fight over the slot, losing their
+connect windows and reporting "could not reach SITL" while the vehicle is perfectly healthy
+(`fileParallelism` is off when SITL=1). For the same reason every integration test connects
+through `test-fixtures/sitl-client.ts` rather than calling `net.connect` itself: the runner
+relaunches SITL between files, and a connection made in that gap gets ECONNREFUSED, which reads
+as "nothing is running" when something is starting. **Run both vehicles.** The suite adapts
+where the vehicles genuinely differ rather than assuming Copter — and every one of those was a
+Copter assumption caught by a Plane run: `FRAME_CLASS` is Copter's and a fixed wing has none
+(`FORMAT_VERSION` is the marker every vehicle carries); `LOIT_SPEED` is Copter's and Plane's is
+`WP_LOITER_RAD`; the Phase 5 flight gate is skipped off Copter because ArduPlane refuses
+NAV_TAKEOFF in Guided by design; and the parameter-download gate is 3.5 s because 3 s was
+calibrated on Copter alone — measured three runs each, Copter serves 1,370 parameters in
+2.40-2.53 s and Plane 1,419 in 2.88-3.10 s. **The test suite also asserted the MAVFTP capability
+bit** on the grounds that "a real ArduPilot has it" — ArduPlane reports it as zero and serves
+MAVFTP perfectly well, which is the same lesson a real flight controller taught the Files screen,
+learned twice. The desktop app can
 also install and run SITL itself — the app bar's SITL tray (`electron/sitl-core.ts`).
 
 ## Video test source

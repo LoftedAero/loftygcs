@@ -4,13 +4,10 @@
 // reports come from a live SITL rather than frames this repo encoded for
 // itself. Start SITL first (npm run sitl), then SITL=1 npm test.
 import { describe, expect, it } from 'vitest'
-import net from 'node:net'
-import { once } from 'node:events'
+import type net from 'node:net'
+import { connectSitl } from '../test-fixtures/sitl-client'
 import { ProtocolEngine } from './engine'
 import type { InspectorRow, ProtocolEvent } from './types'
-
-const SITL_HOST = '127.0.0.1'
-const SITL_PORT = 5760
 
 describe.runIf(process.env.SITL === '1')('inspector against SITL', () => {
   it('reports the vehicle traffic with plausible rates and decoded fields', async () => {
@@ -20,9 +17,9 @@ describe.runIf(process.env.SITL === '1')('inspector against SITL', () => {
       if (out.t === 'tx') socket?.write(out.bytes)
       else if (out.t === 'evt') events.push(out.evt)
     })
-    socket = net.connect(SITL_PORT, SITL_HOST)
-    socket.on('error', () => {})
-    await once(socket, 'connect')
+    // Retried: the runner relaunches SITL between files, and connecting
+    // into that gap is a race, not a result.
+    socket = await connectSitl()
     socket.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
     engine.start()
     engine.setInspecting(true)

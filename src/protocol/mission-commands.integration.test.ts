@@ -14,8 +14,8 @@
 //   npm run sitl           (or: npm run sitl -- plane)
 //   SITL=1 npm test
 import { describe, expect, it } from 'vitest'
-import net from 'node:net'
-import { once } from 'node:events'
+import type net from 'node:net'
+import { connectSitl } from '../test-fixtures/sitl-client'
 import { ProtocolEngine } from './engine'
 import { MISSION_COMMANDS } from './mission-commands'
 import type { MissionItem, ProtocolEvent } from './types'
@@ -61,9 +61,9 @@ run('the mission command catalog', () => {
         if (out.t === 'tx') socket?.write(out.bytes)
         else if (out.t === 'evt') events.push(out.evt)
       })
-      const sock = net.connect(5760, '127.0.0.1')
-      await once(sock, 'connect')
-      sock.on('error', () => {})
+      // Retried: the runner relaunches SITL between files, and connecting
+      // into that gap is a race, not a result.
+      const sock = await connectSitl()
       socket = sock
       sock.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
       engine.start()
