@@ -3860,6 +3860,13 @@ body.is-splitting .flight-map {
   overflow: hidden;
   background: var(--la-surface);
 }
+/* The column stacks its groups with no gap of its own, so the switch sat
+   directly on the headrow beneath it and its badge -- which is a tall pill
+   at the top of that row -- came within a couple of pixels. This is the
+   actions column's own rhythm, applied to the one child that had none. */
+.mission-side .plan-switch {
+  margin-bottom: var(--la-space-4);
+}
 .plan-switch__btn {
   appearance: none;
   flex: 1;

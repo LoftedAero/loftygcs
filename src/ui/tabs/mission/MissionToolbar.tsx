@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { LaButton, LaHint, LaModal } from '../../components/La'
-import { isDirty, useMissionStore } from '../../../stores/mission-store'
+import { isDirty, useMissionStore, type PlanKind } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import {
   openFromFile,
@@ -9,13 +9,14 @@ import {
   writeToVehicle,
 } from '../../../services/mission'
 import {
-  applyGeoShape,
+  applyGeoShapes,
   destinationFor,
   pickGeoFile,
   saveGpx,
   saveKml,
-  type GeoFilePick,
+  usableShapes,
 } from '../../../services/geo-import'
+import type { GeoShape } from '../../../services/geo-file'
 
 // File in, file out, vehicle in, vehicle out -- and one badge saying whether
 // the screen and the aircraft agree.
@@ -33,18 +34,41 @@ export default function MissionToolbar() {
   const sourceName = useMissionStore((s) => s.sourceName)
   const clear = useMissionStore((s) => s.clear)
   const [busy, setBusy] = useState(false)
-  // A file with one shape in it is applied straight away; only a file that
-  // holds several has a question in it worth asking.
-  const [choosing, setChoosing] = useState<GeoFilePick | null>(null)
+  /**
+   * The two questions an import can raise.
+   *
+   * `fence` is the polygon type, which no file records. `mismatch` is a
+   * file with nothing of the kind being imported -- where the alternative
+   * to asking is doing nothing and not saying why. Everything else applies
+   * without a word.
+   */
+  const [ask, setAsk] = useState<{
+    kind: 'fence' | 'mismatch'
+    name: string
+    shapes: GeoShape[]
+  } | null>(null)
   const editing = useMissionStore((s) => s.editing)
   const setTransfer = useMissionStore((s) => s.setTransfer)
 
   const importGeo = async () => {
     const picked = await pickGeoFile()
     if (!picked) return
-    const only = picked.shapes.length === 1 ? picked.shapes[0] : null
-    if (only) setTransfer({ kind: 'done', text: applyGeoShape(only, picked.name) })
-    else setChoosing(picked)
+    const dest = destinationFor(editing)
+    const usable = usableShapes(picked.shapes, dest)
+    if (usable.length === 0) {
+      setAsk({ kind: 'mismatch', name: picked.name, shapes: picked.shapes })
+      return
+    }
+    if (dest === 'fence') {
+      setAsk({ kind: 'fence', name: picked.name, shapes: usable })
+      return
+    }
+    setTransfer({ kind: 'done', text: applyGeoShapes(usable, picked.name) })
+  }
+
+  const apply = (shapes: GeoShape[], name: string, opts: Parameters<typeof applyGeoShapes>[2]) => {
+    setTransfer({ kind: 'done', text: applyGeoShapes(shapes, name, opts) })
+    setAsk(null)
   }
 
   const run = async (fn: () => Promise<void>) => {
@@ -124,7 +148,7 @@ export default function MissionToolbar() {
           })
         }
       >
-        Import KML or GPX…
+        Import KML or GPX
       </LaButton>
       <LaButton
         variant="ghost"
@@ -158,56 +182,111 @@ export default function MissionToolbar() {
         <p className="app-col__note">{transfer.text}</p>
       ) : null}
 
-      {choosing && (
+      {ask?.kind === 'fence' && (
         <LaModal
           open
           narrow
-          title={`Import from ${choosing.name}`}
+          title={`${ask.shapes.length} ${ask.shapes.length === 1 ? 'area' : 'areas'} from ${ask.name}`}
           actions={
-            <LaButton variant="ghost" onClick={() => setChoosing(null)}>
-              Cancel
-            </LaButton>
+            <div className="la-prompt-actions">
+              <LaButton
+                variant="primary"
+                size="block"
+                onClick={() => apply(ask.shapes, ask.name, { inclusive: true })}
+              >
+                Keep the vehicle inside
+              </LaButton>
+              <LaButton
+                variant="secondary"
+                size="block"
+                onClick={() => apply(ask.shapes, ask.name, { inclusive: false })}
+              >
+                Keep the vehicle out
+              </LaButton>
+              <LaButton variant="ghost" size="block" onClick={() => setAsk(null)}>
+                Cancel
+              </LaButton>
+            </div>
           }
         >
-          {/* A list, not a stack of block buttons. The file holds several
-              shapes and the question is only which one -- where it goes was
-              settled by the plan on screen. */}
-          <p className="la-hint">Pick one.</p>
-          <div className="geo-pick">
-            {choosing.shapes.map((shape, i) => (
-              <button
-                key={i}
-                type="button"
-                className="geo-pick__item"
-                onClick={() => {
-                  setTransfer({ kind: 'done', text: applyGeoShape(shape, choosing.name) })
-                  setChoosing(null)
-                }}
-              >
-                <span className="geo-pick__name">{shape.name ?? KIND_WORDS[shape.kind]}</span>
-                {/* Each row says what it will become, not what it is: a
-                    file can hold a line and an area, and they do not go to
-                    the same place. */}
-                <span className="geo-pick__meta">
-                  {DESTINATION_WORDS[destinationFor(shape, editing)]} · {shape.fixes.length}
-                </span>
-              </button>
-            ))}
-          </div>
+          <p className="la-hint">A file cannot say which kind of fence it is.</p>
         </LaModal>
+      )}
+
+      {ask?.kind === 'mismatch' && (
+        <MismatchPrompt
+          name={ask.name}
+          shapes={ask.shapes}
+          editing={editing}
+          onUse={(shapes, opts) => apply(shapes, ask.name, opts)}
+          onCancel={() => setAsk(null)}
+        />
       )}
     </div>
   )
 }
 
-const DESTINATION_WORDS = {
-  waypoints: 'waypoints',
-  survey: 'survey area',
-  fence: 'fence',
-  rally: 'rally points',
-} as const
+/**
+ * The file has nothing of the kind being imported.
+ *
+ * Rather than "nothing to import", it names what is in there and offers the
+ * nearest sensible thing -- an area while planning a mission is a survey
+ * boundary, a line while editing a fence is a boundary drawn open.
+ */
+function MismatchPrompt({
+  name,
+  shapes,
+  editing,
+  onUse,
+  onCancel,
+}: {
+  name: string
+  shapes: GeoShape[]
+  editing: PlanKind
+  onUse: (shapes: GeoShape[], opts: Parameters<typeof applyGeoShapes>[2]) => void
+  onCancel: () => void
+}) {
+  const areas = shapes.filter((s) => s.kind === 'polygon')
+  const lines = shapes.filter((s) => s.kind !== 'polygon')
+  const offer =
+    editing === 'fence' && lines.length > 0
+      ? { label: 'Use as a fence anyway', shapes: lines, opts: { as: 'fence' as const } }
+      : editing === 'mission' && areas.length > 0
+        ? { label: 'Use as a survey area', shapes: areas, opts: { as: 'survey' as const } }
+        : null
 
-const KIND_WORDS = { track: 'Line', points: 'Points', polygon: 'Area' } as const
+  return (
+    <LaModal
+      open
+      narrow
+      title={`Nothing to import from ${name}`}
+      actions={
+        <div className="la-prompt-actions">
+          {offer && (
+            <LaButton
+              variant="primary"
+              size="block"
+              onClick={() => onUse(offer.shapes, offer.opts)}
+            >
+              {offer.label}
+            </LaButton>
+          )}
+          <LaButton variant="ghost" size="block" onClick={onCancel}>
+            Cancel
+          </LaButton>
+        </div>
+      }
+    >
+      <p className="la-hint">
+        {shapes.length === 0
+          ? 'It holds no routes, points or areas.'
+          : editing === 'fence'
+            ? 'It holds lines and points, not closed areas.'
+            : 'It holds closed areas, not routes.'}
+      </p>
+    </LaModal>
+  )
+}
 
 /** An export name, reusing the loaded one where there was one. */
 function exchangeName(source: string | null, ext: 'kml' | 'gpx'): string {

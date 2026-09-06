@@ -1,7 +1,7 @@
 import { newUid, type MissionPlan, type PlanItem } from '../protocol/mission-plan'
 import { newFenceUid } from '../protocol/geofence'
 import { commandLabel } from '../protocol/mission-commands'
-import { useMissionStore } from '../stores/mission-store'
+import { useMissionStore, type PlanKind } from '../stores/mission-store'
 import {
   fitPath,
   parseGeoFile,
@@ -14,12 +14,16 @@ import {
 
 // KML and GPX, joined to the three plans Mission mode edits.
 //
-// What an imported shape *means* is decided by what is being edited, not by
-// what the shape is: the same polygon is a survey area while planning a
-// mission and a geofence while editing the fence. That is the rule the rest
-// of Mission mode already follows -- the switch changes what things mean --
-// and it removes a dialog that would otherwise ask a question the screen has
-// already answered.
+// What an import *means* is decided by what is being edited, not by what is
+// in the file: on Mission it is waypoints, on Fence it is boundaries, on
+// Rally it is alternates. That is the rule the rest of Mission mode already
+// follows -- the switch changes what things mean -- and it is why the
+// ordinary import asks nothing at all.
+//
+// Only two questions are worth a dialog, and neither is "which shape":
+// whether a fence keeps the vehicle in or out, which the file cannot say;
+// and what to do when the file holds nothing of the kind being imported,
+// where the alternative to asking is doing nothing and not saying why.
 //
 // Everything is capped and simplified on the way in. A GPX track is a fix a
 // second, ArduPilot's mission storage is not, and importing an hour's walk
@@ -40,21 +44,23 @@ export interface GeoFilePick {
   shapes: GeoShape[]
 }
 
-/**
- * Where a shape goes, given what is being edited.
- *
- * A line drawn in Google Earth is a boundary when the fence is on screen and
- * a route when the mission is; a polygon is a survey area while planning and
- * a fence while fencing. Nobody is asked, because the question was answered
- * by opening that plan.
- */
-export function destinationFor(
-  shape: GeoShape,
-  editing: 'mission' | 'fence' | 'rally',
-): GeoDestination {
+/** What is being edited decides what an import becomes. */
+export function destinationFor(editing: PlanKind): GeoDestination {
   if (editing === 'fence') return 'fence'
   if (editing === 'rally') return 'rally'
-  return shape.kind === 'polygon' ? 'survey' : 'waypoints'
+  return 'waypoints'
+}
+
+/**
+ * The shapes in a file that suit where they are going.
+ *
+ * A fence wants closed areas; a mission wants lines and points. A file
+ * routinely holds both -- a route drawn beside the paddock it crosses --
+ * and taking the wrong one is worse than taking none.
+ */
+export function usableShapes(shapes: readonly GeoShape[], dest: GeoDestination): GeoShape[] {
+  if (dest === 'fence') return shapes.filter((s) => s.kind === 'polygon')
+  return shapes.filter((s) => s.kind !== 'polygon')
 }
 
 const toWire = (f: GeoFix) => ({ x: Math.round(f.lat * 1e7), y: Math.round(f.lon * 1e7) })
@@ -70,40 +76,67 @@ function homeAmsl(plan: MissionPlan): number | null {
   return plan.home && plan.home.z !== 0 ? plan.home.z : null
 }
 
-/** Applies a shape to whichever plan is being edited. Returns a summary. */
-export function applyGeoShape(shape: GeoShape, fileName: string): string {
+export interface ApplyOptions {
+  /** Fences only: keep the vehicle in, or out. The file cannot say. */
+  inclusive?: boolean
+  /** Force a destination the shapes would not otherwise go to. */
+  as?: GeoDestination
+}
+
+/**
+ * Apply every shape at once.
+ *
+ * Several tracks become one route rather than a choice: a path drawn in
+ * Google Earth comes back in the pieces it was drawn in, and stitching them
+ * in file order is what the person who drew them meant. Several polygons
+ * become several fence shapes, which is what a fence is made of.
+ */
+export function applyGeoShapes(
+  shapes: readonly GeoShape[],
+  fileName: string,
+  opts: ApplyOptions = {},
+): string {
   const store = useMissionStore.getState()
-  const dest = destinationFor(shape, store.editing)
-  const from = shape.fixes.length
+  const dest = opts.as ?? destinationFor(store.editing)
+  const from = shapes.reduce((n, s) => n + s.fixes.length, 0)
   const said = (kept: number, what: string) =>
     kept < from ? `${what} (simplified from ${from} points)` : what
 
   if (dest === 'fence') {
-    const fixes = fitPath(shape.fixes, MAX_FENCE_POINTS)
-    store.setFence({
-      ...store.fence,
-      shapes: [
-        ...store.fence.shapes,
-        { uid: newFenceUid(), kind: 'polygon', inclusive: true, points: fixes.map(toWire) },
-      ],
-    })
-    return said(fixes.length, `Added a ${fixes.length}-point fence polygon`)
+    const added = shapes.map((shape) => ({
+      uid: newFenceUid(),
+      kind: 'polygon' as const,
+      inclusive: opts.inclusive ?? true,
+      points: fitPath(shape.fixes, MAX_FENCE_POINTS).map(toWire),
+    }))
+    store.setFence({ ...store.fence, shapes: [...store.fence.shapes, ...added] })
+    const points = added.reduce((n, a) => n + a.points.length, 0)
+    return said(
+      points,
+      `Added ${added.length} fence ${added.length === 1 ? 'polygon' : 'polygons'}`,
+    )
   }
 
   if (dest === 'rally') {
-    const fixes = fitPath(shape.fixes, MAX_RALLY_POINTS)
+    const fixes = fitPath(
+      shapes.flatMap((s) => s.fixes),
+      MAX_RALLY_POINTS,
+    )
     for (const f of fixes) store.addRally(toWire(f))
     return said(fixes.length, `Added ${fixes.length} rally points`)
   }
 
   if (dest === 'survey') {
-    const fixes = fitPath(shape.fixes, MAX_SURVEY_POINTS)
+    const fixes = fitPath(shapes[0]?.fixes ?? [], MAX_SURVEY_POINTS)
     store.startSurvey()
     for (const f of fixes) useMissionStore.getState().addSurveyVertex(toWire(f))
     return said(fixes.length, `Drew a ${fixes.length}-corner survey area`)
   }
 
-  const fixes = fitPath(shape.fixes, MAX_IMPORT_ITEMS)
+  const fixes = fitPath(
+    shapes.flatMap((s) => s.fixes),
+    MAX_IMPORT_ITEMS,
+  )
   const { frame, altM } = store.defaults
   const base = homeAmsl(store.plan)
   const items: PlanItem[] = fixes.map((f) => ({
