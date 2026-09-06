@@ -146,11 +146,13 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
         <span className="mission-palette__label">Survey</span>
       </button>
 
-      {/* Home arms placement like every other tool, and while it is armed it
-          offers the other way of answering the same question. A button of its
-          own said the two were separate jobs and cost the strip a row for the
-          rarer of them; it still cannot live on the home marker, because the
-          whole point is reaching it before a home exists. */}
+      {/* Home arms placement like every other tool, and while it is armed a
+          second tile appears beside it with the other way of answering the
+          same question. A permanent row of its own said the two were separate
+          jobs and cost the strip a row for the rarer of them; it still cannot
+          live on the home marker, because the whole point is reaching it
+          before a home exists. The tile is the palette's own chrome so it
+          reads as the strip growing an option, not as a menu opening. */}
       <button
         ref={homeRef}
         type="button"
@@ -171,24 +173,24 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
         <span className="mission-palette__label">Home</span>
       </button>
       {tool === HOME_TOOL && homePos && (
-        <div
-          className="mission-palette__menu mission-palette__menu--tight"
-          role="menu"
-          style={homePos}
-        >
-          <p className="mission-palette__hint">Click the map to place it, or</p>
+        <div className="mission-palette mission-palette--flyout" role="menu" style={homePos}>
           <button
             type="button"
             role="menuitem"
-            className="mission-palette__item"
+            className="mission-palette__btn"
             disabled={!connected}
-            title={connected ? undefined : 'Connect a vehicle to copy its position'}
+            title={
+              connected
+                ? "Put home at the vehicle's position instead of clicking the map"
+                : 'Connect a vehicle to copy its position'
+            }
             onClick={() => {
               onTool(null)
               homeFromVehicle()
             }}
           >
-            Use the vehicle's position
+            <FromVehicleIcon />
+            <span className="mission-palette__label">From vehicle</span>
           </button>
         </div>
       )}
@@ -320,6 +322,20 @@ function SurveyIcon() {
     <svg {...box} aria-hidden="true">
       <path d="M4 5h16v14H4z" {...stroke} />
       <path d="M7 5v14M12 5v14M17 5v14" {...stroke} strokeDasharray="2 3" />
+    </svg>
+  )
+}
+
+// A home under a fix: the Home tool's own roof, with the satellite ticks
+// that say where the position came from -- so the pair reads as two ways to
+// answer one question rather than as two different things.
+function FromVehicleIcon() {
+  return (
+    <svg {...box} aria-hidden="true">
+      <path d="M4 13.5 12 7l8 6.5" {...stroke} />
+      <path d="M6.5 12.5V20h11v-7.5" {...stroke} />
+      <circle cx="12" cy="16" r="1.6" fill="currentColor" />
+      <path d="M12 2v2.5M8.6 3.2l1 2.1M15.4 3.2l-1 2.1" {...stroke} />
     </svg>
   )
 }

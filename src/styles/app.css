@@ -1400,6 +1400,17 @@
   text-align: center;
 }
 
+/* Home's alternative, floated beside the armed button as one more tile of
+   the same strip. Fixed and placed from the button's rect for the reason the
+   More menu is: the palette is a scroll box, and an absolutely positioned
+   child of one is clipped to it. */
+.mission-palette--flyout {
+  position: fixed;
+  z-index: 901;
+  max-height: none;
+  overflow: visible;
+}
+
 .mission-palette__more {
   position: relative;
 }
@@ -1419,22 +1430,6 @@
   border-radius: var(--la-radius-sm);
   box-shadow: var(--la-shadow-2);
 }
-/* Home's one alternative, rather than the twenty-one commands the More menu
-   holds -- so it takes its width from its content instead of the fixed 210. */
-.mission-palette__menu--tight {
-  width: auto;
-  max-width: 220px;
-}
-.mission-palette__hint {
-  margin: 0 0 var(--la-space-1);
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-3);
-}
-.mission-palette__item:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 .mission-palette__group + .mission-palette__group {
   margin-top: var(--la-space-2);
 }
