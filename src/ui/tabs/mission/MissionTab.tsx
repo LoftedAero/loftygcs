@@ -112,9 +112,10 @@ export default function MissionTab() {
               {/* Beside the rows they stamp, not in the settings column:
                   every row below carries whatever these two said when it was
                   placed, and that is easier to believe when both are in one
-                  glance. Only on the mission -- a fence has no altitude and
-                  a rally point sets its own. */}
-              {editing === 'mission' && <NewItemDefaults />}
+                  glance. On every plan, because this pane is the mission list
+                  whichever plan is selected -- and the altitude is live on
+                  Rally too, where a new point is placed at it. */}
+              <NewItemDefaults />
               <span className="la-grow" />
               {/* Centered between the count and the switch: it is the one
                   thing on this header that is a problem, and it reads as

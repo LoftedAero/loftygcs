@@ -1419,6 +1419,22 @@
   border-radius: var(--la-radius-sm);
   box-shadow: var(--la-shadow-2);
 }
+/* Home's one alternative, rather than the twenty-one commands the More menu
+   holds -- so it takes its width from its content instead of the fixed 210. */
+.mission-palette__menu--tight {
+  width: auto;
+  max-width: 220px;
+}
+.mission-palette__hint {
+  margin: 0 0 var(--la-space-1);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+.mission-palette__item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .mission-palette__group + .mission-palette__group {
   margin-top: var(--la-space-2);
 }
@@ -1490,6 +1506,12 @@
   font-size: var(--la-size-xs);
   color: var(--la-ink-3);
   white-space: nowrap;
+}
+/* The unit belongs to the field before it, so the next label needs more air
+   than the 4px rhythm gives -- "m Altitude mode" otherwise reads as one
+   phrase. */
+.mission-defaults__unit + .mission-defaults__label {
+  margin-left: var(--la-space-3);
 }
 .mission-defaults__alt {
   width: 64px;

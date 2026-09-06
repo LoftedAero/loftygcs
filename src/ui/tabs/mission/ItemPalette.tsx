@@ -53,6 +53,10 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const moreRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
+  // Home's alternative, offered while its tool is armed rather than as a
+  // button of its own -- see below.
+  const [homePos, setHomePos] = useState<{ left: number; top: number } | null>(null)
+  const homeRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!moreOpen) return
@@ -142,38 +146,52 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
         <span className="mission-palette__label">Survey</span>
       </button>
 
+      {/* Home arms placement like every other tool, and while it is armed it
+          offers the other way of answering the same question. A button of its
+          own said the two were separate jobs and cost the strip a row for the
+          rarer of them; it still cannot live on the home marker, because the
+          whole point is reaching it before a home exists. */}
       <button
+        ref={homeRef}
         type="button"
         className={`mission-palette__btn${tool === HOME_TOOL ? ' is-armed' : ''}`}
         aria-pressed={tool === HOME_TOOL}
+        aria-haspopup="menu"
         title="Place the planned home position"
-        onClick={() => onTool(tool === HOME_TOOL ? null : HOME_TOOL)}
+        onClick={() => {
+          const armed = tool === HOME_TOOL
+          if (!armed) {
+            const r = homeRef.current?.getBoundingClientRect()
+            if (r) setHomePos({ left: r.right + 8, top: r.top })
+          }
+          onTool(armed ? null : HOME_TOOL)
+        }}
       >
         <HomeIcon />
         <span className="mission-palette__label">Home</span>
       </button>
-
-      {/* Beside the tool that places home by hand, because at the field it
-          is the same job done the easy way -- and it has to be reachable
-          before a home exists, which rules out putting it on the marker
-          with the altitude. Nothing copies the vehicle's home on its own. */}
-      <button
-        type="button"
-        className="mission-palette__btn"
-        disabled={!connected}
-        title={
-          connected
-            ? "Put planned home at the vehicle's position"
-            : 'Connect a vehicle to copy its position'
-        }
-        onClick={() => {
-          onTool(null)
-          homeFromVehicle()
-        }}
-      >
-        <FromVehicleIcon />
-        <span className="mission-palette__label">From vehicle</span>
-      </button>
+      {tool === HOME_TOOL && homePos && (
+        <div
+          className="mission-palette__menu mission-palette__menu--tight"
+          role="menu"
+          style={homePos}
+        >
+          <p className="mission-palette__hint">Click the map to place it, or</p>
+          <button
+            type="button"
+            role="menuitem"
+            className="mission-palette__item"
+            disabled={!connected}
+            title={connected ? undefined : 'Connect a vehicle to copy its position'}
+            onClick={() => {
+              onTool(null)
+              homeFromVehicle()
+            }}
+          >
+            Use the vehicle's position
+          </button>
+        </div>
+      )}
 
       <div className="mission-palette__more" ref={moreRef}>
         <button
@@ -302,19 +320,6 @@ function SurveyIcon() {
     <svg {...box} aria-hidden="true">
       <path d="M4 5h16v14H4z" {...stroke} />
       <path d="M7 5v14M12 5v14M17 5v14" {...stroke} strokeDasharray="2 3" />
-    </svg>
-  )
-}
-
-// A home under a fix: the same roof as the Home tool, with the satellite
-// crosshair that says where the position came from.
-function FromVehicleIcon() {
-  return (
-    <svg {...box} aria-hidden="true">
-      <path d="M4 12.5 12 6l8 6.5" {...stroke} />
-      <path d="M6.5 11.5V20h11v-8.5" {...stroke} />
-      <circle cx="12" cy="15.5" r="1.6" fill="currentColor" />
-      <path d="M12 2.5v2M8.5 3.5l1 1.7M15.5 3.5l-1 1.7" {...stroke} />
     </svg>
   )
 }

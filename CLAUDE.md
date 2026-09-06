@@ -90,10 +90,12 @@ design decisions are recorded there and in code comments.
   full-width text buttons in the far column looked like a different application from the mission
   screen beside it. The column is for what *persists* — vehicle actions, files, and the handful of
   vehicle parameters mission planning needs. Things that are not that went where they belong:
-  home is a point on the map, so its altitude is edited from its own marker's popup and
-  "From vehicle" is a palette button (it has to work before a home exists, which the popup
-  cannot); default altitude and altitude frame stamp the *next* item placed, so they sit on the
-  item list's header beside the rows they produced. A Leaflet popup holding real controls must
+  home is a point on the map, so its altitude is edited from its own marker's popup, and
+  "use the vehicle's position" is a flyout off the palette's Home button — armed-state, not a
+  row of its own, but still on the palette rather than the marker, because the whole point is
+  reaching it before a home exists; default altitude and altitude frame stamp the *next* item
+  placed, so they sit on the item list's header, on every plan, because that pane is the mission
+  list whichever plan is selected. A Leaflet popup holding real controls must
   stop click, scroll and keydown propagation or the map pans on arrow keys and drags on a swipe;
   and because every plan edit rebuilds the marker layer, an open popup has to be noted before the
   clear and reopened after, or typing an altitude dismisses the field it was typed into. Three copies had already drifted — Clear in two

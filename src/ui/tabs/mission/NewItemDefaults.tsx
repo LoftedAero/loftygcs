@@ -13,6 +13,10 @@ import { MAV_FRAMES } from '../../../protocol/mission-commands'
 // the column is where you look for what to *do*, not for what the next
 // click will be worth.
 //
+// Shown on all three plans, because the list under them is always the
+// mission list whichever plan is being edited -- and the altitude is live on
+// Rally as well, where a new point is placed at it.
+//
 // The vehicle has never heard of either: they are editor settings, and
 // changing one does not touch an item already placed.
 
@@ -24,7 +28,7 @@ export default function NewItemDefaults() {
   return (
     <div className="mission-defaults">
       <label className="mission-defaults__label" htmlFor="mission-alt">
-        New items
+        Default altitude
       </label>
       <LaInput
         num
@@ -32,11 +36,16 @@ export default function NewItemDefaults() {
         className="mission-defaults__alt"
         type="number"
         min={0}
-        title="The altitude a newly placed item gets"
+        title="The altitude a newly placed waypoint or rally point gets"
         value={Math.round(toDistance(defaults.altM, units.distance))}
-        onChange={(e) => setDefaults({ altM: fromDistance(Number(e.target.value), units.distance) })}
+        onChange={(e) =>
+          setDefaults({ altM: fromDistance(Number(e.target.value), units.distance) })
+        }
       />
       <span className="mission-defaults__unit">{distanceLabel(units.distance)}</span>
+      <label className="mission-defaults__label" htmlFor="mission-frame">
+        Altitude mode
+      </label>
       {/* The short names, because the header has no room for "Above mean sea
           level" -- and they are the same short names the rows below use, so
           the setting and its result read alike. The long form is on hover. */}
