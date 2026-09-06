@@ -238,7 +238,13 @@ design decisions are recorded there and in code comments.
   server is built from. Zoom 12 is deliberate: that is SRTM's own ~38 m resolution, and more
   zoom resamples the same measurements while downloading sixteen times as much. One tile covers
   about ten kilometers, so a field is one or two and the offline download brings terrain along
-  for nothing. Three traps, all in `services/mission-terrain.ts` with tests: MAVLink's three
+  for nothing — and **the mission map's settled view prefetches its own elevation**
+  (`prefetchTerrainForView`), because imagery storing itself on the way past had made a
+  half-promise: pan your field at home and the map works offline, but the profile there read
+  "unavailable", since nothing ever *displays* an elevation tile to store. Unlike the imagery
+  this is genuine speculative fetching, defensible only because it stays tiny: fixed zoom,
+  already-stored tiles skipped, the area cap returning nothing for a continent, one run at a
+  time coalescing to the newest view, paused during a manual download. Three traps, all in `services/mission-terrain.ts` with tests: MAVLink's three
   altitude frames have to be converted to one datum before anything is drawn or compared — a
   terrain-frame 50 and a relative 50 are different heights, and drawing them at the same place
   hides exactly the mistake a profile exists to catch; clearance must be sampled *between*

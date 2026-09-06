@@ -18,6 +18,7 @@ import { layerById, loadBaseLayer } from '../flight/map-layers'
 import {
   TERRAIN_LAYER_ID,
   TERRAIN_URL,
+  prefetchTerrainForView,
   terrainCoverage,
   terrainTilesForArea,
 } from '../../../services/terrain'
@@ -89,6 +90,16 @@ export default function OfflineMapsPanel({
   useEffect(() => {
     void cacheStats().then(setStats)
   }, [cacheRev])
+
+  // Elevation follows the view the way imagery follows a pan: the settled
+  // bounds prefetch their own terrain, so a field looked at from home has a
+  // working profile at the no-signal field. Deduped and capped in the
+  // service; paused during a manual download, which fetches the same tiles
+  // itself, and caught up when it ends.
+  const downloading = progress !== null
+  useEffect(() => {
+    if (bounds && !downloading) void prefetchTerrainForView(bounds)
+  }, [bounds, downloading])
 
   // Terrain is a separate question from the map's own coverage: it is one
   // zoom level of very large tiles, so an area can have every scrap of

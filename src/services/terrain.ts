@@ -1,11 +1,5 @@
-import { getTile, hasTile, putTile } from './tile-cache'
-import {
-  countTiles,
-  tilesForBounds,
-  tileUrl,
-  type LatLonBounds,
-  type TileCoord,
-} from './tile-math'
+import { getTile, hasTile, prefetchTiles, putTile } from './tile-cache'
+import { countTiles, tilesForBounds, tileUrl, type LatLonBounds, type TileCoord } from './tile-math'
 import {
   decodeElevation,
   gridKey,
@@ -178,6 +172,45 @@ export function terrainTilesForArea(bounds: LatLonBounds): TileCoord[] {
   // visible pause on the way to answering "no".
   if (countTiles(bounds, TERRAIN_ZOOM, TERRAIN_ZOOM) > MAX_AREA_TERRAIN_TILES) return []
   return tilesForBounds(bounds, TERRAIN_ZOOM, TERRAIN_ZOOM)
+}
+
+/**
+ * Keep elevation for wherever the mission map is looking.
+ *
+ * The imagery stores itself as a side effect of being drawn, which made a
+ * half-promise: pan your field at home and the *map* works at the no-signal
+ * field, but the terrain profile there reads "unavailable", because nothing
+ * ever displayed an elevation tile to store on the way past. So the settled
+ * view prefetches its own -- genuine speculative fetching, unlike the
+ * imagery, and cheap by construction: terrain is one fixed zoom whose tiles
+ * span ten kilometers, so a session touches a handful, already-stored ones
+ * are skipped, and the area cap returns nothing for a continent.
+ *
+ * One run at a time, remembering only the newest ask: pans settle faster
+ * than fetches finish, and a queue of every intermediate view would fetch
+ * ground nobody stopped on.
+ */
+let nextView: LatLonBounds | null = null
+let prefetching = false
+
+export async function prefetchTerrainForView(bounds: LatLonBounds): Promise<void> {
+  nextView = bounds
+  if (prefetching) return
+  prefetching = true
+  try {
+    while (nextView) {
+      const view = nextView
+      nextView = null
+      const tiles = terrainTilesForArea(view)
+      if (tiles.length > 0) {
+        // Two at a time: this is background courtesy traffic, not a download
+        // anyone is watching.
+        await prefetchTiles(TERRAIN_LAYER_ID, TERRAIN_URL, tiles, () => {}, undefined, 2)
+      }
+    }
+  } finally {
+    prefetching = false
+  }
 }
 
 export interface TerrainCoverage {
