@@ -670,12 +670,17 @@
    map in order to say it is fine, and the thing anyone is looking for here
    is the hole. The hatch is drawn with a gradient rather than an image so
    it costs no request and scales with the tile. */
-/* The stored-tiles toggle and the whole-store count, one row. */
+/* The stored-tiles toggle and the whole-store count, one row. The count
+   keeps a breath of air off the card edge -- right-aligned grey text flush
+   against a border reads as clipped -- and the row may wrap, so a count
+   grown past any estimate drops under the toggle instead of overflowing. */
 .offline-stored {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--la-space-2);
+  flex-wrap: wrap;
+  padding-right: var(--la-space-2);
 }
 .offline-stored__count {
   font-size: var(--la-size-xs);
