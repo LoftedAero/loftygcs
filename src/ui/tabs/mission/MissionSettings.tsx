@@ -43,8 +43,14 @@ export default function MissionSettings() {
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const [homeNote, setHomeNote] = useState<string | null>(null)
 
+  // A fragment, not a nested `.app-col`. It was the only section in this
+  // column wrapped in a column of its own, which gave it 12px of padding
+  // nothing else had and -- because the padding is the wrapper's, not the
+  // sections' -- put its own three groups on a 16px rhythm while everything
+  // above them sat flush. The visible symptom was Load/save and Home
+  // location touching.
   return (
-    <div className="app-col">
+    <>
       <section className="app-col__group">
         <h3 className="app-col__head">Home location</h3>
         {home ? (
@@ -122,7 +128,7 @@ export default function MissionSettings() {
       </section>
 
       <RadiusParams />
-    </div>
+    </>
   )
 }
 

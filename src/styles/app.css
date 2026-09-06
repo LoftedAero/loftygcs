@@ -1678,10 +1678,21 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
+  /* The actions column's own rhythm, applied once here rather than by each
+     section. Sections used to stack flush, so the only spacing in the column
+     came from the one panel that wrapped itself in a nested `.app-col` -- and
+     the join between the two regimes was two headings touching. */
+  gap: var(--la-space-4);
 }
+/* A tray, not the end of the list. The scroll above it cuts whatever is
+   there mid-button, and against an identical background that reads as a
+   broken panel rather than as a boundary -- so the foot takes the second
+   surface and says which side of the edge it is on. */
 .mission-side__foot {
   flex: none;
+  padding-top: var(--la-space-2);
   border-top: 1px solid var(--la-line);
+  background: var(--la-surface-2);
 }
 
 @media (max-width: 1100px) {
@@ -3901,12 +3912,12 @@ body.is-splitting .flight-map {
   overflow: hidden;
   background: var(--la-surface);
 }
-/* The column stacks its groups with no gap of its own, so the switch sat
-   directly on the headrow beneath it and its badge -- which is a tall pill
-   at the top of that row -- came within a couple of pixels. This is the
-   actions column's own rhythm, applied to the one child that had none. */
+/* The switch used to need a margin of its own, because the column stacked
+   its groups flush and its badge -- a tall pill at the top of the next row --
+   came within a couple of pixels. The column now has a gap; this only stops
+   the switch stretching to the width of the buttons under it. */
 .mission-side .plan-switch {
-  margin-bottom: var(--la-space-4);
+  flex: none;
 }
 .plan-switch__btn {
   appearance: none;
