@@ -14,7 +14,15 @@
 // flown in the simulator without dragging every waypoint to Canberra. Taken
 // at boot, so it applies to every relaunch this run makes.
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, createWriteStream, renameSync } from 'node:fs'
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { get } from 'node:https'
 import path from 'node:path'
 
@@ -60,6 +68,66 @@ const RUNTIME = [
   'cygstdc++-6.dll',
   'cygwin1.dll',
 ]
+
+/**
+ * One supervisor at a time.
+ *
+ * The quick-exit guard catches a second runner started while the first is
+ * serving, because its simulator cannot bind 5760 and dies at once. It does
+ * not catch the case that actually happens: this SITL exits when its client
+ * disconnects, so between one connection and the next there is a window
+ * where the port really is free and a second runner binds it happily. Both
+ * then live, each relaunching its own simulator, and which one you reach
+ * depends on who won the last race -- with `--home`, that means a healthy
+ * simulator at somebody else's field.
+ *
+ * So the runner takes a lock rather than the port. A stale file from a
+ * runner that was killed outright is ignored, which is the common case:
+ * the check is whether that pid is still alive, not whether the file
+ * exists.
+ */
+function claimRunner(name) {
+  const lockFile = path.join(DIR, '.runner.pid')
+  const held = readPid(lockFile)
+  if (held !== null && held !== process.pid && isAlive(held)) {
+    console.error(
+      `Another ${name} SITL runner is already going (pid ${held}).\n` +
+        'Stop it first, or talk to the one it is already serving on 5760.',
+    )
+    process.exit(1)
+  }
+  writeFileSync(lockFile, String(process.pid))
+  let released = false
+  const release = () => {
+    if (released) return
+    released = true
+    // Only ever our own claim: a runner that took over after we were
+    // killed must not have its lock deleted by our exit handler.
+    if (readPid(lockFile) === process.pid) rmSync(lockFile, { force: true })
+  }
+  process.on('exit', release)
+  return release
+}
+
+function readPid(file) {
+  try {
+    const pid = Number(readFileSync(file, 'utf8').trim())
+    return Number.isInteger(pid) && pid > 0 ? pid : null
+  } catch {
+    return null
+  }
+}
+
+/** Signal 0 tests for existence without touching the process. */
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (err) {
+    // EPERM means it exists and belongs to someone else, which still counts.
+    return err?.code === 'EPERM'
+  }
+}
 
 function download(url, dest) {
   return new Promise((resolve, reject) => {
@@ -157,9 +225,50 @@ if (cmd === 'fetch') {
   // connections (each getting a freshly-booted vehicle). Ctrl+C ends it.
   if (home !== CMAC) console.log(`${name} SITL home: ${home}`)
 
+  const unlock = claimRunner(name)
+
   let stopping = false
-  process.on('SIGINT', () => {
+  /** The simulator we are supervising, so a signal can actually stop it. */
+  let running = null
+
+  /**
+   * Take the simulator down with us.
+   *
+   * Setting a flag is not enough. On Windows a Ctrl+C reaches this process
+   * but not reliably the grandchild behind npm's cmd.exe wrapper, and any
+   * other way of ending the runner -- a kill, an editor closing the
+   * terminal -- reaches it not at all. The simulator then keeps 5760, and
+   * the next run looks like a broken simulator: with --home, a second one
+   * silently leaves you connected to the first, at its own location.
+   *
+   * SIGTERM first, then TerminateProcess if it has not gone. Node maps
+   * kill() to TerminateProcess on Windows anyway, so the second one only
+   * matters on POSIX -- where a simulator wedged at boot does ignore the
+   * first.
+   */
+  const shutdown = () => {
     stopping = true
+    const child = running
+    running = null
+    unlock()
+    if (!child || child.exitCode !== null) process.exit(0)
+    const hard = setTimeout(() => child.kill('SIGKILL'), 2000)
+    child.on('exit', () => {
+      clearTimeout(hard)
+      process.exit(0)
+    })
+    child.kill()
+  }
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
+    // SIGBREAK is Windows' Ctrl+Break, and SIGHUP is what a closing
+    // terminal sends; neither is delivered by default on the other
+    // platform, and listening for an undeliverable one is harmless.
+    process.on(signal, shutdown)
+  }
+  // A crash in the supervisor must not leave a simulator behind either.
+  process.on('uncaughtException', (err) => {
+    console.error(err)
+    shutdown()
   })
   // A SITL that dies immediately never served anyone, so relaunching it is
   // an infinite loop that looks like it is working. The most common cause is
@@ -188,9 +297,11 @@ if (cmd === 'fetch') {
       ],
       { cwd: DIR, stdio: 'inherit' },
     )
+    running = child
     child.on('exit', () => {
       if (stopping) process.exit(0)
       if (Date.now() - startedAt < MIN_USEFUL_MS && ++quickExits >= 3) {
+        unlock()
         console.error(
           `${name} SITL keeps exiting at startup. Is another simulator already on 5760? ` +
             'With --home, a second one leaves you connected to the first, at its own location.',

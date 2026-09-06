@@ -28,6 +28,15 @@ design decisions are recorded there and in code comments.
   `--la-surface`, which is only white by coincidence in the light theme. Orange = the one primary action
   per region; blue = working controls; green/red = status only, never actions. Units go in
   `.la-field__unit`; validation goes in `.la-hint` beside the control.
+- **A renderer reload leaks whatever the main process is holding for it.** Link sockets and the
+  video receiver live in the main process and are closed one at a time by the renderer that
+  opened them, so a reload throws away the ids and the sockets stay open — and a *bound* one (a
+  UDP link, the video port) then refuses the next connection with EADDRINUSE on a machine where
+  nothing appears to be running. `main.ts` therefore drops that state on
+  `did-start-loading` and `render-process-gone` as well as on quit. The simulator is
+  deliberately exempt: it is a separate process serving a port, not renderer state, and
+  reloading the window is not a reason to end a flight.
+
 - **Electron security**: contextIsolation + sandbox stay on. The whole privileged surface is
   `electron/preload.ts`, mirrored by `src/types/loftgcs.d.ts` — change them together.
 - **Branding**: app identity lives in `src/brand.ts` only ("Loft GCS" is a working name).
@@ -367,8 +376,16 @@ Planner uses, into gitignored `sitl/`), then `npm run sitl` to start it — it s
 boots it at your own field instead of CMAC, so a mission planned on the map can be flown
 without dragging every waypoint to Canberra; the desktop app's Simulator card has the same
 field. Home is read at boot, so changing it means restarting. `SITL_HOME=... SITL=1 npm test`
-then asserts the vehicle really reports being there. **Do not check whether 5760 is free by
-binding it** — Windows lets a second bind succeed over a listening socket, so the probe says
+then asserts the vehicle really reports being there. **One runner at a time, enforced by a lock file**
+(`sitl/.runner.pid`): the quick-exit guard catches a second runner started while the first is
+*serving*, but this SITL exits when its client disconnects, so between one connection and the
+next there is a window where the port really is free and a second runner binds it happily.
+Both then live, each relaunching its own simulator, and which one you reach depends on who won
+the last race — with `--home`, a healthy simulator at somebody else's field. A lock whose pid
+is no longer alive is ignored, so a runner killed outright leaves nothing to clean up. Measured
+rather than assumed: killing the supervisor outright *does* take the simulator with it and free
+the port, so orphaning was never the problem — duplicate supervisors were. **Do not check
+whether 5760 is free by binding it** — Windows lets a second bind succeed over a listening socket, so the probe says
 "free" and you end up talking to the *previous* simulator at its own home; the runner instead
 gives up after three immediate exits and says so. `SITL=1 npm test` runs the integration suite against
 it (`src/protocol/*.integration.test.ts`, `electron/sitl-core.test.ts`). The desktop app can

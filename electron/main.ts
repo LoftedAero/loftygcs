@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, net, shell, session } from 'electron'
 import path from 'node:path'
-import { registerLinkIpc } from './ipc-links'
+import { closeAllLinks, registerLinkIpc } from './ipc-links'
 import { registerSitlIpc, stopSim } from './sitl'
 import { registerVideoHandlers, stopVideo } from './video'
 
@@ -34,6 +34,28 @@ function createWindow() {
   })
   mainWindow.setMenuBarVisibility(false)
   mainWindow.once('ready-to-show', () => mainWindow?.show())
+
+  /**
+   * A renderer that reloads has forgotten every link it opened.
+   *
+   * The sockets live here, in the main process, and are closed one id at a
+   * time by the renderer that opened them -- so a reload leaks them, and a
+   * bound UDP link keeps its port. The next connection then fails with
+   * EADDRINUSE on a machine where nothing appears to be running, which is
+   * the kind of thing that gets blamed on the autopilot. The video
+   * receiver is bound the same way and goes for the same reason.
+   *
+   * `did-start-loading` also fires for the first load, where there is
+   * nothing to close and this costs nothing. The simulator is deliberately
+   * left alone: it is a separate process serving a port, not renderer
+   * state, and reloading the window is not a reason to end a flight.
+   */
+  const dropRendererState = () => {
+    closeAllLinks()
+    stopVideo()
+  }
+  mainWindow.webContents.on('did-start-loading', dropRendererState)
+  mainWindow.webContents.on('render-process-gone', dropRendererState)
 
   mainWindow.webContents.session.on('select-serial-port', (event, portList, _wc, callback) => {
     event.preventDefault()
@@ -152,5 +174,14 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   stopSim()
   stopVideo()
+  closeAllLinks()
   if (process.platform !== 'darwin') app.quit()
+})
+
+// macOS keeps the app alive with no windows, so quitting is its own event
+// there rather than a consequence of the last window closing.
+app.on('before-quit', () => {
+  stopSim()
+  stopVideo()
+  closeAllLinks()
 })

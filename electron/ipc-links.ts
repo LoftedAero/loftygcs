@@ -81,3 +81,18 @@ export function registerLinkIpc(getWindow: () => BrowserWindow | null) {
     link?.close()
   })
 }
+
+/**
+ * Drop every link, whatever the renderer thinks it still has open.
+ *
+ * Links are closed one id at a time by the renderer that opened them, which
+ * covers the ordinary case and none of the others: a reload throws away the
+ * ids without closing anything, and the socket stays in this process
+ * holding its port. A UDP link is the one that bites -- it is *bound*, so
+ * the next connection after a reload cannot have the same port back and
+ * fails with EADDRINUSE, on a machine where nothing appears to be running.
+ */
+export function closeAllLinks() {
+  for (const link of links.values()) link.close()
+  links.clear()
+}
