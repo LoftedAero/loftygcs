@@ -7,9 +7,10 @@
 //  - Validation before upload. The vehicle answers a bad fence with one
 //    MAV_MISSION_ERROR and no clue which shape was wrong, so the check that
 //    can name the shape has to happen here.
-//  - An empty fence is uploaded as a clear, not as a zero-item mission. Some
-//    firmware treats a zero COUNT as a no-op, and a fence you think you
-//    deleted but the vehicle still enforces is the worst outcome available.
+//  - Removing a fence is not done here. Write always sends what is on the
+//    screen; emptying the vehicle is MISSION_CLEAR_ALL, in `plan-clear.ts`,
+//    shared with the other two plans -- and it is a deliberate choice a
+//    person makes, not something inferred from an empty editor.
 
 import { connectionService } from './connection'
 import { useMissionStore } from '../stores/mission-store'

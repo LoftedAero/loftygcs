@@ -1,10 +1,6 @@
 import { LaButton, LaInput, LaLinkButton, LaSelect } from '../../components/La'
 import { useUnits } from '../../../stores/preferences-store'
-import {
-  approachSlopes,
-  homeElevation,
-  type LegSlope,
-} from '../../../services/mission-terrain'
+import { approachSlopes, homeElevation, type LegSlope } from '../../../services/mission-terrain'
 import { useTerrain } from './use-terrain'
 import { distanceLabel, formatDistance, fromDistance, toDistance } from '../../../units'
 import { useMissionStore } from '../../../stores/mission-store'

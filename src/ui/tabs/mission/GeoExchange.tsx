@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LaButton, LaHint, LaModal } from '../../components/La'
 import { useMissionStore, type PlanKind } from '../../../stores/mission-store'
+import { openFromFile, saveToFile } from '../../../services/mission'
 import {
   applyGeoShapes,
   destinationFor,
@@ -12,7 +13,7 @@ import {
 } from '../../../services/geo-import'
 import type { GeoShape } from '../../../services/geo-file'
 
-// KML and GPX, for whichever plan is on screen.
+// Everything that reads or writes a file, for whichever plan is on screen.
 //
 // It sits outside the three per-plan panels on purpose. The whole design of
 // the import is that the switch above decides what a file means -- a route on
@@ -20,6 +21,11 @@ import type { GeoShape } from '../../../services/geo-file'
 // nonsense if the buttons only exist on one of them. They did at first: the
 // fence half of this was written and could not be reached, because the
 // toolbar holding it renders only while editing the mission.
+//
+// The mission's own .waypoints pair leads, because a native format keeps
+// everything and an interchange format keeps what it can. Only the mission
+// has one here: ArduPilot's .fence and .rally files are not read or written
+// yet, so those two plans travel as KML.
 
 const WORD: Record<PlanKind, string> = {
   mission: 'mission',
@@ -92,7 +98,28 @@ export default function GeoExchange() {
 
   return (
     <section className="app-col__group">
-      <h3 className="app-col__head">Import and export</h3>
+      <h3 className="app-col__head">Files</h3>
+
+      {editing === 'mission' && (
+        <>
+          <LaButton
+            variant="secondary"
+            size="block"
+            disabled={busy}
+            onClick={() => void openFromFile()}
+          >
+            Open from file
+          </LaButton>
+          <LaButton
+            variant="secondary"
+            size="block"
+            disabled={busy || !can.kml}
+            onClick={() => saveToFile(waypointsName(sourceName))}
+          >
+            Save to file
+          </LaButton>
+        </>
+      )}
 
       <LaButton variant="secondary" size="block" disabled={busy} onClick={onImport}>
         Import KML or GPX
@@ -231,4 +258,10 @@ function exchangeName(source: string | null, editing: PlanKind, ext: 'kml' | 'gp
   if (editing !== 'mission') return `${editing}.${ext}`
   if (!source || source === 'Vehicle') return `mission.${ext}`
   return `${source.replace(/\.[^.]+$/, '')}.${ext}`
+}
+
+/** A .waypoints name, reusing the loaded one where there was one. */
+function waypointsName(source: string | null): string {
+  if (!source || source === 'Vehicle') return 'mission.waypoints'
+  return source.replace(/\.(plan|txt|mission)$/i, '.waypoints')
 }

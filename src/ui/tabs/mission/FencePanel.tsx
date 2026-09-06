@@ -1,20 +1,15 @@
-import { useState } from 'react'
 import { useUnits } from '../../../stores/preferences-store'
 import { distanceLabel, fromDistance, toDistance } from '../../../units'
 import { LaButton, LaField, LaHint, LaInput } from '../../components/La'
-import { fenceDirty, useMissionStore, type FenceTool } from '../../../stores/mission-store'
-import { useConnectionStore } from '../../../stores/connection-store'
-import { readFence, writeFence } from '../../../services/geofence'
+import { useMissionStore, type FenceTool } from '../../../stores/mission-store'
 import { polygonAreaM2 } from '../../../protocol/survey'
 import { validateFence } from '../../../protocol/geofence'
 
-// The geofence column: transfer at the top, then the tools that draw, then
-// the shapes that exist.
+// The geofence column: the tools that draw, then the shapes that exist.
 //
-// Ordered the way the actions column is ordered everywhere else -- what you
-// do to the vehicle, then what you do to the plan, then what you set. Write
-// is the one orange action, because it is the one that changes what the
-// aircraft will refuse to fly past.
+// Read, write and clear are not here -- they are identical for all three
+// plans and live in PlanActions above, which is what keeps the three columns
+// looking like one screen. What is left is what only a fence has.
 
 const TOOLS: { id: FenceTool; label: string; hint: string }[] = [
   { id: 'inclusionPolygon', label: 'Inclusion area', hint: 'Stay inside this' },
@@ -26,10 +21,7 @@ const TOOLS: { id: FenceTool; label: string; hint: string }[] = [
 
 export default function FencePanel() {
   const units = useUnits()
-  const connected = useConnectionStore((s) => s.phase === 'connected')
   const fence = useMissionStore((s) => s.fence)
-  const synced = useMissionStore((s) => s.fenceSynced)
-  const dirty = useMissionStore(fenceDirty)
   const tool = useMissionStore((s) => s.fenceTool)
   const draft = useMissionStore((s) => s.fenceDraft)
   const selected = useMissionStore((s) => s.selectedShape)
@@ -39,70 +31,11 @@ export default function FencePanel() {
   const updateShape = useMissionStore((s) => s.updateShape)
   const selectShape = useMissionStore((s) => s.selectShape)
   const setReturn = useMissionStore((s) => s.setFenceReturn)
-  const setFence = useMissionStore((s) => s.setFence)
-  const transfer = useMissionStore((s) => s.transfer)
-  const [busy, setBusy] = useState(false)
-
-  const working = busy || transfer.kind === 'busy'
   const drawingPolygon = tool === 'inclusionPolygon' || tool === 'exclusionPolygon'
   const problems = validateFence(fence)
 
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true)
-    try {
-      await fn()
-    } catch {
-      // The store carries the message; the hint below shows it.
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <>
-      <section className="app-col__group">
-        <div className="app-col__headrow">
-          <h3 className="app-col__head">Fence</h3>
-          <span className={`mission-badge${dirty ? ' is-dirty' : synced ? ' is-synced' : ''}`}>
-            {!synced ? 'Not on vehicle' : dirty ? 'Modified' : 'Matches vehicle'}
-          </span>
-        </div>
-
-        <LaButton
-          variant="secondary"
-          size="block"
-          disabled={working || !connected}
-          onClick={() => void run(readFence)}
-        >
-          Read from vehicle
-        </LaButton>
-        <LaButton
-          variant="primary"
-          size="block"
-          disabled={working || !connected || problems.length > 0}
-          onClick={() => void run(writeFence)}
-        >
-          Write to vehicle
-        </LaButton>
-        {!connected && <LaHint>Connect a vehicle to read or write.</LaHint>}
-        {transfer.kind === 'error' && <LaHint error>{transfer.text}</LaHint>}
-        {transfer.kind === 'done' && <p className="app-col__note">{transfer.text}</p>}
-
-        <LaButton
-          variant="ghost"
-          size="block"
-          disabled={working || (fence.shapes.length === 0 && !fence.returnPoint)}
-          onClick={() => setFence({ shapes: [], returnPoint: null })}
-        >
-          Clear fence
-        </LaButton>
-        {/* Writing an empty fence is how a fence is removed, so say it --
-            clearing the screen alone leaves the vehicle still enforcing. */}
-        <LaHint>
-          Clearing only changes the screen. Write to remove the fence from the vehicle.
-        </LaHint>
-      </section>
-
       <section className="app-col__group">
         <h3 className="app-col__head">Add</h3>
         {TOOLS.map((t) => (

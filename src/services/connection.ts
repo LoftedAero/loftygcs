@@ -6,12 +6,7 @@ import { TransportManager } from '../transport'
 import { useInspectorStore } from '../stores/inspector-store'
 import type { TransportOptions } from '../transport/Transport'
 import { WorkerClient } from '../worker/worker-client'
-import type {
-  FirmwareVersion,
-  MissionItem,
-  ProtocolEvent,
-  TelemetryDelta,
-} from '../protocol/types'
+import type { FirmwareVersion, MissionItem, ProtocolEvent, TelemetryDelta } from '../protocol/types'
 import { modeName, vehicleTypeName } from '../protocol/modes'
 import { setConnectionState, useConnectionStore } from '../stores/connection-store'
 import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
@@ -153,9 +148,7 @@ class ConnectionService {
         for (const d of evt.batch) this.applyDelta(d)
         return
       case 'version': {
-        useVehicleStore
-          .getState()
-          .apply({ firmware: evt.firmware, capabilities: evt.capabilities })
+        useVehicleStore.getState().apply({ firmware: evt.firmware, capabilities: evt.capabilities })
         // The answer we were holding the metadata fetch for.
         if (this.metadataTimer) {
           clearTimeout(this.metadataTimer)
@@ -407,6 +400,13 @@ class ConnectionService {
     const worker = this.worker
     if (!worker) return Promise.reject(new Error('not connected'))
     return worker.uploadMission(items, missionType)
+  }
+
+  /** Forget the stored mission (or fence, or rally) entirely. */
+  clearMission(missionType = 0) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.clearMission(missionType)
   }
 
   /**

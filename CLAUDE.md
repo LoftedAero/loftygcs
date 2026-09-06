@@ -74,6 +74,16 @@ design decisions are recorded there and in code comments.
   polygon is N consecutive wire items whose only boundary marker is the vertex count each one
   repeats in param1, and the vehicle answers a bad fence with a single error code that names
   nothing — so `validateFence` runs before upload and names the shape itself.
+  **The column is one skeleton for all three**: `PlanActions` (read, write, clear, the badge and
+  the transfer note) and `GeoExchange` (files) render outside the per-plan panels, which are left
+  holding only what is peculiar to their plan. Three copies had already drifted — Clear in two
+  different places, a failed transfer in a hint on one screen and a note on another, progress
+  shown on one of the three — none of it decided. **Clearing always asks**, because clearing the
+  screen and clearing the aircraft are different acts and an empty plan cannot show which
+  happened: a fence cleared only on screen is still being enforced. The vehicle half is
+  MISSION_CLEAR_ALL (`services/plan-clear.ts`), covered for all three mission_types in
+  `sitl.integration.test.ts`; a refused clear leaves the screen alone, or the app would report a
+  vehicle with nothing on it while it still holds the old plan.
 - **Staged parameter edits belong to the page that made them.** Leaving a page with unwritten
   edits prompts (`ui-store`'s `pendingNav`), so a screen's column can own its own Write. The
   global action bar still carries Write for Setup tabs that have no column.

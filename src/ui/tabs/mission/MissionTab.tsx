@@ -9,7 +9,7 @@ import SurveyPanel from './SurveyPanel'
 import PlanKindSwitch from './PlanKindSwitch'
 import FencePanel from './FencePanel'
 import RallyPanel from './RallyPanel'
-import MissionToolbar from './MissionToolbar'
+import PlanActions from './PlanActions'
 import GeoExchange from './GeoExchange'
 import ItemPalette from './ItemPalette'
 import AltitudeProfile from './AltitudeProfile'
@@ -127,9 +127,12 @@ export default function MissionTab() {
         <aside className="mission-side">
           {/* First, because it decides what everything below it is about. */}
           <PlanKindSwitch />
+          {/* Read, write and clear are the same three actions on all three
+              plans, so they are one component in one place rather than a
+              copy per panel that drifts. */}
+          <PlanActions />
           {editing === 'mission' && (
             <>
-              <MissionToolbar />
               {/* Above the settings: while an area is being drawn it is what
                   the map clicks mean, so it should be the first thing in
                   reach. */}
@@ -139,7 +142,7 @@ export default function MissionTab() {
           )}
           {editing === 'fence' && <FencePanel />}
           {editing === 'rally' && <RallyPanel />}
-          {/* Outside the three panels above: a KML means whichever plan is
+          {/* Also outside the three panels: a file means whichever plan is
               selected, so the buttons have to exist on all of them. */}
           <GeoExchange />
           {/* Last in the column: preparing for a field with no signal is
