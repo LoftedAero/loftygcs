@@ -218,7 +218,7 @@ export default function OfflineMapsPanel({
           can, so the switch is next to the number rather than instead of
           it. */}
       <LaSwitch
-        label="Show what is stored"
+        label="Show stored tiles"
         checked={coverage}
         onChange={(e) => onCoverage(e.target.checked)}
       />
