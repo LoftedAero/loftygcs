@@ -41,8 +41,7 @@ export default function AltitudeProfile() {
   const plan = useMissionStore((s) => s.plan)
   const selected = useMissionStore((s) => s.selected)
   const select = useMissionStore((s) => s.select)
-  const terrainOn = useMissionStore((s) => s.terrain)
-  const terrain = useTerrain(plan, terrainOn)
+  const terrain = useTerrain(plan, true)
 
   const seqOf = useMemo(() => {
     const map = new Map<string, number>()

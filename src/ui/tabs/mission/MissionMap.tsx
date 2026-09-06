@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { LatLonBounds } from '../../../services/tile-math'
 import { createCachedTileLayer } from '../flight/cached-tile-layer'
 import { createCoverageLayer } from '../flight/coverage-layer'
+import { TERRAIN_ATTRIBUTION } from '../../../services/terrain'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMissionStore } from '../../../stores/mission-store'
@@ -242,6 +243,10 @@ export default function MissionMap({
     tileRef.current = createCachedTileLayer(spec).addTo(map)
     tileRef.current.setZIndex(0)
     saveBaseLayer(base)
+    // Credit for the elevation data sits with the imagery credit rather
+    // than in the actions column: it is the same kind of fact, and it was
+    // a line of small print beside controls people are trying to use.
+    map.attributionControl.addAttribution(TERRAIN_ATTRIBUTION)
   }, [base])
 
   // The coverage overlay is rebuilt with the base layer as well as with the

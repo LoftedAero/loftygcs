@@ -43,7 +43,6 @@ export type TransferState =
   | { kind: 'done'; text: string }
 
 const SPLIT_KEY = 'loftgcs.mission.split'
-const TERRAIN_KEY = 'loftgcs.mission.terrain'
 
 function loadSplit(): number {
   try {
@@ -55,17 +54,6 @@ function loadSplit(): number {
   // Two thirds map, one third table: the table is a list to glance at and
   // the map is the thing being worked on.
   return 0.67
-}
-
-// Ground elevation costs a couple of tile fetches and answers the question
-// the map cannot -- so it is on unless someone turns it off, the same way
-// the map itself is.
-function loadTerrainOn(): boolean {
-  try {
-    return localStorage.getItem(TERRAIN_KEY) !== 'off'
-  } catch {
-    return true
-  }
 }
 
 /**
@@ -101,9 +89,6 @@ export interface MissionState {
   /** Fraction of the height given to the map, above the items list. */
   split: number
   setSplit(ratio: number): void
-  /** Whether the profile draws the ground under the mission. */
-  terrain: boolean
-  setTerrain(on: boolean): void
 
   /**
    * The survey area being drawn, or null when not surveying. Held apart from
@@ -183,7 +168,6 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   transfer: { kind: 'idle' },
   sourceName: null,
   split: loadSplit(),
-  terrain: loadTerrainOn(),
   survey: null,
   editing: 'mission',
   fence: emptyFence(),
@@ -369,15 +353,6 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         ...(altM !== undefined ? { altM } : {}),
       },
     })
-  },
-
-  setTerrain(on) {
-    set({ terrain: on })
-    try {
-      localStorage.setItem(TERRAIN_KEY, on ? 'on' : 'off')
-    } catch {
-      // The choice just won't persist.
-    }
   },
 
   setSplit(ratio) {
