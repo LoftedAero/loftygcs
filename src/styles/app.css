@@ -1418,6 +1418,12 @@
   max-height: none;
   overflow: visible;
 }
+/* Overflowing a pixel is better than wrapping: a second line makes the tile
+   taller than the buttons it sits beside, which is the whole thing this was
+   sized to match. */
+.mission-palette--flyout .mission-palette__label {
+  white-space: nowrap;
+}
 
 .mission-palette__more {
   position: relative;

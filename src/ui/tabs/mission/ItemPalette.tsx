@@ -190,10 +190,14 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
             }}
           >
             <FromVehicleIcon />
-            {/* One word, so the tile is exactly a palette button's box --
-                "From vehicle" wrapped to two lines and made it taller than
-                everything it sits beside. The sentence is on the title. */}
-            <span className="mission-palette__label">Vehicle</span>
+            {/* One line, so the tile is exactly a palette button's box --
+                "From vehicle" wrapped to two and made it taller than
+                everything it sits beside. The preposition is what earns its
+                place: "Vehicle" alone is a noun with no verb, and "Current"
+                means the active mission item everywhere else in this app.
+                53px of the 56 there are; nowrap below keeps it one line if a
+                fallback font renders it wider. */}
+            <span className="mission-palette__label">At vehicle</span>
           </button>
         </div>
       )}
