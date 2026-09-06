@@ -19,6 +19,9 @@ import { CHANNEL_NAMES, PWM_MAX, PWM_MIN, type JoystickConfig } from '../../../p
 export default function JoystickPanel() {
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const pad = useJoystickStore((s) => s.pad)
+  const pads = useJoystickStore((s) => s.pads)
+  const deviceId = useJoystickStore((s) => s.deviceId)
+  const chooseDevice = useJoystickStore((s) => s.chooseDevice)
   const axes = useJoystickStore((s) => s.axes)
   const channels = useJoystickStore((s) => s.channels)
   const active = useJoystickStore((s) => s.active)
@@ -43,7 +46,31 @@ export default function JoystickPanel() {
     <div className="joystick-panel">
       <div className="joystick-panel__row">
         <span className="joystick-panel__label">Joystick</span>
-        <span className="joystick-panel__pad">{pad ? pad.id : 'no gamepad — press a button'}</span>
+
+        {/* One device needs no choosing; several do, and choosing for
+            someone is choosing which sticks they are holding. The list is
+            by the id the browser reports, because indices shuffle between
+            sessions. */}
+        {pads.length > 1 ? (
+          <LaSelect
+            aria-label="Which device to fly with"
+            className="joystick-panel__pick"
+            value={deviceId ?? ''}
+            disabled={active}
+            onChange={(e) => chooseDevice(e.target.value === '' ? null : e.target.value)}
+          >
+            <option value="">Choose a device…</option>
+            {pads.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.id}
+              </option>
+            ))}
+          </LaSelect>
+        ) : (
+          <span className="joystick-panel__pad">
+            {pad ? pad.id : 'no gamepad — press a button on it'}
+          </span>
+        )}
 
         <LaButton
           variant={active ? 'danger' : 'primary'}
@@ -68,6 +95,14 @@ export default function JoystickPanel() {
         ))}
         {active && <span className="joystick-panel__live">sending</span>}
       </div>
+
+      {pads.length > 1 && !pad && (
+        <LaHint>
+          {deviceId
+            ? 'That device is no longer attached. Choose another.'
+            : 'Several input devices are attached. Choose the one to fly with — nothing is read until you do.'}
+        </LaHint>
+      )}
 
       {message && <LaHint error={active === false}>{message}</LaHint>}
 

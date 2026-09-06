@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadTerrainTiles } from '../../../services/terrain'
+import { loadTerrainTiles, MAX_AREA_TERRAIN_TILES } from '../../../services/terrain'
 import { gridKey, terrainTilesFor, type TerrainGrids } from '../../../services/terrain-math'
 import { routeSamples, type RouteSample } from '../../../services/mission-terrain'
 import type { MissionPlan } from '../../../protocol/mission-plan'
@@ -25,7 +25,14 @@ const EMPTY: TerrainGrids = new Map()
 
 export function useTerrain(plan: MissionPlan, enabled: boolean): Terrain {
   const samples = useMemo(() => routeSamples(plan), [plan])
-  const tiles = useMemo(() => (enabled ? terrainTilesFor(samples) : []), [samples, enabled])
+  const tiles = useMemo(() => {
+    if (!enabled) return []
+    const needed = terrainTilesFor(samples)
+    // A mission drawn across a continent would ask for hundreds of tiles
+    // and tens of megabytes to draw a profile nobody could read. The same
+    // cap the offline download uses, for the same reason.
+    return needed.length > MAX_AREA_TERRAIN_TILES ? [] : needed
+  }, [samples, enabled])
   const key = useMemo(() => tiles.map(gridKey).sort().join(','), [tiles])
 
   const [grids, setGrids] = useState<TerrainGrids>(EMPTY)

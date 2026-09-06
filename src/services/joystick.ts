@@ -34,16 +34,41 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 let sendTimer: ReturnType<typeof setInterval> | null = null
 let listening = false
 
+/** Every device the browser will admit to, in its own index order. */
+function connectedPads(): Gamepad[] {
+  if (typeof navigator === 'undefined' || !navigator.getGamepads) return []
+  const out: Gamepad[] = []
+  // getGamepads() is a sparse array whose holes are meaningful: a pad's
+  // index is its slot, so the list is filtered rather than compacted.
+  for (const pad of navigator.getGamepads()) if (pad && pad.connected) out.push(pad)
+  return out
+}
+
+/**
+ * The device to read, or null when that is not decided.
+ *
+ * With one pad attached there is nothing to choose. With several -- a
+ * wheel, a HOTAS and a gamepad all sitting on the same desk -- picking the
+ * first is picking whichever the browser happened to enumerate first, and
+ * on this feature that means the sticks are somewhere other than where the
+ * screen says they are. So it stays null until someone says which, and
+ * `enable` refuses meanwhile.
+ */
+function chosenPad(): Gamepad | null {
+  const pads = connectedPads()
+  if (pads.length === 0) return null
+  const wanted = useJoystickStore.getState().deviceId
+  if (wanted !== null) return pads.find((p) => p.id === wanted) ?? null
+  return pads.length === 1 ? pads[0]! : null
+}
+
 function readPad(): { pad: Gamepad; state: PadState } | null {
-  if (typeof navigator === 'undefined' || !navigator.getGamepads) return null
-  for (const pad of navigator.getGamepads()) {
-    if (!pad || !pad.connected) continue
-    return {
-      pad,
-      state: { axes: [...pad.axes], buttons: pad.buttons.map((b) => b.pressed) },
-    }
+  const pad = chosenPad()
+  if (!pad) return null
+  return {
+    pad,
+    state: { axes: [...pad.axes], buttons: pad.buttons.map((b) => b.pressed) },
   }
-  return null
 }
 
 /** Start reading the pad for display. Nothing is sent until `enable`. */
@@ -52,14 +77,14 @@ export function startReading(): void {
   attachGuards()
   pollTimer = setInterval(() => {
     const store = useJoystickStore.getState()
+    const pads = connectedPads().map((p) => ({ index: p.index, id: p.id }))
     const found = readPad()
+    store.setPads(pads, found ? { index: found.pad.index, id: found.pad.id } : null)
     if (!found) {
-      if (store.pad) store.setPad(null)
+      // Losing the chosen device mid-flight is the unplug case whether the
+      // cable came out or the browser dropped it.
       if (store.active) stop('The gamepad was unplugged')
       return
-    }
-    if (store.pad?.index !== found.pad.index) {
-      store.setPad({ index: found.pad.index, id: found.pad.id })
     }
     store.setLive(
       found.state.axes as number[],
@@ -86,7 +111,11 @@ export function enable(): string | null {
   const store = useJoystickStore.getState()
   if (useConnectionStore.getState().phase !== 'connected') return 'Not connected to a vehicle'
   const found = readPad()
-  if (!found) return 'No gamepad found — press a button on it first'
+  if (!found) {
+    return connectedPads().length > 1
+      ? 'Several devices are attached — choose which one to fly with'
+      : 'No gamepad found — press a button on it first'
+  }
   if (!sticksAreSafe(found.state, store.config)) {
     return 'Center the sticks and put the throttle down first'
   }

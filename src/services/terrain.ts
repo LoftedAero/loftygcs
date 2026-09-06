@@ -1,5 +1,11 @@
-import { getTile, putTile } from './tile-cache'
-import { tilesForBounds, tileUrl, type LatLonBounds, type TileCoord } from './tile-math'
+import { getTile, hasTile, putTile } from './tile-cache'
+import {
+  countTiles,
+  tilesForBounds,
+  tileUrl,
+  type LatLonBounds,
+  type TileCoord,
+} from './tile-math'
 import {
   decodeElevation,
   gridKey,
@@ -25,8 +31,7 @@ import {
 // every caller has to draw the case where the answer is null. A profile
 // that silently invents ground is worse than one that says it has none.
 
-export const TERRAIN_URL =
-  'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+export const TERRAIN_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
 
 /** Its data sources require credit; the string travels with the source. */
 export const TERRAIN_ATTRIBUTION = 'Elevation: SRTM, USGS NED, GMTED via AWS Terrain Tiles'
@@ -146,10 +151,50 @@ export async function loadTerrainTiles(tiles: readonly TileCoord[]): Promise<Ter
 }
 
 /**
+ * As many terrain tiles as an area may ask for.
+ *
+ * A flying field is one or two, a county is a handful. The whole world at
+ * this zoom is 341,598 -- which is what the map shows before anyone has
+ * moved it, and what this cap exists for: without it, opening Mission mode
+ * asked the cache about every terrain tile on Earth (starving every other
+ * read on the page) and offered to download thirty gigabytes of them.
+ * Sixty-four covers about eight hundred kilometers on a side, which is
+ * further than anything flies in one trip.
+ */
+export const MAX_AREA_TERRAIN_TILES = 64
+
+/**
  * The tiles an area needs, for the offline download to fetch alongside the
  * map. Covering the whole rectangle rather than its corners: a view wider
  * than a terrain tile would otherwise come back with a hole in the middle.
+ *
+ * An area past the cap returns nothing rather than a truncated list: there
+ * is no useful terrain answer for a continent, and half of one would be a
+ * profile with a hole in it that nothing explains.
  */
 export function terrainTilesForArea(bounds: LatLonBounds): TileCoord[] {
+  // Counted before it is built: the list for a world view is a third of a
+  // million objects, and constructing them only to throw them away is a
+  // visible pause on the way to answering "no".
+  if (countTiles(bounds, TERRAIN_ZOOM, TERRAIN_ZOOM) > MAX_AREA_TERRAIN_TILES) return []
   return tilesForBounds(bounds, TERRAIN_ZOOM, TERRAIN_ZOOM)
+}
+
+export interface TerrainCoverage {
+  stored: number
+  total: number
+}
+
+/**
+ * How much of an area's terrain is already on this machine.
+ *
+ * Asked separately from the map's own coverage because the two are
+ * genuinely independent: terrain is one zoom level of very large tiles, so
+ * an area can have every scrap of imagery and no elevation at all, and the
+ * profile would then go quiet at the field with no explanation.
+ */
+export async function terrainCoverage(bounds: LatLonBounds): Promise<TerrainCoverage> {
+  const tiles = terrainTilesForArea(bounds)
+  const flags = await Promise.all(tiles.map((t) => hasTile(TERRAIN_LAYER_ID, t)))
+  return { stored: flags.filter(Boolean).length, total: tiles.length }
 }

@@ -170,7 +170,13 @@ design decisions are recorded there and in code comments.
   downloads three levels of nothing; and `services/tile-cache.ts` never throws — a database
   that will not open (private browsing, storage denied) has to degrade to plain network
   fetching rather than break a map someone is flying with. Concurrency stays at six because
-  these are public tile servers used keyless, and courtesy is the condition of that.
+  these are public tile servers used keyless, and courtesy is the condition of that. **"Will
+  this work when I get there" has no honest answer from a tile count** — a cache can hold five
+  thousand tiles of the wrong valley — so the coverage overlay is a `GridLayer`
+  (`ui/tabs/flight/coverage-layer.ts`) drawing Leaflet's own squares, and it shades the *gaps*:
+  hatching what is already stored would obscure the map in order to say it is fine. It asks
+  `hasTile`, which reads the key and never materializes the blob, because it asks about every
+  square on screen at once.
 - **Terrain is a raster, and the datum is the part to get right.** Ground elevation comes from
   Terrarium tiles (`services/terrain.ts`) — an ordinary PNG whose RGB encodes one height, from
   AWS's keyless `elevation-tiles-prod`, which is the same SRTM/NED data ArduPilot's own terrain
@@ -185,7 +191,13 @@ design decisions are recorded there and in code comments.
   fine; and Terrarium carries bathymetry, so an offshore leg reads the sea floor four kilometers
   down unless it is pulled up to zero (`groundLevel`), which also overstates the ground in Death
   Valley — the safe direction. Sampling is bilinear because nearest-pixel puts a 38 m staircase
-  in the profile and reads as cliffs on a slope.
+  in the profile and reads as cliffs on a slope. **Any area handed to the terrain code is capped
+  at `MAX_AREA_TERRAIN_TILES`**, and the count is taken before the list is built: the world at
+  zoom 12 is 341,598 tiles, which is what Mission mode shows before anyone touches the map, and
+  without the cap opening it asked the cache about every terrain tile on Earth — starving every
+  other read on the page — and offered to download thirty gigabytes of them. An area past the
+  cap returns *nothing* rather than a truncated list, because half a terrain profile is a hole
+  nothing explains.
 - **An imported shape means whatever plan is on screen.** KML and GPX come in through
   `services/geo-import.ts`, and the destination is decided by `editing`, not by the shape: the
   same polygon is a survey area while planning a mission and a geofence while editing the
@@ -253,7 +265,13 @@ design decisions are recorded there and in code comments.
   stops holds the last value until its own RC failsafe notices, so `RELEASE` is sent three
   times over. Two more: an unmapped channel goes out as 65535 ("no change"), never as 1500,
   because centering an unmapped channel drives a flight-mode switch to its middle position; and
-  a throttle gets no center deadzone, which would be a dead patch mid-travel. Proven against
+  a throttle gets no center deadzone, which would be a dead patch mid-travel. **With more than
+  one input device attached, nothing is read until someone says which** — a wheel, a HOTAS and
+  a gamepad on the same desk all appear in `getGamepads()`, and taking the first is taking
+  whichever the browser happened to enumerate, which on this feature means the sticks are
+  somewhere other than where the screen says they are. The choice is remembered by the device's
+  reported *id*, never its index: indices shuffle between sessions, so a remembered index is a
+  remembered different device. Proven against
   SITL both ways — the override reaches the vehicle's RC_CHANNELS *and* the release hands them
   back — because the encoder accepts any field name and a wrong one produces a well-formed
   message full of zeros that a fake would happily accept.

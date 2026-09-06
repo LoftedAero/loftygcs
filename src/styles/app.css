@@ -619,6 +619,31 @@
   margin-left: auto;
 }
 
+/* ── Offline coverage overlay ──
+   Only the gaps are drawn. Hatching what is already stored would cover the
+   map in order to say it is fine, and the thing anyone is looking for here
+   is the hole. The hatch is drawn with a gradient rather than an image so
+   it costs no request and scales with the tile. */
+.tile-coverage {
+  width: 100%;
+  height: 100%;
+}
+.tile-coverage.is-missing {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(214, 48, 49, 0.28) 0,
+    rgba(214, 48, 49, 0.28) 3px,
+    rgba(214, 48, 49, 0) 3px,
+    rgba(214, 48, 49, 0) 9px
+  );
+  box-shadow: inset 0 0 0 1px rgba(214, 48, 49, 0.35);
+}
+/* Stored squares get a hairline and nothing else: enough to show the grid
+   the download works in, not enough to read the map through. */
+.tile-coverage.is-stored {
+  box-shadow: inset 0 0 0 1px rgba(47, 174, 78, 0.35);
+}
+
 /* ── Joystick ──
    The camera strip's shape, with one difference that is not decoration: the
    channel bars are the only way to see a stuck stick, so they are wide
@@ -646,6 +671,9 @@
   text-transform: uppercase;
   color: var(--la-ink-3);
   min-width: 56px;
+}
+.joystick-panel__pick {
+  max-width: 260px;
 }
 .joystick-panel__pad,
 .joystick-panel__live {

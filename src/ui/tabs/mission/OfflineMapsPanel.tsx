@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { LaButton, LaField, LaHint, LaSelect } from '../../components/La'
+import { LaButton, LaField, LaHint, LaSelect, LaSwitch } from '../../components/La'
 import {
   cacheStats,
   clearCache,
@@ -14,7 +14,12 @@ import {
   type LatLonBounds,
 } from '../../../services/tile-math'
 import { layerById, loadBaseLayer } from '../flight/map-layers'
-import { TERRAIN_LAYER_ID, TERRAIN_URL, terrainTilesForArea } from '../../../services/terrain'
+import {
+  TERRAIN_LAYER_ID,
+  TERRAIN_URL,
+  terrainCoverage,
+  terrainTilesForArea,
+} from '../../../services/terrain'
 
 // Downloading the map before leaving for the field.
 //
@@ -44,16 +49,44 @@ export interface OfflineMapsPanelProps {
   /** The map's current bounds, or null before it has a view. */
   bounds: LatLonBounds | null
   zoom: number
+  /** Whether the map is shading the squares it has not stored. */
+  coverage: boolean
+  onCoverage: (on: boolean) => void
 }
 
-export default function OfflineMapsPanel({ bounds, zoom }: OfflineMapsPanelProps) {
+export default function OfflineMapsPanel({
+  bounds,
+  zoom,
+  coverage,
+  onCoverage,
+}: OfflineMapsPanelProps) {
   const [extra, setExtra] = useState(2)
   const [stats, setStats] = useState({ count: 0, bytes: 0 })
   const [progress, setProgress] = useState<PrefetchProgress | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  const [terrain, setTerrain] = useState<{ stored: number; total: number } | null>(null)
+
   const refresh = () => void cacheStats().then(setStats)
   useEffect(refresh, [])
+
+  // Terrain is a separate question from the map's own coverage: it is one
+  // zoom level of very large tiles, so an area can have every scrap of
+  // imagery and no elevation at all -- and the profile would then go quiet
+  // at the field with nothing to explain it.
+  useEffect(() => {
+    if (!bounds) {
+      setTerrain(null)
+      return
+    }
+    let live = true
+    void terrainCoverage(bounds).then((c) => {
+      if (live) setTerrain(c)
+    })
+    return () => {
+      live = false
+    }
+  }, [bounds, progress])
 
   const layer = layerById(loadBaseLayer())
   // Never past what the server actually has: asking for zoom 22 of imagery
@@ -149,10 +182,36 @@ export default function OfflineMapsPanel({ bounds, zoom }: OfflineMapsPanelProps
         </>
       )}
 
+      {/* A tile count cannot answer "will this work when I get there" -- a
+          cache can hold five thousand tiles of the wrong valley. The map
+          can, so the switch is next to the number rather than instead of
+          it. */}
+      <LaSwitch
+        label="Show what is stored"
+        checked={coverage}
+        onChange={(e) => {
+          onCoverage(e.target.checked)
+          // The stored count is read once on mount, and panning the map
+          // stores what it draws -- so by the time anyone asks to see the
+          // coverage, the number beneath it is usually already stale and
+          // would contradict the squares on screen.
+          if (e.target.checked) refresh()
+        }}
+      />
+      {coverage && <LaHint>Hatched squares are not stored at this zoom; clear ones are.</LaHint>}
+
       <LaHint>
         Stored: {stats.count.toLocaleString()} tiles, {formatBytes(stats.bytes)}. Panning the map
         online saves what it draws, so this only fills the gaps.
       </LaHint>
+
+      {terrain && terrain.total > 0 && (
+        <LaHint error={terrain.stored === 0}>
+          {terrain.stored === terrain.total
+            ? 'Elevation for this view is stored too.'
+            : `Elevation: ${terrain.total - terrain.stored} of ${terrain.total} tiles missing — the profile needs these to draw the ground.`}
+        </LaHint>
+      )}
       <LaButton
         variant="ghost"
         size="block"

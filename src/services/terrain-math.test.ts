@@ -6,6 +6,7 @@ import {
   TERRAIN_TILE_PX,
   terrainTilesFor,
 } from './terrain-math'
+import { MAX_AREA_TERRAIN_TILES, terrainTilesForArea } from './terrain'
 
 // The Terrarium encoding is fixed by the format, so the decoder is checked
 // against elevations pushed back through the *encoder* -- and against the
@@ -111,5 +112,30 @@ describe('ground under water', () => {
     expect(groundLevel(-4965)).toBe(0)
     expect(groundLevel(0)).toBe(0)
     expect(groundLevel(219)).toBe(219)
+  })
+})
+
+describe('how much terrain an area may ask for', () => {
+  it('covers a flying field in a tile or two', () => {
+    const field = { north: 40.13, south: 40.11, east: -88.81, west: -88.85 }
+    const tiles = terrainTilesForArea(field)
+    expect(tiles.length).toBeGreaterThan(0)
+    expect(tiles.length).toBeLessThanOrEqual(4)
+  })
+
+  it('refuses the whole world rather than trying to answer for it', () => {
+    // 341,598 tiles at this zoom: asking the cache about each one starved
+    // every other read on the page, and offering to download them was
+    // thirty gigabytes. That view is what the map shows before anyone has
+    // touched it, so this is the default case, not an edge one.
+    expect(terrainTilesForArea({ north: 85, south: -85, east: 180, west: -180 })).toEqual([])
+  })
+
+  it('draws the line where a trip stops being a trip', () => {
+    // About 800 km on a side is still answered; a continent is not.
+    const trip = { north: 40, south: 37, east: -104, west: -108 }
+    expect(terrainTilesForArea(trip).length).toBeLessThanOrEqual(MAX_AREA_TERRAIN_TILES)
+    const continent = { north: 50, south: 25, east: -70, west: -125 }
+    expect(terrainTilesForArea(continent)).toEqual([])
   })
 })

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LatLonBounds } from '../../../services/tile-math'
 import { createCachedTileLayer } from '../flight/cached-tile-layer'
+import { createCoverageLayer } from '../flight/coverage-layer'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMissionStore } from '../../../stores/mission-store'
@@ -43,6 +44,8 @@ export interface MissionMapProps {
    * a drag.
    */
   onView?: (view: { bounds: LatLonBounds; zoom: number }) => void
+  /** Shade the squares this base layer has not stored for offline use. */
+  coverage?: boolean
 }
 
 /** Numbered waypoint pin. Orange when selected, blue otherwise. */
@@ -131,10 +134,17 @@ function homeIcon(selected: boolean): L.DivIcon {
   })
 }
 
-export default function MissionMap({ tool, onPlaced, onFirstItem, onView }: MissionMapProps) {
+export default function MissionMap({
+  tool,
+  onPlaced,
+  onFirstItem,
+  onView,
+  coverage = false,
+}: MissionMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileRef = useRef<L.TileLayer | null>(null)
+  const coverRef = useRef<L.GridLayer | null>(null)
   const layerRef = useRef<L.LayerGroup | null>(null)
   const vehicleRef = useRef<L.Marker | null>(null)
   const [base, setBase] = useState<BaseLayerId>(loadBaseLayer)
@@ -233,6 +243,24 @@ export default function MissionMap({ tool, onPlaced, onFirstItem, onView }: Miss
     tileRef.current.setZIndex(0)
     saveBaseLayer(base)
   }, [base])
+
+  // The coverage overlay is rebuilt with the base layer as well as with the
+  // switch: what is stored for the satellite imagery says nothing about
+  // what is stored for the street map.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    coverRef.current?.remove()
+    coverRef.current = null
+    if (!coverage) return
+    const layer = createCoverageLayer(layerById(base).id).addTo(map)
+    layer.setZIndex(1)
+    coverRef.current = layer
+    return () => {
+      layer.remove()
+      coverRef.current = null
+    }
+  }, [coverage, base])
 
   useEffect(() => {
     const map = mapRef.current

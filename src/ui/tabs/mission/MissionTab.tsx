@@ -37,6 +37,9 @@ import { useMissionStore } from '../../../stores/mission-store'
 
 export default function MissionTab() {
   const [view, setView] = useState<{ bounds: LatLonBounds; zoom: number } | null>(null)
+  // Not persisted: it is a thing you switch on to answer one question
+  // before a trip, not a way to leave the map hatched.
+  const [coverage, setCoverage] = useState(false)
   // Which command the next map click places. Null means the default, which
   // is a waypoint -- see MissionMap for why clicking does something rather
   // than nothing.
@@ -73,6 +76,7 @@ export default function MissionTab() {
               onPlaced={() => setTool(null)}
               onFirstItem={setFirstAt}
               onView={setView}
+              coverage={coverage}
             />
           </div>
 
@@ -125,7 +129,12 @@ export default function MissionTab() {
           {editing === 'rally' && <RallyPanel />}
           {/* Last in the column: preparing for a field with no signal is
               something you do once, after the plan is what you want. */}
-          <OfflineMapsPanel bounds={view?.bounds ?? null} zoom={view?.zoom ?? 15} />
+          <OfflineMapsPanel
+            bounds={view?.bounds ?? null}
+            zoom={view?.zoom ?? 15}
+            coverage={coverage}
+            onCoverage={setCoverage}
+          />
         </aside>
       </div>
 

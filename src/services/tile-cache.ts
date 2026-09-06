@@ -79,6 +79,21 @@ export async function getTile(layerId: string, t: TileCoord): Promise<Blob | nul
   return rec?.blob ?? null
 }
 
+/**
+ * Whether a tile is stored, without reading it.
+ *
+ * `getKey` answers from the index and never materializes the blob, which
+ * matters because the coverage overlay asks this of every tile on screen
+ * at once -- a few hundred reads of 20 kB each would be a map that stutters
+ * while it tells you the map is fine.
+ */
+export async function hasTile(layerId: string, t: TileCoord): Promise<boolean> {
+  const found = await tx<IDBValidKey | undefined>('readonly', (store) =>
+    store.getKey(key(layerId, t)),
+  )
+  return found !== null && found !== undefined
+}
+
 export async function putTile(layerId: string, t: TileCoord, blob: Blob): Promise<void> {
   await tx('readwrite', (s) =>
     s.put({ key: key(layerId, t), blob, bytes: blob.size, at: Date.now() } as TileRecord),

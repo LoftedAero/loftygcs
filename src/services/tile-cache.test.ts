@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { prefetchTiles } from './tile-cache'
+import { hasTile, prefetchTiles } from './tile-cache'
 import type { TileCoord } from './tile-math'
 
 // jsdom has no IndexedDB, which is the interesting half of the contract:
@@ -86,5 +86,15 @@ describe('prefetching tiles', () => {
     const result = await prefetchTiles('esri', 'https://x/{z}/{y}/{x}', [], () => {})
     expect(result).toMatchObject({ done: 0, total: 0 })
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('asking what is stored', () => {
+  it('answers false rather than throwing when there is no database', async () => {
+    // jsdom has no IndexedDB, which is the same position as a private
+    // window or a machine with storage denied. The coverage overlay asks
+    // this of every tile on screen, so a rejection here would be a map
+    // full of errors rather than a map with no overlay.
+    await expect(hasTile('esri', { z: 15, x: 1, y: 2 })).resolves.toBe(false)
   })
 })
