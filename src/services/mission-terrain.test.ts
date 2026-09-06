@@ -5,7 +5,9 @@ import {
   altitudeAt,
   groundProfile,
   homeElevation,
+  approachSlopes,
   itemAltitudes,
+  legSlopes,
   minClearance,
   routeCorners,
   routeSamples,
@@ -223,5 +225,88 @@ describe('what zero relative altitude means', () => {
     expect(homeElevation(plan([], null), new Map())).toEqual({ amslM: 0, source: 'none' })
     expect(homeElevation(plan([], { x: HOME.x, y: HOME.y, z: 0 }), new Map()).source).toBe('none')
     expect(homeElevation(plan([{ x: 0, y: 0 }], null), flat(600)).source).toBe('none')
+  })
+})
+
+describe('how steeply each leg climbs', () => {
+  const at = (uid: string, amslM: number, d: number) => ({ uid, amslM, d })
+
+  it('reads a three-degree approach as three degrees', () => {
+    // The standard glide slope, and the reason this column exists: 300 m
+    // of descent over 5.72 km.
+    const slopes = legSlopes([at('a', 300, 0), at('b', 0, 5723)])
+    expect(slopes.get('b')!.deg).toBeCloseTo(-3, 1)
+  })
+
+  it('gives the gradient as a percentage of the run', () => {
+    // 100 m up over 1 km is 10%, and about 5.7 degrees.
+    const slopes = legSlopes([at('a', 0, 0), at('b', 100, 1000)])
+    expect(slopes.get('b')!.percent).toBeCloseTo(10, 6)
+    expect(slopes.get('b')!.deg).toBeCloseTo(5.71, 1)
+  })
+
+  it('signs a descent negative', () => {
+    expect(legSlopes([at('a', 100, 0), at('b', 0, 1000)]).get('b')!.percent).toBeCloseTo(-10, 6)
+  })
+
+  it('says nothing about the first item', () => {
+    expect(legSlopes([at('a', 0, 0)]).size).toBe(0)
+  })
+
+  it('refuses a leg with no horizontal distance', () => {
+    // A takeoff climbs straight up. Ninety degrees is arithmetically true
+    // and reads as a slope someone could fly, which it is not.
+    expect(legSlopes([at('a', 0, 0), at('b', 100, 0)]).has('b')).toBe(false)
+  })
+
+  it('is flat when the altitude does not change', () => {
+    const s = legSlopes([at('a', 50, 0), at('b', 50, 800)]).get('b')!
+    expect(s.deg).toBe(0)
+    expect(s.percent).toBe(0)
+  })
+
+  it('measures each leg against the one before it, not against the start', () => {
+    const slopes = legSlopes([at('a', 0, 0), at('b', 100, 1000), at('c', 100, 2000)])
+    expect(slopes.get('b')!.percent).toBeCloseTo(10, 6)
+    expect(slopes.get('c')!.percent).toBe(0)
+  })
+})
+
+describe('the approach onto a landing', () => {
+  it('measures the last leg, which itemAltitudes leaves out', () => {
+    // A land command's altitude is ignored by ArduPilot, so it is not on
+    // the profile -- but it is on the ground, and the leg onto it is the
+    // one an approach is planned around.
+    const p = plan(
+      [
+        { command: 16, x: HOME.x, y: HOME.y, z: 100 },
+        { command: 21, x: HOME.x + 100000, y: HOME.y, z: 0 },
+      ],
+      HOME,
+    )
+    const slopes = approachSlopes(p, HOME.z, flat(HOME.z))
+    const landing = slopes.get('u1')
+    expect(landing).toBeDefined()
+    // 100 m down over the leg; the sign says descending.
+    expect(landing!.deg).toBeLessThan(0)
+    expect(landing!.percent).toBeLessThan(0)
+  })
+
+  it('leaves the clearance check alone', () => {
+    // The same mission must not read as flying into the ground just
+    // because it ends on it.
+    const p = plan(
+      [
+        { command: 16, x: HOME.x, y: HOME.y, z: 100 },
+        { command: 21, x: HOME.x + 100000, y: HOME.y, z: 0 },
+      ],
+      HOME,
+    )
+    const grids = flat(HOME.z)
+    const worst = minClearance(
+      groundProfile(routeSamples(p, 60), grids),
+      itemAltitudes(p, HOME.z, grids),
+    )
+    expect(worst!.minM).toBeGreaterThan(0)
   })
 })

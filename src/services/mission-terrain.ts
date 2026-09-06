@@ -186,6 +186,77 @@ export function altitudeAt(items: readonly ItemAltitude[], d: number): number | 
   return last.amslM
 }
 
+export interface LegSlope {
+  /** Climb angle from the previous item, degrees. Negative is descending. */
+  deg: number
+  /** The same as a percentage: 100 m of climb over 1 km is 10%. */
+  percent: number
+}
+
+/**
+ * How steeply each leg climbs or descends, by item uid.
+ *
+ * Planning an automatic landing is the reason this exists: an approach is
+ * specified as an angle (three degrees is the usual one) or as a gradient,
+ * and both are otherwise a calculator job with numbers taken off two rows.
+ *
+ * Computed from the AMSL altitudes rather than the raw `z`, so a leg
+ * between a relative-frame waypoint and an AMSL one is still right.
+ * Undefined where it would be meaningless: the first item, an item with no
+ * altitude, and a leg with no horizontal distance -- a vertical climb has
+ * no gradient, and reporting ninety degrees for a takeoff would be a
+ * number that looks like a slope and is not one.
+ */
+export function legSlopes(items: readonly ItemAltitude[]): Map<string, LegSlope> {
+  const out = new Map<string, LegSlope>()
+  for (let i = 1; i < items.length; i++) {
+    const a = items[i - 1]!
+    const b = items[i]!
+    const run = b.d - a.d
+    if (run <= 0) continue
+    const rise = b.amslM - a.amslM
+    out.set(b.uid, {
+      deg: (Math.atan2(rise, run) * 180) / Math.PI,
+      percent: (rise / run) * 100,
+    })
+  }
+  return out
+}
+
+/** Commands that end on the ground, whatever altitude the item carries. */
+const LANDINGS = new Set([21, 85])
+
+/**
+ * Leg slopes for the whole route, including the descent onto a landing.
+ *
+ * `itemAltitudes` leaves landing commands out, and rightly: ArduPilot
+ * ignores their altitude, so drawing one on the profile would invent a
+ * height. But a landing point is not at an *unknown* height -- it is on
+ * the ground -- and the leg onto it is exactly the one an approach is
+ * planned around. So it is put back here, at ground level, and nowhere
+ * else: feeding it to the clearance check would report every mission with
+ * a landing in it as flying into terrain.
+ */
+export function approachSlopes(
+  plan: MissionPlan,
+  homeAmslM: number,
+  grids: TerrainGrids,
+): Map<string, LegSlope> {
+  const corners = routeCorners(plan)
+  let ci = plan.home ? 1 : 0
+  const landings: ItemAltitude[] = []
+  for (const it of plan.items) {
+    const located = hasCoords(it)
+    const d = located ? (corners[ci]?.d ?? 0) : null
+    if (located) ci++
+    if (d === null || !LANDINGS.has(it.command)) continue
+    const raw = sampleElevation(grids, toLatLon(it))
+    landings.push({ uid: it.uid, amslM: raw === null ? homeAmslM : groundLevel(raw), d })
+  }
+  const all = [...itemAltitudes(plan, homeAmslM, grids), ...landings].sort((a, b) => a.d - b.d)
+  return legSlopes(all)
+}
+
 export interface Clearance {
   /** Least height above ground anywhere along the route, meters. */
   minM: number

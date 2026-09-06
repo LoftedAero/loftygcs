@@ -1512,22 +1512,20 @@
   border-collapse: collapse;
   font-size: var(--la-size-sm);
   /* Honors the colgroup below; without it the widths are advisory and the
-     parameter columns take whatever is going. `max-content` then makes the
-     table exactly the sum of them -- no stretching to fill a wide pane, no
-     squeezing to fit a narrow one (the pane scrolls instead). */
+     parameter columns take whatever is going. The table then fills the pane
+     and the leftover is spread across every column in proportion, rather
+     than piled into one of them -- which is what left a thousand pixels of
+     nothing between the command and the frame. Below the sum of the
+     columns it stops shrinking and the pane scrolls. */
   table-layout: fixed;
-  width: max-content;
+  width: 100%;
+  min-width: max-content;
 }
-/* Everything is sized for its content: a sequence number, the longest
+/* Each column is sized for what it holds: a sequence number, the longest
    command name (NAV_CONTINUE_AND_CHANGE_ALT), a frame abbreviation, two
    numbers, four parameter columns wide enough for the longest label any
-   command uses, and four icon buttons.
-
-   The table stops at its own width rather than stretching to the pane. It
-   used to give the leftover to the command column, which on a wide monitor
-   left a thousand pixels of nothing between the command and the frame --
-   a table is as wide as its columns, and a pane wider than that just has
-   room to spare. */
+   command uses, the approach figures, and three icon buttons. Extra width
+   is shared out across all of them rather than given to one. */
 .mission-col--seq {
   width: 34px;
 }
@@ -1542,6 +1540,9 @@
 }
 .mission-col--param {
   width: 124px;
+}
+.mission-col--slope {
+  width: 78px;
 }
 .mission-col--dist {
   width: 76px;
@@ -1584,6 +1585,9 @@
 .mission-table__param .la-select {
   width: 100%;
   min-width: 0;
+  /* The cell may be roomy on a wide monitor; the box for a number should
+     not grow with it. */
+  max-width: 160px;
 }
 /* Rows carry a label per parameter, so they are taller than a plain grid;
    trimming the cell padding is what keeps a useful number of them on

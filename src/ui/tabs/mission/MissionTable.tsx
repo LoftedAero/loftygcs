@@ -1,5 +1,11 @@
 import { LaButton, LaInput, LaLinkButton, LaSelect } from '../../components/La'
 import { useUnits } from '../../../stores/preferences-store'
+import {
+  approachSlopes,
+  homeElevation,
+  type LegSlope,
+} from '../../../services/mission-terrain'
+import { useTerrain } from './use-terrain'
 import { distanceLabel, formatDistance, fromDistance, toDistance } from '../../../units'
 import { useMissionStore } from '../../../stores/mission-store'
 import { legStats, hasCoords, type PlanItem } from '../../../protocol/mission-plan'
@@ -29,6 +35,11 @@ export default function MissionTable() {
   const move = useMissionStore((s) => s.moveItem)
   const addAfter = useMissionStore((s) => s.addItemAfter)
   const stats = legStats(plan)
+  // The same altitudes the profile is drawn from, so a leg between a
+  // relative waypoint and an AMSL one still reads correctly.
+  const terrain = useTerrain(plan, true)
+  const home = homeElevation(plan, terrain.grids)
+  const slopes = approachSlopes(plan, home.amslM, terrain.grids)
 
   if (plan.items.length === 0) {
     return (
@@ -71,6 +82,8 @@ export default function MissionTable() {
           <col className="mission-col--param" />
           <col className="mission-col--param" />
           <col className="mission-col--param" />
+          <col className="mission-col--slope" />
+          <col className="mission-col--slope" />
           <col className="mission-col--dist" />
           <col className="mission-col--actions" />
         </colgroup>
@@ -88,10 +101,27 @@ export default function MissionTable() {
               Parameters
             </th>
             <th scope="col" className="mission-table__num">
+              Slope
+            </th>
+            <th scope="col" className="mission-table__num">
+              Grade
+            </th>
+            <th scope="col" className="mission-table__num">
               Dist
             </th>
-            <th scope="col">
-              <span className="mission-table__sr">Actions</span>
+            {/* One add button, at the end of the row of labels rather than
+                repeated down every line. It appends, which is what adding
+                from a list means. */}
+            <th scope="col" className="mission-table__actions">
+              <LaButton
+                variant="ghost"
+                size="sm"
+                aria-label="Add a waypoint at the end"
+                title="Add a waypoint"
+                onClick={() => addAfter(-1)}
+              >
+                +
+              </LaButton>
             </th>
           </tr>
         </thead>
@@ -104,12 +134,12 @@ export default function MissionTable() {
               index={i}
               count={plan.items.length}
               legM={stats[i]?.legM ?? 0}
+              slope={slopes.get(it.uid) ?? null}
               selected={selected === it.uid}
               onSelect={() => select(it.uid)}
               onChange={(patch) => update(it.uid, patch)}
               onRemove={() => remove(it.uid)}
               onMove={(to) => move(it.uid, to)}
-              onAddBelow={() => addAfter(i)}
             />
           ))}
         </tbody>
@@ -124,24 +154,24 @@ function Row({
   index,
   count,
   legM,
+  slope,
   selected,
   onSelect,
   onChange,
   onRemove,
   onMove,
-  onAddBelow,
 }: {
   item: PlanItem
   seq: number
   index: number
   count: number
   legM: number
+  slope: LegSlope | null
   selected: boolean
   onSelect: () => void
   onChange: (patch: Partial<Omit<PlanItem, 'uid'>>) => void
   onRemove: () => void
   onMove: (to: number) => void
-  onAddBelow: () => void
 }) {
   const units = useUnits()
   const spec = commandSpec(item.command)
@@ -252,6 +282,12 @@ function Row({
       })}
 
       <td className="mission-table__num mission-table__dist">
+        {slope ? `${slope.deg.toFixed(1)}°` : <span className="mission-table__dash">—</span>}
+      </td>
+      <td className="mission-table__num mission-table__dist">
+        {slope ? `${slope.percent.toFixed(1)}%` : <span className="mission-table__dash">—</span>}
+      </td>
+      <td className="mission-table__num mission-table__dist">
         {hasCoords(item) ? (
           `${formatDistance(legM, units.distance, 0)} ${distanceLabel(units.distance)}`
         ) : (
@@ -277,18 +313,6 @@ function Row({
           onClick={() => onMove(index + 1)}
         >
           ↓
-        </LaButton>
-        {/* A waypoint under this one, without going to the map. It lands
-            between its neighbors, so inserting into a leg puts it on that
-            leg rather than on top of an end. */}
-        <LaButton
-          variant="ghost"
-          size="sm"
-          aria-label={`Add a waypoint after item ${seq}`}
-          title="Add a waypoint below"
-          onClick={onAddBelow}
-        >
-          +
         </LaButton>
         <LaButton variant="ghost" size="sm" aria-label={`Delete item ${seq}`} onClick={onRemove}>
           ✕
