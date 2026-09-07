@@ -281,6 +281,36 @@ export default function MapView({
           Follow
         </button>
       </div>
+      {/* How many aircraft are being heard, whenever the layer is on.
+          Without it, "no traffic in range" and "the layer is broken" are the
+          same empty map -- which is exactly the question a receiver on a
+          bench raises, and the traffic list used to answer before it was
+          removed in favour of the markers. Zero is worth saying out loud;
+          it is the answer most of the time, and an answer is not nothing. */}
+      {showTraffic && <TrafficCount />}
+    </div>
+  )
+}
+
+/**
+ * The traffic readout: a count, and where it came from.
+ *
+ * Deliberately says "no ADS-B receiver" rather than "0" until something has
+ * been heard on this connection. Most vehicles have no receiver fitted, and
+ * a permanent zero on those would read as a fault in something that was
+ * never there -- where a vehicle that *has* heard an aircraft and now hears
+ * none is genuinely reporting zero.
+ */
+function TrafficCount() {
+  const count = useTrafficStore((s) => s.targets.length)
+  const everSeen = useTrafficStore((s) => s.everSeen)
+  return (
+    <div className={`map-traffic-count${count > 0 ? ' is-active' : ''}`}>
+      {everSeen
+        ? `${count} aircraft`
+        : /* Not "0 aircraft": nothing has been heard at all, which on most
+             vehicles means no receiver rather than an empty sky. */
+          'No ADS-B yet'}
     </div>
   )
 }

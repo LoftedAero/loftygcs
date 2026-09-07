@@ -738,8 +738,13 @@
   position: absolute;
   left: 28px;
   top: 2px;
+  /* Stacked: the callsign identifies and the height qualifies it, so they
+     read down rather than across -- and a narrow tag crowds its neighbours
+     far less on a map with several aircraft on it. */
   display: flex;
-  gap: var(--la-space-1);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
   padding: 1px 3px;
   border-radius: var(--la-radius-sm);
   background: color-mix(in srgb, var(--la-surface) 82%, transparent);
@@ -767,6 +772,26 @@
   overflow: auto;
   padding: var(--la-space-2) var(--la-space-3);
 }
+/* The traffic count, under the map's own controls: small, and only there
+   while the layer is on. */
+.map-traffic-count {
+  position: absolute;
+  top: calc(var(--la-space-2) + 30px);
+  right: var(--la-space-2);
+  z-index: 500;
+  padding: 2px var(--la-space-2);
+  border-radius: var(--la-radius-sm);
+  background: color-mix(in srgb, var(--la-surface) 88%, transparent);
+  border: 1px solid var(--la-line);
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  color: var(--la-ink-3);
+  pointer-events: none;
+}
+.map-traffic-count.is-active {
+  color: var(--la-ink);
+}
+
 .traffic-panel__note {
   margin: 0 0 var(--la-space-2);
   font-size: var(--la-size-xs);

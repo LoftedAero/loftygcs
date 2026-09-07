@@ -82,10 +82,10 @@ function altLabel(t: RelativeTarget, unit: DistanceUnit): string {
     if (t.relAltM === null) return ''
     const v = Math.round(toDistance(t.relAltM, unit))
     const sign = v > 0 ? '+' : v < 0 ? '−' : '±'
-    return `${sign}${Math.abs(v).toLocaleString()} ${distanceLabel(unit)}`
+    return `${sign}${Math.abs(v)} ${distanceLabel(unit)}`
   }
   if (t.altMslM === null) return ''
-  return `${Math.round(toDistance(t.altMslM, unit)).toLocaleString()} ${distanceLabel(unit)}`
+  return `${Math.round(toDistance(t.altMslM, unit))} ${distanceLabel(unit)}`
 }
 
 function escapeHtml(text: string): string {

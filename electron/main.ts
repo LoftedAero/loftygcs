@@ -33,6 +33,11 @@ function createWindow() {
     },
   })
   mainWindow.setMenuBarVisibility(false)
+  // Maximized, not fullscreen: a ground station is a window someone alt-tabs
+  // to a browser and a log viewer from, and true fullscreen hides the taskbar
+  // it takes to get back. The width and height above stay as the restored
+  // size, so un-maximizing gives a usable window rather than a sliver.
+  mainWindow.maximize()
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 
   /**
