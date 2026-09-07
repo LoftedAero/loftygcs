@@ -49,13 +49,14 @@ design decisions are recorded there and in code comments.
   (plus a running guide) take the whole window. The rail order is the bring-up sequence, and Ports
   deliberately precedes Sensors because SERIALn_PROTOCOL gates compass/GPS detection.
   The mode switch is never orange: Connect owns the app bar's one primary action.
-  **The rail is grouped with Mission Planner's names** — Initial setup, Mandatory, Optional,
-  Config, Data — because anyone arriving here has almost certainly used it, and a familiar
-  vocabulary beats a better one nobody knows. The headings come from a `group` field on `TABS`
-  rather than a second structure, so a tab cannot land in a group the rail does not draw. Order
-  still carries meaning *inside* a group: Mandatory runs as a bring-up runs. Failsafes is
-  Mandatory, as it is in Mission Planner, because a vehicle whose radio failsafe was never set
-  flies away; the battery monitor is Optional because plenty of airframes have none.
+  **The rail is grouped in three** — Initial Setup, Config/Tuning, Data — leaning on Mission
+  Planner's vocabulary because anyone arriving here has almost certainly used it. Its
+  Mandatory/Optional split is deliberately *not* carried over: that distinction belongs to the
+  airframe rather than the screen (a battery monitor is optional until the vehicle has one, at
+  which point setting it up is not), and a label that is wrong half the time teaches people to
+  stop reading labels. The headings come from a `group` field on `TABS` rather than a second
+  structure, so a tab cannot land in a group the rail does not draw. Order still carries meaning
+  *inside* a group: the middle one runs as a bring-up runs.
   **The simulator was a fourth mode and is not one** — it is something you switch on before
   flying or planning, not an activity in itself, so it lives in the app bar's SITL tray
   (`ui/shell/SimTray.tsx`). Its open state is in `ui-store` because other screens send people

@@ -20,52 +20,49 @@ export const MODES = [
 export type ModeId = (typeof MODES)[number]['id']
 
 /**
- * The Setup rail, grouped the way Mission Planner groups it.
+ * The Setup rail, in three groups.
  *
- * Sixteen items in one list read as sixteen things to do; the groups say
- * which of them are steps, which are extras, and which are not steps at all.
- * The names are Mission Planner's on purpose -- anyone arriving here has
- * almost certainly used it, and a familiar vocabulary is worth more than a
- * better one nobody knows.
+ * Sixteen items in one list read as sixteen things to do. The names lean on
+ * Mission Planner's, because anyone arriving here has almost certainly used
+ * it and a familiar vocabulary beats a better one nobody knows -- but its
+ * Mandatory/Optional split is not carried over. That distinction is a
+ * property of the *airframe*, not of the screen: a battery monitor is
+ * optional until the vehicle has one, at which point setting it up is not.
+ * A rail cannot know which, and a label that is wrong half the time teaches
+ * people to stop reading labels.
  *
- * Order still carries meaning inside each group: Mandatory runs as a bring-up
- * runs, and Ports sits ahead of Sensors deliberately, because
+ * So: what you do once when a board is new, what you set and adjust for a
+ * particular airframe, and what you read afterwards.
+ *
+ * Order still carries meaning inside a group. The middle one runs as a
+ * bring-up runs, and Ports sits ahead of Sensors deliberately, because
  * SERIALn_PROTOCOL decides whether the external compass and GPS are detected
- * at all -- calibrating a compass the board has not found is the classic dead
- * end.
- *
- * Failsafes is Mandatory rather than Optional for the same reason it is in
- * Mission Planner: a vehicle whose radio failsafe was never set is a vehicle
- * that flies away. The battery monitor is Optional because plenty of airframes
- * genuinely have none.
+ * at all -- calibrating a compass the board has not found is the classic
+ * dead end.
  */
-export const TAB_GROUPS = ['Initial setup', 'Mandatory', 'Optional', 'Config', 'Data'] as const
+export const TAB_GROUPS = ['Initial Setup', 'Config/Tuning', 'Data'] as const
 
 export type TabGroup = (typeof TAB_GROUPS)[number]
 
 export const TABS = [
-  { id: 'overview', label: 'Overview', group: 'Initial setup' },
-  { id: 'firmware', label: 'Firmware', group: 'Initial setup' },
-  // The curated cards, at the head of the rail rather than beside the
-  // parameters they write: it is where a new airframe starts, and the
-  // things it covers -- battery monitor, failsafes, arming checks -- are
-  // exactly the ones a first bring-up needs and would not think to look
-  // for under their own tabs.
-  { id: 'configuration', label: 'Configuration', group: 'Initial setup' },
+  { id: 'overview', label: 'Overview', group: 'Initial Setup' },
+  { id: 'firmware', label: 'Firmware', group: 'Initial Setup' },
+  // The curated cards lead: it is where a new airframe starts, and the
+  // things they cover -- battery monitor, failsafes, arming checks -- are
+  // exactly the ones a first bring-up would not think to look for under
+  // their own tabs.
+  { id: 'configuration', label: 'Configuration', group: 'Initial Setup' },
 
-  { id: 'ports', label: 'Ports', group: 'Mandatory' },
-  { id: 'sensors', label: 'Sensors', group: 'Mandatory' },
-  { id: 'radio', label: 'Radio', group: 'Mandatory' },
-  { id: 'modes', label: 'Flight modes', group: 'Mandatory' },
-  { id: 'outputs', label: 'Outputs', group: 'Mandatory' },
-  { id: 'failsafes', label: 'Failsafes', group: 'Mandatory' },
-
-  { id: 'power', label: 'Power', group: 'Optional' },
-  { id: 'osd', label: 'OSD', group: 'Optional' },
-
-  // Config is where a setting is changed rather than a step performed.
-  { id: 'tuning', label: 'Tuning', group: 'Config' },
-  { id: 'parameters', label: 'Parameters', group: 'Config' },
+  { id: 'ports', label: 'Ports', group: 'Config/Tuning' },
+  { id: 'sensors', label: 'Sensors', group: 'Config/Tuning' },
+  { id: 'radio', label: 'Radio', group: 'Config/Tuning' },
+  { id: 'modes', label: 'Flight modes', group: 'Config/Tuning' },
+  { id: 'outputs', label: 'Outputs', group: 'Config/Tuning' },
+  { id: 'failsafes', label: 'Failsafes', group: 'Config/Tuning' },
+  { id: 'power', label: 'Power', group: 'Config/Tuning' },
+  { id: 'osd', label: 'OSD', group: 'Config/Tuning' },
+  { id: 'tuning', label: 'Tuning', group: 'Config/Tuning' },
+  { id: 'parameters', label: 'Parameters', group: 'Config/Tuning' },
 
   // Not steps at all: what you reach for when a step misbehaves.
   { id: 'logs', label: 'Logs', group: 'Data' },
