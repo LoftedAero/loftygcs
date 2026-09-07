@@ -1,3 +1,4 @@
+import type { AdsbTarget } from './adsb'
 // Shared protocol types. Everything crossing the worker boundary must be
 // structured-cloneable: plain objects and numbers, never class instances.
 
@@ -67,6 +68,15 @@ export type ProtocolEvent =
    */
   | { t: 'fields'; at: number; values: Record<string, number> }
   | { t: 'statustext'; severity: number; text: string }
+  /**
+   * Other aircraft, as a whole picture rather than a stream of reports.
+   *
+   * A snapshot of everything currently heard, sent at a fixed low rate: a
+   * transponder receiver in busy airspace produces a report per aircraft per
+   * second and ArduPilot forwards all of them, so a per-message event would
+   * be tens of store writes a second to move markers that move slowly.
+   */
+  | { t: 'traffic'; targets: AdsbTarget[] }
   | { t: 'inspector'; rows: InspectorRow[] }
   | { t: 'commandAck'; command: number; result: number }
   | { t: 'linkStats'; stats: LinkStats }

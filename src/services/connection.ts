@@ -4,6 +4,7 @@
 // and reads the stores.
 import { TransportManager } from '../transport'
 import { useInspectorStore } from '../stores/inspector-store'
+import { useTrafficStore } from '../stores/traffic-store'
 import type { TransportOptions } from '../transport/Transport'
 import { WorkerClient } from '../worker/worker-client'
 import type { FirmwareVersion, MissionItem, ProtocolEvent, TelemetryDelta } from '../protocol/types'
@@ -89,6 +90,9 @@ class ConnectionService {
     // Otherwise the next vehicle inherits the last one's field list, and a
     // plot keeps drawing a line that belongs to an aircraft that is gone.
     fieldRegistry.clear()
+    // Same reason: traffic belongs to the aircraft that heard it. Leaving it
+    // on the map would show the last flight's sky over the next field.
+    useTrafficStore.getState().clear()
     useCalStore.getState().magCalReset()
     setConnectionState(
       error
@@ -185,6 +189,9 @@ class ConnectionService {
       }
       case 'inspector':
         useInspectorStore.getState().applyRows(evt.rows)
+        return
+      case 'traffic':
+        useTrafficStore.getState().applyTargets(evt.targets)
         return
       case 'statustext':
         useVehicleStore

@@ -30,6 +30,7 @@ export const LOG_PANES = [
   { id: 'preflight', label: 'Preflight' },
   { id: 'camera', label: 'Camera' },
   { id: 'joystick', label: 'Joystick' },
+  { id: 'traffic', label: 'Traffic' },
 ] as const
 
 export type LogPane = (typeof LOG_PANES)[number]['id']

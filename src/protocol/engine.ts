@@ -6,6 +6,7 @@ import { MavFramer, encodeFrame } from './frames'
 import { decodeFrameFields } from './serializer'
 import { collectFields } from './fields'
 import { messageToDeltas } from './telemetry'
+import { decodeAdsbVehicle, type AdsbTarget } from './adsb'
 import { MavFtpClient, type FtpDirEntry } from './ftp/mavftp'
 import { decodeParamPck } from './params/pck'
 import { ParamStreamClient } from './params/param-client'
@@ -42,6 +43,20 @@ const PROGRESS_INTERVAL_MS = 100
 // slow enough that a snapshot of every message type costs nothing. The EMA
 // keeps a 1 Hz message from reading as 0 and 2.5 Hz on alternate windows.
 const INSPECT_FLUSH_MS = 400
+/**
+ * How often the traffic picture goes out, and how long a target survives
+ * without a fresh report.
+ *
+ * Reports arrive about once a second per aircraft and aeroplanes do not jump,
+ * so a snapshot every second is as much as any display can use. The timeout
+ * is deliberately several times that: ADS-B reception drops in and out at
+ * range, and an aircraft that blinks off the map every time a report is
+ * missed is worse than one drawn a few seconds stale. ArduPilot's own list
+ * ages out on its side too, so a target it has genuinely lost stops arriving
+ * and leaves here as well.
+ */
+const TRAFFIC_FLUSH_MS = 1000
+const TRAFFIC_TIMEOUT_MS = 15000
 const INSPECT_EMA = 0.3
 
 export class ProtocolEngine {
@@ -72,6 +87,10 @@ export class ProtocolEngine {
     }
   >()
   private inspectTimer: ReturnType<typeof setInterval> | null = null
+  /** Aircraft heard, by ICAO address. Flushed as a picture, not per report. */
+  private traffic = new Map<number, AdsbTarget>()
+  /** Whether the last flush said anything, so "now empty" is still said once. */
+  private trafficSent = false
 
   // MAVFTP is a fast path, not a requirement: a 500 ms op timeout makes the
   // capability probe fail fast on firmware without it, instead of the
@@ -101,6 +120,7 @@ export class ProtocolEngine {
     this.timers.push(setInterval(() => this.flushTelemetry(), TELEMETRY_FLUSH_MS))
     this.timers.push(setInterval(() => this.flushFields(), FIELDS_FLUSH_MS))
     this.timers.push(setInterval(() => this.reportLinkStats(), LINKSTATS_INTERVAL_MS))
+    this.timers.push(setInterval(() => this.flushTraffic(), TRAFFIC_FLUSH_MS))
     this.sendHeartbeat()
   }
 
@@ -252,6 +272,15 @@ export class ProtocolEngine {
             productId: Number(msg.fields.productId ?? 0),
           },
         })
+        return
+      }
+      case 'ADSB_VEHICLE': {
+        // Kept by ICAO address and flushed as a picture, not forwarded per
+        // report -- see TRAFFIC_FLUSH_MS. A report with no valid position
+        // decodes to null and is dropped here rather than stored as a target
+        // that cannot be drawn.
+        const target = decodeAdsbVehicle(msg.fields)
+        if (target) this.traffic.set(target.icao, target)
         return
       }
       case 'STATUSTEXT':
@@ -473,6 +502,22 @@ export class ProtocolEngine {
       t: 'evt',
       evt: { t: 'fields', at: Date.now(), values: Object.fromEntries(this.fieldValues) },
     })
+  }
+
+  /**
+   * The sky as it stands, and only when it has changed.
+   *
+   * Expiry happens here rather than on a timer of its own: this is the only
+   * thing that reads the map, so a target that has aged out has not been
+   * seen by anyone in the meantime. The empty-to-empty case sends nothing,
+   * which is the ordinary case for every vehicle without a receiver fitted.
+   */
+  private flushTraffic() {
+    const cutoff = Date.now() - TRAFFIC_TIMEOUT_MS
+    for (const [icao, t] of this.traffic) if (t.at < cutoff) this.traffic.delete(icao)
+    if (this.traffic.size === 0 && !this.trafficSent) return
+    this.trafficSent = this.traffic.size > 0
+    this.emit({ t: 'evt', evt: { t: 'traffic', targets: [...this.traffic.values()] } })
   }
 
   private flushTelemetry() {

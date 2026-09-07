@@ -443,6 +443,7 @@ export class VirtualFcTransport implements Transport {
     this.timers.push(setInterval(() => this.sendPositionAndHud(), 250))
     this.timers.push(setInterval(() => this.sendStatusAndGps(), 1000))
     this.timers.push(setInterval(() => this.sendRcChannels(), 200))
+    this.timers.push(setInterval(() => this.sendTraffic(), 1000))
     setTimeout(() => this.sendStatusText(6, 'Loft GCS virtual vehicle ready'), 300)
     // The EKF settling, compressed. Until it lands, arming and the position
     // modes are refused exactly as the real vehicle refuses them.
@@ -724,6 +725,65 @@ export class VirtualFcTransport implements Transport {
       default:
         return ack()
     }
+  }
+
+  /**
+   * Two aircraft passing the field, as ADSB_VEHICLE.
+   *
+   * Modelled on what real ArduPilot sends and only after seeing it: SITL's
+   * own SIM_ADSB was run first (`npm run sitl -- --adsb`) and its reports
+   * read, so the rate, the units and -- the part worth copying -- the flags
+   * are the firmware's, not invented here. One aircraft carries a full set
+   * and the other deliberately does not: an aircraft with no altitude and no
+   * callsign is ordinary in real traffic, and a demo where every field is
+   * always present is a demo that never exercises the null paths a display
+   * has to handle.
+   *
+   * Two, not twenty. This exists so the traffic screens have something to
+   * show without hardware, not to simulate an airspace.
+   */
+  private sendTraffic() {
+    const t = this.t()
+    // Crossing a kilometre or so north of home, opposite directions, one
+    // above and one below the demo vehicle's circuit.
+    const send = (
+      icao: number,
+      bearingDeg: number,
+      km: number,
+      altM: number,
+      callsign: string | null,
+      headingDeg: number,
+    ) => {
+      const rad = (bearingDeg * Math.PI) / 180
+      const north = km * 1000 * Math.cos(rad)
+      const east = km * 1000 * Math.sin(rad)
+      const latDeg = HOME_LAT + north / 111320
+      const lonDeg = HOME_LON + east / (111320 * Math.cos((HOME_LAT * Math.PI) / 180))
+      // VALID_COORDS | VALID_HEADING | VALID_VELOCITY | VERTICAL_VELOCITY,
+      // plus altitude and callsign only for the aircraft that has them.
+      const flags = 1 | 4 | 8 | 128 | (callsign ? 2 | 16 | 32 : 0)
+      this.emit('ADSB_VEHICLE', {
+        ICAOAddress: icao,
+        lat: Math.round(latDeg * 1e7),
+        lon: Math.round(lonDeg * 1e7),
+        altitudeType: 0,
+        // Millimeters, like the firmware sends.
+        altitude: Math.round(altM * 1000),
+        heading: Math.round(headingDeg * 100),
+        horVelocity: 4000,
+        verVelocity: 0,
+        callsign: callsign ?? '',
+        emitterType: callsign ? 1 : 7,
+        tslc: 1,
+        flags,
+        squawk: 1200,
+      })
+    }
+    // Tracking across the field rather than orbiting: a marker that never
+    // moves proves nothing about a display that has to keep up with one.
+    const drift = (t * 0.6) % 360
+    send(0xa1b2c3, (20 + drift) % 360, 1.2, HOME_ALT_M + 250, 'N172SP', (110 + drift) % 360)
+    send(0x4ca1f0, (200 - drift + 360) % 360, 0.9, HOME_ALT_M + 40, null, (290 - drift + 360) % 360)
   }
 
   private sendRcChannels() {

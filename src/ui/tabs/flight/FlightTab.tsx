@@ -20,6 +20,7 @@ import StatusList from './StatusList'
 import PreflightPanel from './PreflightPanel'
 import CameraPanel from './CameraPanel'
 import JoystickPanel from './JoystickPanel'
+import TrafficPanel from './TrafficPanel'
 import VideoSourceModal from './VideoSourceModal'
 
 // The flight screen, arranged as Mission Planner arranges it: one panel
@@ -213,6 +214,7 @@ function LogPane({
       {pane === 'preflight' && <PreflightPanel />}
       {pane === 'camera' && <CameraPanel />}
       {pane === 'joystick' && <JoystickPanel />}
+      {pane === 'traffic' && <TrafficPanel />}
     </div>
   )
 }

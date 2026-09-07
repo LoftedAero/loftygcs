@@ -129,8 +129,10 @@ before more readouts multiply; the inspector helps debug everything after it).
 | ~~11~~ | ~~Camera & gimbal control~~ | done — Fly ▸ View ▸ Camera; the protocol follows the firmware version |
 | ~~12~~ | ~~Physical joystick support~~ | done — opt-in every session, releases on focus loss, unplug or link drop |
 
-All twelve are done. Deferred, and the next things to consider: ADS-B traffic display,
-BLHeli/AM32 ESC passthrough, shareable aircraft config bundles.
+All twelve are done, and so is ADS-B traffic (Fly ▸ Traffic, and the aircraft drawn on the
+flying map) — SITL-validated, since the simulator generates its own traffic:
+`npm run sitl -- --adsb`. Deferred, and the next things to consider: BLHeli/AM32 ESC
+passthrough, shareable aircraft config bundles.
 
 ### Non-goals
 

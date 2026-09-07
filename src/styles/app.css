@@ -726,6 +726,89 @@
   background: color-mix(in srgb, var(--la-ok) 8%, transparent);
 }
 
+/* ── ADS-B traffic ──
+   The map's markers and the list beside them. Close contacts are red, which
+   is this sheet's status color used as status: it says where to look, and
+   nothing here acts on it. */
+.traffic-marker {
+  /* The tag hangs off the symbol, so the icon's own box must not clip it. */
+  overflow: visible;
+}
+.traffic-marker__tag {
+  position: absolute;
+  left: 28px;
+  top: 2px;
+  display: flex;
+  gap: var(--la-space-1);
+  padding: 1px 3px;
+  border-radius: var(--la-radius-sm);
+  background: color-mix(in srgb, var(--la-surface) 82%, transparent);
+  color: var(--la-ink);
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.traffic-marker__tag b {
+  font-family: var(--la-font-mono);
+  font-weight: 700;
+  color: var(--la-ink-2);
+}
+.traffic-marker__tag.is-close {
+  background: color-mix(in srgb, var(--la-bad) 88%, transparent);
+  color: var(--app-on-dark);
+}
+.traffic-marker__tag.is-close b {
+  color: var(--app-on-dark);
+}
+
+.traffic-panel {
+  min-height: 0;
+  overflow: auto;
+  padding: var(--la-space-2) var(--la-space-3);
+}
+.traffic-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-sm);
+}
+.traffic-table th {
+  text-align: left;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  padding: 0 var(--la-space-2) var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+.traffic-table td {
+  padding: var(--la-space-1) var(--la-space-2) var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+/* Numbers line up so a column can be scanned rather than read. */
+.traffic-table__num {
+  text-align: right;
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+th.traffic-table__num {
+  font-family: var(--la-font);
+}
+.traffic-table tr.is-close td {
+  color: var(--la-bad);
+  font-weight: 600;
+}
+.traffic-table__sim {
+  margin-left: var(--la-space-2);
+  padding: 0 var(--la-space-1);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  color: var(--la-ink-3);
+}
+
 /* ── Joystick ──
    The camera pane's shape, with one difference that is not decoration: the
    channel bars are the only way to see a stuck stick, so they are wide

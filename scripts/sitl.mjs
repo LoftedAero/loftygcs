@@ -148,6 +148,8 @@ function download(url, dest) {
 const argv = process.argv.slice(2)
 const homeFlag = argv.indexOf('--home')
 const homeArg = homeFlag >= 0 ? argv.splice(homeFlag, 2)[1] : undefined
+const adsbFlag = argv.indexOf('--adsb')
+const adsbArg = adsbFlag >= 0 ? (argv.splice(adsbFlag, 2)[1] ?? '4') : undefined
 const positional = argv.filter((a) => !a.startsWith('-'))
 
 const cmd = positional[0] ?? 'run'
@@ -208,7 +210,41 @@ async function fetchVehicle() {
     console.log(`fetching ${vehicle.defaults}`)
     await download(AUTOTEST_BASE + vehicle.source, defaults)
   }
+
   console.log(`${name} SITL ready in sitl/`)
+}
+
+/**
+ * A vehicle that hears other aircraft, for the traffic display.
+ *
+ * Three things have to be true and two of them only at boot, which is why
+ * this is a launch option rather than something a test can set over MAVLink.
+ * `--serial5 sim:adsb` attaches the simulator's own transponder receiver to a
+ * serial port; SERIAL5_PROTOCOL has to speak MAVLink to it, and a serial
+ * protocol is read once at startup; ADSB_TYPE instantiates the backend that
+ * forwards what the receiver hears. Only SIM_ADSB_COUNT can be set live, and
+ * on its own it does nothing visible: the aircraft exist inside the
+ * simulation and nothing carries them to the autopilot. Measured, after a
+ * probe that set all three over MAVLink and saw no traffic at all.
+ *
+ * Written beside the bench defaults and passed as a second `--defaults` file
+ * -- ArduPilot accepts them comma separated -- rather than edited into the
+ * bench defaults, which come from ArduPilot's own autotest tree and should
+ * stay as they arrived.
+ */
+function adsbDefaults(count) {
+  const file = path.join(DIR, 'adsb.parm')
+  const lines = [
+    '# Written by scripts/sitl.mjs --adsb. Safe to delete.',
+    'SERIAL5_PROTOCOL 2',
+    'ADSB_TYPE 1',
+    `SIM_ADSB_COUNT ${count}`,
+    '# Close enough to see at a field, high enough to read as traffic.',
+    'SIM_ADSB_RADIUS 3000',
+    'SIM_ADSB_ALT 300',
+  ]
+  writeFileSync(file, lines.join('\n') + '\n')
+  return path.basename(file)
 }
 
 if (cmd === 'fetch') {
@@ -224,6 +260,7 @@ if (cmd === 'fetch') {
   // in a loop -- one `npm run sitl` then serves any number of sequential
   // connections (each getting a freshly-booted vehicle). Ctrl+C ends it.
   if (home !== CMAC) console.log(`${name} SITL home: ${home}`)
+  if (adsbArg !== undefined) console.log(`${name} SITL with ${adsbArg} ADS-B aircraft`)
 
   const unlock = claimRunner(name)
 
@@ -289,9 +326,12 @@ if (cmd === 'fetch') {
         vehicle.model,
         '-w',
         '--defaults',
-        vehicle.defaults,
+        adsbArg === undefined ? vehicle.defaults : `${vehicle.defaults},${adsbDefaults(adsbArg)}`,
         '--home',
         home,
+        // The simulator's own transponder receiver, on the serial port those
+        // defaults point ADSB_TYPE at.
+        ...(adsbArg === undefined ? [] : ['--serial5', 'sim:adsb']),
         // No --rate override: the default sim rate keeps the gyro sample
         // rate above the 1.8x-loop-rate arming check.
       ],

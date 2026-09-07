@@ -396,6 +396,29 @@ design decisions are recorded there and in code comments.
   the gamepad while you are reading messages; and a saved pane name is validated on load,
   because a name that no longer exists renders nothing at all with no clue in the tab strip.
 
+- **ADS-B reports say which of their own fields to believe, and that is the whole feature**
+  (`protocol/adsb.ts`). ADSB_VEHICLE carries all fourteen fields whatever the receiver actually
+  knows, so an aircraft with no position still arrives with a lat and a lon — not zero, but
+  stale or noise. Every optional field is therefore `null` unless its flag is set, and a report
+  without VALID_COORDS is not a target at all: trusting it draws an aeroplane where there is
+  none, which on a traffic display is worse than drawing nothing. Vertical velocity has its own
+  flag separate from VALID_VELOCITY. Three unit scales share one message — altitude in
+  millimeters, heading in centidegrees, both velocities in centimeters per second — and the
+  identity is the ICAO address, whose decoded key is `ICAOAddress` where every neighbour is
+  camelCase (a wrong key reads as undefined and every aircraft in the sky collapses onto one
+  target). **Unknown is not clear**: `isClose` treats a contact with no reported altitude as
+  close when the range is close, because the first cut required a known relative height and so
+  drew the least-known aircraft the most calmly. The picture is flushed as a whole snapshot at
+  1 Hz rather than forwarded per report, and targets expire after 15 s — several times the
+  report rate, because ADS-B reception blinks in and out at range. Nothing here decides
+  anything: ArduPilot runs its own avoidance from the same messages (AVD_*).
+- **SITL can generate ADS-B traffic, and needs launching for it** — `npm run sitl -- --adsb`.
+  Setting the parameters over MAVLink is not enough, and that was measured rather than assumed:
+  ADSB_TYPE does instantiate its backend live (its parameters appear with no reboot), but the
+  simulated transponder receiver is a `--serial5 sim:adsb` device and the serial protocol that
+  talks to it is read once at boot, so a probe that set all three over the link saw exactly zero
+  aircraft. The flag writes a second defaults file and passes both (ArduPilot accepts
+  `--defaults a,b`), leaving the bench defaults as they came from ArduPilot's autotest tree.
 - **High-rate telemetry** never goes through React state — ring buffers + rAF reads
   (arrives in Phase 1).
 - **American English** everywhere — code, comments, UI strings, docs (color, behavior,

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useVehicleStore } from '../../../stores/vehicle-store'
+import { relativeTo, useTrafficStore } from '../../../stores/traffic-store'
+import { TrafficLayer } from './traffic-layer'
 import { useMissionStore } from '../../../stores/mission-store'
 import { createMissionOverlay, type MissionOverlay } from './mission-overlay'
 import { createCachedTileLayer } from './cached-tile-layer'
@@ -176,6 +178,30 @@ export default function MapView({
       }
     })
     return unsub
+  }, [])
+
+  // Traffic. Driven by the reports alone, and this vehicle's position is
+  // *read* at draw time rather than subscribed to: the marker positions do
+  // not depend on where we are, only the relative-height labels do, and
+  // subscribing to a store that ticks at telemetry rate would rebuild every
+  // marker's icon ten times a second to move a number that changes once. The
+  // engine sends a fresh picture every second for as long as anything is
+  // being heard, so the labels are never more than that stale.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const layer = new TrafficLayer(map)
+    const draw = () => {
+      const v = useVehicleStore.getState()
+      const own = v.latDeg === 0 && v.lonDeg === 0 ? null : v
+      layer.update(relativeTo(useTrafficStore.getState().targets, own))
+    }
+    draw()
+    const unsub = useTrafficStore.subscribe(draw)
+    return () => {
+      unsub()
+      layer.remove()
+    }
   }, [])
 
   useEffect(() => {
