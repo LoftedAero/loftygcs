@@ -38,13 +38,11 @@ export type ModeId = (typeof MODES)[number]['id']
  * So: what you do once when a board is new, what you set and adjust for a
  * particular airframe, and what you read afterwards.
  *
- * One hazard the order no longer warns about, and which is still real:
- * SERIALn_PROTOCOL decides whether an external compass or GPS is detected at
- * all, so a board whose ports are not configured will not find them --
- * and calibrating a compass the firmware never saw is the classic dead end.
- * Ports used to sit ahead of Sensors for exactly that reason. It now sits
- * after it by request, so the sequence no longer teaches it; the Sensors
- * screen is the place to say so if it ever bites.
+ * Ports sits ahead of Sensors deliberately: SERIALn_PROTOCOL decides whether
+ * an external compass or GPS is detected at all, so a board whose ports are
+ * not configured will not find them -- and calibrating a compass the
+ * firmware never saw is the classic dead end. The order is the only place
+ * that warns about it, which is why it is worth keeping.
  */
 export const TAB_GROUPS = ['Initial Setup', 'Config/Tuning', 'Data'] as const
 
@@ -58,8 +56,8 @@ export const TABS = [
   // exactly the ones a first bring-up would not think to look for under
   // their own tabs.
   { id: 'configuration', label: 'Configuration', group: 'Initial Setup' },
-  { id: 'sensors', label: 'Sensors', group: 'Initial Setup' },
   { id: 'ports', label: 'Ports', group: 'Initial Setup' },
+  { id: 'sensors', label: 'Sensors', group: 'Initial Setup' },
 
   { id: 'radio', label: 'Radio', group: 'Config/Tuning' },
   { id: 'modes', label: 'Flight Modes', group: 'Config/Tuning' },

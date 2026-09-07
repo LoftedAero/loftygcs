@@ -53,11 +53,10 @@ design decisions are recorded there and in code comments.
   it. What makes that safe is that everything commanding the aircraft is already gated on
   `connected` in `FlightControls` — App.test.tsx pins that, because it is the property the
   decision rests on. Setup is last, which is Mission Planner's order and the order the work
-  happens in. **SERIALn_PROTOCOL gates compass/GPS detection**, so a board whose
-  ports are unconfigured will not find an external compass, and calibrating one the firmware
-  never saw is the classic dead end. The rail used to encode that by putting Ports ahead of
-  Sensors; it no longer does (Sensors leads, by request), so the hazard now lives only here and
-  belongs on the Sensors screen if it ever bites someone.
+  happens in. Ports deliberately precedes Sensors, because
+  **SERIALn_PROTOCOL gates compass/GPS detection**: a board whose ports are unconfigured will not
+  find an external compass, and calibrating one the firmware never saw is the classic dead end.
+  The order is the only thing that warns about it.
   The mode switch is never orange: Connect owns the app bar's one primary action.
   **The rail is grouped in three** — Initial Setup, Config/Tuning, Data — leaning on Mission
   Planner's vocabulary because anyone arriving here has almost certainly used it. Its
@@ -65,8 +64,8 @@ design decisions are recorded there and in code comments.
   airframe rather than the screen (a battery monitor is optional until the vehicle has one, at
   which point setting it up is not), and a label that is wrong half the time teaches people to
   stop reading labels. The headings come from a `group` field on `TABS` rather than a second
-  structure, so a tab cannot land in a group the rail does not draw. Order inside a group is the user's,
-  not a sequence the app asserts.
+  structure, so a tab cannot land in a group the rail does not draw. Order still carries meaning
+  *inside* a group: Initial Setup runs as a bring-up runs.
   **The simulator was a fourth mode and is not one** — it is something you switch on before
   flying or planning, not an activity in itself, so it lives in the app bar's SITL tray
   (`ui/shell/SimTray.tsx`). Its open state is in `ui-store` because other screens send people
