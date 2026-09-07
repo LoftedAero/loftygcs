@@ -134,9 +134,14 @@ export function batteryLabel(volts: number, amps: number, pct: number): string {
  *
  * The fix type is what decides whether the aircraft can hold a position at
  * all, so it leads; the satellite count is the number that moves while you
- * wait for it, so it follows. GPS_FIX_TYPE from MAVLink: below 2 there is no
- * position, 3 is the ordinary one, and the RTK types matter enough to name
- * because someone who has set up an RTK base wants to see it took.
+ * wait for it, so it follows. GPS_FIX_TYPE from MAVLink, and its first two
+ * values are different problems with the same symptom: 0 is NO_GPS -- no
+ * receiver is talking to the autopilot at all, which is a wiring or a port
+ * configuration to go and fix -- where 1 is NO_FIX, a receiver that is
+ * present and searching, which is a matter of waiting. Mission Planner
+ * distinguishes them for that reason and so does this. 3 is the ordinary
+ * fix, and the RTK types are named because someone who has set up an RTK
+ * base wants to see it took.
  */
 export function gpsLabel(fixType: number, sats: number): string {
   const kind =
@@ -150,12 +155,14 @@ export function gpsLabel(fixType: number, sats: number): string {
             ? '3D'
             : fixType === 2
               ? '2D'
-              : 'No fix'
+              : fixType === 1
+                ? 'No fix'
+                : 'No GPS'
   // Satellites only once there are some to count: "No fix 0" says the same
   // thing twice, and a receiver that has not reported yet says nothing.
   // Named, because the line opposite says "RSSI 83%" and "28 pkt/s" -- a
   // bare number among labelled ones is the one a reader has to stop at.
-  return sats > 0 ? `GPS ${kind}  ${sats} sats` : `GPS ${kind}`
+  return sats > 0 ? `GPS: ${kind}  ${sats} sats` : `GPS: ${kind}`
 }
 
 /**

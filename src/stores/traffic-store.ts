@@ -30,20 +30,17 @@ export type { AdsbTarget }
 export interface TrafficState {
   /** Everything currently heard, newest picture wins. */
   targets: AdsbTarget[]
-  /** Whether any report has ever arrived on this connection. */
-  everSeen: boolean
   applyTargets(targets: AdsbTarget[]): void
   clear(): void
 }
 
 export const useTrafficStore = create<TrafficState>((set) => ({
   targets: [],
-  everSeen: false,
   applyTargets(targets) {
-    set((s) => ({ targets, everSeen: s.everSeen || targets.length > 0 }))
+    set({ targets })
   },
   clear() {
-    set({ targets: [], everSeen: false })
+    set({ targets: [] })
   },
 }))
 

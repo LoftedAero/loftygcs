@@ -174,19 +174,31 @@ describe('linkLabel', () => {
 
 describe('the GPS readout', () => {
   it('names the fix a pilot would name', () => {
-    expect(gpsLabel(0, 0)).toBe('GPS No fix')
-    expect(gpsLabel(2, 5)).toBe('GPS 2D  5 sats')
-    expect(gpsLabel(3, 14)).toBe('GPS 3D  14 sats')
+    expect(gpsLabel(2, 5)).toBe('GPS: 2D  5 sats')
+    expect(gpsLabel(3, 14)).toBe('GPS: 3D  14 sats')
     // Worth naming separately: someone who set up an RTK base wants to see
     // it took, and "3D" would hide it.
-    expect(gpsLabel(5, 20)).toBe('GPS RTK float  20 sats')
-    expect(gpsLabel(6, 20)).toBe('GPS RTK fixed  20 sats')
+    expect(gpsLabel(5, 20)).toBe('GPS: RTK float  20 sats')
+    expect(gpsLabel(6, 20)).toBe('GPS: RTK fixed  20 sats')
   })
 
   it('leaves the satellite count out until there is one', () => {
     // "No fix 0" says the same thing twice, and a receiver that has not
     // reported yet has not said zero -- it has said nothing.
-    expect(gpsLabel(1, 0)).toBe('GPS No fix')
+    expect(gpsLabel(1, 0)).toBe('GPS: No fix')
+  })
+
+  it('tells a missing receiver from one that is still searching', () => {
+    // GPS_FIX_TYPE 0 is NO_GPS: nothing is talking to the autopilot, which
+    // is a wire or a serial port to go and fix. 1 is NO_FIX: a receiver is
+    // there and searching, which is a matter of waiting. Same blank map,
+    // completely different thing to do about it -- so they get different
+    // words, as they do in Mission Planner.
+    expect(gpsLabel(0, 0)).toBe('GPS: No GPS')
+    expect(gpsLabel(1, 0)).toBe('GPS: No fix')
+    // A receiver reporting satellites but no fix is still searching, and
+    // saying "No GPS" over a count of them would be plainly wrong.
+    expect(gpsLabel(1, 4)).toBe('GPS: No fix  4 sats')
   })
 
   it('calls a fix usable at exactly the threshold ArduPilot does', () => {
