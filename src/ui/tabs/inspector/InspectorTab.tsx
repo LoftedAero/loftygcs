@@ -1,9 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { LaCard, LaHint, LaInput, LaSwitch } from '../../components/La'
 import { connectionService } from '../../../services/connection'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { rowKey, useInspectorStore } from '../../../stores/inspector-store'
 import type { FieldValue } from '../../../protocol/types'
+import HardwareId from './HardwareId'
 
 // Everything on the link, live: which messages are arriving, from whom, how
 // often, and what the latest one said. The X-ray for "why is my airspeed
@@ -14,8 +15,17 @@ import type { FieldValue } from '../../../protocol/types'
 // (an upsert per message, next to a decode that already happened) but only
 // builds snapshots while someone is looking, so mounting turns it on and
 // leaving turns it off.
+//
+// Hardware ID shares this tab because it is the same kind of answer from the
+// other direction: the message list says what the vehicle is *saying*, and
+// hardware says what it *found*. A compass that will not calibrate is
+// usually a compass that was never detected, and between the two views that
+// is one place to look rather than two.
+
+type View = 'messages' | 'hardware'
 
 export default function InspectorTab() {
+  const [view, setView] = useState<View>('messages')
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const rows = useInspectorStore((s) => s.rows)
   const selectedKey = useInspectorStore((s) => s.selectedKey)
@@ -26,13 +36,16 @@ export default function InspectorTab() {
   const setFilter = useInspectorStore((s) => s.setFilter)
 
   useEffect(() => {
-    if (!connected) return
+    // Only while the message list is the one showing: snapshotting the link
+    // to draw a table nobody is looking at is the cost this switch exists to
+    // avoid.
+    if (!connected || view !== 'messages') return
     connectionService.setInspecting(true)
     return () => {
       connectionService.setInspecting(false)
       useInspectorStore.getState().clear()
     }
-  }, [connected])
+  }, [connected, view])
 
   const sorted = useMemo(() => {
     const q = filter.trim().toUpperCase()
@@ -44,9 +57,32 @@ export default function InspectorTab() {
   const totalHz = rows.reduce((sum, r) => sum + r.hz, 0)
   const selected = rows.find((r) => rowKey(r) === selectedKey) ?? null
 
+  const tabs = (
+    <div className="inspector__views" role="tablist" aria-label="Inspector view">
+      {(
+        [
+          ['messages', 'Messages'],
+          ['hardware', 'Hardware ID'],
+        ] as const
+      ).map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={view === id}
+          className={`inspector__view${view === id ? ' is-active' : ''}`}
+          onClick={() => setView(id)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
   if (!connected) {
     return (
       <LaCard title="MAVLink inspector" note="Every message on the link, live.">
+        {tabs}
         <p className="app-placeholder">
           Connect a vehicle (or start Demo mode) and this fills with what it is saying: each message
           type, its rate, and the fields inside the latest one.
@@ -55,8 +91,20 @@ export default function InspectorTab() {
     )
   }
 
+  if (view === 'hardware') {
+    // subtitle, not note: LaCard puts a note at the foot as a footnote, and
+    // this is a description of the card rather than an aside after it.
+    return (
+      <LaCard title="Hardware ID" subtitle="The sensors this firmware has detected.">
+        {tabs}
+        <HardwareId />
+      </LaCard>
+    )
+  }
+
   return (
     <div className="inspector">
+      {tabs}
       <div className="inspector__main">
         <div className="inspector__bar">
           <LaInput

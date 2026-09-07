@@ -19,30 +19,58 @@ export const MODES = [
 
 export type ModeId = (typeof MODES)[number]['id']
 
-// The Setup rail, ordered as a bring-up runs. Ports sits ahead of Sensors
-// deliberately: SERIALn_PROTOCOL decides whether the external compass and
-// GPS are detected at all, and calibrating a compass the board has not
-// found is the classic dead end.
+/**
+ * The Setup rail, grouped the way Mission Planner groups it.
+ *
+ * Sixteen items in one list read as sixteen things to do; the groups say
+ * which of them are steps, which are extras, and which are not steps at all.
+ * The names are Mission Planner's on purpose -- anyone arriving here has
+ * almost certainly used it, and a familiar vocabulary is worth more than a
+ * better one nobody knows.
+ *
+ * Order still carries meaning inside each group: Mandatory runs as a bring-up
+ * runs, and Ports sits ahead of Sensors deliberately, because
+ * SERIALn_PROTOCOL decides whether the external compass and GPS are detected
+ * at all -- calibrating a compass the board has not found is the classic dead
+ * end.
+ *
+ * Failsafes is Mandatory rather than Optional for the same reason it is in
+ * Mission Planner: a vehicle whose radio failsafe was never set is a vehicle
+ * that flies away. The battery monitor is Optional because plenty of airframes
+ * genuinely have none.
+ */
+export const TAB_GROUPS = ['Initial setup', 'Mandatory', 'Optional', 'Config', 'Data'] as const
+
+export type TabGroup = (typeof TAB_GROUPS)[number]
+
 export const TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'firmware', label: 'Firmware' },
-  { id: 'configuration', label: 'Configuration' },
-  { id: 'ports', label: 'Ports' },
-  { id: 'sensors', label: 'Sensors' },
-  { id: 'radio', label: 'Radio' },
-  { id: 'modes', label: 'Flight modes' },
-  { id: 'outputs', label: 'Outputs' },
-  { id: 'power', label: 'Power' },
-  { id: 'failsafes', label: 'Failsafes' },
-  { id: 'tuning', label: 'Tuning' },
-  { id: 'osd', label: 'OSD' },
-  { id: 'parameters', label: 'Parameters' },
-  { id: 'logs', label: 'Logs' },
-  { id: 'files', label: 'MAVFTP' },
-  // After Logs, deliberately: the rail above is the bring-up sequence and
-  // the inspector is not a step in it -- it is the X-ray you reach for when
-  // a step misbehaves.
-  { id: 'inspector', label: 'Inspector' },
+  { id: 'overview', label: 'Overview', group: 'Initial setup' },
+  { id: 'firmware', label: 'Firmware', group: 'Initial setup' },
+  // The curated cards, at the head of the rail rather than beside the
+  // parameters they write: it is where a new airframe starts, and the
+  // things it covers -- battery monitor, failsafes, arming checks -- are
+  // exactly the ones a first bring-up needs and would not think to look
+  // for under their own tabs.
+  { id: 'configuration', label: 'Configuration', group: 'Initial setup' },
+
+  { id: 'ports', label: 'Ports', group: 'Mandatory' },
+  { id: 'sensors', label: 'Sensors', group: 'Mandatory' },
+  { id: 'radio', label: 'Radio', group: 'Mandatory' },
+  { id: 'modes', label: 'Flight modes', group: 'Mandatory' },
+  { id: 'outputs', label: 'Outputs', group: 'Mandatory' },
+  { id: 'failsafes', label: 'Failsafes', group: 'Mandatory' },
+
+  { id: 'power', label: 'Power', group: 'Optional' },
+  { id: 'osd', label: 'OSD', group: 'Optional' },
+
+  // Config is where a setting is changed rather than a step performed.
+  { id: 'tuning', label: 'Tuning', group: 'Config' },
+  { id: 'parameters', label: 'Parameters', group: 'Config' },
+
+  // Not steps at all: what you reach for when a step misbehaves.
+  { id: 'logs', label: 'Logs', group: 'Data' },
+  { id: 'files', label: 'MAVFTP', group: 'Data' },
+  { id: 'inspector', label: 'Inspector', group: 'Data' },
 ] as const
 
 export type TabId = (typeof TABS)[number]['id']

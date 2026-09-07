@@ -49,6 +49,13 @@ design decisions are recorded there and in code comments.
   (plus a running guide) take the whole window. The rail order is the bring-up sequence, and Ports
   deliberately precedes Sensors because SERIALn_PROTOCOL gates compass/GPS detection.
   The mode switch is never orange: Connect owns the app bar's one primary action.
+  **The rail is grouped with Mission Planner's names** — Initial setup, Mandatory, Optional,
+  Config, Data — because anyone arriving here has almost certainly used it, and a familiar
+  vocabulary beats a better one nobody knows. The headings come from a `group` field on `TABS`
+  rather than a second structure, so a tab cannot land in a group the rail does not draw. Order
+  still carries meaning *inside* a group: Mandatory runs as a bring-up runs. Failsafes is
+  Mandatory, as it is in Mission Planner, because a vehicle whose radio failsafe was never set
+  flies away; the battery monitor is Optional because plenty of airframes have none.
   **The simulator was a fourth mode and is not one** — it is something you switch on before
   flying or planning, not an activity in itself, so it lives in the app bar's SITL tray
   (`ui/shell/SimTray.tsx`). Its open state is in `ui-store` because other screens send people
@@ -181,6 +188,19 @@ design decisions are recorded there and in code comments.
   heartbeat arrive" is binary, needs no MAVLink parsing, and cannot pass for the wrong reason.
   `SYSID_THISMAV` looks like the obvious marker and is not — it does not reach the heartbeat
   from a defaults file, so a test built on it can only ever pass.
+- **ArduPilot device IDs are packed, and the device type means nothing without its class**
+  (`protocol/device-id.ts`, shown as Inspector ▸ Hardware ID). Every detected sensor gets a
+  `bus_type:3, bus:5, address:8, devtype:8` word stored in a parameter — INS_ACC_ID,
+  COMPASS_DEV_ID, BARO1_DEVID and their siblings — and the tables that name a devtype are
+  **per driver**: 0x0B is an ICM20948 to the compass and an MS5611 to the barometer, so a
+  decoder that does not take the class with the number puts a confident wrong part on screen.
+  The values are ArduPilot's own, from `AP_HAL/Device.h` and the three backends' headers, and
+  verified against SITL: the COMPASS_DEV_IDs it reports are exactly its own `SIM_MAG*_DEVID`
+  fixtures, decoded back. Zero means a slot the firmware found nothing on, which is a different
+  answer from a device it found and this build cannot name — the first gets no row, the second
+  keeps its number. It lives in the Inspector because it answers the same question from the
+  other side: the message list says what the vehicle is *saying*, hardware says what it *found*,
+  and a compass that will not calibrate is usually a compass that was never detected.
 - **The inspector is the one place raw traffic reaches React state, and only because it is not
   raw** (`protocol/engine.ts` + `stores/inspector-store.ts`). The engine counts every received
   message always — one map upsert beside a decode that already happened — but builds snapshots

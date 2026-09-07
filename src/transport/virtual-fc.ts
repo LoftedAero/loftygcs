@@ -183,6 +183,19 @@ const SIM_PARAMS: [string, number, number][] = [
   ['COMPASS_USE3', 0, 2],
   ['COMPASS_ORIENT', 0, 2],
   ['COMPASS_AUTODEC', 1, 2],
+  // Device IDs, so Hardware ID has a board to describe. The *encoding* is
+  // ArduPilot's own and was read off SITL before being used here --
+  // `bus_type:3, bus:5, address:8, devtype:8` -- while the parts are this
+  // demo airframe's: a modern IMU on SPI, an external compass on I2C where
+  // an external compass goes, and a baro on the bus its board shares.
+  // uint32 parameters, so mavType 6 (MAV_PARAM_TYPE_UINT32).
+  // 0x34 ICM42688, SPI bus 1, CS 1.
+  ['INS_ACC_ID', 0x340102 | 0x0a, 6],
+  ['INS_GYR_ID', 0x340102 | 0x0a, 6],
+  // 0x0A IST8310 at 0x0e on I2C bus 0: the classic external compass.
+  ['COMPASS_DEV_ID', 0x0a0e00 | 0x01, 6],
+  // 0x06 DPS310 at 0x76 on I2C bus 0.
+  ['BARO1_DEVID', 0x067600 | 0x01, 6],
   ['INS_ACCEL_FILTER', 20, 9],
   ['INS_GYRO_FILTER', 20, 9],
   ['GPS_TYPE', 1, 2],

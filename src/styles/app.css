@@ -969,6 +969,91 @@
   min-height: 0;
   flex: 1;
 }
+/* The Inspector's two views, in the plan switch's shape: one segmented
+   control, because they are two ways of looking at one link rather than two
+   places to be. */
+.inspector__views {
+  display: flex;
+  gap: 0;
+  align-self: flex-start;
+  margin-bottom: var(--la-space-3);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+  background: var(--la-surface);
+  flex: none;
+}
+.inspector__view {
+  appearance: none;
+  border: 0;
+  border-right: 1px solid var(--la-line);
+  background: transparent;
+  color: var(--la-ink-2);
+  font: 600 var(--la-size-sm) / 1 var(--la-font);
+  padding: var(--la-space-2) var(--la-space-4);
+  cursor: default;
+}
+.inspector__view:last-child {
+  border-right: 0;
+}
+.inspector__view.is-active {
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
+
+/* Hardware ID: a plain table, because every column is a fact and none of
+   them is a control. */
+.hwid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-width: 0;
+  overflow-x: auto;
+}
+.hwid__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--la-size-sm);
+}
+.hwid__table th {
+  text-align: left;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+  padding: 0 var(--la-space-3) var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+.hwid__table td {
+  padding: var(--la-space-2) var(--la-space-3) var(--la-space-2) 0;
+  border-bottom: 1px solid var(--la-line);
+  vertical-align: baseline;
+}
+.hwid__table .num {
+  text-align: right;
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.hwid__table th.num {
+  font-family: var(--la-font);
+}
+/* The parameter name under its label: the next thing anyone does with a
+   surprising row is go and look it up. */
+.hwid__param {
+  display: block;
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+.hwid__unknown {
+  font-family: var(--la-font-mono);
+  color: var(--la-ink-2);
+}
+.hwid__raw {
+  color: var(--la-ink-3);
+}
+
 .inspector__main {
   display: flex;
   flex-direction: column;
@@ -1248,6 +1333,29 @@
   background: var(--la-surface);
   border-right: 1px solid var(--la-line);
   overflow-y: auto;
+}
+
+/* Group headings: the actions column's own label treatment, because they do
+   the same job there -- name a set of things without competing with them.
+   The first needs no space above it; the rest separate their group from the
+   one before. */
+.app-nav__group {
+  margin: var(--la-space-4) 0 var(--la-space-2);
+  padding: 0 var(--la-space-3) var(--la-space-1);
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--la-ink-2);
+  /* The accent rule .la-card__title carries, for the same reason: it marks
+     a heading as the start of something rather than another quiet line in a
+     column of quiet lines. Orange is the brand accent used as structure
+     here, not as an action -- nothing in this rail is clickable that is not
+     already a button. */
+  border-bottom: 2px solid var(--la-orange);
+}
+.app-nav__group:first-child {
+  margin-top: 0;
 }
 
 /* Nav items read as places, not actions, so they take neither the button
