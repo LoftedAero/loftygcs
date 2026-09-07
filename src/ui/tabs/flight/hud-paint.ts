@@ -61,6 +61,9 @@ export interface HudState {
   units: UnitPrefs
   batteryText: string
   linkText: string
+  gpsText: string
+  /** Whether that fix will fly a position mode; red when it will not. */
+  gpsUsable: boolean
   modeName: string
   armed: boolean
   showArmedBanner: boolean
@@ -238,7 +241,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   pair('THR', `${st.throttlePct.toFixed(0)}%`, right, u2, 'right')
 
   // The corners: battery bottom left, mode bottom right, link top right,
-  // all at the same weight as the readouts above them.
+  // GPS top left, all at the same weight as the readouts above them.
   const corner = 13 * s
   write(st.batteryText, left, h - 8 * s, { size: corner })
   write(st.modeName || '—', right, h - 8 * s, {
@@ -249,6 +252,14 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     align: 'right',
   })
   write(st.linkText, right, ribbonH + 18 * s, { size: corner, align: 'right' })
+  // GPS opposite the link, on the same line: both answer "can I trust what
+  // this thing is telling me", and they are the two that decide whether a
+  // position mode is available at all. Red without a usable fix -- status,
+  // and the one number on this screen that turns a Loiter into a refusal.
+  write(st.gpsText, left, ribbonH + 18 * s, {
+    size: corner,
+    ...(st.gpsUsable ? {} : { color: RED, weight: '600' }),
+  })
 
   // State, centered and unmissable. Sits above the horizon center so the
   // aircraft symbol stays readable underneath it.

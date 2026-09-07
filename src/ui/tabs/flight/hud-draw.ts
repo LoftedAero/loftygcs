@@ -129,6 +129,46 @@ export function batteryLabel(volts: number, amps: number, pct: number): string {
   return parts.join('  ')
 }
 
+/**
+ * GPS fix quality, in the words a pilot uses for it.
+ *
+ * The fix type is what decides whether the aircraft can hold a position at
+ * all, so it leads; the satellite count is the number that moves while you
+ * wait for it, so it follows. GPS_FIX_TYPE from MAVLink: below 2 there is no
+ * position, 3 is the ordinary one, and the RTK types matter enough to name
+ * because someone who has set up an RTK base wants to see it took.
+ */
+export function gpsLabel(fixType: number, sats: number): string {
+  const kind =
+    fixType >= 6
+      ? 'RTK fixed'
+      : fixType === 5
+        ? 'RTK float'
+        : fixType === 4
+          ? 'DGPS'
+          : fixType === 3
+            ? '3D'
+            : fixType === 2
+              ? '2D'
+              : 'No fix'
+  // Satellites only once there are some to count: "No fix 0" says the same
+  // thing twice, and a receiver that has not reported yet says nothing.
+  // Named, because the line opposite says "RSSI 83%" and "28 pkt/s" -- a
+  // bare number among labelled ones is the one a reader has to stop at.
+  return sats > 0 ? `GPS ${kind}  ${sats} sats` : `GPS ${kind}`
+}
+
+/**
+ * Whether the fix is one a position-holding mode can fly on.
+ *
+ * Three is the threshold ArduPilot itself uses: below it the vehicle refuses
+ * Loiter, Auto and RTL, which is exactly when a pilot wants the number to be
+ * shouting rather than sitting quietly in a corner.
+ */
+export function gpsUsable(fixType: number): boolean {
+  return fixType >= 3
+}
+
 /** Link line: receiver RSSI where the vehicle reports it, else packet rate. */
 export function linkLabel(rcRssi: number, packetsPerSec: number | undefined): string {
   const parts: string[] = []

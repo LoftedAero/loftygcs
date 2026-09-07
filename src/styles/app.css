@@ -772,12 +772,13 @@
   overflow: auto;
   padding: var(--la-space-2) var(--la-space-3);
 }
-/* The traffic count, under the map's own controls: small, and only there
-   while the layer is on. */
+/* The traffic count, bottom left: out of the way of the layer switch and the
+   Follow button at the top, and of the zoom control at the bottom right.
+   Only there while the layer is on. */
 .map-traffic-count {
   position: absolute;
-  top: calc(var(--la-space-2) + 30px);
-  right: var(--la-space-2);
+  bottom: calc(var(--la-space-2) + 18px);
+  left: var(--la-space-2);
   z-index: 500;
   padding: 2px var(--la-space-2);
   border-radius: var(--la-radius-sm);

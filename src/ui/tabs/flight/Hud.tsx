@@ -4,7 +4,14 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { usePreferencesStore } from '../../../stores/preferences-store'
 import { SENSOR_BITS } from '../../../protocol/sensors'
-import { armReadiness, batteryLabel, isFailsafe, linkLabel } from './hud-draw'
+import {
+  armReadiness,
+  batteryLabel,
+  gpsLabel,
+  gpsUsable,
+  isFailsafe,
+  linkLabel,
+} from './hud-draw'
 import { paintHud } from './hud-paint'
 import VideoLayer from './VideoLayer'
 import { videoService } from '../../../services/video'
@@ -89,6 +96,8 @@ export default function Hud({ horizon, overlays, onContextMenu }: HudProps) {
         // rxCount is already the count over the last second, so it is the
         // packet rate as it stands.
         linkText: linkLabel(v.rcRssi, link?.rxCount),
+        gpsText: gpsLabel(v.gpsFix, v.gpsSats),
+        gpsUsable: gpsUsable(v.gpsFix),
         modeName: v.modeName,
         armed: v.armed,
         showArmedBanner: v.armed && now - armedAt.current.at < ARMED_BANNER_MS,

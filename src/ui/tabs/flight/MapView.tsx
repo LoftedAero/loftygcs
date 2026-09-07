@@ -307,10 +307,10 @@ function TrafficCount() {
   return (
     <div className={`map-traffic-count${count > 0 ? ' is-active' : ''}`}>
       {everSeen
-        ? `${count} aircraft`
+        ? `ADS-B: ${count} aircraft`
         : /* Not "0 aircraft": nothing has been heard at all, which on most
              vehicles means no receiver rather than an empty sky. */
-          'No ADS-B yet'}
+          'ADS-B: nothing heard yet'}
     </div>
   )
 }

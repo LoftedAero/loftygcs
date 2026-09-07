@@ -5,6 +5,8 @@ import {
   armReadiness,
   batteryLabel,
   compassTicks,
+  gpsLabel,
+  gpsUsable,
   isFailsafe,
   linkLabel,
   tapeTicks,
@@ -167,5 +169,31 @@ describe('linkLabel', () => {
   it('says nothing rather than showing zeros', () => {
     expect(linkLabel(-1, undefined)).toBe('')
     expect(linkLabel(-1, 0)).toBe('')
+  })
+})
+
+describe('the GPS readout', () => {
+  it('names the fix a pilot would name', () => {
+    expect(gpsLabel(0, 0)).toBe('GPS No fix')
+    expect(gpsLabel(2, 5)).toBe('GPS 2D  5 sats')
+    expect(gpsLabel(3, 14)).toBe('GPS 3D  14 sats')
+    // Worth naming separately: someone who set up an RTK base wants to see
+    // it took, and "3D" would hide it.
+    expect(gpsLabel(5, 20)).toBe('GPS RTK float  20 sats')
+    expect(gpsLabel(6, 20)).toBe('GPS RTK fixed  20 sats')
+  })
+
+  it('leaves the satellite count out until there is one', () => {
+    // "No fix 0" says the same thing twice, and a receiver that has not
+    // reported yet has not said zero -- it has said nothing.
+    expect(gpsLabel(1, 0)).toBe('GPS No fix')
+  })
+
+  it('calls a fix usable at exactly the threshold ArduPilot does', () => {
+    // Below 3 the vehicle refuses Loiter, Auto and RTL, which is when the
+    // number should be shouting rather than sitting quietly in a corner.
+    expect(gpsUsable(2)).toBe(false)
+    expect(gpsUsable(3)).toBe(true)
+    expect(gpsUsable(6)).toBe(true)
   })
 })
