@@ -139,10 +139,18 @@ function cleanCallsign(raw: FieldValue | undefined): string | null {
   return text.length > 0 ? text : null
 }
 
-/** The label a screen shows for an aircraft, in the order a pilot would say it. */
+/**
+ * What a screen calls an aircraft: its callsign, or its ICAO address.
+ *
+ * Two levels, not three. The squawk sat between them for a while and does
+ * not belong: it is assigned for a flight and reassigned freely, so the same
+ * four digits mean different aircraft on different days and 1200 means
+ * "nobody assigned me one" on a great many at once -- a label that can be
+ * shared by every VFR aircraft in the circuit is not identifying anything.
+ * The address always exists and always means this airframe.
+ */
 export function targetLabel(t: AdsbTarget): string {
   if (t.callsign) return t.callsign
-  if (t.squawk !== null) return `Squawk ${String(t.squawk).padStart(4, '0')}`
   // Hex, uppercase, six digits: how an ICAO address is written everywhere
   // it is written at all.
   return t.icao.toString(16).toUpperCase().padStart(6, '0')
