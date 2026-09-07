@@ -30,7 +30,6 @@ export const LOG_PANES = [
   { id: 'preflight', label: 'Preflight' },
   { id: 'camera', label: 'Camera' },
   { id: 'joystick', label: 'Joystick' },
-  { id: 'traffic', label: 'Traffic' },
 ] as const
 
 export type LogPane = (typeof LOG_PANES)[number]['id']
@@ -45,6 +44,8 @@ export interface FlightLayoutState {
   showMessages: boolean
   /** The plot strip above the map. */
   showPlot: boolean
+  /** ADS-B traffic drawn on the map. */
+  showTraffic: boolean
   /** Which telemetry fields the plot is drawing. */
   plotFields: string[]
   /** Last HUD video source, so it does not have to be retyped. */
@@ -75,7 +76,8 @@ export interface FlightLayoutState {
       | 'showMessages'
       | 'showPlot'
       | 'hudHorizon'
-      | 'hudOverlays',
+      | 'hudOverlays'
+      | 'showTraffic',
   ) => void
   togglePlotField: (name: string) => void
   setLogPane: (pane: LogPane) => void
@@ -98,6 +100,7 @@ interface Persisted {
   videoUrl: string
   hudHorizon: boolean
   hudOverlays: boolean
+  showTraffic: boolean
 }
 
 const DEFAULTS: Persisted = {
@@ -115,6 +118,10 @@ const DEFAULTS: Persisted = {
   videoUrl: '',
   hudHorizon: true,
   hudOverlays: true,
+  // On by default: a vehicle with no receiver draws nothing, so the cost of
+  // it being on is zero, and traffic you did not know to switch on is the
+  // traffic you do not see.
+  showTraffic: true,
 }
 
 function load(): Persisted {
@@ -164,6 +171,7 @@ function snapshot(s: FlightLayoutState): Persisted {
     videoUrl: s.videoUrl,
     hudHorizon: s.hudHorizon,
     hudOverlays: s.hudOverlays,
+    showTraffic: s.showTraffic,
   }
 }
 

@@ -81,6 +81,13 @@ export interface RelativeTarget extends AdsbTarget {
    * whether a contact matters, and null unless both altitudes are known.
    */
   relAltM: number | null
+  /**
+   * Whether this vehicle knew where it was, and so whether the three fields
+   * above mean anything. Carried explicitly rather than inferred from a null
+   * range: both screens need to tell "no fix here" from "this report had no
+   * altitude", and those are different sentences to put on a screen.
+   */
+  relative: boolean
 }
 
 /**
@@ -102,6 +109,7 @@ export function relativeTo(
     rangeM: own ? distanceM(own, t) : null,
     bearingDeg: own ? bearingDeg(own, t) : null,
     relAltM: own && t.altMslM !== null ? t.altMslM - own.altMslM : null,
+    relative: own !== null,
   }))
   // Nearest first: on a traffic list the top of the screen is where the
   // thing you care about belongs, and the thing you care about is the close

@@ -95,6 +95,19 @@ export default function LayoutMenu({ onVideo }: LayoutMenuProps) {
             onChange={() => layout.toggle('showPlot')}
           />
 
+          {/* A map layer, not a panel: it draws over the map rather than
+              taking room from anything. On by default and kept here because
+              a vehicle with no receiver draws nothing anyway -- the switch
+              exists for the field where the sky is busy and the markers are
+              in the way of the plan. */}
+          <p className="layout-menu__heading">Map layers</p>
+          <LaSwitch
+            label="ADS-B traffic"
+            checked={layout.showTraffic}
+            disabled={!layout.showMap}
+            onChange={() => layout.toggle('showTraffic')}
+          />
+
           <p className="layout-menu__heading">HUD layers</p>
           <LaSwitch
             label="Horizon"

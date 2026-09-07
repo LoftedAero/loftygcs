@@ -203,3 +203,21 @@ describe('which contacts stand out', () => {
     expect(isClose(blind)).toBe(false)
   })
 })
+
+describe('what a bench with no fix can still say', () => {
+  it('keeps the report even when nothing is relative to anything', () => {
+    // The case a real receiver on a desk produces: the aircraft is fully
+    // described, and this vehicle does not know where it is, so range,
+    // bearing and relative height are all unknown together -- which is why
+    // three dashes at once mean "no fix", not "bad report".
+    const [t] = relativeTo([decodeAdsbVehicle(report())!], null)
+    expect(t!.rangeM).toBeNull()
+    expect(t!.bearingDeg).toBeNull()
+    expect(t!.relAltM).toBeNull()
+    // The one height that survives: the aircraft's own, straight from the
+    // report, which is what the map tag falls back to on a bench.
+    expect(t!.altMslM).toBeCloseTo(1524, 3)
+    expect(t!.callsign).toBe('N172SP')
+    expect(t!.groundSpeedMs).toBeCloseTo(51.44, 3)
+  })
+})

@@ -408,7 +408,11 @@ design decisions are recorded there and in code comments.
   camelCase (a wrong key reads as undefined and every aircraft in the sky collapses onto one
   target). **Unknown is not clear**: `isClose` treats a contact with no reported altitude as
   close when the range is close, because the first cut required a known relative height and so
-  drew the least-known aircraft the most calmly. The picture is flushed as a whole snapshot at
+  drew the least-known aircraft the most calmly. The map tag shows height above this vehicle
+  where there is a fix and the aircraft's own AMSL figure where there is not — one value, and
+  `relative` on the target says which, because a relative 200 and an AMSL 200 are different
+  heights and the fallback must never be silent. It started as a list *and* a map layer; the
+  list went, because the map answers the same questions in the place you are already looking. The picture is flushed as a whole snapshot at
   1 Hz rather than forwarded per report, and targets expire after 15 s — several times the
   report rate, because ADS-B reception blinks in and out at range. Nothing here decides
   anything: ArduPilot runs its own avoidance from the same messages (AVD_*).

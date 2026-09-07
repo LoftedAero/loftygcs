@@ -767,6 +767,11 @@
   overflow: auto;
   padding: var(--la-space-2) var(--la-space-3);
 }
+.traffic-panel__note {
+  margin: 0 0 var(--la-space-2);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
 .traffic-table {
   width: 100%;
   border-collapse: collapse;

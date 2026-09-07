@@ -3,6 +3,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { relativeTo, useTrafficStore } from '../../../stores/traffic-store'
+import { useUnits } from '../../../stores/preferences-store'
+import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 import { TrafficLayer } from './traffic-layer'
 import { useMissionStore } from '../../../stores/mission-store'
 import { createMissionOverlay, type MissionOverlay } from './mission-overlay'
@@ -187,14 +189,16 @@ export default function MapView({
   // marker's icon ten times a second to move a number that changes once. The
   // engine sends a fresh picture every second for as long as anything is
   // being heard, so the labels are never more than that stale.
+  const distanceUnit = useUnits().distance
+  const showTraffic = useFlightLayoutStore((s) => s.showTraffic)
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map || !showTraffic) return
     const layer = new TrafficLayer(map)
     const draw = () => {
       const v = useVehicleStore.getState()
       const own = v.latDeg === 0 && v.lonDeg === 0 ? null : v
-      layer.update(relativeTo(useTrafficStore.getState().targets, own))
+      layer.update(relativeTo(useTrafficStore.getState().targets, own), distanceUnit)
     }
     draw()
     const unsub = useTrafficStore.subscribe(draw)
@@ -202,7 +206,10 @@ export default function MapView({
       unsub()
       layer.remove()
     }
-  }, [])
+    // Rebuilt when the switch or the unit changes: the tags carry a number
+    // and a unit, and switching the preference must not leave feet on the
+    // map and meters everywhere else.
+  }, [distanceUnit, showTraffic])
 
   useEffect(() => {
     const draw = () => {
