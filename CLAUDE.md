@@ -76,8 +76,11 @@ design decisions are recorded there and in code comments.
   of 860px cards, which on the full-screen window this app is actually used in put every card in
   a third-width ribbon down the left — measured at 39% of the content area used. Cards are
   independent settings groups, so they tile: `repeat(auto-fill, minmax(460px, 1fr))`, capped at
-  four columns and centered past that, because an ultrawide spreading eight short cards over six
-  columns reads as scattered and a left-aligned cap just moves the void further out. Three things
+  four columns past 2600px, because an ultrawide spreading eight short cards over six columns
+  reads as scattered. **Cap the column count, never the grid's width**: a `max-width` stops the
+  tracks growing the moment four fit, and the slack becomes side padding on an ordinary 16:9 —
+  padding nobody asked for, on the screen the grid exists to fill. A media query setting
+  `repeat(4, minmax(0, 1fr))` caps the count and lets the tracks keep the width. Three things
   it is easy to get wrong: `auto-fill`, never `auto-fit` — `auto-fit` collapses the empty tracks
   and stretches a lone card across the whole window, the same problem inverted; `align-items:
   start`, or every card in a row grows to the tallest one; and **`.app-content--flush` must undo

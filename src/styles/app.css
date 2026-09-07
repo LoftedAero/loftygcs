@@ -1423,13 +1423,21 @@
   align-items: start;
   align-content: start;
   gap: var(--la-space-4);
-  max-width: calc(4 * 460px + 3 * var(--la-space-4) + 2 * var(--la-space-5));
-  /* Centered once the cap bites, which only happens past four columns. Left
-     aligned, an ultrawide puts the whole cap against the rail and leaves a
-     void the width of a laptop screen beside it -- the same lopsidedness the
-     cap exists to avoid, moved further out. Below the cap the grid fills its
-     column and this does nothing. */
-  margin-inline: auto;
+}
+
+/* The column cap, and only where it is wanted.
+ 
+   It was a max-width on the grid, which capped the *width* rather than the
+   count -- so the moment four columns fit, the tracks stopped growing and
+   the slack became side padding. On an ordinary 16:9 that is padding nobody
+   asked for, on the screen this was meant to fill. Capping the count instead
+   leaves the tracks at 1fr, so they always take the whole width, and only a
+   genuinely ultrawide window is stopped from growing a fifth and sixth
+   column of short cards. */
+@media (min-width: 2600px) {
+  .app-content {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* Inside a setup card, a control sits next to its label rather than at the
