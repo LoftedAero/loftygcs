@@ -1395,20 +1395,76 @@
 /* The content pane owns the scrolling and the card rhythm. Cards cap at a
    readable width; a GCS grows wide screens fast and 100%-wide prose cards
    are unreadable on them. */
+/* Setup lays its cards out as a grid, not a column.
+ 
+   They were a flex column of 860px cards, which on a full-screen window put
+   every card in a third-width ribbon down the left with two thirds of the
+   monitor empty beside it -- measured at 39% of the content area used, and
+   this app is used full screen. Cards are independent settings groups, so
+   they tile.
+
+   `auto-fill` rather than `auto-fit`: auto-fit collapses the empty tracks
+   and stretches a lone card across the whole window, which is the same
+   problem the other way round. A tab with one card gets one column's worth,
+   the same size it would be beside others.
+
+   The cap is what stops an ultrawide from spreading eight short cards over
+   six columns, which reads as scattered rather than full: 4 columns at
+   460px plus gaps, and past that the grid stays put and the space goes to
+   the margin. */
 .app-content {
   overflow-y: auto;
   padding: var(--la-space-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  /* Cards keep their own heights; without this every card in a row stretches
+     to the tallest, and a three-field card grows white space to match a
+     twelve-field one. */
+  align-items: start;
+  align-content: start;
+  gap: var(--la-space-4);
+  max-width: calc(4 * 460px + 3 * var(--la-space-4) + 2 * var(--la-space-5));
+  /* Centered once the cap bites, which only happens past four columns. Left
+     aligned, an ultrawide puts the whole cap against the rail and leaves a
+     void the width of a laptop screen beside it -- the same lopsidedness the
+     cap exists to avoid, moved further out. Below the cap the grid fills its
+     column and this does nothing. */
+  margin-inline: auto;
+}
+
+/* Inside a setup card, a control sits next to its label rather than at the
+   far edge. The system sheet's `.la-field` is `1fr auto`, so the label column
+   absorbs every spare pixel -- which in an 860px card left ~590 of them
+   between "P" and its value, and the pair stopped reading as one thing. A
+   fixed label column also lines every control in a card up with the others,
+   which a shrink-to-fit one does not. Scoped here rather than changed in
+   lofted-aero.css, which is frozen and shared with three other apps. */
+.app-content .la-card .la-field {
+  grid-template-columns: minmax(0, 20ch) auto;
+  justify-content: start;
+}
+
+/* Anything that is not a card brought its own layout -- the log screen, the
+   file browser, the inspector -- and none of them is a tile. They take the
+   full row rather than being squeezed into a column of one. */
+.app-content > *:not(.la-card) {
+  grid-column: 1 / -1;
+}
+
+
+
+/* Fly and Mission own their own layout; the pane just holds them, and is not
+   a grid at all -- they arrange their whole window themselves. */
+.app-content--flush {
   display: flex;
   flex-direction: column;
-  gap: var(--la-space-4);
-}
-
-.app-content > .la-card {
-  max-width: 860px;
-}
-
-/* Fly and Mission own their own layout; the pane just holds them. */
-.app-content--flush {
+  /* Every grid property the setup layout sets has to be undone here, and
+     `align-items` is the one that bites: `start` on a flex column makes each
+     child shrink to its own content, which left the flight screen 877px wide
+     in a 2400px window -- the very complaint the grid was added to fix,
+     reintroduced one screen over. */
+  align-items: stretch;
+  max-width: none;
   padding: var(--la-space-4);
 }
 
@@ -2024,6 +2080,7 @@
    table is the one card that wants everything -- 1400 rows of name, value
    and a paragraph of description have somewhere to put the width. */
 .app-content > .params-card {
+  grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
   flex: 1;

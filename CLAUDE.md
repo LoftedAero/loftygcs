@@ -72,6 +72,21 @@ design decisions are recorded there and in code comments.
   to it. The dot is the part that earns the bar space: a SITL left running in the background
   is otherwise invisible, and the cost of forgetting is a mystery TCP connection or a second
   simulator that will not bind.
+- **Setup lays its cards out as a grid, not a column** (`.app-content`). They were a flex column
+  of 860px cards, which on the full-screen window this app is actually used in put every card in
+  a third-width ribbon down the left — measured at 39% of the content area used. Cards are
+  independent settings groups, so they tile: `repeat(auto-fill, minmax(460px, 1fr))`, capped at
+  four columns and centered past that, because an ultrawide spreading eight short cards over six
+  columns reads as scattered and a left-aligned cap just moves the void further out. Three things
+  it is easy to get wrong: `auto-fill`, never `auto-fit` — `auto-fit` collapses the empty tracks
+  and stretches a lone card across the whole window, the same problem inverted; `align-items:
+  start`, or every card in a row grows to the tallest one; and **`.app-content--flush` must undo
+  every grid property**, `align-items` above all — `start` on the flex column it becomes made the
+  flight screen shrink to its own content, 877px in a 2400px window, reintroducing the exact
+  complaint one screen over. Narrower cards also fixed the field rows for free: the system
+  sheet's `.la-field` is `1fr auto`, so in an 860px card ~590px sat between "P" and its value,
+  and a scoped `minmax(0, 20ch) auto` in `app.css` (the sheet itself is frozen) now puts the
+  control beside its label and lines every control in a card up.
 - **The actions column** (`.app-col` in `app.css`): every screen that edits something has a
   fixed-width column on the right holding what you *do*, beside the thing you are doing it to.
   Mission, Parameters and OSD share one set of classes so they cannot drift — they each grew a
