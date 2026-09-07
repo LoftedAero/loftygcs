@@ -28,7 +28,13 @@ describe('app shell', () => {
     // Fly and Mission are full-window: no setup rail alongside them.
     fireEvent.click(screen.getByRole('tab', { name: 'Fly' }))
     expect(screen.queryByRole('button', { name: 'Firmware' })).toBeNull()
-    expect(screen.getByText(/Connect a vehicle \(or start demo mode\) to fly/)).toBeTruthy()
+    // The flight screen draws with no vehicle rather than describing itself:
+    // the map is worth looking at before anything is connected. Asserted by
+    // the lower pane's own tabs, which only exist once it has mounted.
+    expect(screen.getByRole('tab', { name: 'Messages' })).toBeTruthy()
+    // And nothing that commands an aircraft is reachable without one. This
+    // is the property that makes drawing it safe, so it is the one pinned.
+    expect(screen.getByRole('button', { name: 'RTL' }).hasAttribute('disabled')).toBe(true)
 
     fireEvent.click(screen.getByRole('tab', { name: 'Mission' }))
     // The planner stands on its own without a vehicle: a mission can be

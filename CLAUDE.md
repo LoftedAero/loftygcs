@@ -44,9 +44,16 @@ design decisions are recorded there and in code comments.
 - **Electron security**: contextIsolation + sandbox stay on. The whole privileged surface is
   `electron/preload.ts`, mirrored by `src/types/loftgcs.d.ts` — change them together.
 - **Branding**: app identity lives in `src/brand.ts` only ("Loft GCS" is a working name).
-- **Navigation** (`src/stores/ui-store.ts`): two levels. Top level is a *mode* — Setup, Fly,
-  Mission — switched from the app bar; only Setup has the tab rail, and the others
-  (plus a running guide) take the whole window. The rail order is the bring-up sequence, and Ports
+- **Navigation** (`src/stores/ui-store.ts`): two levels. Top level is a *mode* — Fly, Mission,
+  Setup — switched from the app bar; only Setup has the tab rail, and the others
+  (plus a running guide) take the whole window. **The app opens on Fly, and Fly draws with or
+  without a vehicle.** It used to be a card describing what the screen would have shown, which
+  meant the app opened on a description of itself; the map is worth looking at before anything is
+  connected, and the instruments reading zero is what an instrument does when nothing is driving
+  it. What makes that safe is that everything commanding the aircraft is already gated on
+  `connected` in `FlightControls` — App.test.tsx pins that, because it is the property the
+  decision rests on. Setup is last, which is Mission Planner's order and the order the work
+  happens in. The rail order is the bring-up sequence, and Ports
   deliberately precedes Sensors because SERIALn_PROTOCOL gates compass/GPS detection.
   The mode switch is never orange: Connect owns the app bar's one primary action.
   **The rail is grouped in three** — Initial Setup, Config/Tuning, Data — leaning on Mission

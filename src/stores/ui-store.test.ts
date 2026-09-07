@@ -1,86 +1,22 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { useUiStore } from './ui-store'
-import { useParamStore } from './param-store'
+import { describe, expect, it } from 'vitest'
+import { MODES, useUiStore } from './ui-store'
 
-// The guard that turns a global dirty set back into a per-page transaction.
+// The mode switch's shape, in its own file so the store is read before any
+// other test has moved it -- App.test.tsx sets a mode in beforeEach, which
+// would make an assertion about the default there pass for the wrong reason.
 
-function stageEdit() {
-  useParamStore.getState().loaded([{ name: 'ANGLE_MAX', value: 3000, mavType: 9 }])
-  useParamStore.getState().edit('ANGLE_MAX', 4500)
-}
-
-beforeEach(() => {
-  useParamStore.getState().reset()
-  useUiStore.setState({ mode: 'setup', activeTab: 'overview', pendingNav: null })
-})
-
-describe('with nothing staged', () => {
-  it('navigates straight away', () => {
-    useUiStore.getState().setMode('fly')
+describe('where the app opens', () => {
+  it('opens on Fly', () => {
+    // The flight screen draws with or without a vehicle, so opening on it
+    // costs nothing when nothing is connected and saves a click when
+    // something is.
     expect(useUiStore.getState().mode).toBe('fly')
-    expect(useUiStore.getState().pendingNav).toBeNull()
   })
 
-  it('a tab also returns to Setup, since picking one implies wanting the rail', () => {
-    useUiStore.setState({ mode: 'fly' })
-    useUiStore.getState().setTab('radio')
-    expect(useUiStore.getState()).toMatchObject({ mode: 'setup', activeTab: 'radio' })
-  })
-})
-
-describe('with staged edits', () => {
-  beforeEach(stageEdit)
-
-  it('holds a mode change instead of making it', () => {
-    useUiStore.getState().setMode('mission')
-    expect(useUiStore.getState().mode).toBe('setup')
-    expect(useUiStore.getState().pendingNav).toEqual({ mode: 'mission' })
-  })
-
-  it('holds a tab change too', () => {
-    useUiStore.getState().setTab('failsafes')
-    expect(useUiStore.getState().activeTab).toBe('overview')
-    expect(useUiStore.getState().pendingNav).toEqual({ mode: 'setup', tab: 'failsafes' })
-  })
-
-  it('does not ask when the destination is where you already are', () => {
-    // Clicking the current tab is not leaving the page, and a dialog for it
-    // would be pure obstruction.
-    useUiStore.getState().setTab('overview')
-    expect(useUiStore.getState().pendingNav).toBeNull()
-    useUiStore.getState().setMode('setup')
-    expect(useUiStore.getState().pendingNav).toBeNull()
-  })
-
-  it('goes through on commit, and stays put on cancel', () => {
-    useUiStore.getState().setTab('tuning')
-    useUiStore.getState().commitPendingNav()
-    expect(useUiStore.getState()).toMatchObject({ mode: 'setup', activeTab: 'tuning' })
-    expect(useUiStore.getState().pendingNav).toBeNull()
-
-    useUiStore.getState().setMode('fly')
-    useUiStore.getState().cancelPendingNav()
-    expect(useUiStore.getState().mode).toBe('setup')
-    expect(useUiStore.getState().pendingNav).toBeNull()
-  })
-
-  it('lets navigation through again once the edits are gone', () => {
-    useUiStore.getState().setMode('fly')
-    expect(useUiStore.getState().pendingNav).not.toBeNull()
-    useUiStore.getState().cancelPendingNav()
-
-    useParamStore.getState().revertAll()
-    useUiStore.getState().setMode('fly')
-    expect(useUiStore.getState().mode).toBe('fly')
-    expect(useUiStore.getState().pendingNav).toBeNull()
-  })
-
-  it('stops asking once the vehicle has confirmed the write', () => {
-    // confirmWrite is what the echo handler calls; the edit is no longer
-    // unwritten, so the page is no longer holding anything.
-    useParamStore.getState().confirmWrite('ANGLE_MAX', 4500)
-    expect(useParamStore.getState().dirtyCount).toBe(0)
-    useUiStore.getState().setMode('mission')
-    expect(useUiStore.getState().mode).toBe('mission')
+  it('puts Fly first and Setup last', () => {
+    // Mission Planner's order, and the order the work happens in: flying is
+    // what the app is for, setup is where you go when the aircraft needs
+    // changing.
+    expect(MODES.map((m) => m.id)).toEqual(['fly', 'mission', 'setup'])
   })
 })

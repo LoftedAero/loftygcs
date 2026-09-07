@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { LaCard } from '../../components/La'
-import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import {
   LOG_PANES,
@@ -31,7 +29,6 @@ import VideoSourceModal from './VideoSourceModal'
 // which the stack underneath absorbs. Swap exchanges which panel is pinned;
 // whichever lands on the left inherits the aspect rule.
 export default function FlightTab() {
-  const phase = useConnectionStore((s) => s.phase)
   const [follow, setFollow] = useState(true)
   const [menu, setMenu] = useState<MapMenuPoint | null>(null)
   const [hudMenu, setHudMenu] = useState<HudMenuPoint | null>(null)
@@ -42,15 +39,13 @@ export default function FlightTab() {
   const gridRef = useRef<HTMLDivElement>(null)
   const layout = useFlightLayoutStore()
 
-  if (phase !== 'connected' && phase !== 'linkLost') {
-    return (
-      <LaCard title="Flight" note="Connect a vehicle (or start demo mode) to fly.">
-        <p className="app-placeholder">
-          Live map with vehicle trail, artificial horizon, status messages, and guided click-to-go.
-        </p>
-      </LaCard>
-    )
-  }
+  // Drawn with or without a vehicle. It used to be a card saying what the
+  // screen would have shown, which meant the app opened on a description of
+  // itself -- and the map is useful before a vehicle exists: it is where you
+  // look at the field, and where a mission drawn next door is already
+  // visible. Everything that commands the aircraft is disabled without a
+  // connection (see FlightControls), and the instruments read zero, which is
+  // what an instrument does when nothing is driving it.
 
   const mapPanel = (
     <MapView

@@ -11,10 +11,14 @@ import { useParamStore } from './param-store'
 // you switch on before doing one of these, not an activity in itself. It
 // lives in the app bar's tray (SimTray) so it stays reachable from whatever
 // screen the work is on.
+// Fly first and Setup last, which is the order Mission Planner puts them in
+// and the order the work happens in: flying is what the app is for, and
+// setup is where you go when something about the aircraft needs changing.
+// It also means the app opens on the screen someone is most often after.
 export const MODES = [
-  { id: 'setup', label: 'Setup' },
   { id: 'fly', label: 'Fly' },
   { id: 'mission', label: 'Mission' },
+  { id: 'setup', label: 'Setup' },
 ] as const
 
 export type ModeId = (typeof MODES)[number]['id']
@@ -127,7 +131,10 @@ function blocked(): boolean {
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
-  mode: 'setup',
+  // Fly, not Setup: the flight screen draws its map, HUD and controls with
+  // or without a vehicle, so opening on it costs nothing when nothing is
+  // connected and saves a click when something is.
+  mode: 'fly',
   activeTab: 'overview',
   connectModalOpen: false,
   setConnectModalOpen: (connectModalOpen) => set({ connectModalOpen }),
