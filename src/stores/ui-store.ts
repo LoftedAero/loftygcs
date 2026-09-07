@@ -38,11 +38,13 @@ export type ModeId = (typeof MODES)[number]['id']
  * So: what you do once when a board is new, what you set and adjust for a
  * particular airframe, and what you read afterwards.
  *
- * Order still carries meaning inside a group. The middle one runs as a
- * bring-up runs, and Ports sits ahead of Sensors deliberately, because
- * SERIALn_PROTOCOL decides whether the external compass and GPS are detected
- * at all -- calibrating a compass the board has not found is the classic
- * dead end.
+ * One hazard the order no longer warns about, and which is still real:
+ * SERIALn_PROTOCOL decides whether an external compass or GPS is detected at
+ * all, so a board whose ports are not configured will not find them --
+ * and calibrating a compass the firmware never saw is the classic dead end.
+ * Ports used to sit ahead of Sensors for exactly that reason. It now sits
+ * after it by request, so the sequence no longer teaches it; the Sensors
+ * screen is the place to say so if it ever bites.
  */
 export const TAB_GROUPS = ['Initial Setup', 'Config/Tuning', 'Data'] as const
 
@@ -51,22 +53,24 @@ export type TabGroup = (typeof TAB_GROUPS)[number]
 export const TABS = [
   { id: 'overview', label: 'Overview', group: 'Initial Setup' },
   { id: 'firmware', label: 'Firmware', group: 'Initial Setup' },
-  // The curated cards lead: it is where a new airframe starts, and the
-  // things they cover -- battery monitor, failsafes, arming checks -- are
+  // The curated cards lead the rest: it is where a new airframe starts, and
+  // the things they cover -- battery monitor, failsafe, arming checks -- are
   // exactly the ones a first bring-up would not think to look for under
   // their own tabs.
   { id: 'configuration', label: 'Configuration', group: 'Initial Setup' },
+  { id: 'sensors', label: 'Sensors', group: 'Initial Setup' },
+  { id: 'ports', label: 'Ports', group: 'Initial Setup' },
 
-  { id: 'ports', label: 'Ports', group: 'Config/Tuning' },
-  { id: 'sensors', label: 'Sensors', group: 'Config/Tuning' },
   { id: 'radio', label: 'Radio', group: 'Config/Tuning' },
-  { id: 'modes', label: 'Flight modes', group: 'Config/Tuning' },
+  { id: 'modes', label: 'Flight Modes', group: 'Config/Tuning' },
   { id: 'outputs', label: 'Outputs', group: 'Config/Tuning' },
-  { id: 'failsafes', label: 'Failsafes', group: 'Config/Tuning' },
   { id: 'power', label: 'Power', group: 'Config/Tuning' },
+  { id: 'failsafes', label: 'Failsafe', group: 'Config/Tuning' },
   { id: 'osd', label: 'OSD', group: 'Config/Tuning' },
   { id: 'tuning', label: 'Tuning', group: 'Config/Tuning' },
-  { id: 'parameters', label: 'Parameters', group: 'Config/Tuning' },
+  // The label changed, the id did not: `parameters` is what a saved tab and
+  // every deep link already say, and renaming it would strand both.
+  { id: 'parameters', label: 'Parameter List', group: 'Config/Tuning' },
 
   // Not steps at all: what you reach for when a step misbehaves.
   { id: 'logs', label: 'Logs', group: 'Data' },

@@ -16,7 +16,11 @@ describe('app shell', () => {
       expect(screen.getByRole('button', { name: tab.label })).toBeTruthy()
     }
     expect(screen.getByText('Ground control for ArduPilot')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Parameters' }))
+    // Found through TABS rather than by a hardcoded label: this broke on a
+    // rename that had nothing to do with what it is testing, which is that
+    // clicking a rail item mounts its screen.
+    const params = TABS.find((t) => t.id === 'parameters')!
+    fireEvent.click(screen.getByRole('button', { name: params.label }))
     expect(screen.getByText(/Connect a vehicle to load its parameters/)).toBeTruthy()
   })
 
