@@ -352,6 +352,21 @@
   & .la-modal__backdrop {
     background: rgb(0 0 0 / 66%);
   }
+
+  /* The chevron on a select is an inlined SVG whose fill is written into
+     the data URI, so it cannot follow a token -- left alone every dropdown
+     keeps a light-mode gray arrow on a dark field. Re-inlined with the one
+     value changed. */
+  & .la-select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%23b4b6be' d='M1.4 0 6 4.6 10.6 0 12 1.4 6 7.4 0 1.4z'/%3E%3C/svg%3E");
+  }
+  /* Disabled controls dim by color rather than opacity, which is right,
+     but --la-ink-3 on a dark field reads as text that failed to load
+     rather than text that is not editable yet. */
+  & .la-input:disabled,
+  & .la-select:disabled {
+    color: var(--la-ink-2);
+  }
   /* Leaflet draws its own controls and attribution in white. */
   & .leaflet-control-zoom a,
   & .leaflet-bar a {
@@ -371,6 +386,22 @@
   & .leaflet-control-attribution a {
     color: var(--la-blue-deep);
   }
+}
+
+/* --- The list a <select> drops down ----------------------------------
+   That list is drawn by the OS, not by us, and it does not reliably follow
+   `color-scheme`: on Windows it comes up white even on a dark window. The
+   options then take --la-ink, which in dark is near-white, and the whole
+   list reads as blank rows -- only the highlighted one is legible, because
+   the platform draws that pair itself.
+
+   So pin both halves rather than hoping the platform agrees with us. The
+   tokens still do the theming, so one rule serves both themes, and it is
+   deliberately not scoped to dark: the same thing happens the other way on
+   a machine whose OS is dark while the window is light. */
+.la-select option {
+  background-color: var(--la-surface);
+  color: var(--la-ink);
 }
 
 /* Preview marker in the action bar. Amber, which is the warn role -- status,
