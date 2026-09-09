@@ -21,6 +21,12 @@ export interface OsdScreenProps {
   overlaps: ReadonlySet<string>
   /** Panels the current grid is too small for; clipped rather than drawn. */
   offGrid: ReadonlySet<string>
+  /**
+   * The OSD is off, so the layout is readable but not editable. Dragging a
+   * panel would stage a parameter the vehicle is not drawing from -- and
+   * with no backend there is nothing to lay out yet.
+   */
+  disabled?: boolean | undefined
   /** Highlight the rows an NTSC frame cuts off. Analog grids only. */
   showNtscGuide: boolean
   onSelect: (id: string) => void
@@ -50,6 +56,7 @@ export default function OsdScreen({
   overlaps,
   offGrid,
   showNtscGuide,
+  disabled,
   onSelect,
   onMove,
 }: OsdScreenProps) {
@@ -159,11 +166,15 @@ export default function OsdScreen({
                   width: `${(extent.width / grid.cols) * 100}%`,
                   height: `${(extent.height / grid.rows) * 100}%`,
                 }}
-                onPointerDown={(e) => beginDrag(e, p)}
+                onPointerDown={(e) => {
+                  if (disabled) return
+                  beginDrag(e, p)
+                }}
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
                 onKeyDown={(e) => {
+                  if (disabled) return
                   const step = NUDGE[e.key]
                   if (!step) return
                   // Shift jumps by five cells; crossing a 60-column screen one

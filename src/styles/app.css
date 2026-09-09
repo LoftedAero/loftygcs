@@ -21,6 +21,10 @@
      OSD all grew one independently and all picked a different number; this is
      the one they share. Change it here and every screen moves together. */
   --app-col-w: 280px;
+  /* The gap between a screen's main pane and its actions column. It was four
+     different values across five screens -- 8px on Mission and Logs, 12px on
+     Parameters, 16px on MAVFTP and the Inspector -- for one relationship. */
+  --app-col-gap: var(--la-space-3);
   /* One width for every control in the Preferences dialog, and for its
      action row. Sized to the longest option any of its dropdowns carries
      ("Kilometers per hour"); the buttons then take it rather than setting
@@ -188,27 +192,13 @@
   background: var(--la-blue-soft);
 }
 
-/* The OSD column is a stack of cards rather than one bordered panel, so the
-   actions get their own border to sit among them -- which also makes their
-   buttons the same width as the other two screens', since all three then
-   inset by the same border plus padding. Two pixels is invisible; a rule
-   that only holds on two screens out of three is not. */
+/* The OSD column is a stack of cards rather than one bordered panel, so its
+   actions block is its own shell among them -- which also keeps its buttons
+   the same width as every other screen's, since all of them then inset by
+   the same border plus padding. The frame comes from `.app-col-shell`; this
+   class is only what is left over. */
 .osd-actions {
   gap: var(--la-space-4);
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  background: var(--la-surface);
-}
-/* The one place on this page where turning the OSD on is offered by name;
-   marked out so it does not read as another settings card. */
-.osd-actions__off {
-  padding: var(--la-space-3);
-  border: 1px solid var(--la-warn);
-  border-radius: var(--la-radius-sm);
-  background: var(--la-orange-soft);
-}
-.osd-actions__off .app-placeholder {
-  margin-bottom: 0;
 }
 
 .app-col__note {
@@ -325,8 +315,25 @@
   border-bottom: none;
   padding-bottom: 0;
 }
-/* The outer shell: the border and scrolling belong to the container, so a
-   column can also sit inside a card that already has one. */
+/*
+ * The outer shell of an actions column, and the *only* place its frame is
+ * defined.
+ *
+ * Every screen with a right-hand column uses `.app-col-shell` around
+ * `.app-col`: the container owns the border, the background and the
+ * scrolling; the inner `.app-col` owns the padding and the rhythm between
+ * groups. Splitting it that way is what lets a column also sit inside a card
+ * that already has a frame -- the shell comes off, the content does not
+ * change.
+ *
+ * This class existed and nothing used it. Parameters and Mission had the
+ * three lines below pasted into `.params-aside, .mission-side`, OSD had them
+ * again in `.osd-actions`, and Logs and MAVFTP had no frame at all -- which
+ * on Logs meant its *left* field list was framed and its right column was
+ * not, on the same screen. Reach for this rather than writing the trio a
+ * fourth time; `app-status.test.ts`'s sibling, `panel-frame.test.ts`, fails
+ * if the copies start multiplying again.
+ */
 .app-col-shell {
   min-height: 0;
   overflow: auto;
@@ -1082,24 +1089,29 @@
    The inspector's two-column shape, for the same reason: a list to scan
    beside the actions that act on what you picked. Names are monospace so a
    column of 00000042.BIN lines up and a stray space in a filename shows. */
+/* Same three-part shape as the parameters screen: the path bar belongs to
+   the listing under it, so it sits in the listing's track, and the actions
+   column is placed in the listing's row rather than beside all of it. */
 .files {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--app-col-w);
-  gap: var(--la-space-4);
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: var(--app-col-gap);
   min-height: 0;
   flex: 1;
 }
-.files__main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-  min-height: 0;
-}
 .files__bar {
+  grid-area: 1 / 1;
   display: flex;
   align-items: center;
   gap: var(--la-space-3);
-  flex: none;
+  margin-bottom: var(--la-space-2);
+}
+.files > .files__scroll {
+  grid-area: 2 / 1;
+}
+.files > .app-col-shell {
+  grid-area: 2 / 2;
 }
 .files__path {
   font-family: var(--la-font-mono);
@@ -1170,12 +1182,27 @@
    scrolling content pane, min-height:0 so the table scrolls rather than the
    window. Numbers are tabular so a changing rate does not make the column
    breathe. */
+/* The same three-part shape again. The view switcher is the exception: it
+   changes what the whole screen is showing, so it spans both tracks; the
+   filter bar below it describes only the table, so it sits in the table's
+   track and the actions column is placed in the table's row. */
 .inspector {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--app-col-w);
-  gap: var(--la-space-4);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  column-gap: var(--app-col-gap);
   min-height: 0;
   flex: 1;
+}
+.inspector > .app-subtabs {
+  grid-area: 1 / 1 / 2 / -1;
+  margin-bottom: var(--la-space-3);
+}
+.inspector > .inspector__scroll {
+  grid-area: 3 / 1;
+}
+.inspector > .app-col-shell {
+  grid-area: 3 / 2;
 }
 /* A second level of tabs inside one screen -- the Inspector's messages and
    hardware, Tuning's attitude and navigation. One segmented control, in the
@@ -1270,17 +1297,12 @@
   color: var(--la-ink-3);
 }
 
-.inspector__main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-  min-height: 0;
-}
 .inspector__bar {
+  grid-area: 2 / 1;
   display: flex;
   align-items: center;
   gap: var(--la-space-4);
-  flex: none;
+  margin-bottom: var(--la-space-2);
 }
 .inspector__bar .la-input {
   max-width: 260px;
@@ -1339,10 +1361,6 @@
 }
 .inspector__table tbody tr.is-selected td {
   background: var(--la-blue-soft);
-}
-.inspector__detail {
-  min-height: 0;
-  overflow-y: auto;
 }
 .inspector__fields {
   width: 100%;
@@ -1652,6 +1670,55 @@
   border: 0;
 }
 
+/* Parameters loading, along the app bar's own foot.
+
+   Absolutely placed so it is not a grid item: it must not add a track, take
+   a gap, or move a single control -- it appears and disappears while someone
+   is reading the bar, and a layout that shifts under that is worse than no
+   indicator. It sits *on* the bar's bottom edge rather than under it, which
+   is where QGroundControl puts the same thing.
+
+   Blue because this app's other two progress bars are blue and one of them
+   carries the reason: progress is activity, not a status verdict. */
+.la-appbar {
+  position: relative;
+}
+.app-bar-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+.app-bar-progress__fill {
+  height: 100%;
+  background: var(--la-blue);
+  transition: width var(--la-ease);
+}
+/* Before the first packet there is no fraction to draw, and a bar sitting at
+   0% reads as stalled. A sweep says "started" without claiming a position. */
+.app-bar-progress.is-indeterminate .app-bar-progress__fill {
+  width: 30%;
+  animation: app-bar-progress-sweep 1.1s ease-in-out infinite;
+}
+@keyframes app-bar-progress-sweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(440%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-bar-progress.is-indeterminate .app-bar-progress__fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
 /* Vehicle status in the app bar: a row of indicators, not a sentence.
 
    It replaced a `.la-readout--wide`, which is `flex: 1 1 auto` in the system
@@ -1721,10 +1788,20 @@
   font-size: var(--la-size-md);
   font-weight: 600;
   white-space: nowrap;
-  /* The error phase puts the transport's own words here and they can be
-     long, so this one element may ellipsize -- but only down to a width
-     that still carries a useful prefix. Every other state is two words. */
+  /* A failed connection puts a whole sentence here; every other state is two
+     words. It may ellipsize, but only down to a width that still carries a
+     useful prefix. */
   max-width: 34ch;
+  overflow: hidden;
+}
+/* The truncation happens on the word, not on the pill.
+   `text-overflow` needs a block box of its own to act on: left on the flex
+   container it did nothing, and because the pill centers its content a long
+   message overflowed *both* edges and was cut at the front as well as the
+   back -- the one part of "Nothing is listening at 127.0.0.1:5760" you could
+   read was the middle. */
+.app-status__word {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2197,6 +2274,14 @@ button.app-status__state--bad:hover {
   max-width: none;
   padding: var(--la-space-4);
 }
+/* A filling tab still shows an ordinary card when it has nothing to fill
+   with -- MAVFTP and the Inspector before a vehicle, Parameters before its
+   table loads. In a stretch column that card took the whole window, so a
+   one-line "connect a vehicle" note read as a banner where the same note on
+   any other tab is a card. It keeps a card's width instead. */
+.app-content--flush > .la-card {
+  max-width: 860px;
+}
 
 /* Leaflet paints its popups and tooltips from its own sheet -- white card,
    near-black text, white tip -- which in dark mode is a light-mode card
@@ -2259,7 +2344,7 @@ button.app-status__state--bad:hover {
      have no definite height to size themselves against, and a grid inside
      that tries to divide it grows without bound instead. */
   grid-template-rows: minmax(0, 1fr);
-  gap: var(--la-space-2);
+  gap: var(--app-col-gap);
   flex: 1;
   min-height: 0;
 }
@@ -2728,18 +2813,8 @@ button.app-status__state--bad:hover {
   background: var(--la-orange-soft);
 }
 
-/* Both screens' columns are the shared shell; see .app-col-shell. */
-.mission-side,
-.params-aside {
-  min-height: 0;
-  overflow: auto;
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  background: var(--la-surface);
-  display: flex;
-  flex-direction: column;
-}
-/* The mission column scrolls in its upper half only. Offline maps is the one
+/* `.mission-side` is `.app-col-shell` plus one thing: the column scrolls in
+   its upper half only. Offline maps is the one
    section in it that has nothing to do with which plan is selected -- the
    tiles under the map are the same tiles either way -- so it is pinned to the
    foot instead of riding at the end of the flow, where flipping the switch
@@ -2747,17 +2822,15 @@ button.app-status__state--bad:hover {
 .mission-side {
   overflow: hidden;
 }
+/* The scrolling half carries `.app-col`, so its padding and the rhythm
+   between sections come from the same place as every other column's. It used
+   to set that gap itself, which is how the two regimes came to differ: the
+   sections stacked flush and the only spacing came from the one panel that
+   wrapped itself in a nested `.app-col`. */
 .mission-side__scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  display: flex;
-  flex-direction: column;
-  /* The actions column's own rhythm, applied once here rather than by each
-     section. Sections used to stack flush, so the only spacing in the column
-     came from the one panel that wrapped itself in a nested `.app-col` -- and
-     the join between the two regimes was two headings touching. */
-  gap: var(--la-space-4);
 }
 /* A tray, not the end of the list. The scroll above it cuts whatever is
    there mid-button, and against an identical background that reads as a
@@ -2765,7 +2838,9 @@ button.app-status__state--bad:hover {
    surface and says which side of the edge it is on. */
 .mission-side__foot {
   flex: none;
-  padding-top: var(--la-space-2);
+  /* Its own padding: it is outside the scrolling `.app-col`, so nothing else
+     insets it from the shell's border. Matches `.app-col`'s. */
+  padding: var(--la-space-3);
   border-top: 1px solid var(--la-line);
   background: var(--la-surface-2);
 }
@@ -2801,41 +2876,64 @@ button.app-status__state--bad:hover {
 
 /* --- Parameters tab ------------------------------------------------- */
 
-/* The params card owns the remaining height and scrolls internally: the
+/* The parameters screen owns the remaining height and scrolls internally: the
    virtualizer needs a bounded scroll container, and the ~1400-row table
-   should never drive the page's own scrollbar. */
-/* The child selector matters: `.app-content > .la-card` caps cards at 860px
-   and is two classes, so a bare `.params-card` override lost the cascade and
-   the table sat in a column two thirds of the window wide. The parameter
-   table is the one card that wants everything -- 1400 rows of name, value
-   and a paragraph of description have somewhere to put the width. */
-.app-content > .params-card {
-  grid-column: 1 / -1;
+   should never drive the page's own scrollbar.
+
+   It used to be a `.la-card`, which had to fight the grid for the width and,
+   worse, put a frame
+   around the two panels inside it. A white bordered column 17px inside a
+   white bordered card does not read as a column beside a table; it reads as
+   one panel with a line down it. The frames that matter are the table's and
+   the actions column's, and both want the page ground behind them --
+   which is what Logs and MAVFTP already did.
+
+   `.app-content > *:not(.la-card)` gives it the full row, so nothing here
+   needs to ask for it. */
+.params-screen {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  max-width: none;
+}
+/* The count under the table. `.la-card__note`'s job, outside a card. */
+.params-note {
+  margin: 0;
+  color: var(--la-ink-3);
+  font-size: var(--la-size-xs);
 }
 
 /* Table and its actions column, the same shape the Mission planner uses --
    and the same 260px, so the two screens read as one app. */
+/* Three rows, and the actions column is placed in the middle one.
+   The toolbar and the count belong to the *table* -- search filters that
+   list, the count describes it -- so they sit in its track and not across
+   the whole screen. Putting them in a flex wrapper instead made the column a
+   sibling of all three, so it spanned toolbar, table and note and finished
+   58px taller than the panel beside it. Two framed panels that nearly line
+   up read as a mistake; a column that is exactly the height of the table
+   reads as a pair. */
 .params-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--app-col-w);
-  grid-template-rows: minmax(0, 1fr);
-  gap: var(--la-space-3);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  column-gap: var(--app-col-gap);
   flex: 1;
   min-height: 0;
 }
-.params-main {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-}
 .params-toolbar {
+  grid-area: 1 / 1;
   margin-bottom: var(--la-space-3);
+}
+.params-layout > .params-scroll {
+  grid-area: 2 / 1;
+}
+.params-layout > .app-col-shell {
+  grid-area: 2 / 2;
+}
+.params-layout > .params-note {
+  grid-area: 3 / 1;
+  margin-top: var(--la-space-2);
 }
 
 .params-scroll {
@@ -5225,7 +5323,7 @@ body.is-splitting .flight-map {
   /* An explicit row for the same reason the mission body needs one: the
      children have no definite height to size a canvas against otherwise. */
   grid-template-rows: minmax(0, 1fr);
-  gap: var(--la-space-2);
+  gap: var(--app-col-gap);
   flex: 1;
   min-height: 0;
 }
@@ -5238,12 +5336,6 @@ body.is-splitting .flight-map {
   border-radius: var(--la-radius-sm);
   background: var(--la-surface);
   overflow: hidden;
-}
-.log-side {
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
 }
 /* The field picker takes whatever the groups above it did not. */
 .app-col__group--grow {

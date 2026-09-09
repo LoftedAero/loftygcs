@@ -3,7 +3,6 @@ import { LaButton, LaHint, LaModal } from '../../components/La'
 import VehicleParamActions from '../../components/VehicleParamActions'
 import { useParamStore } from '../../../stores/param-store'
 import { parseParamFile, sameValue } from '../../../protocol/param-file'
-import { TYPE_MSP_DISPLAYPORT } from './osd-layout'
 
 // The OSD page's actions column.
 //
@@ -26,14 +25,16 @@ export function isOsdParam(name: string): boolean {
 
 export default function OsdActions() {
   return (
-    <div className="app-col osd-actions">
-      <VehicleParamActions title="OSD" />
-      <section className="app-col__group">
-        <h3 className="app-col__head">Layout file</h3>
-        <SaveLayout />
-        <LoadLayout />
-        <LaHint>Only the OSD parameters — the rest of the vehicle is untouched.</LaHint>
-      </section>
+    <div className="app-col-shell osd-actions">
+      <div className="app-col">
+        <VehicleParamActions title="OSD" />
+        <section className="app-col__group">
+          <h3 className="app-col__head">Layout file</h3>
+          <SaveLayout />
+          <LoadLayout />
+          <LaHint>Only the OSD parameters — the rest of the vehicle is untouched.</LaHint>
+        </section>
+      </div>
     </div>
   )
 }
@@ -154,48 +155,5 @@ function LoadLayout() {
         )}
       </LaModal>
     </>
-  )
-}
-
-/** The backends worth offering by name; the rest stay in the Display card. */
-const BACKENDS = [
-  { value: 1, label: 'Analog (MAX7456)', note: 'The onboard chip most boards have.' },
-  { value: 5, label: 'MSP DisplayPort', note: 'Digital HD systems — Walksnail, HDZero, DJI.' },
-] as const
-
-/**
- * Turning the OSD on, from the page that lays it out.
- *
- * With OSD_TYPE at 0 nothing is drawn on the video, and the only way to
- * change that was the Display card's numeric field or a trip to the
- * Parameters table — both of which need you to already know that 1 is a
- * MAX7456 and 5 is DisplayPort.
- */
-export function OsdTypePrompt() {
-  const entries = useParamStore((s) => s.entries)
-  const edit = useParamStore((s) => s.edit)
-  const type = entries.get('OSD_TYPE')
-  if (!type || type.value !== 0) return null
-
-  return (
-    <section className="app-col__group osd-actions__off">
-      <h3 className="app-col__head">The OSD is off</h3>
-      <p className="app-placeholder">
-        Nothing is drawn on the video feed. Screens can still be laid out, and take effect once a
-        type is set.
-      </p>
-      {BACKENDS.map((b) => (
-        <LaButton
-          key={b.value}
-          variant={b.value === TYPE_MSP_DISPLAYPORT ? 'secondary' : 'primary'}
-          size="block"
-          title={b.note}
-          onClick={() => edit('OSD_TYPE', b.value)}
-        >
-          {b.label}
-        </LaButton>
-      ))}
-      <LaHint>Staged like any parameter, and the vehicle needs a reboot to apply it.</LaHint>
-    </section>
   )
 }

@@ -107,7 +107,7 @@ export default function AppStatus() {
           title={`${vehicleName} — open the preflight checks`}
         >
           <span className="app-status__dot" aria-hidden="true" />
-          {status.text}
+          <span className="app-status__word">{status.text}</span>
         </button>
       ) : (
         <span
@@ -117,7 +117,7 @@ export default function AppStatus() {
           title={status.text}
         >
           <span className="app-status__dot" aria-hidden="true" />
-          {status.text}
+          <span className="app-status__word">{status.text}</span>
         </span>
       )}
 

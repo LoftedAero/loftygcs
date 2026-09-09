@@ -70,142 +70,149 @@ export default function FilesTab() {
 
   return (
     <div className="files">
-      <div className="files__main">
-        <div className="files__bar">
-          <span className="files__path" title={path}>
-            {path}
-          </span>
-          <LaButton
-            variant="ghost"
-            disabled={busy || path === '/'}
-            onClick={() => void goUp()}
-            title={`Up to ${parentPath(path)}`}
-          >
-            Up
-          </LaButton>
-        </div>
-
-        <div className="files__scroll">
-          <table className="files__table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th className="num">Size</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((e) => (
-                <tr
-                  key={e.name}
-                  className={e.name === selectedName ? 'is-selected' : undefined}
-                  onClick={() => select(e.name)}
-                  onDoubleClick={() => {
-                    if (e.kind === 'directory') void enterDirectory(e.name)
-                  }}
-                >
-                  <td>
-                    <span className="files__kind">{e.kind === 'directory' ? 'DIR' : 'FILE'}</span>
-                    {e.name}
-                  </td>
-                  <td className="num">{e.kind === 'directory' ? '' : formatSize(e.size ?? 0)}</td>
-                </tr>
-              ))}
-              {entries.length === 0 && !busy && (
-                <tr>
-                  <td colSpan={2}>Nothing here.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* No wrapper around the bar and the table: the actions column is
+          placed in the table's row, so the two framed panels line up. */}
+      <div className="files__bar">
+        <span className="files__path" title={path}>
+          {path}
+        </span>
+        <LaButton
+          variant="ghost"
+          disabled={busy || path === '/'}
+          onClick={() => void goUp()}
+          title={`Up to ${parentPath(path)}`}
+        >
+          Up
+        </LaButton>
       </div>
 
-      <aside className="app-col">
-        <section className="app-col__group">
-          <h3 className="app-col__head">This folder</h3>
-          <LaButton variant="secondary" size="block" disabled={busy} onClick={() => void refresh()}>
-            {busy ? 'Working…' : 'Refresh'}
-          </LaButton>
-          <LaButton
-            variant="secondary"
-            size="block"
-            disabled={busy || !selected || selected.kind !== 'directory'}
-            onClick={() => selected && void enterDirectory(selected.name)}
-          >
-            Open folder
-          </LaButton>
-        </section>
+      <div className="files__scroll">
+        <table className="files__table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th className="num">Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((e) => (
+              <tr
+                key={e.name}
+                className={e.name === selectedName ? 'is-selected' : undefined}
+                onClick={() => select(e.name)}
+                onDoubleClick={() => {
+                  if (e.kind === 'directory') void enterDirectory(e.name)
+                }}
+              >
+                <td>
+                  <span className="files__kind">{e.kind === 'directory' ? 'DIR' : 'FILE'}</span>
+                  {e.name}
+                </td>
+                <td className="num">{e.kind === 'directory' ? '' : formatSize(e.size ?? 0)}</td>
+              </tr>
+            ))}
+            {entries.length === 0 && !busy && (
+              <tr>
+                <td colSpan={2}>Nothing here.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-        <section className="app-col__group">
-          <h3 className="app-col__head">Transfer</h3>
-          <LaButton
-            variant="primary"
-            size="block"
-            disabled={busy || atRoot}
-            onClick={() => pickAndUpload()}
-            title={atRoot ? 'Open a folder first' : `Write a file into ${path}`}
-          >
-            Upload a file
-          </LaButton>
-          {atRoot && <LaHint>Open a folder first.</LaHint>}
-          <LaButton
-            variant="secondary"
-            size="block"
-            disabled={busy || !selected || selected.kind !== 'file'}
-            onClick={() => selected && void downloadEntry(selected)}
-          >
-            Download
-          </LaButton>
-          {transfer && (
-            <>
-              <p className="app-col__note">
-                {transfer.dir === 'read' ? 'Reading' : 'Writing'} {transfer.name} —{' '}
-                {formatSize(transfer.got)}
-                {transfer.total > 0 && ` of ${formatSize(transfer.total)}`}
-              </p>
-              <progress
-                className="log-progress"
-                value={transfer.got}
-                max={Math.max(1, transfer.total)}
-                aria-label={`${transfer.dir === 'read' ? 'Downloading' : 'Uploading'} ${transfer.name}`}
-              />
-            </>
-          )}
-        </section>
+      <aside className="app-col-shell">
+        <div className="app-col">
+          <section className="app-col__group">
+            <h3 className="app-col__head">This folder</h3>
+            <LaButton
+              variant="secondary"
+              size="block"
+              disabled={busy}
+              onClick={() => void refresh()}
+            >
+              {busy ? 'Working…' : 'Refresh'}
+            </LaButton>
+            <LaButton
+              variant="secondary"
+              size="block"
+              disabled={busy || !selected || selected.kind !== 'directory'}
+              onClick={() => selected && void enterDirectory(selected.name)}
+            >
+              Open folder
+            </LaButton>
+          </section>
 
-        <section className="app-col__group">
-          <h3 className="app-col__head">Change</h3>
-          <LaButton
-            variant="secondary"
-            size="block"
-            disabled={busy || atRoot}
-            onClick={() => setNewFolder('')}
-          >
-            New folder
-          </LaButton>
-          {/* Renaming is how a Lua script is switched off without deleting
+          <section className="app-col__group">
+            <h3 className="app-col__head">Transfer</h3>
+            <LaButton
+              variant="primary"
+              size="block"
+              disabled={busy || atRoot}
+              onClick={() => pickAndUpload()}
+              title={atRoot ? 'Open a folder first' : `Write a file into ${path}`}
+            >
+              Upload a file
+            </LaButton>
+            {atRoot && <LaHint>Open a folder first.</LaHint>}
+            <LaButton
+              variant="secondary"
+              size="block"
+              disabled={busy || !selected || selected.kind !== 'file'}
+              onClick={() => selected && void downloadEntry(selected)}
+            >
+              Download
+            </LaButton>
+            {transfer && (
+              <>
+                <p className="app-col__note">
+                  {transfer.dir === 'read' ? 'Reading' : 'Writing'} {transfer.name} —{' '}
+                  {formatSize(transfer.got)}
+                  {transfer.total > 0 && ` of ${formatSize(transfer.total)}`}
+                </p>
+                <progress
+                  className="log-progress"
+                  value={transfer.got}
+                  max={Math.max(1, transfer.total)}
+                  aria-label={`${transfer.dir === 'read' ? 'Downloading' : 'Uploading'} ${transfer.name}`}
+                />
+              </>
+            )}
+          </section>
+
+          <section className="app-col__group">
+            <h3 className="app-col__head">Change</h3>
+            <LaButton
+              variant="secondary"
+              size="block"
+              disabled={busy || atRoot}
+              onClick={() => setNewFolder('')}
+            >
+              New folder
+            </LaButton>
+            {/* Renaming is how a Lua script is switched off without deleting
               it: ArduPilot only runs *.lua, so rangefinder.lua.off stays on
               the card and stops running. */}
-          <LaButton
-            variant="secondary"
-            size="block"
-            disabled={busy || !selected}
-            onClick={() => selected && setRenaming({ entry: selected, to: selected.name })}
-          >
-            Rename
-          </LaButton>
-          <LaButton
-            variant="ghost"
-            size="block"
-            disabled={busy || !selected}
-            onClick={() => selected && setConfirming(selected)}
-          >
-            Delete
-          </LaButton>
-        </section>
+            <LaButton
+              variant="secondary"
+              size="block"
+              disabled={busy || !selected}
+              onClick={() => selected && setRenaming({ entry: selected, to: selected.name })}
+            >
+              Rename
+            </LaButton>
+            <LaButton
+              variant="ghost"
+              size="block"
+              disabled={busy || !selected}
+              onClick={() => selected && setConfirming(selected)}
+            >
+              Delete
+            </LaButton>
+          </section>
 
-        {status.kind === 'error' && <p className="app-col__note is-error">{status.text}</p>}
-        {status.kind === 'done' && <p className="app-col__note">{status.text}</p>}
+          {status.kind === 'error' && <p className="app-col__note is-error">{status.text}</p>}
+          {status.kind === 'done' && <p className="app-col__note">{status.text}</p>}
+        </div>
       </aside>
 
       {confirming && (

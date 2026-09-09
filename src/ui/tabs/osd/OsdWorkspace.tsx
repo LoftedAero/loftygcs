@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { LaButton, LaCard, LaHint, LaLinkButton, LaSelect, LaSwitch } from '../../components/La'
-import OsdActions, { OsdTypePrompt } from './OsdActions'
+import OsdActions from './OsdActions'
 import ParamCard from '../../components/ParamCard'
 import { useParamStore } from '../../../stores/param-store'
 import OsdScreen from './OsdScreen'
@@ -59,6 +59,7 @@ export default function OsdWorkspace() {
   const screenEnabled = (entries.get(screenEnableParam)?.value ?? 0) !== 0
 
   const move = (id: string, x: number, y: number) => {
+    if (!osdType) return
     const item = OSD_ITEMS.find((i) => i.id === id)
     if (!item) return
     const at = clampPlacement(item, x, y, grid, metadata, screen)
@@ -67,19 +68,20 @@ export default function OsdWorkspace() {
   }
 
   const setEnabled = (id: string, on: boolean) => {
+    if (!osdType) return
     edit(paramName(screen, id, 'EN'), on ? 1 : 0)
     if (on) setSelectedId(id)
   }
 
-  if (placements.length === 0) {
-    return (
-      <LaCard title="Screen layout">
-        <p className="app-placeholder">
-          This firmware exposes no panel parameters for screen {screen}.
-        </p>
-      </LaCard>
-    )
-  }
+  // The page draws itself with the OSD off, and did not: with OSD_TYPE at 0
+  // this returned a lone card saying the firmware exposes no panels, which
+  // replaced the whole workspace -- *including* the column holding the one
+  // control that turns the OSD on. The state hid its own fix, and the only
+  // way out was the Parameters table. Everything renders now; what changes
+  // is that nothing can be edited until the OSD is on, which is also the
+  // truth about the vehicle: with no backend there is nothing to lay out.
+  const osdOff = !osdType
+  const noPanels = placements.length === 0
 
   // Alphabetical inside each group. The catalog is written in a rough
   // reading order, which is fine for a spec and useless for finding one
@@ -102,6 +104,13 @@ export default function OsdWorkspace() {
         className="osd-workspace__panels"
       >
         <div className="osd-palette-scroll">
+          {noPanels && (
+            <p className="app-placeholder">
+              {osdOff
+                ? 'The vehicle reports no panel positions while its OSD is off. Turn it on beside this, write the change and reboot, and the layout appears here.'
+                : `This firmware exposes no panel parameters for screen ${screen}.`}
+            </p>
+          )}
           {[...byGroup.entries()].map(([group, list]) => (
             <div key={group} className="osd-palette__group">
               <h3 className="osd-palette__heading">{OSD_GROUP_LABELS[group]}</h3>
@@ -111,6 +120,7 @@ export default function OsdWorkspace() {
                     key={p.item.id}
                     label={p.item.label}
                     checked={p.enabled}
+                    disabled={osdOff}
                     onChange={(e) => setEnabled(p.item.id, e.target.checked)}
                   />
                 ))}
@@ -133,6 +143,7 @@ export default function OsdWorkspace() {
                     type="radio"
                     name="osd-screen"
                     checked={screen === n}
+                    disabled={osdOff}
                     onChange={() => {
                       setScreen(n)
                       setSelectedId(null)
@@ -153,6 +164,7 @@ export default function OsdWorkspace() {
                 <span className="la-field__unit">Grid</span>
                 <LaSelect
                   value={String(txtRes ?? 0)}
+                  disabled={osdOff}
                   className={entries.get(txtResParam)?.dirty ? 'is-dirty' : ''}
                   onChange={(e) => edit(txtResParam, Number(e.target.value))}
                 >
@@ -170,6 +182,7 @@ export default function OsdWorkspace() {
               <LaSwitch
                 label="Screen enabled"
                 checked={screenEnabled}
+                disabled={osdOff}
                 onChange={(e) => edit(screenEnableParam, e.target.checked ? 1 : 0)}
               />
             )}
@@ -182,8 +195,8 @@ export default function OsdWorkspace() {
             and offer the one parameter change that makes it real. */}
         {hdWanted && osdType !== TYPE_MSP_DISPLAYPORT && (
           <LaHint>
-            The vehicle draws 30×16 until its OSD type is MSP DisplayPort — HD text resolution
-            is ignored on every other backend.{' '}
+            The vehicle draws 30×16 until its OSD type is MSP DisplayPort — HD text resolution is
+            ignored on every other backend.{' '}
             {entries.has('OSD_TYPE') && (
               <LaLinkButton onClick={() => edit('OSD_TYPE', TYPE_MSP_DISPLAYPORT)}>
                 Set OSD type to MSP DisplayPort
@@ -199,6 +212,7 @@ export default function OsdWorkspace() {
           overlaps={overlaps}
           offGrid={offGrid}
           showNtscGuide={osdType !== TYPE_MSP_DISPLAYPORT}
+          disabled={osdOff}
           onSelect={setSelectedId}
           onMove={move}
         />
@@ -208,6 +222,7 @@ export default function OsdWorkspace() {
           grid={grid}
           osdType={osdType}
           overlapping={selectedId !== null && overlaps.has(selectedId)}
+          disabled={osdOff}
           onMove={move}
           onDisable={(id) => {
             setEnabled(id, false)
@@ -245,11 +260,15 @@ export default function OsdWorkspace() {
             are doing it to. Same shape as the Parameters and Mission
             columns. */}
         <OsdActions />
-        <OsdTypePrompt />
         <ParamCard
           title="Display"
           fields={[
-            { param: 'OSD_TYPE', label: 'OSD type' },
+            // Written as soon as it is picked, not staged: with OSD_TYPE at
+            // 0 the vehicle reports no panel positions at all, so staging it
+            // leaves this page empty however many times you choose a
+            // backend. The write is followed by a quiet re-read, which is
+            // where the panel parameters come from.
+            { param: 'OSD_TYPE', label: 'OSD type', writeNow: true },
             { param: 'OSD_UNITS', label: 'Units' },
             { param: 'OSD_MSG_TIME', label: 'Message time', unit: 's' },
             { param: 'OSD_SW_METHOD', label: 'Switch method' },
@@ -258,8 +277,8 @@ export default function OsdWorkspace() {
         >
           {osdType === 0 && (
             <LaHint>
-              The OSD is off, so nothing is drawn on the video feed. Screens can still be laid
-              out, and take effect once a type is set — which needs a reboot.
+              The OSD is off, so nothing is drawn on the video feed. Screens can still be laid out,
+              and take effect once a type is set — which needs a reboot.
             </LaHint>
           )}
         </ParamCard>
@@ -299,6 +318,7 @@ function SelectionDetail({
   grid,
   osdType,
   overlapping,
+  disabled,
   onMove,
   onDisable,
 }: {
@@ -306,6 +326,7 @@ function SelectionDetail({
   grid: { cols: number; rows: number }
   osdType: number | undefined
   overlapping: boolean
+  disabled: boolean
   onMove: (id: string, x: number, y: number) => void
   onDisable: (id: string) => void
 }) {
@@ -332,6 +353,7 @@ function SelectionDetail({
               min={0}
               max={grid.cols - 1}
               value={x}
+              disabled={disabled}
               onChange={(e) => onMove(item.id, Number(e.target.value), y)}
             />
           </label>
@@ -343,18 +365,24 @@ function SelectionDetail({
               min={0}
               max={grid.rows - 1}
               value={y}
+              disabled={disabled}
               onChange={(e) => onMove(item.id, x, Number(e.target.value))}
             />
           </label>
-          <LaButton variant="ghost" size="sm" onClick={() => onDisable(item.id)}>
+          <LaButton
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            onClick={() => onDisable(item.id)}
+          >
             Remove
           </LaButton>
         </div>
       </div>
       {mspGap && (
         <LaHint>
-          ArduPilot draws this panel only on an MSP OSD. It stays configurable here, but the
-          current OSD type will ignore it.
+          ArduPilot draws this panel only on an MSP OSD. It stays configurable here, but the current
+          OSD type will ignore it.
         </LaHint>
       )}
       {overlapping && <LaHint error>This panel overlaps another.</LaHint>}

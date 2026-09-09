@@ -47,6 +47,18 @@ reads across.
 
 ### A screen renders itself, never a description of itself
 
+Disabled, not absent. If a screen cannot be used yet, draw it and switch its
+controls off — replacing it with a card explaining what it would have shown
+is how a state comes to hide its own fix. The OSD page returned one card
+while `OSD_TYPE` was 0, and that card replaced the whole workspace including
+the column holding the Display card, which is where `OSD_TYPE` is edited; the
+only way out was the Parameters table.
+
+> *"the OSD page doesn't render unless OSD is enabled. I think it should -
+> just with inputs disabled until the OSD is enabled."*
+
+Check what the empty state takes away with it, not just what it says.
+
 If there is no vehicle, draw the screen empty. Do not replace it with a card
 explaining what would have been there. Both Fly and Overview did this and
 both stopped.
@@ -189,6 +201,84 @@ question with three answers.
 A port number and a URL are both *the value*, so they get the same box. The
 card is then sized to that column rather than left at the sheet's default,
 or the narrowest variant is mostly empty.
+
+### A panel is framed one way, and the frame lives in one place
+
+A hairline border, the small radius, the surface background: that trio is what
+makes a panel in this app, and CSS cannot say "the same as that one", so it
+gets pasted. Every paste is a screen quietly opting out of the next change to
+what a panel looks like.
+
+The right-hand actions column is `.app-col-shell` around `.app-col` — the
+shell owns the frame, the background and the scrolling, the inner column owns
+the padding and the rhythm. Reach for it rather than writing the trio again,
+and if a genuinely new *kind* of surface needs it, add the selector to the
+list in `src/styles/panel-frame.test.ts` so the next person sees the choice
+being made.
+
+> *"the one in the Parameters page looks like it lives inside a frame /
+> document, the one in Logs and MAVFTP doesn't, and the one in Mission is
+> somewhere in between"*
+
+The shared class existed the whole time and nothing used it. Writing the
+class is not the convention; adopting it is — and a comment claiming things
+"cannot drift" is worth checking before relying on it.
+
+### A screen with a column fills the window; only its panes scroll
+
+The column has to stay beside the thing it acts on, so nothing above it may
+scroll: the screen takes the window's height and the *panes inside it* scroll
+within their own frames. Anything else and the buttons ride away with the
+list.
+
+> *"The parameters list is a long scroll. Should we make the right-side bar
+> with the buttons always keep the buttons in view?"*
+
+This needs no sticky positioning — get the container right and the column
+simply cannot move. What it does need is that `fills` is set on the tab, and
+the trap is that a screen asking to fill with `flex: 1` gets nothing on a
+grid whose `align-items` is `start`: `flex` is inert there, and the screen
+sizes to its content in silence.
+
+> *"the description on the Overview page…"* — the same `fills` flag, for the
+> same reason, two screens earlier.
+
+### A column is exactly as tall as the pane it sits beside
+
+Two framed panels that nearly line up read as a mistake; two that line up
+exactly read as a pair. So a pane's own toolbar and its caption go in that
+pane's track, and the column is placed in the pane's *row* — not beside all
+three. Wrapped in a flex column instead, the actions column spanned the
+search bar, the table and the note, and finished 58px taller than the table.
+
+> *"the parameter table is a bit shorter than the menu frame. Might also have
+> something to do with the note at the bottom."*
+
+Which side a control belongs to is the same question in a different form: the
+search filters the list, the path bar names the listing, the count describes
+the table — all of them belong to the pane and sit in its track. Something
+that changes what the *whole screen* shows, like the Inspector's view
+switcher, spans both.
+
+One gap between pane and column, from `--app-col-gap`. It had been four
+values across five screens for one relationship.
+
+### A panel inside a panel is one panel
+
+Two surfaces of the same color, one inset a few pixels inside the other, read
+as a single box with a line through it — not as two things. Parameters wrapped
+its table and its actions column in a card, which put a white bordered column
+17px inside a white bordered card; the column's own frame did nothing except
+look like a division. It is now a full-height screen, so both panels sit on
+the page ground with the background between them, which is what makes them
+read as separate on Logs and MAVFTP.
+
+> *"the one in Parameter List still looks to be part of the broader parameter
+> list frame"*
+
+So: a screen either is a card, or contains framed panels. Not both. MAVFTP is
+the pattern to copy — a card while there is nothing to show, its own layout
+once there is.
 
 ### Sibling screens share a shape
 
@@ -343,6 +433,63 @@ control and was already applied unevenly across eleven of them.
 telemetry…` keep theirs: the ellipsis is what separates a thing happening
 from a thing finished, and `Writing` alone reads as done. So does elision in
 the middle of a value — `[1, 2, 3, … 40]`.
+
+### An error names what the user did, not what the code was doing
+
+Machine text is for the log. On screen, say which thing failed in the words
+the user typed and what state it is in: "Nothing is listening at
+127.0.0.1:5760", not `Error invoking remote method 'link:open': Error:
+connect ECONNREFUSED 127.0.0.1:5760`. Match the error *code*, which is stable,
+rather than the sentence around it, which is not — and where there is no code
+to match, repeat the message plainly instead of guessing at a cause.
+
+> *"I noticed this when I tried to connect to an existing SITL that wasn't
+> actually running. Looks like we'll need to handle this sort of thing."*
+
+**Cancelling is not failing.** Closing a picker, dismissing a prompt, choosing
+not to connect: none of them get an error state.
+
+### Work that is not about one screen is reported on the app bar
+
+A parameter download starts from a connect, a reboot, or a write, and while
+it runs every curated tab is showing an incomplete vehicle. A note on the
+Parameters tab tells whoever is already there; the app bar tells everyone
+else.
+
+> *"We should have a global indicator that parameters are loading. In QGC, a
+> thin green bar moves across the header and disappears when complete."*
+
+Two things such an indicator has to get right. It must not move anything —
+it comes and goes while someone is reading the bar, so it is placed out of
+the layout's flow entirely. And before there is a fraction to draw it should
+sweep, not sit at 0%, which reads as stalled.
+
+Progress is blue here, not green: activity, not a verdict. Green would say
+"good".
+
+### A setting that gates other settings writes itself
+
+Everything else stages and goes to the vehicle when Write is pressed. A
+parameter that decides whether *other* parameters exist cannot: until it is
+written the screen has nothing to show, so staging it looks like the control
+does not work. Write it on the spot and re-read in the background.
+
+> *"Let's make the OSD type selection automatically write, then trigger a
+> background parameter refresh."*
+
+Two things to keep honest about it. Writing on a *keystroke* is never the
+gesture — a dropdown commits when it changes, a number field when you press
+Enter or leave it. And a write that fails goes back to being a staged edit,
+so nothing the user chose is lost.
+
+### One prompt per thing to fix
+
+A control that already carries a setting, and a hint beside it saying what
+the setting being off means, is the prompt. A second emphasized panel offering
+the same change is a louder copy of a control that is already there.
+
+> *"We don't need the emphasis panel with the OSD buttons because we already
+> have the display menu that prompts for OSD type."*
 
 ### A label must not be ambiguous
 

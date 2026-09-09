@@ -136,10 +136,10 @@ export default function MissionTab() {
           </div>
         </div>
 
-        <aside className="mission-side">
+        <aside className="app-col-shell mission-side">
           {/* Everything that belongs to a plan scrolls; see below for what
               does not. */}
-          <div className="mission-side__scroll">
+          <div className="app-col mission-side__scroll">
             {/* First, because it decides what everything below it is about. */}
             <PlanKindSwitch />
             {/* Read, write and clear are the same three actions on all three

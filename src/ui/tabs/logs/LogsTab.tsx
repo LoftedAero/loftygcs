@@ -108,112 +108,114 @@ export default function LogsTab() {
           )}
         </div>
 
-        <aside className="app-col log-side">
-          <section className="app-col__group">
-            <h3 className="app-col__head">Log</h3>
-            <LaButton variant="primary" size="block" disabled={busy} onClick={() => void open()}>
-              Open log file
-            </LaButton>
-            {log && (
-              <>
-                <p className="app-col__note">{describe(status)}</p>
-                {/* Saving is offered only once a log is open: a download
+        <aside className="app-col-shell">
+          <div className="app-col">
+            <section className="app-col__group">
+              <h3 className="app-col__head">Log</h3>
+              <LaButton variant="primary" size="block" disabled={busy} onClick={() => void open()}>
+                Open log file
+              </LaButton>
+              {log && (
+                <>
+                  <p className="app-col__note">{describe(status)}</p>
+                  {/* Saving is offered only once a log is open: a download
                     goes straight into the viewer, so this is how a log you
                     pulled off the vehicle gets kept. */}
-                <LaButton
-                  variant="secondary"
-                  size="block"
-                  onClick={() => bytes && saveOpenLog(describe(status) || 'log.bin', bytes)}
-                  disabled={!bytes}
-                >
-                  Save to file
-                </LaButton>
-                <LaButton
-                  variant="secondary"
-                  size="block"
-                  disabled={!log.params.size}
-                  title="Write the parameters recorded in this log to a .param file"
-                  onClick={() => saveLogParams(describe(status) || 'log', log.params)}
-                >
-                  Save parameters ({log.params.size})
-                </LaButton>
-                <LaButton variant="ghost" size="block" onClick={clear}>
-                  Close log
-                </LaButton>
-              </>
-            )}
-          </section>
+                  <LaButton
+                    variant="secondary"
+                    size="block"
+                    onClick={() => bytes && saveOpenLog(describe(status) || 'log.bin', bytes)}
+                    disabled={!bytes}
+                  >
+                    Save to file
+                  </LaButton>
+                  <LaButton
+                    variant="secondary"
+                    size="block"
+                    disabled={!log.params.size}
+                    title="Write the parameters recorded in this log to a .param file"
+                    onClick={() => saveLogParams(describe(status) || 'log', log.params)}
+                  >
+                    Save parameters ({log.params.size})
+                  </LaButton>
+                  <LaButton variant="ghost" size="block" onClick={clear}>
+                    Close log
+                  </LaButton>
+                </>
+              )}
+            </section>
 
-          <VehicleLogs />
+            <VehicleLogs />
 
-          {log && (
-            <>
-              {/* Link-outs to ArduPilot WebTools. There is no upload API to
+            {log && (
+              <>
+                {/* Link-outs to ArduPilot WebTools. There is no upload API to
                   hand the log across -- each opens in the browser and the
                   user drops the .bin in -- so the useful work here is saying
                   in advance whether this log has what each tool reads. */}
-              <section className="app-col__group">
-                <h3 className="app-col__head">Analyze (WebTools)</h3>
-                {webToolsFor(log).map((t) => (
-                  <LaButton
-                    key={t.id}
-                    variant="secondary"
-                    size="block"
-                    disabled={t.missing !== null}
-                    title={t.missing ?? t.purpose}
-                    onClick={() => openExternal(t.url)}
-                  >
-                    {t.name}
-                  </LaButton>
-                ))}
-                <LaHint>
-                  Opens in the browser — drop this log&rsquo;s .bin file into the page. If the log
-                  came off the vehicle, Save to file first.
-                </LaHint>
-              </section>
-
-              <section className="app-col__group">
-                <h3 className="app-col__head">View</h3>
-                <div className="log-viewswitch" role="radiogroup" aria-label="Upper pane">
-                  {(
-                    [
-                      ['none', '3D only'],
-                      ['plot', 'Plot'],
-                      ['table', 'Table'],
-                    ] as const
-                  ).map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      role="radio"
-                      aria-checked={upper === id}
-                      className={`log-viewswitch__btn${upper === id ? ' is-active' : ''}`}
-                      onClick={() => setUpper(id)}
+                <section className="app-col__group">
+                  <h3 className="app-col__head">Analyze (WebTools)</h3>
+                  {webToolsFor(log).map((t) => (
+                    <LaButton
+                      key={t.id}
+                      variant="secondary"
+                      size="block"
+                      disabled={t.missing !== null}
+                      title={t.missing ?? t.purpose}
+                      onClick={() => openExternal(t.url)}
                     >
-                      {label}
-                    </button>
+                      {t.name}
+                    </LaButton>
                   ))}
-                </div>
-                {upper === 'plot' && (
-                  <>
-                    <LaSwitch
-                      label="Shade by flight mode"
-                      checked={shadeModes}
-                      onChange={(e) => setShadeModes(e.target.checked)}
-                    />
-                    {/* Gestures are not discoverable by looking at a canvas. */}
-                    <LaHint>
-                      Drag across the plot to zoom to that stretch. Shift-drag pans, the wheel
-                      zooms, a double-click puts it all back, and a click sends the replay there.
-                    </LaHint>
-                  </>
-                )}
-              </section>
+                  <LaHint>
+                    Opens in the browser — drop this log&rsquo;s .bin file into the page. If the log
+                    came off the vehicle, Save to file first.
+                  </LaHint>
+                </section>
 
-              <PlottedFields />
-              <PlotPresets />
-            </>
-          )}
+                <section className="app-col__group">
+                  <h3 className="app-col__head">View</h3>
+                  <div className="log-viewswitch" role="radiogroup" aria-label="Upper pane">
+                    {(
+                      [
+                        ['none', '3D only'],
+                        ['plot', 'Plot'],
+                        ['table', 'Table'],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="radio"
+                        aria-checked={upper === id}
+                        className={`log-viewswitch__btn${upper === id ? ' is-active' : ''}`}
+                        onClick={() => setUpper(id)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {upper === 'plot' && (
+                    <>
+                      <LaSwitch
+                        label="Shade by flight mode"
+                        checked={shadeModes}
+                        onChange={(e) => setShadeModes(e.target.checked)}
+                      />
+                      {/* Gestures are not discoverable by looking at a canvas. */}
+                      <LaHint>
+                        Drag across the plot to zoom to that stretch. Shift-drag pans, the wheel
+                        zooms, a double-click puts it all back, and a click sends the replay there.
+                      </LaHint>
+                    </>
+                  )}
+                </section>
+
+                <PlottedFields />
+                <PlotPresets />
+              </>
+            )}
+          </div>
         </aside>
       </div>
     </div>

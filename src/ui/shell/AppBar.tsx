@@ -4,6 +4,7 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
 import AppStatus from './AppStatus'
+import ParamProgress from './ParamProgress'
 import SimTray from './SimTray'
 import ThemeToggle from './ThemeToggle'
 import { hasIpLinks } from '../../env'
@@ -96,6 +97,10 @@ export default function AppBar() {
       <div className="app-bar__band app-bar__band--center">
         <AppStatus />
       </div>
+
+      {/* Out of the grid's flow entirely (absolutely placed on the bar's
+          own foot), so it adds no fourth track and cannot move anything. */}
+      <ParamProgress />
 
       <div className="app-bar__band app-bar__band--right">
         <LaSelect

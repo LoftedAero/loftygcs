@@ -39,6 +39,7 @@ interface ParamState {
   beginDownload: () => void
   setProgress: (p: { got: number; total: number; source: 'ftp' | 'stream' }) => void
   loaded: (records: ParamRecord[]) => void
+  merged: (records: ParamRecord[]) => void
   failed: (error: string) => void
   edit: (name: string, value: number) => void
   revertAll: () => void
@@ -86,6 +87,37 @@ export const useParamStore = create<ParamState>((set, get) => ({
     }
     order.sort()
     set({ entries, order, loadState: 'ready', progress: null, dirtyCount: 0 })
+  },
+  /**
+   * A second download folded into the set already on screen.
+   *
+   * `loaded` is for the first one and rebuilds everything, which is wrong
+   * for a refresh in two ways: it flips `loadState`, blanking every curated
+   * tab while it runs, and it throws away staged edits -- a background
+   * refresh that silently discarded someone's unwritten changes would be a
+   * far worse bug than the one it was added to fix.
+   *
+   * So a dirty entry keeps the value it is staged at, and only learns what
+   * the vehicle now says it is staged *against*: if the vehicle has caught
+   * up to the staged value, the edit is no longer an edit.
+   */
+  merged: (records) => {
+    const prev = get().entries
+    const entries = new Map<string, ParamEntry>()
+    const order: string[] = []
+    for (const r of records) {
+      const value = tidy(r.value)
+      const was = prev.get(r.name)
+      if (was?.dirty) {
+        entries.set(r.name, { ...was, origValue: value, dirty: was.value !== value })
+      } else {
+        entries.set(r.name, { value, origValue: value, mavType: r.mavType, dirty: false })
+      }
+      order.push(r.name)
+    }
+    // Progress is cleared here as well as in `loaded`, or the app bar's
+    // parameter bar would be left running after a quiet refresh finished.
+    set({ entries, order, dirtyCount: recount(entries), progress: null })
   },
   failed: (error) => set({ loadState: 'error', error }),
 

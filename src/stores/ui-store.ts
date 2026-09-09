@@ -57,6 +57,17 @@ export type TabGroup = (typeof TAB_GROUPS)[number]
  * content) it collapsed to whatever the shortest column of vitals allowed.
  * Those tabs get the same treatment Fly and Mission get: the content pane
  * stops being a grid and hands them the window.
+ *
+ * The four screens with an actions column need it for a second reason, and
+ * went without it for a while: each one's root sets `flex: 1; min-height: 0`
+ * expecting to fill, and on the card grid -- whose `align-items` is `start`
+ * -- `flex` is inert, so they were sized by their content and the *page*
+ * scrolled instead. Two things follow from that, and both were live bugs.
+ * The actions column scrolled away with everything else, when the whole
+ * point of a column is that it stays beside what it acts on. And the
+ * parameter table's virtualizer measures its own scroll box, which had no
+ * bounded height, so it had no window to virtualize against -- 1,400 rows
+ * of a list that exists to render a slice.
  */
 export const TABS = [
   { id: 'overview', label: 'Overview', group: 'Initial Setup', fills: true },
@@ -78,12 +89,12 @@ export const TABS = [
   { id: 'tuning', label: 'Tuning', group: 'Config/Tuning' },
   // The label changed, the id did not: `parameters` is what a saved tab and
   // every deep link already say, and renaming it would strand both.
-  { id: 'parameters', label: 'Parameter List', group: 'Config/Tuning' },
+  { id: 'parameters', label: 'Parameter List', group: 'Config/Tuning', fills: true },
 
   // Not steps at all: what you reach for when a step misbehaves.
-  { id: 'logs', label: 'Logs', group: 'Data' },
-  { id: 'files', label: 'MAVFTP', group: 'Data' },
-  { id: 'inspector', label: 'Inspector', group: 'Data' },
+  { id: 'logs', label: 'Logs', group: 'Data', fills: true },
+  { id: 'files', label: 'MAVFTP', group: 'Data', fills: true },
+  { id: 'inspector', label: 'Inspector', group: 'Data', fills: true },
 ] as const
 
 export type TabId = (typeof TABS)[number]['id']

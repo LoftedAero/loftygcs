@@ -10,6 +10,7 @@ import { WorkerClient } from '../worker/worker-client'
 import type { FirmwareVersion, MissionItem, ProtocolEvent, TelemetryDelta } from '../protocol/types'
 import { modeName, vehicleTypeName } from '../protocol/modes'
 import { setConnectionState, useConnectionStore } from '../stores/connection-store'
+import { describeLinkError } from './link-error'
 import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { useCalStore } from '../stores/cal-store'
@@ -43,6 +44,8 @@ class ConnectionService {
   private snapshotTimer: ReturnType<typeof setInterval> | null = null
   // Deltas mutate this between snapshot flushes so the store re-renders at
   // a few Hz no matter how fast telemetry arrives.
+  /** What the current link was opened with, for naming it in a message. */
+  private openedWith: TransportOptions | null = null
   private pending: Partial<VehicleSnapshot> = {}
   private pendingDirty = false
 
@@ -50,6 +53,7 @@ class ConnectionService {
     const { phase } = useConnectionStore.getState()
     if (phase !== 'idle' && phase !== 'error') await this.disconnect()
 
+    this.openedWith = opts
     setConnectionState({ phase: 'opening', kind: opts.kind, error: null })
     try {
       const worker = this.ensureWorker()
@@ -69,10 +73,12 @@ class ConnectionService {
       }, HANDSHAKE_TIMEOUT_MS)
       this.snapshotTimer = setInterval(() => this.flushSnapshot(), SNAPSHOT_INTERVAL_MS)
     } catch (err) {
-      setConnectionState({
-        phase: 'error',
-        error: err instanceof Error ? err.message : 'Connection failed',
-      })
+      // Cancelling the port chooser is not a failure, and reported as one it
+      // left a red chip on the app bar for choosing not to connect.
+      const error = describeLinkError(err, opts)
+      setConnectionState(
+        error === null ? { phase: 'idle', kind: null, error: null } : { phase: 'error', error },
+      )
     }
   }
 
@@ -111,7 +117,13 @@ class ConnectionService {
   }
 
   private onTransportClosed(reason?: string) {
-    void this.disconnect(reason ? `Link closed: ${reason}` : undefined)
+    // The reason is a socket error message from the main process, so it gets
+    // the same cleaning a failed open does -- a link dropped mid-flight is
+    // exactly when nobody wants to read "ECONNRESET" off the app bar. The
+    // options are the ones this link was opened with.
+    const opts = this.openedWith
+    const said = reason && opts ? describeLinkError(new Error(reason), opts) : reason
+    void this.disconnect(said ? `Link closed: ${said}` : undefined)
   }
 
   private onEvent(evt: ProtocolEvent) {
@@ -301,15 +313,34 @@ class ConnectionService {
     this.pendingDirty = false
   }
 
-  async refreshParams() {
+  /**
+   * Re-read every parameter.
+   *
+   * `quiet` is for a refresh nobody asked for out loud -- writing a
+   * parameter that gates a whole subtree, where the point is to discover
+   * what the vehicle now exposes. It keeps the screen showing what it has:
+   * no `beginDownload`, so no curated tab blanks to a loading card; the new
+   * set is *merged*, so staged edits survive; and a failure is dropped,
+   * because a background read that could not complete is not a reason to
+   * put the Parameters tab into an error state.
+   */
+  async refreshParams(opts: { quiet?: boolean } = {}) {
     const worker = this.worker
     if (!worker) return
-    const store = useParamStore.getState()
-    store.beginDownload()
+    if (!opts.quiet) useParamStore.getState().beginDownload()
     try {
       const result = await worker.downloadParams()
-      useParamStore.getState().loaded(result.params)
+      const store = useParamStore.getState()
+      if (opts.quiet) store.merged(result.params)
+      else store.loaded(result.params)
     } catch (err) {
+      // A quiet refresh that could not finish leaves the screen as it was --
+      // but the progress bar has to stop, or the bar reads as a download
+      // still running.
+      if (opts.quiet) {
+        useParamStore.setState({ progress: null })
+        return
+      }
       useParamStore.getState().failed(err instanceof Error ? err.message : 'param download failed')
     }
   }

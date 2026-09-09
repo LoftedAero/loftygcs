@@ -72,53 +72,65 @@ export default function ParamsTab() {
   }
 
   return (
-    <LaCard title="Parameters" className="params-card">
+    // Not a card, and that is the point. Every other screen with an actions
+    // column -- Logs, MAVFTP, Mission -- puts its main pane and its column
+    // side by side on the page ground, each with its own frame. This one wrapped
+    // both in a card, so a white bordered column sat 17px inside a white
+    // bordered card and the two read as one panel with a divider through it.
+    // MAVFTP already had the shape to copy: a card while there is nothing to
+    // show, its own full-height layout once there is. The heading goes with
+    // the card; the rail already says which screen this is.
+    <div className="params-screen">
+      {/* One grid, not a column beside a column: the toolbar and the note
+          are placed in the table's track only, and the actions column is
+          placed in the table's *row* -- so the two framed panels start and
+          end on the same lines. Nested in a flex wrapper the column spanned
+          all three rows and stood 58px taller than the table it sits beside,
+          which reads as a misalignment rather than as a taller column. */}
       <div className="params-layout">
-        <div className="params-main">
-          {/* Search stays with the list it filters. It wants the width, and
+        {/* Search stays with the list it filters. It wants the width, and
               it is the one control used while reading rather than between
               tasks -- which is what the actions column is for. */}
-          <div className="la-row params-toolbar">
-            <LaInput
-              placeholder="Search parameters"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="la-grow"
-            />
+        <div className="la-row params-toolbar">
+          <LaInput
+            placeholder="Search parameters"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="la-grow"
+          />
+        </div>
+        <div className="params-scroll" ref={scrollRef}>
+          <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+            {virtualizer.getVirtualItems().map((item) => (
+              <div
+                key={names[item.index]}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${item.start}px)`,
+                }}
+              >
+                <ParamRow name={names[item.index]!} />
+              </div>
+            ))}
           </div>
-          <div className="params-scroll" ref={scrollRef}>
-            <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-              {virtualizer.getVirtualItems().map((item) => (
-                <div
-                  key={names[item.index]}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${item.start}px)`,
-                  }}
-                >
-                  <ParamRow name={names[item.index]!} />
-                </div>
-              ))}
-            </div>
-          </div>
-          <p className="la-card__note">
-            {names.length} of {order.length} parameters. Changes stage here and are written from
-            the column beside them.
-            {/* Which documentation is on screen. Parameters are added and
+        </div>
+        <p className="params-note">
+          {names.length} of {order.length} parameters. Changes stage here and are written from the
+          column beside them.
+          {/* Which documentation is on screen. Parameters are added and
                 re-scaled between releases, so a hint from the wrong version
                 is worse than no hint -- worth one line to say. */}
-            {metadataSource && ` Hints from ArduPilot ${metadataSource}.`}
-          </p>
-        </div>
+          {metadataSource && ` Hints from ArduPilot ${metadataSource}.`}
+        </p>
 
-        <aside className="params-aside">
+        <aside className="app-col-shell">
           <ParamSidebar />
         </aside>
       </div>
-    </LaCard>
+    </div>
   )
 }
 

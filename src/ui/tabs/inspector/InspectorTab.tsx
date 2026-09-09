@@ -91,88 +91,90 @@ export default function InspectorTab() {
   return (
     <div className="inspector">
       {tabs}
-      <div className="inspector__main">
-        <div className="inspector__bar">
-          <LaInput
-            type="search"
-            placeholder="Filter messages — try “GPS”"
-            aria-label="Filter messages"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-          <span className="inspector__total">
-            {rows.length} message types · {totalHz.toFixed(0)} msg/s
-          </span>
-          <LaSwitch label="Pause" checked={paused} onChange={(e) => setPaused(e.target.checked)} />
-        </div>
-        <div className="inspector__scroll">
-          <table className="inspector__table">
-            <thead>
-              <tr>
-                <th>Message</th>
-                <th className="num">ID</th>
-                <th className="num">Src</th>
-                <th className="num">Hz</th>
-                <th className="num">Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((r) => {
-                const key = rowKey(r)
-                return (
-                  <tr
-                    key={key}
-                    className={key === selectedKey ? 'is-selected' : undefined}
-                    onClick={() => select(key === selectedKey ? null : key)}
-                  >
-                    <td>{r.msgName}</td>
-                    <td className="num">{r.msgid}</td>
-                    <td className="num">
-                      {r.sysid}:{r.compid}
-                    </td>
-                    <td className="num">{r.hz >= 9.95 ? r.hz.toFixed(0) : r.hz.toFixed(1)}</td>
-                    <td className="num">{r.count.toLocaleString()}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          {sorted.length === 0 && (
-            <p className="app-placeholder">
-              {rows.length === 0 ? 'Waiting for traffic…' : `Nothing matches “${filter}”.`}
-            </p>
-          )}
-        </div>
+      {/* No wrapper: the filter bar sits in the table's track and the
+          actions column in the table's row, so the two panels line up. */}
+      <div className="inspector__bar">
+        <LaInput
+          type="search"
+          placeholder="Filter messages — try “GPS”"
+          aria-label="Filter messages"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <span className="inspector__total">
+          {rows.length} message types · {totalHz.toFixed(0)} msg/s
+        </span>
+        <LaSwitch label="Pause" checked={paused} onChange={(e) => setPaused(e.target.checked)} />
+      </div>
+      <div className="inspector__scroll">
+        <table className="inspector__table">
+          <thead>
+            <tr>
+              <th>Message</th>
+              <th className="num">ID</th>
+              <th className="num">Src</th>
+              <th className="num">Hz</th>
+              <th className="num">Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r) => {
+              const key = rowKey(r)
+              return (
+                <tr
+                  key={key}
+                  className={key === selectedKey ? 'is-selected' : undefined}
+                  onClick={() => select(key === selectedKey ? null : key)}
+                >
+                  <td>{r.msgName}</td>
+                  <td className="num">{r.msgid}</td>
+                  <td className="num">
+                    {r.sysid}:{r.compid}
+                  </td>
+                  <td className="num">{r.hz >= 9.95 ? r.hz.toFixed(0) : r.hz.toFixed(1)}</td>
+                  <td className="num">{r.count.toLocaleString()}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        {sorted.length === 0 && (
+          <p className="app-placeholder">
+            {rows.length === 0 ? 'Waiting for traffic…' : `Nothing matches “${filter}”.`}
+          </p>
+        )}
       </div>
 
-      <aside className="app-col inspector__detail">
-        <section className="app-col__group">
-          <h3 className="app-col__head">
-            {selected ? `${selected.msgName} · ${selected.sysid}:${selected.compid}` : 'Fields'}
-          </h3>
-          {selected ? (
-            <table className="inspector__fields">
-              <tbody>
-                {Object.entries(selected.fields).map(([name, value]) => (
-                  <tr key={name}>
-                    <td>{name}</td>
-                    <td className="num">{formatValue(value)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <LaHint>Click a message to watch its latest field values here.</LaHint>
-          )}
-          {/* Only decoded traffic can appear: MAVLink's CRC folds each
+      <aside className="app-col-shell">
+        <div className="app-col">
+          <section className="app-col__group">
+            <h3 className="app-col__head">
+              {selected ? `${selected.msgName} · ${selected.sysid}:${selected.compid}` : 'Fields'}
+            </h3>
+            {selected ? (
+              <table className="inspector__fields">
+                <tbody>
+                  {Object.entries(selected.fields).map(([name, value]) => (
+                    <tr key={name}>
+                      <td>{name}</td>
+                      <td className="num">{formatValue(value)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <LaHint>Click a message to watch its latest field values here.</LaHint>
+            )}
+            {/* Only decoded traffic can appear: MAVLink's CRC folds each
               message's definition into the checksum, so a message this GCS
               has no definition for is indistinguishable from line noise and
               never survives framing. True of every ground station. */}
-          <LaHint>
-            Messages update {paused ? 'when unpaused' : 'about twice a second'}. Only message types
-            in this app&rsquo;s MAVLink dialect can appear.
-          </LaHint>
-        </section>
+            <LaHint>
+              Messages update {paused ? 'when unpaused' : 'about twice a second'}. Only message
+              types in this app&rsquo;s MAVLink dialect can appear.
+            </LaHint>
+          </section>
+        </div>
       </aside>
     </div>
   )

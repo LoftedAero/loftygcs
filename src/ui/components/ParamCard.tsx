@@ -13,6 +13,14 @@ export interface ParamFieldSpec {
   param: string
   label: string
   unit?: string
+  /**
+   * Send this one as soon as it is chosen, instead of staging it.
+   *
+   * Only for a parameter that gates others -- see ParamField. A curated card
+   * is a declaration, so this stays a field on the declaration rather than a
+   * second kind of card.
+   */
+  writeNow?: boolean
 }
 
 export default function ParamCard({
@@ -43,6 +51,7 @@ export default function ParamCard({
           param={f.param}
           label={f.label}
           {...(f.unit ? { unit: f.unit } : {})}
+          {...(f.writeNow ? { writeNow: true } : {})}
         />
       ))}
       {children}

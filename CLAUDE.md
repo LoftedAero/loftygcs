@@ -93,6 +93,32 @@ design decisions are recorded there and in code comments.
   it when a review produces a preference that will apply again, and leave anything that applies
   to one screen only in a comment there. `docs/screen-review.md` is the per-screen gate those
   conventions are checked against before a preview build.
+- **A transport's failure is turned into a sentence before anyone sees it**
+  (`services/link-error.ts`). `Transport.open` is documented as rejecting with "a user-readable
+  Error" and the IP transports never honored it: they reject with whatever Node threw, and
+  Electron wraps a rejected `ipcMain.handle` in its own, so connecting to a simulator that was
+  not running put `Error invoking remote method 'link:open': Error: connect ECONNREFUSED
+  127.0.0.1:5760` on the app bar — an IPC channel name the user has never heard of, with the one
+  useful word buried in the middle. `describeLinkError` matches the **code** rather than the
+  message around it (codes are stable across platforms, the wording is not) and names the target
+  the user actually typed, not the address inside the error: an EADDRINUSE while binding says
+  "Something is already using port 14550". Anything with no code falls through to the cleaned
+  text, because an unknown failure said plainly beats a wrong guess said confidently. Two things
+  it must keep doing: **cancelling the port chooser returns to idle, not to an error** — Web
+  Serial rejects with NotFoundError when someone presses Cancel, and a red chip for choosing not
+  to connect is a bug; and the same cleaning runs on a link that drops mid-session, which is
+  exactly when nobody wants to read "ECONNRESET" off the bar.
+- **A parameter download is reported on the app bar, not on the tab that started it**
+  (`ui/shell/ParamProgress.tsx`, QGroundControl's arrangement). It is the one long operation that
+  is not about the screen you are on — it starts on connect, on a reboot, and on writing a
+  parameter that gates others — and until it finishes *every* curated tab is showing an
+  incomplete vehicle. It keys off `progress` as well as `loadState`, because a quiet refresh
+  deliberately never touches `loadState`, and it sweeps rather than sitting at 0% before the
+  first packet, since a bar parked at zero reads as stalled. Absolutely placed on the bar's own
+  foot so it is not a grid item: it appears and disappears while someone is reading the bar, and
+  a layout that shifted under that would be worse than no indicator (measured — nothing moves,
+  the bar stays 52px). Blue, not QGC's green, because this app's other two progress bars are
+  blue and one carries the reason beside it: progress is activity, not a status verdict.
 - **The app bar is a three-track grid, not a flex row, and only the middle track may change
   size.** Left is what the app is — brand, the mode switch, the SITL tray, preferences; right is
   the link — transport, Connect, Disconnect; the vehicle status sits between them. The outer two
@@ -194,11 +220,44 @@ design decisions are recorded there and in code comments.
   sheet's `.la-field` is `1fr auto`, so in an 860px card ~590px sat between "P" and its value,
   and a scoped `minmax(0, 20ch) auto` in `app.css` (the sheet itself is frozen) now puts the
   control beside its label and lines every control in a card up.
-- **The actions column** (`.app-col` in `app.css`): every screen that edits something has a
-  fixed-width column on the right holding what you *do*, beside the thing you are doing it to.
-  Mission, Parameters and OSD share one set of classes so they cannot drift — they each grew a
-  private copy first and each picked a different width, which is what the convention exists to
-  stop. The rules: width is `var(--app-col-w)`, never a bespoke number; buttons are always
+- **The actions column is two classes, and both are required**: `.app-col-shell` around
+  `.app-col` (`app.css`). Every screen that edits something has a fixed-width column on the
+  right holding what you *do*, beside the thing you are doing it to. The **shell** owns the
+  frame, the background and the scrolling; the **inner** `.app-col` owns the padding and the
+  rhythm between groups — split that way so a column can also sit inside a card that already
+  has a frame, by leaving the shell off. This entry used to claim the screens shared one set of
+  classes "so they cannot drift"; they did not, and they had. `.app-col-shell` was written for
+  this job and **nothing used it**: Parameters and Mission had its three lines pasted into
+  `.params-aside, .mission-side`, OSD had them a third time in `.osd-actions`, and Logs and
+  MAVFTP had no frame at all — so on Logs the *left* field list was framed and the right
+  column was not, on one screen. Mission had the frame but no inner padding, so its content sat
+  against the border. A claim in this file that something cannot drift is worth checking before
+  it is relied on. `src/styles/panel-frame.test.ts` guards both halves: it pins every selector
+  allowed to draw the frame itself, so the next copy is a deliberate edit rather than a paste,
+  and it fails on a bare `.app-col` rendered without a shell — which is how the Inspector's
+  detail column, and before it Logs and MAVFTP, came to have no frame at all.
+  **And a screen either *is* a card or *contains* framed panels, never both**: Parameters
+  wrapped its table and its column in a `LaCard`, which put a white bordered column 17px inside
+  a white bordered card, so the column's frame read as a division rather than an edge. It is now
+  a full-height screen (`.params-screen`), which is the shape MAVFTP already had — a card while
+  there is nothing to show, its own layout once there is.
+  **Every screen with a column is `fills: true`**, and all four went without it: each one's root
+  sets `flex: 1; min-height: 0` expecting to fill, and on the card grid — whose `align-items` is
+  `start` — `flex` is inert, so they sized to their content and the *page* scrolled. The column
+  then rode away with the list, which is the one thing a column must not do; no sticky
+  positioning is needed once the container is right. It also meant the parameter table's
+  virtualizer measured a scroll box with no bounded height, so it had no window to virtualize
+  against — 1,400 rows of a list that exists to render a slice. `fills` costs one thing worth
+  knowing: `.app-content--flush` stretches its children, so a filling tab's *placeholder* card
+  needs `max-width` or a one-line "connect a vehicle" note becomes a full-window banner.
+  **The column is placed in the main pane's grid row, not beside the whole screen**, so the two
+  framed panels start and end on the same lines — Parameters, MAVFTP and the Inspector each
+  wrapped their bar and their pane in a flex column, which left the actions column spanning all
+  of it and standing 58px taller than the panel it sits beside. A pane's toolbar and caption go
+  in that pane's *track* (the search filters the list, the path bar names the listing, the count
+  describes the table); only something that changes what the whole screen shows, like the
+  Inspector's view switcher, spans both tracks. The gap between pane and column is
+  `--app-col-gap`, which was four different values across five screens. The rules: width is `var(--app-col-w)`, never a bespoke number; buttons are always
   `size="block"`, one per row (two to a row only fits by shortening labels past the point of
   saying anything); groups are `<section class="app-col__group">` with an `<h3
   class="app-col__head">`; order is what-you-do before what-you-set (vehicle actions, then file
@@ -251,6 +310,34 @@ design decisions are recorded there and in code comments.
 - **Curated tabs** are declarations, not code: `ParamCard` takes a field list, drops params
   the vehicle lacks, and hides itself when empty — so one definition serves Copter, Plane,
   and Rover. `ParamField`'s `bare` prop drops the label for table layouts.
+  **`writeNow` is the one exception to staging, and it is narrow on purpose.** Edits stage so the
+  action bar's Write covers all of them and nothing reaches the vehicle on keystroke; a
+  parameter that *gates other parameters* breaks that, because the screen shows nothing until it
+  is written. `OSD_TYPE` is the case — at 0 the vehicle reports no panel positions, so staging it
+  leaves the OSD page empty however many times a backend is picked. The field writes, then calls
+  `refreshParams({ quiet: true })`, which is where the newly exposed parameters come from. Two
+  things that flag needs and would be bugs without: **it never writes on a keystroke** (a
+  dropdown writes on change, a number field on Enter or blur — "50" passes through 5 on the way,
+  and a field writing every digit would send a value nobody chose); and **a failed write falls
+  back to staging** rather than vanishing, so the choice survives and Write is its honest state.
+  A *quiet* refresh is equally particular: it skips `beginDownload` (which would blank every
+  curated tab to a loading card) and calls the store's `merged` rather than `loaded`, because
+  `loaded` rebuilds from scratch and would silently discard staged edits — a worse bug than the
+  one the refresh exists to fix. A dirty entry keeps its staged value and only learns what the
+  vehicle now says it is staged *against*, so a value the vehicle has caught up with stops being
+  an edit.
+- **A screen that cannot be used yet is drawn disabled, not replaced.** The OSD tab returned a
+  single card while `OSD_TYPE` was 0 — and that card replaced the whole workspace *including*
+  `OsdWorkspace`'s own column, which holds the Display card where `OSD_TYPE` is edited. The
+  state hid its own fix and the only way out was the Parameters table. (There was briefly a
+  second, emphasized "The OSD is off" panel offering the backends by name; it went, because the
+  Display card already carries the parameter *and* the hint saying what being off means.) Everything now
+  renders and `osdOff` disables it: the panel switches, the screen radios, the grid select, the
+  coordinate spinners, and dragging on the preview (`OsdScreen`'s `disabled`), with the mutating
+  helpers guarded as well so a missed control cannot stage a parameter. The empty case keeps its
+  own words, because the two are different news: with the OSD off the vehicle reports no panel
+  positions at all, which is not the same as a firmware that has no panels for that screen.
+  **When removing a screen's content, check what the empty state takes away with it.**
 - **Profiles/guides** (`src/profiles/`): product-specific content is strictly opt-in — the
   sole entry point is Setup > "Guided setups…", and labels apply only after explicit
   aircraft selection. New aircraft = a new data module (profile + guide steps), never new
