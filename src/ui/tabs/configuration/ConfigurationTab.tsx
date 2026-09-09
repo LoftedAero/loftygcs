@@ -27,7 +27,7 @@ function AircraftCard() {
       </LaField>
       <div className="la-row">
         <LaButton variant="ghost" onClick={() => setBrowserOpen(true)}>
-          Guided setups…
+          Guided setups
         </LaButton>
       </div>
       {browserOpen && <GuideBrowserModal onClose={() => setBrowserOpen(false)} />}

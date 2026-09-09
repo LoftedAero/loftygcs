@@ -46,7 +46,7 @@ export default function LogTable() {
             onChange={(e) => setMessage(e.target.value || null)}
             aria-label="Message type"
           >
-            <option value="">Choose a message…</option>
+            <option value="">Choose a message</option>
             {names.map((n) => (
               <option key={n} value={n}>
                 {n} ({log.messages.get(n)!.count})
@@ -85,9 +85,7 @@ export default function LogTable() {
                 })}
               </tr>
             </thead>
-            <tbody
-              style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
-            >
+            <tbody style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
               {virtualizer.getVirtualItems().map((row) => (
                 <tr
                   key={row.key}
@@ -104,9 +102,7 @@ export default function LogTable() {
                   {table.format.fields.map((f) => {
                     const col = table.columns.get(f.name)
                     const v = col ? col[row.index] : undefined
-                    return (
-                      <td key={f.name}>{typeof v === 'number' ? formatCell(v) : (v ?? '')}</td>
-                    )
+                    return <td key={f.name}>{typeof v === 'number' ? formatCell(v) : (v ?? '')}</td>
                   })}
                 </tr>
               ))}

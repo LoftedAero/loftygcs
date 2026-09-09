@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePreferencesStore } from './preferences-store'
 import { fromDistance, fromSpeed, toDistance, toSpeed } from '../units'
 
@@ -12,17 +12,18 @@ beforeEach(() => {
 
 describe('preferences', () => {
   it('starts in SI, the units MAVLink itself speaks', () => {
-    expect(store().units).toEqual({ distance: 'm', speed: 'ms' })
+    expect(store().units).toEqual({ distance: 'm', speed: 'ms', verticalSpeed: 'follow' })
   })
 
   it('remembers a choice across a reload', () => {
     store().setDistanceUnit('ft')
     store().setSpeedUnit('kts')
+    store().setVerticalSpeedUnit('fpm')
     const saved = JSON.parse(localStorage.getItem(KEY)!) as {
       version: number
-      units: { distance: string; speed: string }
+      units: { distance: string; speed: string; verticalSpeed: string }
     }
-    expect(saved.units).toEqual({ distance: 'ft', speed: 'kts' })
+    expect(saved.units).toEqual({ distance: 'ft', speed: 'kts', verticalSpeed: 'fpm' })
     // Versioned, so a future change that reinterprets a key can tell.
     expect(saved.version).toBe(1)
   })
@@ -56,7 +57,29 @@ describe('preferences', () => {
     store().setDistanceUnit('ft')
     store().setSpeedUnit('mph')
     store().reset()
-    expect(store().units).toEqual({ distance: 'm', speed: 'ms' })
+    expect(store().units).toEqual({ distance: 'm', speed: 'ms', verticalSpeed: 'follow' })
+  })
+
+  it('reads a store written before climb rate had a control', async () => {
+    // The additive-shape claim, exercised rather than asserted in a comment:
+    // a document with no verticalSpeed key must come back as `follow`, which
+    // is precisely what those builds did. If this needed a VERSION bump, it
+    // would fail here.
+    //
+    // Re-imported rather than poked through a setter: the document is only
+    // read at module load, so a setter would assert the in-memory default
+    // and pass whatever is in storage -- which is a test that cannot fail.
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ version: 1, units: { distance: 'ft', speed: 'kts' } }),
+    )
+    vi.resetModules()
+    const fresh = await import('./preferences-store')
+    expect(fresh.usePreferencesStore.getState().units).toEqual({
+      distance: 'ft',
+      speed: 'kts',
+      verticalSpeed: 'follow',
+    })
   })
 })
 

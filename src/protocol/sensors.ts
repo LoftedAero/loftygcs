@@ -50,7 +50,13 @@ const SENSOR_LABELS: [SensorId, string][] = [
   ['ahrs', 'AHRS'],
   ['logging', 'Logging'],
   ['geofence', 'Geofence'],
-  ['prearm', 'Prearm check'],
+  // Bit 28 is deliberately absent: MAV_SYS_STATUS_PREARM_CHECK is not a
+  // sensor, it is ArduPilot saying whether its prearm checks are passing.
+  // Listed here it came out under "Unhealthy sensors", which tells a pilot
+  // they have broken hardware when what they have is an unmet arming
+  // condition -- and says it a second time, worse, because the same bit is
+  // already the readiness state at the top of the Preflight pane
+  // (`armReadiness`). The bit stays in SENSOR_BITS for that reader.
 ]
 
 export function decodeSensors(present: number, enabled: number, health: number): SensorReading[] {

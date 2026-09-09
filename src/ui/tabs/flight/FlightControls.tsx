@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMissionStore } from '../../../stores/mission-store'
 import { formatEta, missionProgress } from './mission-progress'
 import { useUnits } from '../../../stores/preferences-store'
@@ -13,6 +13,7 @@ import {
 import { LaButton, LaModal, LaSelect } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
+import { useParamStore } from '../../../stores/param-store'
 import { MAV_RESULT } from '../../../protocol/commands'
 import { modeNumberByName, modeTable, vehicleClass } from '../../../protocol/modes'
 import {
@@ -26,9 +27,9 @@ import {
   setGuidedAltitude,
   setModeConfirmed,
   takeoff,
+  takeoffStyle,
   triggerCamera,
 } from '../../../services/flight'
-import LayoutMenu from './LayoutMenu'
 
 // Every command you give the vehicle, in one place.
 //
@@ -74,11 +75,7 @@ const TAKEOFF_ALT_M = 20
 /** How recent a STATUSTEXT has to be to count as the reason for a refusal. */
 const REASON_WINDOW_MS = 4000
 
-export interface FlightControlsProps {
-  onVideo: () => void
-}
-
-export default function FlightControls({ onVideo }: FlightControlsProps) {
+export default function FlightControls() {
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const vehicleType = useVehicleStore((s) => s.vehicleType)
   const customMode = useVehicleStore((s) => s.customMode)
@@ -92,6 +89,12 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
   const planItems = useMissionStore((s) => s.plan.items)
   const progress = missionProgress(missionSeq, planItems, wpDistM, groundspeedMs)
   const isCopter = vehicleClass(vehicleType) === 'copter'
+  // How this airframe leaves the ground, from the same function the command
+  // uses -- so the tooltip cannot promise one thing while Takeoff does
+  // another. A quadplane goes the copter's way (vertically, to the altitude
+  // asked for); only a fixed wing takes off by mode.
+  const qEnable = useParamStore((s) => s.entries.get('Q_ENABLE')?.value)
+  const takeoffVia = takeoffStyle(vehicleType, qEnable)
 
   const [status, setStatus] = useState('')
   const [speed, setSpeed] = useState('')
@@ -102,6 +105,20 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
   const [confirmForce, setConfirmForce] = useState(false)
 
   const modes = modeTable(vehicleType)
+
+  // The mode picked but not yet sent. Null means "showing what the vehicle
+  // is actually in", which is what it shows whenever nothing is staged.
+  const [pendingMode, setPendingMode] = useState<number | null>(null)
+  const shownMode = pendingMode ?? customMode
+  const modeStaged = pendingMode !== null && pendingMode !== customMode
+  // Any change to the vehicle's own mode clears the staged one -- our Set
+  // landing, but also a failsafe or a switch on the transmitter. A staged
+  // choice made before the situation changed is not one to keep offering.
+  useEffect(() => setPendingMode(null), [customMode])
+  const applyMode = () => {
+    if (pendingMode === null) return
+    void setModeConfirmed(pendingMode).then(report('Mode')).catch(fail('Mode'))
+  }
 
   /**
    * A refusal is only useful with the vehicle's own words attached.
@@ -178,24 +195,41 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
       {/* Tier one: what mode it is in and whether it is armed. Full size and
           first, because everything else is an adjustment to these two. */}
       <div className="flight-controls__primary">
+        {/* Chosen, then sent -- not sent on change.
+            A <select> takes the mouse wheel, so a scroll that happens to
+            pass over this one used to command a mode change on a flying
+            aircraft, with nothing pressed and nothing confirmed. Staging
+            the choice also makes this the same gesture as the value fields
+            below and as a parameter edit: pick, then commit. The staged
+            state wears `.is-dirty`, which is the app's existing "this is
+            what the button will send" highlight. */}
         <LaSelect
-          className="flight-controls__mode"
-          value={String(customMode)}
+          className={`flight-controls__mode${modeStaged ? ' is-dirty' : ''}`}
+          value={String(shownMode)}
           disabled={!connected}
           aria-label="Flight mode"
-          onChange={(e) =>
-            void setModeConfirmed(Number(e.target.value)).then(report('Mode')).catch(fail('Mode'))
-          }
+          onChange={(e) => setPendingMode(Number(e.target.value))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && modeStaged) applyMode()
+          }}
         >
           {Object.entries(modes).map(([num, name]) => (
             <option key={num} value={num}>
               {name}
             </option>
           ))}
-          {modes[customMode] === undefined && (
-            <option value={String(customMode)}>{modeNameNow}</option>
+          {modes[shownMode] === undefined && (
+            <option value={String(shownMode)}>{modeNameNow}</option>
           )}
         </LaSelect>
+        <LaButton
+          variant="secondary"
+          disabled={!connected || !modeStaged}
+          title="Send the selected flight mode"
+          onClick={applyMode}
+        >
+          Set
+        </LaButton>
         <LaButton
           variant={armed ? 'danger' : 'primary'}
           size="lg"
@@ -209,18 +243,30 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
 
         {/* Tier two: one-touch jumps that are really mode changes, so they
             sit beside the mode picker but a step down in size. */}
+        {/* Just "Takeoff". The altitude was in the label, but what the
+            command actually does differs by airframe, and one honest word
+            beats a number that is only true for some of them -- measured
+            against SITL, armed and in Guided: a quadplane answers
+            NAV_TAKEOFF with ACCEPTED and a fixed wing with FAILED. The
+            altitude is on the tooltip. */}
         <LaButton
           variant="secondary"
-          disabled={!connected || !armed}
+          title={
+            takeoffVia === 'guided'
+              ? `Climb to ${formatDistance(TAKEOFF_ALT_M, units.distance, 0)} ${distanceLabel(units.distance)}`
+              : 'Switch to Takeoff mode and climb to the vehicle’s TKOFF_ALT'
+          }
+          disabled={!connected || !armed || takeoffVia === 'unsupported'}
           onClick={() => {
-            // Takeoff switches to Guided first, and a vehicle whose EKF is
-            // still settling refuses that for a few seconds. Say so, or the
-            // button looks like it did nothing for twenty seconds.
-            setStatus('Takeoff: switching to Guided…')
+            // Only a copter goes via Guided, and only that route is slow
+            // enough to need saying: its EKF refuses the switch for a few
+            // seconds after boot, and without a word the button looks like
+            // it did nothing for twenty. A plane is one mode change.
+            if (takeoffVia === 'guided') setStatus('Takeoff: switching to Guided…')
             void takeoff(TAKEOFF_ALT_M).then(report('Takeoff')).catch(fail('Takeoff'))
           }}
         >
-          Takeoff {formatDistance(TAKEOFF_ALT_M, units.distance, 0)} {distanceLabel(units.distance)}
+          Takeoff
         </LaButton>
         <LaButton variant="secondary" disabled={!connected} onClick={() => jump('Auto')}>
           Auto
@@ -228,14 +274,11 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
         <LaButton variant="secondary" disabled={!connected} onClick={() => jump('RTL')}>
           RTL
         </LaButton>
-      </div>
 
-      {/* Tier three, on a recessed strip: numbers you nudge while it is up
-          there, then the occasional command, then arranging the window.
-          Ordered by how often a hand goes to them. */}
-      <div className="flight-controls__secondary">
-        {/* What the vehicle says about its own progress, ahead of the
-            controls: it is read while flying, not operated. */}
+        {/* Read, not pressed -- so it takes the top row's right-hand end,
+            which was the one piece of always-visible space on this screen
+            and was empty. It also stops a read-only readout sitting in the
+            middle of the strip of controls below. */}
         {progress.position !== null && (
           <span className="flight-progress" title="Mission item the vehicle is flying">
             <span className="flight-progress__label">WP</span>
@@ -253,6 +296,12 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
             )}
           </span>
         )}
+      </div>
+
+      {/* Tier three, on a recessed strip: numbers you nudge while it is up
+          there, then the occasional command, then arranging the window.
+          Ordered by how often a hand goes to them. */}
+      <div className="flight-controls__secondary">
         {/* Typed in the reader's units and converted on the way out: the
             vehicle is commanded in SI whatever the box says. */}
         <Field
@@ -293,35 +342,35 @@ export default function FlightControls({ onVideo }: FlightControlsProps) {
             void setCurrentMissionItem(Number(wp)).then(report('Set item')).catch(fail('Set item'))
           }
         />
-        <span className="la-grow" />
-        <LaSelect
-          className="flight-controls__action"
-          value={action}
-          disabled={!connected}
-          aria-label="Action to run"
-          onChange={(e) => setAction(e.target.value)}
-        >
-          {DO_ACTIONS.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.label}
-            </option>
-          ))}
-        </LaSelect>
-        <LaButton
-          variant="secondary"
-          size="sm"
-          disabled={!connected}
-          onClick={() => {
-            const a = DO_ACTIONS.find((x) => x.id === action)
-            if (a) run(a)
-          }}
-        >
-          Run
-        </LaButton>
-        <span className="flight-controls__sep" />
-        {/* Arranging the window is not a command at all, so it sits at the
-            quiet end of the quiet row. */}
-        <LayoutMenu onVideo={onVideo} />
+        {/* One group, so a wrap takes both or neither -- and it keeps the
+            right-hand end on the line it lands on, rather than a spacer
+            holding the end of the line above. */}
+        <div className="flight-controls__run">
+          <LaSelect
+            className="flight-controls__action"
+            value={action}
+            disabled={!connected}
+            aria-label="Action to run"
+            onChange={(e) => setAction(e.target.value)}
+          >
+            {DO_ACTIONS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label}
+              </option>
+            ))}
+          </LaSelect>
+          <LaButton
+            variant="secondary"
+            size="sm"
+            disabled={!connected}
+            onClick={() => {
+              const a = DO_ACTIONS.find((x) => x.id === action)
+              if (a) run(a)
+            }}
+          >
+            Run
+          </LaButton>
+        </div>
       </div>
 
       {status && <p className="la-hint flight-controls__status">{status}</p>}

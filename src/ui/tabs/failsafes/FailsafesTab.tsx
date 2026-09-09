@@ -1,4 +1,5 @@
 import ParamCard, { NeedsVehicle } from '../../components/ParamCard'
+import SetupDoc from '../../components/SetupDoc'
 import { useConnectionStore } from '../../../stores/connection-store'
 
 // What the vehicle does when something goes wrong. Battery failsafe actions
@@ -14,7 +15,7 @@ export default function FailsafesTab() {
     )
   }
   return (
-    <>
+    <SetupDoc>
       <ParamCard
         title="Radio failsafe"
         note="Test this before every new airframe flies: switch the transmitter off on the bench, props removed, and confirm the vehicle reacts."
@@ -72,6 +73,6 @@ export default function FailsafesTab() {
           { param: 'DISARM_DELAY', label: 'Auto-disarm delay', unit: 's' },
         ]}
       />
-    </>
+    </SetupDoc>
   )
 }

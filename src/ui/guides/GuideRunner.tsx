@@ -285,7 +285,7 @@ function CalibrationStep({
       {step.cal === 'accel' && (
         <>
           <LaButton variant="secondary" disabled={!connected} onClick={() => setAccelOpen(true)}>
-            Calibrate accelerometer…
+            Calibrate accelerometer
           </LaButton>
           {accelOpen && (
             <AccelCalWizard onClose={() => setAccelOpen(false)} onSuccess={() => markDone()} />

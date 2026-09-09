@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, net, shell, session } from 'electron'
 import path from 'node:path'
+import { withDriverNames } from './serial-names'
 import { closeAllLinks, registerLinkIpc } from './ipc-links'
 import { registerSitlIpc, stopSim } from './sitl'
 import { registerVideoHandlers, stopVideo } from './video'
@@ -69,8 +70,11 @@ function createWindow() {
     // not a choice anyone can make. The OS product string is the honest
     // source for "which board is this"; the ids are what identifies it when
     // the string is missing or generic, which is most CH340-style adapters.
-    mainWindow?.webContents.send(
-      'serial:ports',
+    // `displayName` is the USB *product* string, which describes the device
+    // and not the interface -- so a CubeOrange's MAVLink and SLCAN ports
+    // arrive as two identical rows. The Windows driver names them apart, and
+    // that is the same source Mission Planner reads; see serial-names.ts.
+    void withDriverNames(
       portList.map((p) => ({
         portId: p.portId,
         portName: p.portName,
@@ -78,8 +82,9 @@ function createWindow() {
         vendorId: p.vendorId,
         productId: p.productId,
         serialNumber: p.serialNumber,
+        deviceInstanceId: p.deviceInstanceId,
       })),
-    )
+    ).then((ports) => mainWindow?.webContents.send('serial:ports', ports))
   })
 
   // Web Serial and WebUSB need these handlers to say yes; without them
@@ -101,9 +106,7 @@ function createWindow() {
   // the first match rather than building a chooser for a one-device list.
   mainWindow.webContents.session.on('select-usb-device', (event, details, callback) => {
     event.preventDefault()
-    const dfu = details.deviceList.find(
-      (d) => d.vendorId === 0x0483 && d.productId === 0xdf11,
-    )
+    const dfu = details.deviceList.find((d) => d.vendorId === 0x0483 && d.productId === 0xdf11)
     callback(dfu?.deviceId)
   })
 

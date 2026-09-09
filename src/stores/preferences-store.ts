@@ -1,5 +1,11 @@
 import { create } from 'zustand'
-import { DEFAULT_UNITS, type DistanceUnit, type SpeedUnit, type UnitPrefs } from '../units'
+import {
+  DEFAULT_UNITS,
+  type DistanceUnit,
+  type SpeedUnit,
+  type UnitPrefs,
+  type VerticalSpeedUnit,
+} from '../units'
 
 // What the person using the app has chosen, as opposed to what the aircraft
 // is doing. Units today; language and whatever comes after it belong here
@@ -39,6 +45,14 @@ function load(): Preferences {
       units: {
         distance: valid(parsed.units?.distance, ['m', 'ft'], DEFAULTS.units.distance),
         speed: valid(parsed.units?.speed, ['ms', 'kmh', 'kts', 'mph'], DEFAULTS.units.speed),
+        // Absent in anything written before the control existed, and the
+        // fallback is `follow` -- which is exactly what those builds did.
+        // So this needed no VERSION bump: nothing is reinterpreted.
+        verticalSpeed: valid(
+          parsed.units?.verticalSpeed,
+          ['follow', 'ms', 'fpm'],
+          DEFAULTS.units.verticalSpeed,
+        ),
       },
     }
   } catch {
@@ -66,6 +80,7 @@ function save(prefs: Preferences): void {
 interface PreferencesState extends Preferences {
   setDistanceUnit(unit: DistanceUnit): void
   setSpeedUnit(unit: SpeedUnit): void
+  setVerticalSpeedUnit(unit: VerticalSpeedUnit): void
   /** Back to the shipped defaults, for a dialog that offers it. */
   reset(): void
 }
@@ -81,6 +96,12 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
 
   setSpeedUnit(speed) {
     const units = { ...get().units, speed }
+    set({ units })
+    save({ units })
+  },
+
+  setVerticalSpeedUnit(verticalSpeed) {
+    const units = { ...get().units, verticalSpeed }
     set({ units })
     save({ units })
   },

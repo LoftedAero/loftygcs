@@ -61,7 +61,7 @@ export default function JoystickPanel() {
             disabled={active}
             onChange={(e) => chooseDevice(e.target.value === '' ? null : e.target.value)}
           >
-            <option value="">Choose a device…</option>
+            <option value="">Choose a device</option>
             {pads.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.id}
@@ -83,7 +83,7 @@ export default function JoystickPanel() {
           {active ? 'Release control' : 'Take control'}
         </LaButton>
         <LaButton variant="ghost" size="sm" disabled={active} onClick={() => setSetup(true)}>
-          Set up…
+          Set up
         </LaButton>
       </div>
 

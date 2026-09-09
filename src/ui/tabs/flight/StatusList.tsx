@@ -47,17 +47,28 @@ export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
 
   const plottedSet = new Set(plotted)
 
+  const hasFields = namesRef.current.length > 0
+
   return (
     <div className="status-list">
-      <input
-        className="la-input status-list__filter"
-        type="search"
-        placeholder={`Filter ${namesRef.current.length} fields…`}
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        aria-label="Filter telemetry fields"
-      />
-      {namesRef.current.length === 0 && <p className="app-placeholder">Waiting for telemetry…</p>}
+      {/* Gone until there is something to filter. "Filter 0 fields" over an
+          empty list is a control that cannot do anything, and it was the
+          only thing making this pane's empty state look different from the
+          two beside it -- which read as three separate faults rather than
+          one situation. Keyed on the field count rather than on the link,
+          so the filter and the placeholder can never both be showing: a
+          connected vehicle that has sent nothing yet is the same case. */}
+      {hasFields && (
+        <input
+          className="la-input status-list__filter"
+          type="search"
+          placeholder={`Filter ${namesRef.current.length} fields`}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          aria-label="Filter telemetry fields"
+        />
+      )}
+      {!hasFields && <p className="app-placeholder">Waiting for telemetry…</p>}
       {needle && shown.length === 0 && (
         <p className="app-placeholder">No field matches “{filter}”.</p>
       )}

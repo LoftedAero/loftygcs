@@ -43,6 +43,19 @@ describe('decodeSensors', () => {
     const all = Object.values(SENSOR_BITS).reduce((a, b) => a | b, 0)
     const ids = decodeSensors(all, all, all).map((r) => r.id)
     expect(ids.indexOf('gyro')).toBeLessThan(ids.indexOf('gps'))
-    expect(ids.indexOf('gps')).toBeLessThan(ids.indexOf('prearm'))
+    expect(ids.indexOf('gps')).toBeLessThan(ids.indexOf('geofence'))
+  })
+
+  it('never lists the prearm flag as a sensor', () => {
+    // MAV_SYS_STATUS_PREARM_CHECK is ArduPilot reporting whether its arming
+    // checks pass, not a device. It appeared under "Unhealthy sensors" the
+    // moment a vehicle was not ready to arm -- which is normal, and reads as
+    // broken hardware. The readiness line above it already says it properly.
+    const all = Object.values(SENSOR_BITS).reduce((a, b) => a | b, 0)
+    expect(decodeSensors(all, all, all).map((r) => r.id)).not.toContain('prearm')
+    // Including when it is the failing one, which is the case that showed.
+    const healthy = all & ~SENSOR_BITS.prearm
+    const readings = decodeSensors(all, all, healthy)
+    expect(readings.filter((r) => r.state === 'unhealthy')).toEqual([])
   })
 })

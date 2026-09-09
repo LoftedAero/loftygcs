@@ -50,8 +50,8 @@ contextBridge.exposeInMainWorld('loftgcs', {
     install: (vehicle: string) => ipcRenderer.invoke('sim:install', vehicle),
     start: (launch: unknown) => ipcRenderer.invoke('sim:start', launch),
     stop: () => ipcRenderer.invoke('sim:stop'),
-    pickBuild: () => ipcRenderer.invoke('sim:pick-build'),
-    pickParams: () => ipcRenderer.invoke('sim:pick-params'),
+    pickBuild: (startIn?: string) => ipcRenderer.invoke('sim:pick-build', startIn),
+    pickParams: (startIn?: string) => ipcRenderer.invoke('sim:pick-params', startIn),
     onProgress: (cb: (p: { file: string; done: number; total: number }) => void) => {
       const handler = (_e: unknown, p: { file: string; done: number; total: number }) => cb(p)
       ipcRenderer.on('sim:progress', handler)
@@ -95,8 +95,7 @@ contextBridge.exposeInMainWorld('loftgcs', {
       return () => ipcRenderer.removeListener('video:unit', handler)
     },
     onStatus: (cb: (s: { text: string; error?: boolean; closed?: boolean }) => void) => {
-      const handler = (_e: unknown, s: { text: string; error?: boolean; closed?: boolean }) =>
-        cb(s)
+      const handler = (_e: unknown, s: { text: string; error?: boolean; closed?: boolean }) => cb(s)
       ipcRenderer.on('video:status', handler)
       return () => ipcRenderer.removeListener('video:status', handler)
     },

@@ -20,6 +20,7 @@ import {
   installedVehicles,
   isInstalled,
   modelName,
+  simProcessNames,
   prepareWorkDir,
   readBuildInfo,
   simArgs,
@@ -62,8 +63,11 @@ describe('sitl-core', () => {
   })
 
   it('uses the right physics model per vehicle', () => {
+    // The two differ -- a plane launched on the copter model flies like
+    // nothing at all -- so this is the assertion, not the literal names.
     expect(args({ vehicle: 'plane' })).toContain(SIM_VEHICLES.plane.model)
-    expect(args({ vehicle: 'rover' })).toContain('rover')
+    expect(args({ vehicle: 'copter' })).toContain(SIM_VEHICLES.copter.model)
+    expect(SIM_VEHICLES.plane.model).not.toBe(SIM_VEHICLES.copter.model)
   })
 
   it('reports nothing installed for an empty directory', () => {
@@ -279,18 +283,33 @@ describe('RealFlight', () => {
     expect(flag(a, '--model')).toBe('flightaxis')
   })
 
-  it('names a remote RealFlight, and leaves the local one unnamed', () => {
-    expect(
-      modelName({ vehicle: 'plane', physics: { kind: 'flightaxis', host: '192.168.1.5' } }),
-    ).toBe('flightaxis:192.168.1.5')
-    // The address is optional and FlightAxis defaults to this machine, so
-    // spelling it out would only be noise in the argument list.
-    expect(
-      modelName({ vehicle: 'plane', physics: { kind: 'flightaxis', host: '127.0.0.1' } }),
-    ).toBe('flightaxis')
-    expect(modelName({ vehicle: 'plane', physics: { kind: 'flightaxis', host: '' } })).toBe(
-      'flightaxis',
-    )
+  it('names only simulators it could have launched, for the stray killer', () => {
+    // This list is handed to taskkill/pkill, so what is *not* in it matters
+    // more than what is: "whatever holds 5760" would be an unidentified
+    // process on someone's machine, and the app has no business killing it.
+    const win = simProcessNames(undefined, 'win32')
+    expect(win).toEqual(['ArduCopter.exe', 'ArduPlane.exe'])
+    expect(simProcessNames(undefined, 'linux')).toEqual(['ArduCopter', 'ArduPlane'])
+
+    // A custom build joins the set, by basename -- a full path would be
+    // handed to taskkill as an image name and match nothing.
+    const custom = simProcessNames('C:/builds/f35b/ArduPlane.exe', 'win32')
+    expect(custom).toContain('ArduPlane.exe')
+    expect(custom.every((n) => n === path.basename(n))).toBe(true)
+    // And it does not appear twice when it shares a name with a managed one.
+    expect(custom.filter((n) => n === 'ArduPlane.exe')).toHaveLength(1)
+
+    const other = simProcessNames('C:/builds/Custom.exe', 'win32')
+    expect(other).toContain('Custom.exe')
+    expect(other).toHaveLength(3)
+  })
+
+  it('names RealFlight without an address, which means this machine', () => {
+    // ArduPilot also accepts `flightaxis:<host>` for a copy running across
+    // a network, and the app no longer offers it -- so the model string is
+    // always bare, and spelling out 127.0.0.1 would only be noise in the
+    // argument list.
+    expect(modelName({ vehicle: 'plane', physics: { kind: 'flightaxis' } })).toBe('flightaxis')
   })
 
   it('keeps each model its own stored parameters, beside the build', () => {

@@ -272,7 +272,7 @@ export default function PlotPanel({
           )}
         </div>
         <LaButton variant="secondary" size="sm" onClick={onPick}>
-          Add field…
+          Add field
         </LaButton>
         <button
           type="button"

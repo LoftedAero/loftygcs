@@ -13,6 +13,8 @@ import { useConnectionStore } from '../../stores/connection-store'
 let started: unknown = null
 let pickedBuild: unknown = null
 let pickedParams: string | null = null
+/** Which folder each dialog was asked to open at. */
+const startedAt: { build?: string | undefined; params?: string | undefined } = {}
 
 const bridge = (over: Partial<Record<string, unknown>> = {}) => ({
   platform: 'win32',
@@ -35,8 +37,14 @@ const bridge = (over: Partial<Record<string, unknown>> = {}) => ({
       return Promise.resolve(5760)
     },
     stop: () => Promise.resolve(),
-    pickBuild: () => Promise.resolve(pickedBuild),
-    pickParams: () => Promise.resolve(pickedParams),
+    pickBuild: (startIn?: string) => {
+      startedAt.build = startIn
+      return Promise.resolve(pickedBuild)
+    },
+    pickParams: (startIn?: string) => {
+      startedAt.params = startIn
+      return Promise.resolve(pickedParams)
+    },
     onProgress: () => () => {},
     onLog: () => () => {},
     onExit: () => () => {},
@@ -77,7 +85,7 @@ beforeEach(() => {
     build: null,
     physics: { kind: 'builtin' },
     params: { kind: 'wipe' },
-    homeText: '',
+    homes: { builtin: '', flightaxis: '' },
   })
 })
 
@@ -179,7 +187,7 @@ describe('what the panel offers', () => {
     // And points at the two things that do work from a browser tab.
     expect(screen.getByRole('dialog').textContent).toMatch(/WebSocket/)
     expect(screen.getByRole('dialog').textContent).toMatch(/Demo mode/)
-    expect(screen.queryByRole('button', { name: /start simulator/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /launch SITL instance/i })).toBeNull()
   })
 
   it('offers Install for a vehicle that is not downloaded yet', () => {
@@ -196,7 +204,7 @@ describe('what the panel offers', () => {
     render(<SimTray />)
     fireEvent.click(trayButton())
     expect(screen.getByRole('button', { name: /install simulator/i })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /^start simulator$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^launch SITL instance$/i })).toBeNull()
     expect(screen.getByText(/about 20 MB/i)).toBeTruthy()
   })
 
@@ -213,11 +221,11 @@ describe('what the panel offers', () => {
     })
     render(<SimTray />)
     fireEvent.click(trayButton())
-    expect(screen.getByRole('button', { name: /start simulator/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /launch SITL instance/i })).toBeTruthy()
 
     act(() => useSimStore.setState({ phase: 'running' }))
     expect(screen.getByRole('button', { name: /stop simulator/i })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /start simulator/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /launch SITL instance/i })).toBeNull()
   })
 
   it('will not start one over a vehicle that is already connected', () => {
@@ -235,7 +243,7 @@ describe('what the panel offers', () => {
     render(<SimTray />)
     fireEvent.click(trayButton())
     expect(
-      (screen.getByRole('button', { name: /start simulator/i }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: /launch SITL instance/i }) as HTMLButtonElement).disabled,
     ).toBe(true)
     expect(screen.getByText(/disconnect the current vehicle/i)).toBeTruthy()
     useConnectionStore.setState({ phase: 'idle' })
@@ -245,14 +253,14 @@ describe('what the panel offers', () => {
     setBridge(bridge())
     render(<SimTray />)
     fireEvent.click(trayButton())
-    expect(screen.getByRole('button', { name: /connect to a running simulator/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /connect existing instance/i })).toBeTruthy()
   })
 })
 
 describe('choosing what to launch', () => {
   it('launches the managed build with its own physics and a wipe', async () => {
     openTray()
-    fireEvent.click(screen.getByRole('button', { name: /start simulator/i }))
+    fireEvent.click(screen.getByRole('button', { name: /launch SITL instance/i }))
     await waitFor(() => expect(started).not.toBeNull())
     // The defaults are what someone gets who just presses Start -- the
     // behavior before any of this was choosable.
@@ -269,11 +277,11 @@ describe('choosing what to launch', () => {
     // launches ArduPlane against copter defaults.
     pickedBuild = { path: 'C:/rf/arduplane.exe', vehicle: 'plane', version: '4.6.3' }
     openTray()
-    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'custom' } })
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'pick' } })
     await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
     // Named by what it is, not by where it sits.
     expect(screen.getByLabelText('Build').textContent).toMatch(/Plane 4\.6\.3/)
-    fireEvent.click(screen.getByRole('button', { name: /start simulator/i }))
+    fireEvent.click(screen.getByRole('button', { name: /launch SITL instance/i }))
     await waitFor(() => expect(started).not.toBeNull())
     expect(started).toMatchObject({ vehicle: 'plane', exe: 'C:/rf/arduplane.exe' })
   })
@@ -281,46 +289,134 @@ describe('choosing what to launch', () => {
   it('leaves the setup alone when the picker is cancelled', async () => {
     pickedBuild = { path: 'C:/rf/arduplane.exe', vehicle: 'plane', version: '4.6.3' }
     openTray()
-    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'custom' } })
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'pick' } })
     await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
 
     // Cancelling a second pick must not throw the first one away -- the
     // dropdown is only a way to reach the picker, not a choice in itself.
+    // Re-choosing the custom option is how a build is changed now; there is
+    // no separate button, so this is the gesture that has to be safe.
     pickedBuild = null
-    fireEvent.click(screen.getByRole('button', { name: /change/i }))
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'pick' } })
     await new Promise((r) => setTimeout(r, 20))
     expect(useSimStore.getState().build?.path).toBe('C:/rf/arduplane.exe')
   })
 
-  it('sends RealFlight the flightaxis physics, with a host when given one', async () => {
+  it('sends RealFlight the flightaxis physics, and no address', async () => {
     openTray()
     fireEvent.change(screen.getByLabelText('Physics'), { target: { value: 'flightaxis' } })
-    fireEvent.change(screen.getByLabelText('RealFlight host'), {
-      target: { value: '192.168.1.5' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /start simulator/i }))
+    fireEvent.click(screen.getByRole('button', { name: /launch SITL instance/i }))
     await waitFor(() => expect(started).not.toBeNull())
-    expect(started).toMatchObject({ physics: { kind: 'flightaxis', host: '192.168.1.5' } })
+    // RealFlight is assumed to be on this machine, so there is no host to
+    // send and no field that could offer one.
+    expect(started).toMatchObject({ physics: { kind: 'flightaxis' } })
+    expect(screen.queryByLabelText('RealFlight host')).toBeNull()
   })
 
   it('says what RealFlight needs switched on, because forgetting it hangs', () => {
     openTray()
     fireEvent.change(screen.getByLabelText('Physics'), { target: { value: 'flightaxis' } })
-    expect(screen.getByText(/RealFlight Link enabled/)).toBeTruthy()
+    expect(screen.getByText(/RealFlight Link must be enabled/i)).toBeTruthy()
   })
 
   it('tells a parameter list from a stored image when one is picked', async () => {
+    // The distinction is load-bearing -- an eeprom.bin is copied in whole
+    // and a .parm needs a wipe to take -- and it is decided from the name
+    // rather than asked about. The screen no longer glosses it; the file
+    // name in the field is what says which one this is.
     pickedParams = 'C:/rf/flightaxis/eeprom.bin'
     openTray()
     const select = () => screen.getByLabelText('Parameters') as HTMLSelectElement
-    fireEvent.change(select(), { target: { value: 'file' } })
+    fireEvent.change(select(), { target: { value: 'pick' } })
     await waitFor(() => expect(useSimStore.getState().params.kind).toBe('eeprom'))
-    expect(screen.getByText(/copied in whole/i)).toBeTruthy()
+    expect(select().options[select().selectedIndex]?.text).toBe('eeprom.bin')
+    // The full path is a hover away rather than a line of its own.
+    expect(select().getAttribute('title')).toBe('C:/rf/flightaxis/eeprom.bin')
 
     pickedParams = 'C:/rf/f35.parm'
-    fireEvent.change(select(), { target: { value: 'file' } })
+    fireEvent.change(select(), { target: { value: 'pick' } })
     await waitFor(() => expect(useSimStore.getState().params.kind).toBe('file'))
-    expect(screen.getByText(/with a wipe so it takes/i)).toBeTruthy()
+    expect(select().options[select().selectedIndex]?.text).toBe('f35.parm')
+  })
+
+  it('names a custom build by what it is and which file it is', async () => {
+    pickedBuild = { path: 'C:/rf/f35b/ArduPlane.exe', vehicle: 'plane', version: '4.6.3' }
+    openTray()
+    const select = () => screen.getByLabelText('Build') as HTMLSelectElement
+    fireEvent.change(select(), { target: { value: 'pick' } })
+    await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
+    // The vehicle and version were read out of the binary, and the file
+    // name is how two builds are told apart -- both belong in the field.
+    expect(select().options[select().selectedIndex]?.text).toBe('Plane 4.6.3 · ArduPlane.exe')
+    expect(select().getAttribute('title')).toBe('C:/rf/f35b/ArduPlane.exe')
+    // A build says which vehicle it is, so there is nothing left to choose.
+    expect(screen.queryByLabelText('Vehicle')).toBeNull()
+  })
+
+  it('can still reach the picker once something is already chosen', async () => {
+    // Re-selecting the option that is already selected fires no change
+    // event, so without an entry of its own there is no gesture left that
+    // reopens the picker -- which is what removing the Change buttons cost
+    // until this was put back.
+    pickedBuild = { path: 'C:/rf/one/ArduPlane.exe', vehicle: 'plane', version: '4.6.3' }
+    pickedParams = 'C:/rf/one.parm'
+    openTray()
+    const build = () => screen.getByLabelText('Build') as HTMLSelectElement
+    const params = () => screen.getByLabelText('Parameters') as HTMLSelectElement
+    fireEvent.change(build(), { target: { value: 'pick' } })
+    await waitFor(() => expect(useSimStore.getState().build?.path).toContain('one'))
+    fireEvent.change(params(), { target: { value: 'pick' } })
+    await waitFor(() => expect(useSimStore.getState().params.kind).toBe('file'))
+
+    const texts = (el: HTMLSelectElement) => [...el.options].map((o) => o.text)
+    expect(texts(build())).toContain('Select from file')
+    expect(texts(params())).toContain('Select from file')
+
+    // And it really opens: a second pick replaces the first.
+    pickedBuild = { path: 'C:/rf/two/ArduCopter.exe', vehicle: 'copter', version: '4.7.1' }
+    fireEvent.change(build(), { target: { value: 'pick' } })
+    await waitFor(() => expect(useSimStore.getState().build?.path).toContain('two'))
+  })
+
+  it('opens the parameter dialog in the folder the build came from', async () => {
+    // An aircraft ships as an executable beside its <model>/eeprom.bin, so
+    // choosing the build is what says where the parameters live. Backslashes
+    // on purpose: this is what a real Windows dialog hands back, and the
+    // path splitting used to only understand forward ones.
+    pickedBuild = { path: String.raw`C:\rf\f35b\ArduPlane.exe`, vehicle: 'plane', version: '4.6.3' }
+    openTray()
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'pick' } })
+    await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
+    expect(useSimStore.getState().browseDir).toBe(String.raw`C:\rf\f35b`)
+
+    pickedParams = String.raw`C:\rf\f35b\eeprom.bin`
+    fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'pick' } })
+    await waitFor(() => expect(useSimStore.getState().params.kind).toBe('eeprom'))
+    expect(startedAt.params).toBe(String.raw`C:\rf\f35b`)
+    // And the name in the field is the file, not the whole path.
+    const sel = screen.getByLabelText('Parameters') as HTMLSelectElement
+    expect(sel.options[sel.selectedIndex]?.text).toBe('eeprom.bin')
+  })
+
+  it('remembers the folder for the next session', async () => {
+    pickedParams = String.raw`D:ields\one.parm`
+    openTray()
+    fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'pick' } })
+    await waitFor(() => expect(useSimStore.getState().params.kind).toBe('file'))
+    // Persisted, so the second visit to the same aircraft does not start at
+    // the top of the disk again.
+    expect(localStorage.getItem('loftgcs.sim.browseDir')).toBe(String.raw`D:ields`)
+  })
+
+  it('leaves the control on what is loaded when a picker is cancelled', async () => {
+    pickedBuild = null
+    openTray()
+    const build = () => screen.getByLabelText('Build') as HTMLSelectElement
+    fireEvent.change(build(), { target: { value: 'pick' } })
+    await new Promise((r) => setTimeout(r, 20))
+    // Nothing changed, so nothing re-rendered -- the select must not be
+    // left sitting on an action it did not carry out.
+    expect(build().value).toBe('official')
   })
 
   it('shows the file it was given, for both kinds of file', async () => {
@@ -340,7 +436,7 @@ describe('choosing what to launch', () => {
       // unmount, so without this the next click closes it again.
       useUiStore.setState({ simTrayOpen: false })
       openTray()
-      fireEvent.change(select(), { target: { value: 'file' } })
+      fireEvent.change(select(), { target: { value: 'pick' } })
       await waitFor(() => expect(useSimStore.getState().params.kind).toBe(kind))
       expect(select().value).toBe('file')
       expect(select().selectedOptions[0]!.textContent).toBe(file.split('/').pop())
@@ -351,7 +447,7 @@ describe('choosing what to launch', () => {
     openTray()
     fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'keep' } })
     expect(screen.getByText(/Carries on from wherever/i)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /start simulator/i }))
+    fireEvent.click(screen.getByRole('button', { name: /launch SITL instance/i }))
     await waitFor(() => expect(started).not.toBeNull())
     expect(started).toMatchObject({ params: { kind: 'keep' } })
   })
@@ -359,7 +455,7 @@ describe('choosing what to launch', () => {
   it('remembers the setup, because a rig is not a per-launch decision', async () => {
     pickedBuild = { path: 'C:/rf/arduplane.exe', vehicle: 'plane', version: '4.6.3' }
     openTray()
-    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'custom' } })
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'pick' } })
     fireEvent.change(screen.getByLabelText('Physics'), { target: { value: 'flightaxis' } })
     await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
     const saved = JSON.parse(localStorage.getItem('loftgcs.sim.rig')!) as {
@@ -373,60 +469,85 @@ describe('choosing what to launch', () => {
   it('offers no install for a build that came from disk', async () => {
     pickedBuild = { path: 'C:/rf/arduplane.exe', vehicle: 'plane', version: '4.6.3' }
     openTray()
-    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'custom' } })
+    fireEvent.change(screen.getByLabelText('Build'), { target: { value: 'pick' } })
     await waitFor(() => expect(useSimStore.getState().build).not.toBeNull())
     // It is already on the disk; there is nothing to download.
     expect(screen.queryByRole('button', { name: /install simulator/i })).toBeNull()
-    expect(screen.getByRole('button', { name: /start simulator/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /launch SITL instance/i })).toBeTruthy()
   })
 })
 
-describe('saved flying fields', () => {
-  it('remembers a location by name and puts it back', async () => {
-    openTray()
-    const home = screen.getByLabelText('Home location')
-    // A field, with the runway heading that lines the scenery up.
-    fireEvent.change(home, { target: { value: '40.1234, -88.5678, 220, 90' } })
-    fireEvent.change(screen.getByLabelText('Field name'), { target: { value: 'Eli Field' } })
-    fireEvent.click(screen.getByRole('button', { name: /save field/i }))
-    await waitFor(() => expect(useSimStore.getState().fields['Eli Field']).toBeTruthy())
+describe('where a simulator boots when nobody has said', () => {
+  // The default follows the simulator, because the two disagree: SITL's own
+  // physics opens at CMAC and RealFlight's default scenery is Eli Field, and
+  // booting one at the other's coordinates is precisely the map-versus-
+  // scenery mismatch `--home` exists to remove.
+  const setHome = (text: string) => act(() => useSimStore.getState().setHomeText(text))
 
-    fireEvent.change(home, { target: { value: '' } })
-    const picker = screen.getByLabelText('Flying field') as HTMLSelectElement
-    fireEvent.change(picker, { target: { value: 'Eli Field' } })
-    // The heading comes back with it -- that is the point of saving one.
-    expect((screen.getByLabelText('Home location') as HTMLInputElement).value).toBe(
-      '40.1234, -88.5678, 220, 90',
-    )
+  it('boots at CMAC on the built-in physics', () => {
+    openTray()
+    setHome('')
+    expect(screen.getByText('Default — CMAC')).toBeTruthy()
   })
 
-  it('shows which saved field the box is holding', async () => {
-    useSimStore.setState({ fields: { 'Eli Field': '40.1, -88.5, 220, 90' } })
+  it('boots at Eli Field on RealFlight', () => {
     openTray()
-    fireEvent.change(screen.getByLabelText('Home location'), {
-      target: { value: '40.1, -88.5, 220, 90' },
+    setHome('')
+    act(() => useSimStore.getState().setPhysics({ kind: 'flightaxis' }))
+    expect(screen.getByText('Default — Eli Field')).toBeTruthy()
+  })
+
+  it('lets a picked location beat either default', () => {
+    openTray()
+    act(() => useSimStore.getState().setPhysics({ kind: 'flightaxis' }))
+    // What the map picker writes.
+    setHome('51.5,-0.1,25,90')
+    expect(screen.queryByText('Default — Eli Field')).toBeNull()
+    expect(screen.getByText(/51\.500000, -0\.100000 · 25 m · 90°/)).toBeTruthy()
+  })
+})
+
+describe('a home per simulator, remembered separately', () => {
+  // The two simulators fly different ground: a location measured against
+  // RealFlight's scenery means nothing to SITL's own model. One shared value
+  // made choosing a field for either silently move the other, so switching
+  // physics relocated the aircraft without saying so.
+  const setHome = (text: string) => act(() => useSimStore.getState().setHomeText(text))
+  const setPhysics = (kind: 'builtin' | 'flightaxis') =>
+    act(() => useSimStore.getState().setPhysics({ kind }))
+
+  it('leaves the built-in home behind when RealFlight is selected', () => {
+    openTray()
+    setHome('51.5,-0.1,25,90')
+    expect(screen.getByText(/51\.500000/)).toBeTruthy()
+    // RealFlight has never been given one, so it falls to its own default
+    // rather than inheriting a field chosen for other scenery.
+    setPhysics('flightaxis')
+    expect(screen.getByText('Default — Eli Field')).toBeTruthy()
+  })
+
+  it('gives the built-in home back on the way out', () => {
+    openTray()
+    setHome('51.5,-0.1,25,90')
+    setPhysics('flightaxis')
+    setPhysics('builtin')
+    expect(screen.getByText(/51\.500000, -0\.100000 · 25 m · 90°/)).toBeTruthy()
+  })
+
+  it('keeps a RealFlight home for RealFlight only', () => {
+    openTray()
+    setHome('51.5,-0.1,25,90')
+    setPhysics('flightaxis')
+    setHome('40.059422,-88.551405,206,43')
+    // Each simulator now has its own, and neither has touched the other.
+    setPhysics('builtin')
+    expect(screen.getByText(/51\.500000/)).toBeTruthy()
+    setPhysics('flightaxis')
+    expect(screen.getByText(/40\.059422/)).toBeTruthy()
+    expect(useSimStore.getState().homes).toEqual({
+      builtin: '51.5,-0.1,25,90',
+      flightaxis: '40.059422,-88.551405,206,43',
     })
-    expect((screen.getByLabelText('Flying field') as HTMLSelectElement).value).toBe('Eli Field')
-    // And says "Custom" when it is not one of them, rather than lying about
-    // which field you are at.
-    fireEvent.change(screen.getByLabelText('Home location'), { target: { value: '51.5, -0.1' } })
-    expect((screen.getByLabelText('Flying field') as HTMLSelectElement).value).toBe('')
-  })
-
-  it('forgets one when asked', async () => {
-    useSimStore.setState({ fields: { 'Eli Field': '40.1, -88.5, 220, 90' } })
-    openTray()
-    fireEvent.change(screen.getByLabelText('Home location'), {
-      target: { value: '40.1, -88.5, 220, 90' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /forget Eli Field/i }))
-    await waitFor(() => expect(useSimStore.getState().fields['Eli Field']).toBeUndefined())
-  })
-
-  it('offers no picker before any field is saved', () => {
-    useSimStore.setState({ fields: {} })
-    openTray()
-    expect(screen.queryByLabelText('Flying field')).toBeNull()
   })
 })
 

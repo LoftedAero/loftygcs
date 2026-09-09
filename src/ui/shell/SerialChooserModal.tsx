@@ -51,9 +51,18 @@ export default function SerialChooserModal() {
       {ports.length === 0 ? (
         <p>No serial ports found. Plug the flight controller in over USB.</p>
       ) : (
-        <div className="la-radio-group">
+        // One port per row, not a wrapped set of inline radios: five ports
+        // with names and descriptions landed three-then-two in a ragged
+        // grid, and a chooser is a list. The vendor and product ids are
+        // gone with it -- two boards of the same model share them, so the
+        // one line that was supposed to tell them apart never could; the
+        // port name above it always does.
+        <div className="serial-list">
           {ports.map((p) => (
-            <label className="la-radio" key={p.portId}>
+            <label
+              className={`la-radio serial-port${selected === p.portId ? ' is-selected' : ''}`}
+              key={p.portId}
+            >
               <input
                 type="radio"
                 name="serial-port"
@@ -61,12 +70,9 @@ export default function SerialChooserModal() {
                 onChange={() => setSelected(p.portId)}
               />
               <span className="la-radio__mark"></span>
-              <span className="serial-port">
+              <span className="serial-port__text">
                 <span className="serial-port__name">{p.portName || p.portId}</span>
-                {describePort(p) && (
-                  <span className="serial-port__desc">{describePort(p)}</span>
-                )}
-                {usbIds(p) && <span className="serial-port__ids">{usbIds(p)}</span>}
+                {describePort(p) && <span className="serial-port__desc">{describePort(p)}</span>}
               </span>
             </label>
           ))}
@@ -109,7 +115,15 @@ export function describePort(p: SerialPortChoice): string | null {
   return name
 }
 
-/** The identifying detail, for when two identical boards are plugged in. */
+/**
+ * The identifying detail, kept for the tests and for whatever needs it next.
+ *
+ * It is no longer on the chooser. The ids identify a *model*, not a board,
+ * so the two rows anyone actually has to choose between -- one flight
+ * controller presenting two interfaces, or two of the same aircraft --
+ * carried the same string, and the thing that told them apart was the port
+ * name already printed above it.
+ */
 export function usbIds(p: SerialPortChoice): string | null {
   const vid = hex(p.vendorId)
   const pid = hex(p.productId)

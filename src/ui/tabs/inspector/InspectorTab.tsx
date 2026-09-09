@@ -4,6 +4,7 @@ import { connectionService } from '../../../services/connection'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { rowKey, useInspectorStore } from '../../../stores/inspector-store'
 import type { FieldValue } from '../../../protocol/types'
+import SubTabs from '../../components/SubTabs'
 import HardwareId from './HardwareId'
 
 // Everything on the link, live: which messages are arriving, from whom, how
@@ -22,7 +23,12 @@ import HardwareId from './HardwareId'
 // usually a compass that was never detected, and between the two views that
 // is one place to look rather than two.
 
-type View = 'messages' | 'hardware'
+const VIEWS = [
+  { id: 'messages', label: 'Messages' },
+  { id: 'hardware', label: 'Hardware ID' },
+] as const
+
+type View = (typeof VIEWS)[number]['id']
 
 export default function InspectorTab() {
   const [view, setView] = useState<View>('messages')
@@ -57,27 +63,7 @@ export default function InspectorTab() {
   const totalHz = rows.reduce((sum, r) => sum + r.hz, 0)
   const selected = rows.find((r) => rowKey(r) === selectedKey) ?? null
 
-  const tabs = (
-    <div className="inspector__views" role="tablist" aria-label="Inspector view">
-      {(
-        [
-          ['messages', 'Messages'],
-          ['hardware', 'Hardware ID'],
-        ] as const
-      ).map(([id, label]) => (
-        <button
-          key={id}
-          type="button"
-          role="tab"
-          aria-selected={view === id}
-          className={`inspector__view${view === id ? ' is-active' : ''}`}
-          onClick={() => setView(id)}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
+  const tabs = <SubTabs tabs={VIEWS} active={view} onChange={setView} label="Inspector view" />
 
   if (!connected) {
     return (

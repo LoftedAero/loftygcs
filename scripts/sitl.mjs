@@ -3,8 +3,8 @@
 // target for every protocol feature: the virtual FC proves our plumbing,
 // SITL proves ArduPilot agrees with us.
 //
-//   node scripts/sitl.mjs fetch [copter|plane|rover]
-//   node scripts/sitl.mjs run   [copter|plane|rover] [--home lat,lon[,alt[,yaw]]]
+//   node scripts/sitl.mjs fetch [copter|plane]
+//   node scripts/sitl.mjs run   [copter|plane] [--home lat,lon[,alt[,yaw]]]
 //
 // Vehicle defaults to copter. All three share the cygwin runtime, so the
 // second vehicle you fetch only pulls its own binary and defaults file.
@@ -46,12 +46,6 @@ const VEHICLES = {
     model: 'plane',
     defaults: 'plane.parm',
     source: 'models/plane.parm',
-  },
-  rover: {
-    binary: 'ArduRover',
-    model: 'rover',
-    defaults: 'rover.parm',
-    source: 'default_params/rover.parm',
   },
 }
 

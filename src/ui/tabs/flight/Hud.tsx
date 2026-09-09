@@ -4,14 +4,7 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { usePreferencesStore } from '../../../stores/preferences-store'
 import { SENSOR_BITS } from '../../../protocol/sensors'
-import {
-  armReadiness,
-  batteryLabel,
-  gpsLabel,
-  gpsUsable,
-  isFailsafe,
-  linkLabel,
-} from './hud-draw'
+import { armReadiness, batteryLabel, gpsLabel, gpsUsable, isFailsafe, linkLabel } from './hud-draw'
 import { paintHud } from './hud-paint'
 import VideoLayer from './VideoLayer'
 import { videoService } from '../../../services/video'

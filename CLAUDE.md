@@ -20,12 +20,27 @@ design decisions are recorded there and in code comments.
   *definitions*: the app-local `--app-*` tokens, and the dark palette under
   `:root[data-theme='dark']`, which cannot express a token in terms of itself. **Dark mode is
   an app-local override precisely because the system sheet is frozen** — if it proves out here
-  it should graduate into the canonical copy and propagate to all four apps together. Two
-  traps it exposed, both worth knowing before touching colors: `--la-charcoal` is both the app
+  it should graduate into the canonical copy and propagate to all four apps together. Four
+  traps it exposed, all worth knowing before touching colors. `--la-charcoal` is both the app
   bar's *background* and heading *ink*, which dark mode needs to send opposite ways (so the
   two text uses are overridden); and anything sitting on a permanently dark ground — the OSD
   preview, a caption over video, white-on-green chips — must use `--app-on-dark`, never
-  `--la-surface`, which is only white by coincidence in the light theme. Orange = the one primary action
+  `--la-surface`, which is only white by coincidence in the light theme. **A color baked into
+  a data URI cannot follow a token**: the chevron on `.la-select` is an inlined SVG whose fill
+  lives inside the URI, so it kept a light-mode gray arrow on a dark field until it was
+  re-inlined under the dark block — which means `--la-ink-2`'s dark value is now spelled out
+  in one place and nothing keeps the two in step. It is the one color in `app.css` that
+  *duplicates* a token rather than defining a new one, and the technique that removes it (here
+  and in the light theme, and in the three sequencer apps carrying the same hex) is a
+  `mask-image` plus `background-color`, which is the thing to reach for if this graduates.
+  **And a `<select>`'s dropdown is drawn by the platform, which does not reliably honor
+  `color-scheme`** — on Windows the list comes up white on a dark window. The sheet's only
+  option rule is `.la-appbar .la-select option`, which sets `color` and no background, so in
+  dark the app bar's dropdown went near-white on white and read as blank rows — everything
+  below it was fine, because nothing colored those options at all. The fix is deliberately
+  wider than the bug: both halves are pinned on `.la-select option` for every select, so a
+  dark window stops throwing white popups, and it is unscoped rather than dark-only because
+  the same failure happens inverted on a dark OS showing a light window. Orange = the one primary action
   per region; blue = working controls; green/red = status only, never actions. Units go in
   `.la-field__unit`; validation goes in `.la-hint` beside the control. **Hints are short.** A
   `.la-hint` says the one thing someone needs at the moment they read it — not why the
@@ -72,6 +87,12 @@ design decisions are recorded there and in code comments.
   to it. The dot is the part that earns the bar space: a SITL left running in the background
   is otherwise invisible, and the cost of forgetting is a mystery TCP connection or a second
   simulator that will not bind.
+- **`docs/ui-conventions.md` is the layer above the design system**: how screens in *this* app
+  are put together, as opposed to what a button looks like. Every rule in it is kept with the
+  feedback that produced it, so a rule can be argued with and a wrong one can be found — add to
+  it when a review produces a preference that will apply again, and leave anything that applies
+  to one screen only in a comment there. `docs/screen-review.md` is the per-screen gate those
+  conventions are checked against before a preview build.
 - **Setup lays its cards out as a grid, not a column** (`.app-content`). They were a flex column
   of 860px cards, which on the full-screen window this app is actually used in put every card in
   a third-width ribbon down the left — measured at 39% of the content area used. Cards are
@@ -195,8 +216,11 @@ design decisions are recorded there and in code comments.
   `flightaxis/eeprom.bin`, so pointing at the executable finds the parameters with no further
   instruction. The FlightAxis host is dropped from that name (a colon cannot be a Windows
   directory, and it is the same aircraft whichever machine draws it).
-- **RealFlight is reached by `--model flightaxis[:host]`** over SOAP on port 18083, and it does
-  *not* have to be running first. SITL binds its GCS port and prints its readiness banner in
+- **RealFlight is reached by `--model flightaxis`** over SOAP on port 18083, and it does
+  *not* have to be running first. ArduPilot also accepts `flightaxis:<host>` for a copy across
+  a network and **the app deliberately does not offer it**: it cost every user a field to look
+  at for a case almost nobody has. Add it back on request rather than treating its absence as
+  an oversight. SITL binds its GCS port and prints its readiness banner in
   about 40 ms either way, and ArduPilot's `socket_creator` thread retries the SOAP connection
   for as long as the process lives — so "start the simulator, then start RealFlight" is a
   supported order and the app must not refuse it. What SITL will not do is send any MAVLink
@@ -206,10 +230,34 @@ design decisions are recorded there and in code comments.
   Simulation > Settings > Physics > "RealFlight Link enabled".
 - **With FlightAxis, `--home` places the whole RealFlight field on Earth.** `SIM_Aircraft` sets
   `origin = home`, and FlightAxis adds RealFlight's local coordinates to it, so home decides
-  both where the scenery sits and — through the yaw — which way its runway points. That is why
-  saved flying fields carry a heading. RealFlight itself has no geodetic reference: its content
-  archives contain no latitude or longitude at all, so those numbers can only come from the
-  user, and none may be shipped pre-filled.
+  both where the scenery sits and — through the yaw — which way its runway points. That is why a
+  chosen home carries a heading at all. **Home is remembered once per physics**
+  (`sim-store`'s `homes`, keyed by `homeSlot`): a location measured against RealFlight's
+  scenery means nothing to SITL's own model, so one shared value made choosing a field for
+  either silently relocate the other. An empty slot means that physics' default, so the
+  defaults stay defaults and are never written in as though chosen; an older build's single
+  bare string migrates into the slot for whichever physics the rig says was selected, since
+  assuming `builtin` would move a RealFlight user's field onto ground it was never measured
+  against. RealFlight itself has no geodetic reference: its content
+  archives contain no latitude or longitude at all, so nothing in the product can be *read* —
+  a position for a RealFlight site can only ever be measured against imagery by eye. That was
+  originally a rule against shipping any of them; it is now one pre-filled default,
+  `ELI_FIELD`, and the distinction is worth keeping straight. Eli Field is RealFlight's own
+  default scenery (a real strip in Monticello, Illinois — Horizon Hobby publishes RealFlight
+  and holds its RC Fest there), so with FlightAxis selected and no home chosen, booting at
+  CMAC instead puts Canberra's coordinates over an Illinois runway, which is the mismatch
+  `--home` exists to remove. It is a measured default and not a survey: `defaultHome()` picks
+  it only for FlightAxis, any pick on the map replaces it, and loading a different RealFlight
+  site makes it wrong — which is why the map is one click away and the default is never
+  written into the saved home. **They are picked on a map rather than typed**
+  (`ui/shell/SimFieldPicker.tsx`): a transposed digit in a latitude still parses and boots the
+  vehicle a hundred kilometers away looking perfectly healthy, where pointing at the place is
+  self-verifying. It carries the two things a copied coordinate pair does not — the heading,
+  set by turning an arrow over the imagery until it matches the runway, which is the comparison
+  that number exists for; and the AMSL altitude, looked up from the same Terrarium tiles the
+  mission profile uses, because almost nobody knows their field's elevation offhand. It renders
+  from `App` rather than from the tray that opens it: the tray dismisses on any outside click,
+  so a dialog mounted inside it would unmount on the first click on its own map.
 - **SITL says nothing about a defaults file it could not open** — not for a missing file, not
   for a bad path. Do not look for an error; there is none. When a launch-path change needs
   proving, the probe that works is `SERIAL0_PROTOCOL -1`, which switches MAVLink off: "did a
@@ -243,8 +291,14 @@ design decisions are recorded there and in code comments.
   shows and what a keyboard just produced. A field that displays a stored value converts on the
   way out and back on the way in, and the stored number never moves — a units bug that reaches a
   mission altitude is a flying-into-terrain bug, which is why there is a round-trip test for
-  exactly that. Climb rate has no control of its own: aviation reads it in ft/min wherever
-  distance is in feet, whatever the airspeed unit, so it follows the distance choice. HUD tape
+  exactly that. Climb rate defaults to *following distance*: aviation reads it in ft/min
+  wherever distance is in feet, whatever the airspeed unit, so `follow` is what ships and is
+  what every build before the control did — which is why adding the control needed no VERSION
+  bump, the missing key falling back to exactly the old behavior (there is a test that
+  re-imports the store to prove it, rather than a setter that would assert the in-memory
+  default and pass regardless). The convention is a default and not a rule, so the dropdown
+  also offers m/s and ft/min outright. `resolveVerticalSpeed` is the single place `follow`
+  becomes a real unit; nothing downstream knows the convention. HUD tape
   steps change with the unit too, or the imperial tape scrolls three times too fast to read.
 - **User preferences are one versioned document, not a key per setting** (`preferences-store`).
   Unknown keys are ignored and missing ones fall back, so adding a preference needs no migration
@@ -377,6 +431,24 @@ design decisions are recorded there and in code comments.
   nothing branches on them: what an operation actually answers — an ack, a listing, a NAK — is
   the only evidence worth acting on.
 
+- **Three airframes take off two different ways, and an ack cannot tell them apart.** Measured
+  against SITL, armed: a **copter** and a **quadplane** both take Guided + `NAV_TAKEOFF` and
+  climb to the altitude asked for — the quadplane vertically, 20 m up for 3 m of ground track.
+  A **fixed wing** answers that same command FAILED and takes off by entering mode `TAKEOFF`
+  (13), which climbs away down the runway to its own `TKOFF_ALT`. `NAV_VTOL_TAKEOFF` is
+  **UNSUPPORTED on both plane types** — a mission item with no runtime handler — so there is no
+  third command to reach for. **The trap is that a quadplane accepts mode `TAKEOFF` too**, with
+  MAV_RESULT 0, and flies 277 m of runway takeoff instead of going up; the ack is identical and
+  only the ground track says which happened, so this cannot be settled by sending a command and
+  reading the result. Hence `takeoffStyle()` in `services/flight.ts`, which both the command and
+  the button read so they cannot disagree — and it needs `Q_ENABLE`, because **`MAV_TYPE` cannot
+  tell a quadplane from a fixed wing**: both report FIXED_WING(1), and the parameter is present
+  on both ArduPlane builds at 0 or 1. An *absent* `Q_ENABLE` means the parameters have not
+  downloaded yet, and the two wrong guesses are not equally wrong: fixed-wing-on-a-quadplane
+  starts a runway run in a VTOL aircraft, quadplane-on-a-fixed-wing gets FAILED back and does
+  nothing — so the unknown takes the route that fails harmlessly. Every one of these facts
+  contradicted a confident guess made before the probe ran, including two in a row about the
+  quadplane; do not re-derive them from what the documentation implies.
 - **Which mount protocol to send depends on the firmware, and the answer codes matter.**
   ArduPilot carries three generations and answers all of them, so `protocol/gimbal.ts` picks by
   version: DO_GIMBAL_MANAGER_PITCHYAW (1000) from 4.2 on, DO_MOUNT_CONTROL (205) below it and

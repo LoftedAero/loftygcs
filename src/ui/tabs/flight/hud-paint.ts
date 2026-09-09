@@ -236,8 +236,14 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   const right = w - gap
   pair('AS', `${formatSpeed(st.airspeedMs, spd)} ${speedLabel(spd)}`, left, u1, 'left')
   pair('GS', `${formatSpeed(st.groundspeedMs, spd)} ${speedLabel(spd)}`, left, u2, 'left')
-  const vs = formatVerticalSpeed(st.climbMs, dst)
-  pair('V/S', `${st.climbMs >= 0 ? '+' : ''}${vs} ${verticalSpeedLabel(dst)}`, right, u1, 'right')
+  const vs = formatVerticalSpeed(st.climbMs, st.units)
+  pair(
+    'V/S',
+    `${st.climbMs >= 0 ? '+' : ''}${vs} ${verticalSpeedLabel(st.units)}`,
+    right,
+    u1,
+    'right',
+  )
   pair('THR', `${st.throttlePct.toFixed(0)}%`, right, u2, 'right')
 
   // The corners: battery bottom left, mode bottom right, link top right,

@@ -23,6 +23,44 @@ export const CMAC_HOME: SimHome = {
 }
 
 /**
+ * Where RealFlight's own default scenery sits on Earth.
+ *
+ * Eli Field is a real place -- the Monticello Model Masters' strip in
+ * Monticello, Illinois, and the site of Horizon Hobby's RC Fest, which is
+ * why the simulator Horizon publishes opens there.
+ *
+ * These numbers are *measured against the scenery*, not read out of it:
+ * RealFlight's content archives carry no latitude or longitude at all, so
+ * there is nothing in the product to copy and the alignment can only be
+ * judged by eye against imagery. Treat it as a good starting point rather
+ * than a survey -- which is exactly why it is a default that any pick on
+ * the map replaces, and why it is only offered for FlightAxis: loading a
+ * different RealFlight site makes it wrong, and the map is one click away.
+ */
+export const ELI_FIELD: SimHome = {
+  latDeg: 40.059422,
+  lonDeg: -88.551405,
+  altM: 206,
+  headingDeg: 43,
+}
+
+/**
+ * Where a simulator boots when nobody has chosen.
+ *
+ * It follows the physics because the two disagree: SITL's own model opens
+ * at CMAC, and RealFlight's default scenery is Eli Field. Booting one at
+ * the other's coordinates puts Canberra's numbers over an Illinois runway,
+ * which is the map-versus-scenery mismatch `--home` exists to remove.
+ *
+ * Takes the kind as a string rather than the SimPhysics union: this file is
+ * shared with the Electron main process and deliberately knows nothing
+ * about the renderer's types.
+ */
+export function defaultHome(physicsKind: string): SimHome {
+  return physicsKind === 'flightaxis' ? ELI_FIELD : CMAC_HOME
+}
+
+/**
  * Read a home location typed or pasted by a person.
  *
  * Accepts what a map's "copy coordinates" puts on the clipboard -- two
@@ -62,4 +100,3 @@ export function parseHome(text: string): { home: SimHome } | { error: string } {
 export function formatHome(home: SimHome): string {
   return [home.latDeg, home.lonDeg, home.altM, home.headingDeg].join(',')
 }
-

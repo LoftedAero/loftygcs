@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { LaButton, LaField, LaHint, LaInput, LaSelect } from '../components/La'
-import { useSimStore } from '../../stores/sim-store'
+import { LaButton, LaField, LaHint, LaSelect } from '../components/La'
+import { useHomeText, useSimStore } from '../../stores/sim-store'
+import { useUiStore } from '../../stores/ui-store'
 import { useConnectionStore } from '../../stores/connection-store'
 import { useMissionStore } from '../../stores/mission-store'
-import { CMAC_HOME, parseHome } from '../../sim-home'
+import { defaultHome, parseHome } from '../../sim-home'
 import type { SimBuildChoice, SimParams } from '../../types/loftgcs'
 import {
   connectExternalSimulator,
@@ -27,8 +28,36 @@ function buildLabel(build: SimBuildChoice): string {
   return build.version ? `${name} ${build.version}` : name
 }
 
+/**
+ * What the Build option reads once a custom one is chosen.
+ *
+ * Both halves earn their place: the vehicle and version were read out of
+ * the binary rather than asked for, and are the only thing that says an
+ * executable is the aeroplane it claims to be -- while the file name is how
+ * anyone with two builds tells them apart. The full path is on the select's
+ * title, which is where it goes now that it has no line of its own.
+ */
+function buildOptionLabel(build: SimBuildChoice): string {
+  const file = fileName(build.path)
+  const id = buildLabel(build)
+  return id === file ? file : `${id} · ${file}`
+}
+
+/**
+ * Both separators, because the paths here come from a native file dialog.
+ *
+ * This split on `/` alone and so returned the whole of `C:\rf\ArduPlane.exe`
+ * -- every real Windows pick, which is the only platform the prebuilt
+ * binaries exist for. The tests used forward slashes and passed.
+ */
 function fileName(p: string): string {
-  return p.split(/[\/]/).pop() ?? p
+  return p.split(/[\\/]/).pop() ?? p
+}
+
+/** The folder a path sits in, for opening the next dialog where the last one left off. */
+function dirName(p: string): string {
+  const cut = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'))
+  return cut > 0 ? p.slice(0, cut) : ''
 }
 
 /**
@@ -49,7 +78,7 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
   const error = useSimStore((s) => s.error)
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const [pickedVehicle, setVehicle] = useState('copter')
-  const homeText = useSimStore((s) => s.homeText)
+  const homeText = useHomeText()
   const setHomeText = useSimStore((s) => s.setHomeText)
   const plannedHome = useMissionStore((s) => s.plan.home)
   const build = useSimStore((s) => s.build)
@@ -58,11 +87,10 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
   const setPhysics = useSimStore((s) => s.setPhysics)
   const params = useSimStore((s) => s.params)
   const setParams = useSimStore((s) => s.setParams)
-  const fields = useSimStore((s) => s.fields)
-  const saveField = useSimStore((s) => s.saveField)
-  const deleteField = useSimStore((s) => s.deleteField)
   const waitingForRealFlight = useSimStore((s) => s.waitingForRealFlight)
-  const [fieldName, setFieldName] = useState('')
+  const setFieldPickerOpen = useUiStore((s) => s.setFieldPickerOpen)
+  const browseDir = useSimStore((s) => s.browseDir)
+  const setBrowseDir = useSimStore((s) => s.setBrowseDir)
 
   const busy = phase === 'installing' || phase === 'starting'
   const running = phase === 'running' || status?.running != null
@@ -75,29 +103,37 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
   const locked = busy || running
 
   const paramsFile = params.kind === 'file' || params.kind === 'eeprom' ? params.path : null
-  const fieldNames = Object.keys(fields).sort((a, b) => a.localeCompare(b))
-  // Which saved field the box currently holds, so the select shows it and
-  // "Forget" knows what it is offering to forget.
-  const matchingField = fieldNames.find((n) => fields[n] === homeText.trim()) ?? null
 
   const chooseBuild = async () => {
-    const picked = await window.loftgcs?.sim.pickBuild()
+    const picked = await window.loftgcs?.sim.pickBuild(browseDir)
     // Cancelling leaves the setup alone rather than falling back to the
     // official build: the dropdown was only a way to reach the picker.
-    if (picked) setBuild(picked)
+    if (!picked) return
+    setBuild(picked)
+    // The build's folder is where the parameters are: an aircraft ships as
+    // an executable beside its `<model>/eeprom.bin`, so choosing the one
+    // says where to look for the other.
+    setBrowseDir(dirName(picked.path))
   }
 
   const chooseParams = async () => {
-    const file = await window.loftgcs?.sim.pickParams()
+    const file = await window.loftgcs?.sim.pickParams(browseDir)
     // A .parm is a list of values and an eeprom.bin is the stored set --
     // different acts, told apart here rather than asked about.
-    if (file) setParams(classifyParamFile(file))
+    if (!file) return
+    setParams(classifyParamFile(file))
+    setBrowseDir(dirName(file))
   }
 
-  // Empty means CMAC, the field sim_vehicle.py boots at -- the same vehicle
-  // every ArduPilot user has seen, which is the right thing to get when you
-  // have not asked for anything else.
-  const parsed = homeText.trim() ? parseHome(homeText) : { home: CMAC_HOME }
+  // With nothing chosen, boot where the simulator in use would.
+  //
+  // For built-in physics that is CMAC, the field sim_vehicle.py opens at and
+  // the one every ArduPilot user has seen. For FlightAxis it is Eli Field,
+  // because RealFlight's own default scenery *is* Eli Field and a vehicle
+  // that boots at CMAC instead is flying Canberra's coordinates over an
+  // Illinois runway -- the mismatch home exists to remove. Either is only a
+  // default: a pick on the map replaces it and is what gets remembered.
+  const parsed = homeText.trim() ? parseHome(homeText) : { home: defaultHome(physics.kind) }
   const homeError = 'error' in parsed ? parsed.error : null
   const home = 'home' in parsed ? parsed.home : null
 
@@ -106,7 +142,7 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
       <h3 className="app-simtray__head">SITL</h3>
       <p className="app-simtray__note">
         {status?.supported
-          ? 'Real ArduPilot firmware, running locally — the full parameter set, real arming checks, real mode logic.'
+          ? 'Real ArduPilot firmware, running locally.'
           : 'Prebuilt SITL binaries are published for Windows only. Run sim_vehicle.py yourself and connect to it below.'}
       </p>
 
@@ -116,24 +152,33 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
             <LaSelect
               id="sim-build"
               value={build ? 'custom' : 'official'}
+              // The full path, which has no line of its own any more.
+              {...(build ? { title: build.path } : {})}
               disabled={locked}
               onChange={(e) => {
-                if (e.target.value === 'official') setBuild(null)
-                else void chooseBuild()
+                const picked = e.target.value
+                // "Select from file…" is an action, not a state, and the
+                // control must not sit on it: a cancelled picker changes
+                // nothing, so nothing would re-render and the select would
+                // be left reading an option that is not what is loaded.
+                // Put it back now; a successful pick re-renders over this.
+                e.target.value = build ? 'custom' : 'official'
+                if (picked === 'official') setBuild(null)
+                else if (picked === 'pick') void chooseBuild()
               }}
             >
               <option value="official">Official release</option>
-              <option value="custom">{build ? buildLabel(build) : 'Custom build…'}</option>
+              {/* The build in force, named by what it is and which file it
+                  is. Only rendered when there is one -- it is a state, and
+                  the option below is how a different one is reached, since
+                  re-choosing an option already selected fires no event. */}
+              {build && <option value="custom">{buildOptionLabel(build)}</option>}
+              <option value="pick">Select from file</option>
             </LaSelect>
           </LaField>
-          {build ? (
-            <div className="la-row">
-              <LaHint>{build.path}</LaHint>
-              <LaButton variant="ghost" disabled={locked} onClick={() => void chooseBuild()}>
-                Change…
-              </LaButton>
-            </div>
-          ) : (
+          {/* A custom build says which vehicle it is, so there is nothing to
+              choose -- and asking would let the two disagree. */}
+          {!build && (
             <LaField label="Vehicle" htmlFor="sim-vehicle">
               <LaSelect
                 id="sim-vehicle"
@@ -158,9 +203,7 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
               disabled={locked}
               onChange={(e) =>
                 setPhysics(
-                  e.target.value === 'flightaxis'
-                    ? { kind: 'flightaxis', host: '' }
-                    : { kind: 'builtin' },
+                  e.target.value === 'flightaxis' ? { kind: 'flightaxis' } : { kind: 'builtin' },
                 )
               }
             >
@@ -168,25 +211,10 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
               <option value="flightaxis">RealFlight</option>
             </LaSelect>
           </LaField>
+          {/* The one setting people forget, and the failure it causes --
+              SITL retrying forever -- says nothing about RealFlight. */}
           {physics.kind === 'flightaxis' && (
-            <>
-              <LaField label="RealFlight host" htmlFor="sim-rf-host">
-                <LaInput
-                  id="sim-rf-host"
-                  type="text"
-                  placeholder="127.0.0.1"
-                  disabled={locked}
-                  value={physics.host ?? ''}
-                  onChange={(e) => setPhysics({ kind: 'flightaxis', host: e.target.value })}
-                />
-              </LaField>
-              {/* The one setting people forget, and the failure it causes --
-                  SITL retrying forever -- says nothing about RealFlight. */}
-              <LaHint>
-                RealFlight must be running with Simulation &rsaquo; Settings &rsaquo; Physics
-                &rsaquo; &ldquo;RealFlight Link enabled&rdquo;. Blank means this machine.
-              </LaHint>
-            </>
+            <LaHint>RealFlight Link must be enabled in RealFlight</LaHint>
           )}
 
           <LaField label="Parameters" htmlFor="sim-params">
@@ -197,31 +225,33 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
               // option makes the browser display the first one instead --
               // so picking an EEPROM used to leave "Wipe to defaults" on
               // screen while the launch correctly used the file.
-              value={params.kind === 'eeprom' ? 'file' : params.kind}
+              value={paramsFile ? 'file' : params.kind}
+              {...(paramsFile ? { title: paramsFile } : {})}
               disabled={locked}
               onChange={(e) => {
-                const kind = e.target.value
-                if (kind === 'keep' || kind === 'wipe') setParams({ kind })
-                else void chooseParams()
+                const picked = e.target.value
+                // Same as Build above: the picker is an action, so the
+                // control goes back to what is actually loaded before it
+                // opens, and a cancel leaves the select telling the truth.
+                e.target.value = paramsFile ? 'file' : params.kind
+                if (picked === 'keep' || picked === 'wipe') setParams({ kind: picked })
+                else if (picked === 'pick') void chooseParams()
               }}
             >
               <option value="wipe">Wipe to defaults</option>
               <option value="keep">Keep what is stored</option>
-              <option value="file">{paramsFile ? fileName(paramsFile) : 'From a file…'}</option>
+              {/* A .parm and an eeprom.bin are two kinds behind one entry,
+                  told apart by the extension in the name. Rendered only
+                  when one is loaded, so the entry below stays reachable. */}
+              {paramsFile && <option value="file">{fileName(paramsFile)}</option>}
+              <option value="pick">Select from file</option>
             </LaSelect>
           </LaField>
-          {paramsFile ? (
-            <div className="la-row">
-              <LaHint>
-                {params.kind === 'eeprom'
-                  ? 'A stored parameter set, copied in whole.'
-                  : 'Applied over the defaults, with a wipe so it takes.'}
-              </LaHint>
-              <LaButton variant="ghost" disabled={locked} onClick={() => void chooseParams()}>
-                Change…
-              </LaButton>
-            </div>
-          ) : (
+          {/* Only for the two that look alike and behave differently. A
+              chosen file needs no gloss: its name is in the field and its
+              extension is the difference -- a .bin is the stored set copied
+              in whole, a .parm a list applied over the defaults. */}
+          {!paramsFile && (
             <LaHint>
               {params.kind === 'wipe'
                 ? 'Every launch starts from the same known vehicle.'
@@ -231,75 +261,48 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
           {/* Home is read at boot, so this is deliberately not a live
               setting: changing it takes effect the next time the simulator
               starts. Disabled while one is running, to say so. */}
-          {fieldNames.length > 0 && (
-            <LaField label="Flying field" htmlFor="sim-field">
-              <LaSelect
-                id="sim-field"
-                value={matchingField ?? ''}
-                disabled={locked}
-                onChange={(e) => setHomeText(fields[e.target.value] ?? '')}
-              >
-                <option value="">Custom…</option>
-                {fieldNames.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </LaSelect>
-            </LaField>
-          )}
-          <LaField label="Home location" htmlFor="sim-home">
-            <LaInput
-              id="sim-home"
-              type="text"
-              inputMode="decimal"
-              placeholder="-35.363262, 149.165237, 584, 270"
-              disabled={busy || running}
-              value={homeText}
-              onChange={(e) => setHomeText(e.target.value)}
-            />
-          </LaField>
-          {homeError ? (
-            <LaHint error>{homeError}</LaHint>
-          ) : (
-            <LaHint>
-              Latitude and longitude, and optionally an altitude in meters and a heading in degrees.
-              Empty boots at CMAC, ArduPilot&rsquo;s usual test field.
-              {physics.kind === 'flightaxis' &&
-                ' With RealFlight the heading is what lines its runway up with the map, so it is' +
-                  ' worth getting right.'}
-            </LaHint>
-          )}
-          {home && (
-            <div className="la-row">
-              <LaInput
-                type="text"
-                placeholder="Name this field"
-                aria-label="Field name"
-                disabled={locked}
-                value={fieldName}
-                onChange={(e) => setFieldName(e.target.value)}
-              />
+          {/* The map is the whole interface to this value now. A text box
+              here was asking someone to type four numbers they can only get
+              from another window and cannot check by eye -- and it could
+              not carry the heading usefully, since a heading is only worth
+              anything against the runway it lines up with. What the box did
+              well was *show* the chosen location, so that is what the line
+              below it does. */}
+          {/* Both buttons are one control: setting the home and putting it
+              back. They share the field so Reset lands directly under Pick
+              at the same width, rather than needing an empty label of its
+              own to fake the alignment. */}
+          <LaField label="Home location" htmlFor="sim-home-pick">
+            <div className="app-simtray__stack">
               <LaButton
-                variant="ghost"
-                disabled={locked || !fieldName.trim()}
-                onClick={() => {
-                  saveField(fieldName)
-                  setFieldName('')
-                }}
+                id="sim-home-pick"
+                variant="secondary"
+                disabled={locked}
+                onClick={() => setFieldPickerOpen(true)}
               >
-                Save field
+                Pick on map
               </LaButton>
-              {matchingField && (
-                <LaButton
-                  variant="ghost"
-                  disabled={locked}
-                  onClick={() => deleteField(matchingField)}
-                >
-                  Forget {matchingField}
+              {homeText.trim() !== '' && !running && (
+                <LaButton variant="ghost" disabled={busy} onClick={() => setHomeText('')}>
+                  Reset to default
                 </LaButton>
               )}
             </div>
+          </LaField>
+          {homeError ? (
+            // Not reachable by picking on the map, but the home is a
+            // string in localStorage and this is the only thing that would
+            // explain a hand-edited one that silently does nothing.
+            <LaHint error>{homeError}</LaHint>
+          ) : (
+            // Only the value: what the heading is for is said in the
+            // picker, at the moment it is being set, which is the only
+            // moment it helps.
+            <LaHint>
+              {homeText.trim() === '' || !home
+                ? `Default — ${physics.kind === 'flightaxis' ? 'Eli Field' : 'CMAC'}`
+                : `${home.latDeg.toFixed(6)}, ${home.lonDeg.toFixed(6)} · ${Math.round(home.altM)} m · ${home.headingDeg}°`}
+            </LaHint>
           )}
           <div className="la-row">
             {/* Plan at your field on the map, then boot the simulator there.
@@ -319,16 +322,12 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
                 Use planned home
               </LaButton>
             )}
-            {homeText.trim() !== '' && !running && (
-              <LaButton variant="ghost" disabled={busy} onClick={() => setHomeText('')}>
-                Reset to default
-              </LaButton>
-            )}
           </div>
           <div className="la-row">
             {!isInstalled && (
               <LaButton
                 variant="secondary"
+                size="block"
                 disabled={busy}
                 onClick={() => void installSimulator(vehicle)}
               >
@@ -336,8 +335,11 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
               </LaButton>
             )}
             {isInstalled && !running && (
+              // The one primary action in this panel, and the one that
+              // changes what the app is talking to.
               <LaButton
-                variant="secondary"
+                variant="primary"
+                size="block"
                 disabled={busy || connected || !home}
                 onClick={() => {
                   void startSimulator({
@@ -352,11 +354,11 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
                   onStarted?.()
                 }}
               >
-                {phase === 'starting' ? 'Starting…' : 'Start simulator'}
+                {phase === 'starting' ? 'Launching…' : 'Launch SITL instance'}
               </LaButton>
             )}
             {running && (
-              <LaButton variant="ghost" onClick={() => void stopSimulator()}>
+              <LaButton variant="ghost" size="block" onClick={() => void stopSimulator()}>
                 Stop simulator
               </LaButton>
             )}
@@ -382,9 +384,13 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
         </>
       )}
 
+      {/* Stacked under Launch rather than beside it: at the panel's width
+          two buttons side by side would each have to lose half their label,
+          and these two labels are the whole difference between them. */}
       <div className="la-row">
         <LaButton
           variant="ghost"
+          size="block"
           disabled={connected}
           title="Attach to a SITL you started yourself, on TCP 5760"
           onClick={() => {
@@ -392,7 +398,7 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
             onStarted?.()
           }}
         >
-          Connect to a running simulator
+          Connect existing instance
         </LaButton>
       </div>
       <LaHint error>{error}</LaHint>

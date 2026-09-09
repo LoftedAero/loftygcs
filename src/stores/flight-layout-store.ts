@@ -30,6 +30,15 @@ export const LOG_PANES = [
   { id: 'preflight', label: 'Preflight' },
   { id: 'camera', label: 'Camera' },
   { id: 'joystick', label: 'Joystick' },
+  // The HUD's video source, beside the camera controls that point the thing
+  // it is showing. It was a modal behind the View menu -- two levels down
+  // from a screen where it is set up before flying, and a connection you
+  // watch rather than a question to dismiss.
+  { id: 'video', label: 'Video' },
+  // Last, because it is the only one that is not about the aircraft. It was
+  // a "View" button on the command bar, where everything else commands the
+  // vehicle and this moved furniture.
+  { id: 'view', label: 'View' },
 ] as const
 
 export type LogPane = (typeof LOG_PANES)[number]['id']

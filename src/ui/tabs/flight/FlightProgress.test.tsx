@@ -37,7 +37,7 @@ const strip = () => document.querySelector('.flight-progress')
 describe('mission progress on the Fly screen', () => {
   it('shows nothing until the vehicle reports an item', () => {
     setPlan(3)
-    render(<FlightControls onVideo={() => {}} />)
+    render(<FlightControls />)
     // A vehicle in Loiter is not flying a mission, and an empty "WP —" would
     // be a readout claiming to know something it does not.
     expect(strip()).toBeNull()
@@ -45,7 +45,7 @@ describe('mission progress on the Fly screen', () => {
 
   it('names the item, the command and the distance once it does', () => {
     setPlan(4)
-    render(<FlightControls onVideo={() => {}} />)
+    render(<FlightControls />)
     act(() => useVehicleStore.setState({ missionSeq: 2, wpDistM: 150, groundspeedMs: 10 }))
     const text = strip()!.textContent!
     expect(text).toContain('2 of 3')
@@ -57,7 +57,7 @@ describe('mission progress on the Fly screen', () => {
 
   it('follows the unit preference', () => {
     setPlan(4)
-    render(<FlightControls onVideo={() => {}} />)
+    render(<FlightControls />)
     act(() => {
       usePreferencesStore.getState().setDistanceUnit('ft')
       useVehicleStore.setState({ missionSeq: 1, wpDistM: 150, groundspeedMs: 10 })
@@ -67,16 +67,27 @@ describe('mission progress on the Fly screen', () => {
 
   it('drops the ETA when the vehicle is not moving, keeping the rest', () => {
     setPlan(4)
-    render(<FlightControls onVideo={() => {}} />)
+    render(<FlightControls />)
     act(() => useVehicleStore.setState({ missionSeq: 2, wpDistM: 150, groundspeedMs: 0 }))
     const text = strip()!.textContent!
     expect(text).toContain('2 of 3')
     expect(text).not.toMatch(/\d+:\d\d/)
   })
 
+  it('sits on the top row, where the always-visible space is', () => {
+    // It is read rather than pressed, so it takes the right-hand end of the
+    // row that is never empty -- and stops a readout sitting in the middle
+    // of the strip of controls below it.
+    setPlan(4)
+    render(<FlightControls />)
+    act(() => useVehicleStore.setState({ missionSeq: 2, wpDistM: 150, groundspeedMs: 10 }))
+    expect(strip()!.closest('.flight-controls__primary')).not.toBeNull()
+    expect(strip()!.closest('.flight-controls__secondary')).toBeNull()
+  })
+
   it('still reports the item with no plan loaded here', () => {
     // The vehicle may be flying a mission this GCS never uploaded.
-    render(<FlightControls onVideo={() => {}} />)
+    render(<FlightControls />)
     act(() => useVehicleStore.setState({ missionSeq: 5, wpDistM: 80, groundspeedMs: 8 }))
     expect(strip()!.textContent).toContain('5')
   })

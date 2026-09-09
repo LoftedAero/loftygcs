@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useVehicleStore } from '../../../stores/vehicle-store'
+import { useConnectionStore } from '../../../stores/connection-store'
 import { relativeTo, useTrafficStore } from '../../../stores/traffic-store'
 import { useUnits } from '../../../stores/preferences-store'
 import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
@@ -179,7 +180,27 @@ export default function MapView({
         map.panTo(pos, { animate: false })
       }
     })
-    return unsub
+
+    // Everything the aircraft drew comes off with the aircraft.
+    //
+    // The store's reset cannot do it: it sets the position to 0,0, and the
+    // draw above ignores 0,0 because that is also what an unfixed GPS
+    // reports -- so a disconnect left the last icon and the whole trail
+    // sitting on the map as if something were still flying them. The map
+    // keeps its view; only what belonged to that vehicle goes.
+    const unsubLink = useConnectionStore.subscribe((s) => {
+      if (s.phase === 'connected' || s.phase === 'linkLost') return
+      markerRef.current?.remove()
+      markerRef.current = null
+      trailRef.current?.setLatLngs([])
+      // So the next vehicle centers the map on its first fix, the way the
+      // first one did, rather than being left off screen.
+      firstFix = true
+    })
+    return () => {
+      unsub()
+      unsubLink()
+    }
   }, [])
 
   // Traffic. Driven by the reports alone, and this vehicle's position is

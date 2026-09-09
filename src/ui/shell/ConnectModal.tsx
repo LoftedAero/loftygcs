@@ -8,6 +8,19 @@ import { connectionService } from '../../services/connection'
 // straight from the app bar; only TCP/UDP/WebSocket need anything typed in.
 // Defaults are the ArduPilot conventions: SITL listens on TCP 5760, GCSes
 // listen on UDP 14550.
+//
+// The three are one dialog wearing three faces, so they are built to look
+// like it: same card width, same label-beside-control row, and every box the
+// same width whether it holds a port number or a URL (see `.connect-form` in
+// app.css). Each had drifted to its own shape -- TCP's host box was 170px
+// against its port's 71px, and the URL was a full-width stacked field in a
+// card the other two left mostly empty.
+const TITLES: Record<string, string> = {
+  tcp: 'Connect over TCP',
+  udp: 'Listen on UDP',
+  ws: 'Connect to WebSocket bridge',
+}
+
 export default function ConnectModal() {
   const open = useUiStore((s) => s.connectModalOpen)
   const setOpen = useUiStore((s) => s.setConnectModalOpen)
@@ -52,7 +65,7 @@ export default function ConnectModal() {
   return (
     <LaModal
       open={open}
-      title={kind === 'tcp' ? 'Connect over TCP' : kind === 'udp' ? 'Listen on UDP' : 'Connect to WebSocket bridge'}
+      title={TITLES[kind] ?? 'Connect'}
       actions={
         <>
           <LaButton variant="ghost" onClick={() => setOpen(false)}>
@@ -64,32 +77,34 @@ export default function ConnectModal() {
         </>
       }
     >
-      {kind === 'tcp' && (
-        <>
-          <LaField label="Host" htmlFor="conn-host">
-            <LaInput id="conn-host" value={host} onChange={(e) => setHost(e.target.value)} />
+      <div className="connect-form">
+        {kind === 'tcp' && (
+          <>
+            <LaField label="Host" htmlFor="conn-host">
+              <LaInput id="conn-host" value={host} onChange={(e) => setHost(e.target.value)} />
+            </LaField>
+            <LaField label="Port" htmlFor="conn-port">
+              <LaInput id="conn-port" num value={port} onChange={(e) => setPort(e.target.value)} />
+            </LaField>
+          </>
+        )}
+        {kind === 'udp' && (
+          <LaField label="Listen port" htmlFor="conn-lport">
+            <LaInput
+              id="conn-lport"
+              num
+              value={localPort}
+              onChange={(e) => setLocalPort(e.target.value)}
+            />
           </LaField>
-          <LaField label="Port" htmlFor="conn-port">
-            <LaInput id="conn-port" num value={port} onChange={(e) => setPort(e.target.value)} />
+        )}
+        {kind === 'ws' && (
+          <LaField label="URL" htmlFor="conn-ws">
+            <LaInput id="conn-ws" value={wsUrl} onChange={(e) => setWsUrl(e.target.value)} />
           </LaField>
-        </>
-      )}
-      {kind === 'udp' && (
-        <LaField label="Listen port" htmlFor="conn-lport">
-          <LaInput
-            id="conn-lport"
-            num
-            value={localPort}
-            onChange={(e) => setLocalPort(e.target.value)}
-          />
-        </LaField>
-      )}
-      {kind === 'ws' && (
-        <LaField label="URL" htmlFor="conn-ws" stacked>
-          <LaInput id="conn-ws" value={wsUrl} onChange={(e) => setWsUrl(e.target.value)} />
-        </LaField>
-      )}
-      <LaHint error>{hint}</LaHint>
+        )}
+        <LaHint error>{hint}</LaHint>
+      </div>
     </LaModal>
   )
 }

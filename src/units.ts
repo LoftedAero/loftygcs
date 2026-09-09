@@ -13,12 +13,30 @@
 export type DistanceUnit = 'm' | 'ft'
 export type SpeedUnit = 'ms' | 'kmh' | 'kts' | 'mph'
 
+/**
+ * How climb rate reads.
+ *
+ * `follow` is the aviation convention and the default: vertical speed is
+ * feet per minute wherever horizontal distance is in feet, whatever the
+ * airspeed unit -- a pilot flying in knots still calls a climb "five hundred
+ * feet a minute", never "8 feet a second". It stayed the only behavior for a
+ * while on the grounds that a third dropdown was worse than the convention,
+ * and it is still what the app does out of the box; the other two exist
+ * because the convention is a default, not a rule, and someone reading
+ * altitude in feet off a metric airframe has a reason to break it.
+ */
+export type VerticalSpeedUnit = 'follow' | 'ms' | 'fpm'
+
+/** What `follow` actually resolves to, and the only thing below reads. */
+export type ResolvedVerticalSpeed = Exclude<VerticalSpeedUnit, 'follow'>
+
 export interface UnitPrefs {
   distance: DistanceUnit
   speed: SpeedUnit
+  verticalSpeed: VerticalSpeedUnit
 }
 
-export const DEFAULT_UNITS: UnitPrefs = { distance: 'm', speed: 'ms' }
+export const DEFAULT_UNITS: UnitPrefs = { distance: 'm', speed: 'ms', verticalSpeed: 'follow' }
 
 /** The international foot, exactly. Everything else derives from it. */
 const M_PER_FT = 0.3048
@@ -72,20 +90,23 @@ export function speedLabel(unit: SpeedUnit): string {
 // ---------------------------------------------------------- vertical speed
 
 /**
- * Climb rate, which does not simply follow the speed choice.
+ * Which climb-rate unit is actually in force.
  *
- * Aviation reads vertical speed in feet per minute wherever horizontal
- * distance is in feet, whatever the airspeed unit -- a pilot flying in knots
- * still calls a climb "five hundred feet a minute", never "8 feet a second".
- * So this derives from the distance unit and needs no control of its own,
- * which is also one fewer dropdown to explain.
+ * The one place `follow` is turned into a real unit, so nothing downstream
+ * has to know the convention -- everything below takes the resolved unit and
+ * the preference is read exactly once, here.
  */
-export function toVerticalSpeed(ms: number, unit: DistanceUnit): number {
-  return unit === 'ft' ? (ms / M_PER_FT) * 60 : ms
+export function resolveVerticalSpeed(units: UnitPrefs): ResolvedVerticalSpeed {
+  if (units.verticalSpeed !== 'follow') return units.verticalSpeed
+  return units.distance === 'ft' ? 'fpm' : 'ms'
 }
 
-export function verticalSpeedLabel(unit: DistanceUnit): string {
-  return unit === 'ft' ? 'ft/min' : 'm/s'
+export function toVerticalSpeed(ms: number, units: UnitPrefs): number {
+  return resolveVerticalSpeed(units) === 'fpm' ? (ms / M_PER_FT) * 60 : ms
+}
+
+export function verticalSpeedLabel(units: UnitPrefs): string {
+  return resolveVerticalSpeed(units) === 'fpm' ? 'ft/min' : 'm/s'
 }
 
 // -------------------------------------------------------------- formatting
@@ -109,15 +130,30 @@ export function formatSpeed(ms: number, unit: SpeedUnit, decimals?: number): str
   return v.toFixed(decimals ?? (unit === 'ms' ? 1 : 0))
 }
 
-export function formatVerticalSpeed(ms: number, unit: DistanceUnit): string {
-  const v = toVerticalSpeed(ms, unit)
-  return unit === 'ft' ? v.toFixed(0) : v.toFixed(1)
+export function formatVerticalSpeed(ms: number, units: UnitPrefs): string {
+  const v = toVerticalSpeed(ms, units)
+  // Feet per minute are whole numbers -- "500", never "500.0" -- and a
+  // tenth of a meter per second is the smallest climb worth reading.
+  return resolveVerticalSpeed(units) === 'fpm' ? v.toFixed(0) : v.toFixed(1)
 }
 
 /** Every choice a preferences control offers, with the label it shows. */
 export const DISTANCE_CHOICES: { id: DistanceUnit; label: string }[] = [
   { id: 'm', label: 'Meters' },
   { id: 'ft', label: 'Feet' },
+]
+
+/**
+ * The climb-rate choices.
+ *
+ * `follow` leads because it is the default and the convention; its label is
+ * filled in with whatever it currently resolves to, so the dropdown says
+ * what it is doing rather than making it a thing to work out.
+ */
+export const VERTICAL_SPEED_CHOICES: { id: VerticalSpeedUnit; label: string }[] = [
+  { id: 'follow', label: 'Follow distance' },
+  { id: 'ms', label: 'Meters per second' },
+  { id: 'fpm', label: 'Feet per minute' },
 ]
 
 export const SPEED_CHOICES: { id: SpeedUnit; label: string }[] = [

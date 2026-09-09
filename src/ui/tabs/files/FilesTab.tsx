@@ -145,7 +145,7 @@ export default function FilesTab() {
             onClick={() => pickAndUpload()}
             title={atRoot ? 'Open a folder first' : `Write a file into ${path}`}
           >
-            Upload a file…
+            Upload a file
           </LaButton>
           {atRoot && <LaHint>Open a folder first.</LaHint>}
           <LaButton
@@ -181,7 +181,7 @@ export default function FilesTab() {
             disabled={busy || atRoot}
             onClick={() => setNewFolder('')}
           >
-            New folder…
+            New folder
           </LaButton>
           {/* Renaming is how a Lua script is switched off without deleting
               it: ArduPilot only runs *.lua, so rangefinder.lua.off stays on
@@ -192,7 +192,7 @@ export default function FilesTab() {
             disabled={busy || !selected}
             onClick={() => selected && setRenaming({ entry: selected, to: selected.name })}
           >
-            Rename…
+            Rename
           </LaButton>
           <LaButton
             variant="ghost"
@@ -200,7 +200,7 @@ export default function FilesTab() {
             disabled={busy || !selected}
             onClick={() => selected && setConfirming(selected)}
           >
-            Delete…
+            Delete
           </LaButton>
         </section>
 

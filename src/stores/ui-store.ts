@@ -48,8 +48,18 @@ export const TAB_GROUPS = ['Initial Setup', 'Config/Tuning', 'Data'] as const
 
 export type TabGroup = (typeof TAB_GROUPS)[number]
 
+/**
+ * The setup rail.
+ *
+ * `fills` marks a tab that brings its own full-height layout rather than a
+ * set of cards to tile -- Overview's model sits beside a column of readouts
+ * and is sized by it, so on the card grid (which sizes every row to its
+ * content) it collapsed to whatever the shortest column of vitals allowed.
+ * Those tabs get the same treatment Fly and Mission get: the content pane
+ * stops being a grid and hands them the window.
+ */
 export const TABS = [
-  { id: 'overview', label: 'Overview', group: 'Initial Setup' },
+  { id: 'overview', label: 'Overview', group: 'Initial Setup', fills: true },
   { id: 'firmware', label: 'Firmware', group: 'Initial Setup' },
   // The curated cards lead the rest: it is where a new airframe starts, and
   // the things they cover -- battery monitor, failsafe, arming checks -- are
@@ -77,6 +87,11 @@ export const TABS = [
 ] as const
 
 export type TabId = (typeof TABS)[number]['id']
+
+/** Whether this tab lays out its own window instead of tiling cards. */
+export function tabFills(tab: TabId): boolean {
+  return TABS.some((t) => t.id === tab && 'fills' in t && t.fills)
+}
 
 /** Where the user asked to go, held until unwritten changes are dealt with. */
 export interface PendingNav {
@@ -106,6 +121,16 @@ interface UiState {
    */
   simTrayOpen: boolean
   setSimTrayOpen: (open: boolean) => void
+
+  /**
+   * The map picker for the simulator's home location.
+   *
+   * Here rather than in SimulatorControls, which is what opens it: the tray
+   * dismisses on any outside click, so a dialog mounted inside it would
+   * unmount the moment someone clicked the map it is made of.
+   */
+  fieldPickerOpen: boolean
+  setFieldPickerOpen: (open: boolean) => void
 
   /** Non-null while a navigation is waiting on staged parameter edits. */
   pendingNav: PendingNav | null
@@ -144,6 +169,12 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPreferencesOpen: (preferencesOpen) => set({ preferencesOpen }),
   simTrayOpen: false,
   setSimTrayOpen: (simTrayOpen) => set({ simTrayOpen }),
+
+  fieldPickerOpen: false,
+  // Opening it closes the tray rather than racing the tray's click-away,
+  // which would otherwise dismiss the tray on the first click on the map.
+  setFieldPickerOpen: (fieldPickerOpen) =>
+    set(fieldPickerOpen ? { fieldPickerOpen, simTrayOpen: false } : { fieldPickerOpen }),
   pendingNav: null,
 
   setMode: (mode) => {

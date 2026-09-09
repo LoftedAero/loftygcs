@@ -28,7 +28,13 @@ const AUTOTEST_BASE = 'https://raw.githubusercontent.com/ArduPilot/ardupilot/mas
 /** SITL's serial0 TCP server, the port a GCS attaches to. */
 export const SITL_PORT = 5760
 
-export type SimVehicle = 'copter' | 'plane' | 'rover'
+// Rover is deliberately absent: whether this app supports ground vehicles
+// at all is undecided, and a simulator for one nothing else in the app has
+// been tested against is a feature that only looks supported. Its entry is
+// four lines when that decision is made -- `default_params/rover.parm`, the
+// `rover` physics model, the `ArduRover` binary -- and `readBuildInfo`
+// already refuses to launch a build it has no entry for.
+export type SimVehicle = 'copter' | 'plane'
 
 interface VehicleSpec {
   label: string
@@ -60,13 +66,6 @@ export const SIM_VEHICLES: Record<SimVehicle, VehicleSpec> = {
     model: 'plane',
     defaults: 'plane.parm',
     source: 'models/plane.parm',
-  },
-  rover: {
-    label: 'Rover',
-    binary: 'ArduRover',
-    model: 'rover',
-    defaults: 'rover.parm',
-    source: 'default_params/rover.parm',
   },
 }
 
@@ -130,7 +129,7 @@ export function simWorkDir(baseDir: string, launch: SimLaunch): string {
 }
 
 /** Physics: SITL's own model, or RealFlight driving it over FlightAxis. */
-export type SimPhysics = { kind: 'builtin' } | { kind: 'flightaxis'; host?: string }
+export type SimPhysics = { kind: 'builtin' } | { kind: 'flightaxis' }
 
 /**
  * What the vehicle boots with.
@@ -166,14 +165,16 @@ export function classifyParamFile(file: string): SimParams {
 export function modelName(launch: SimLaunch): string {
   const physics = launch.physics ?? { kind: 'builtin' }
   if (physics.kind === 'builtin') return SIM_VEHICLES[launch.vehicle].model
-  // FlightAxis reads the address off the model string itself; no address
-  // means the copy of RealFlight on this machine.
-  return physics.host && physics.host !== FLIGHTAXIS_HOST
-    ? `flightaxis:${physics.host}`
-    : 'flightaxis'
+  // Bare, which FlightAxis reads as the copy of RealFlight on this machine.
+  // ArduPilot also accepts `flightaxis:<host>` to drive one across a
+  // network, and this app deliberately does not offer it: it cost every
+  // user a field to look at for a case almost nobody has, and RealFlight on
+  // another machine is a thing to add back on request rather than to keep
+  // on screen forever.
+  return 'flightaxis'
 }
 
-/** RealFlight's SOAP port, and the machine it is assumed to run on. */
+/** RealFlight's SOAP port, and the machine it now always runs on. */
 export const FLIGHTAXIS_PORT = 18083
 export const FLIGHTAXIS_HOST = '127.0.0.1'
 
@@ -207,6 +208,28 @@ export function simArgs(baseDir: string, launch: SimLaunch): string[] {
   return args
 }
 
+/**
+ * Process names a leftover simulator could be running under.
+ *
+ * SITL binds TCP 5760, and a second one cannot -- so a simulator this app
+ * did not start (an orphan from a session that crashed or reloaded, or one
+ * launched from the command line) makes every launch fail with a banner
+ * that never arrives. Killing it is the right answer and needs no question
+ * asked: nobody starts a simulator meaning to keep the previous one.
+ *
+ * Named rather than found by port on purpose. "Whatever holds 5760" could
+ * be anything on a developer's machine, and this app has no business
+ * killing a process it cannot identify -- so the set is exactly the
+ * binaries it knows how to launch, plus whatever custom build is about to
+ * be launched, and nothing else is ever a candidate.
+ */
+export function simProcessNames(exe?: string, platform: string = process.platform): string[] {
+  const suffix = platform === 'win32' ? '.exe' : ''
+  const names = new Set(Object.values(SIM_VEHICLES).map((v) => v.binary + suffix))
+  if (exe) names.add(path.basename(exe))
+  return [...names]
+}
+
 /** ArduPilot stamps its own name and version into the binary. */
 const BUILD_BANNER = /Ardu(Copter|Plane|Rover|Sub) V(\d+\.\d+\.\d+)/
 
@@ -237,9 +260,11 @@ export function readBuildInfo(exe: string): BuildInfo | null {
   const vehicle = m[1]!.toLowerCase()
   if (vehicle === 'copter') return { vehicle: 'copter', version: m[2]! }
   if (vehicle === 'plane') return { vehicle: 'plane', version: m[2]! }
-  if (vehicle === 'rover') return { vehicle: 'rover', version: m[2]! }
-  // ArduSub has no entry in SIM_VEHICLES, so there is nothing to launch it
-  // as -- saying so beats guessing copter.
+  // ArduRover and ArduSub have no entry in SIM_VEHICLES, so there is
+  // nothing to launch them as -- saying so beats guessing copter. The
+  // banner still matches all four on purpose: "this is an ArduRover build
+  // and this app cannot run it" is a better answer than "not an ArduPilot
+  // binary", which is what a narrower pattern would produce.
   return null
 }
 

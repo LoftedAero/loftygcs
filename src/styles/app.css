@@ -21,8 +21,21 @@
      OSD all grew one independently and all picked a different number; this is
      the one they share. Change it here and every screen moves together. */
   --app-col-w: 280px;
+  /* One width for every control in the Preferences dialog, and for its
+     action row. Sized to the longest option any of its dropdowns carries
+     ("Kilometers per hour"); the buttons then take it rather than setting
+     it, so the two cannot drift apart when a label is reworded. */
+  --app-prefs-control-w: 210px;
+  /* Same idea in the SITL tray, sized to what its 320px panel leaves after
+     the widest label ("RealFlight host") and the panel's own padding. */
+  --app-simtray-control-w: 168px;
   /* The log field list. Matches the OSD panel list's 262px. */
   --app-log-fields-w: 262px;
+  /* One width for every box in the Connect dialog, whichever link kind it is
+     asking about. Sized to hold the longest thing typed into one -- a
+     WebSocket URL, measured at 109px for `ws://127.0.0.1:5678` -- with room
+     for a hostname in place of an address. */
+  --app-connect-control-w: 200px;
 }
 
 /* The system sheet puts modals at z-index 10, which is plenty for a window
@@ -47,6 +60,40 @@
    card out with a band of nothing. */
 .la-modal__body:empty {
   display: none;
+}
+
+/* The Connect dialog, for all three network link kinds.
+
+   They are the same dialog asking a different question, and they had stopped
+   looking like it: TCP put a 170px host box above a 71px port box, so its two
+   rows lined up on neither edge; UDP showed that same 71px box at the far
+   right of a 560px card; and the WebSocket URL was a stacked, full-width
+   field -- a third layout again. The rows also sat flush against each other,
+   because `.la-modal__body` is a block and the card's own gap falls between
+   title, body and actions rather than between the fields inside it.
+
+   So: one column with the card's own rhythm between rows, one control width
+   whatever the row holds (a port number and a URL are both "the value" and
+   sizing each to its own content is what made the edge ragged), and a card
+   sized to that column instead of to the sheet's default. `.la-input--num`'s
+   5.5em is deliberately overridden here -- it exists to keep a number from
+   sprawling in a card of mixed controls, which is not what this dialog is. */
+.connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+.connect-form .la-field {
+  grid-template-columns: minmax(0, 1fr) var(--app-connect-control-w);
+}
+.connect-form .la-input {
+  width: 100%;
+  min-width: 0;
+}
+/* Scoped with `:has()` rather than a prop on LaModal: the width belongs to
+   this dialog's content, the same way the Preferences dialog's does. */
+.la-modal__card:has(.connect-form) {
+  width: min(400px, 100%);
 }
 /* Stacked answers, full width, in the order they should be considered. */
 .la-prompt-actions {
@@ -171,7 +218,39 @@
 
 /* A port is three lines: what to select it by, what it says it is, and what
    tells two identical boards apart. */
+/* The serial chooser: a column of rows, not a wrapped set of radios.
+   `.la-radio-group` in the system sheet wraps inline options, which is
+   right for "Yes / No" and wrong for five ports carrying a name and a
+   description each -- they landed three-then-two in a ragged grid whose
+   columns did not line up. A chooser is a list, so this is one. */
+.serial-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
 .serial-port {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+  width: 100%;
+  padding: var(--la-space-2) var(--la-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--la-radius-sm);
+  /* The whole row is the target, so the pointer does not have to find an
+     18px dot among five of them. */
+  cursor: pointer;
+}
+.serial-port:hover {
+  background: var(--la-surface-2);
+}
+/* The selected row is marked twice over -- by the dot the system sheet
+   draws and by the row itself -- because at a glance down a list it is the
+   row that reads, not the dot. */
+.serial-port.is-selected {
+  background: var(--la-blue-soft);
+  border-color: var(--la-blue);
+}
+.serial-port__text {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -183,11 +262,9 @@
 .serial-port__desc {
   font-size: var(--la-size-sm);
   color: var(--la-ink-2);
-}
-.serial-port__ids {
-  font-family: var(--la-font-mono);
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- The actions column ----------------------------------------------
@@ -334,7 +411,8 @@
      is used as text are pointed at the ink ramp instead. Without this every
      card and modal title is near-black on near-black. */
   & .la-card__title,
-  & .la-modal__title {
+  & .la-modal__title,
+  & .app-band__title {
     color: var(--la-ink);
   }
 
@@ -356,7 +434,16 @@
   /* The chevron on a select is an inlined SVG whose fill is written into
      the data URI, so it cannot follow a token -- left alone every dropdown
      keeps a light-mode gray arrow on a dark field. Re-inlined with the one
-     value changed. */
+     value changed.
+
+     **That fill is --la-ink-2's dark value spelled out, and nothing keeps
+     the two in step** -- move the token and the arrow silently stays
+     behind. It is the one place in this file where a color is copied
+     rather than referenced, and it is copied because a data URI has no way
+     to reference anything. If this graduates into lofted-aero.css it will
+     be four apps' worth of the same hex, so the thing to reach for then is
+     a `mask-image` with `background-color: var(--la-ink-2)`, which carries
+     no color at all and fixes the light arrow's hardcoding too. */
   & .la-select {
     background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%23b4b6be' d='M1.4 0 6 4.6 10.6 0 12 1.4 6 7.4 0 1.4z'/%3E%3C/svg%3E");
   }
@@ -597,11 +684,43 @@
   flex-direction: column;
   gap: var(--la-space-2);
 }
+/* A section's closing note belongs to the section, not to the last control
+   in it. Pushing it down and pulling the rule up by the same amount moves
+   it across the gap without moving the rule -- so the note reads as the
+   foot of the group rather than as a hint on the row above it. */
+.prefs__group .la-hint {
+  margin-top: var(--la-space-3);
+}
 .prefs__group + .prefs__group {
-  margin-top: var(--la-space-5);
+  margin-top: var(--la-space-3);
   padding-top: var(--la-space-4);
   border-top: 1px solid var(--la-line);
 }
+/* The whole dialog is one right-aligned column: every dropdown, and the
+   action row under them, is exactly `--app-prefs-control-w` wide.
+
+   Letting each control size to its own longest option put a ragged edge
+   down a dialog that is otherwise a column, and the buttons ended a further
+   18px short of it. Both now take the same token rather than the buttons
+   being measured and the number copied, so a reworded label cannot pull the
+   two out of line -- "Reset to defaults" stretches into whatever the row
+   has spare and "Done" keeps its own size.
+
+   Scoped with `:has()` rather than a prop on LaModal: the actions row is
+   the shared component's, and only this dialog wants it constrained. */
+.prefs__group .la-field {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.prefs__group .la-select,
+.la-modal:has(.prefs__group) .la-modal__actions {
+  width: var(--app-prefs-control-w);
+}
+.la-modal:has(.prefs__group) .la-modal__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-left: auto;
+}
+
 .prefs__head {
   margin: 0;
   font-size: var(--la-size-xs);
@@ -609,6 +728,60 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--la-ink-3);
+}
+
+/* ── The View pane ──
+   The window switches, in the space under the controls. As a 210px flyout
+   these stacked into a column taller than the screen; a pane is wide, so
+   the groups sit side by side and the whole thing is one glance. */
+.view-pane {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--la-space-4) var(--la-space-5);
+  align-content: start;
+  padding: var(--la-space-3);
+  overflow-y: auto;
+}
+.view-pane__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-width: 0;
+}
+.view-pane__head {
+  margin: 0;
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+}
+.view-pane__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--la-space-2);
+}
+
+/* ── The Video pane ──
+   Was a modal, so its body was a column with the connect button in a footer
+   the dialog supplied. In a pane the URL and its one action belong on the
+   same line -- it is one setting, not a form. */
+.video-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-3);
+  padding: var(--la-space-3);
+  overflow-y: auto;
+}
+.video-pane__form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--la-space-3);
+  max-width: 720px;
+}
+.video-pane__form .la-field {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ── Camera and gimbal ──
@@ -1000,21 +1173,29 @@
   min-height: 0;
   flex: 1;
 }
-/* The Inspector's two views, in the plan switch's shape: one segmented
-   control, because they are two ways of looking at one link rather than two
-   places to be. */
-.inspector__views {
+/* A second level of tabs inside one screen -- the Inspector's messages and
+   hardware, Tuning's attitude and navigation. One segmented control, in the
+   plan switch's shape, because they are two ways of looking at one thing
+   rather than two places to be. Shared rather than copied: the actions
+   column is this codebase's cautionary tale about three private versions
+   each picking a different width.
+
+   It always takes a full row of whatever grid it lands in and sits at the
+   left of it, so the border wraps the buttons rather than the window; the
+   container's own gap does the spacing beneath. */
+.app-subtabs {
   display: flex;
   gap: 0;
+  grid-column: 1 / -1;
   align-self: flex-start;
-  margin-bottom: var(--la-space-3);
+  justify-self: start;
   border: 1px solid var(--la-line-strong);
   border-radius: var(--la-radius-sm);
   overflow: hidden;
   background: var(--la-surface);
   flex: none;
 }
-.inspector__view {
+.app-subtab {
   appearance: none;
   border: 0;
   border-right: 1px solid var(--la-line);
@@ -1024,10 +1205,10 @@
   padding: var(--la-space-2) var(--la-space-4);
   cursor: default;
 }
-.inspector__view:last-child {
+.app-subtab:last-child {
   border-right: 0;
 }
-.inspector__view.is-active {
+.app-subtab.is-active {
   background: var(--la-blue);
   color: var(--app-on-dark);
 }
@@ -1298,6 +1479,117 @@
   gap: var(--la-space-2);
 }
 
+/* The picker is a map, and 640px of `--wide` is not enough of one to find
+   a runway in. Sized like the RC wizard above rather than by adding another
+   modifier to the frozen sheet. */
+.la-modal__card:has(.field-picker) {
+  width: min(1040px, 100%);
+}
+
+/* ── Picking a flying field on the map ──
+   A map, a strip of controls under it, and one line of state. The map is
+   given a fixed height rather than a ratio: it is inside a modal, which
+   sizes to its content, so a percentage height would resolve against
+   nothing and collapse the container Leaflet measures on creation. */
+.field-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-3);
+  min-width: 0;
+}
+.field-picker__map {
+  height: min(56vh, 520px);
+  min-height: 320px;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+}
+.field-picker__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--la-space-4);
+}
+/* The two numbers sit beside their labels rather than stretching, so the
+   strip reads as a row of small settings under the map. */
+.field-picker__bar .la-field {
+  grid-template-columns: auto auto;
+  gap: var(--la-space-2);
+  align-items: center;
+}
+.field-picker__bar .la-input {
+  width: 8ch;
+}
+.field-picker__layers {
+  display: flex;
+  margin-right: auto;
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+  background: var(--la-surface);
+}
+.field-picker__layer {
+  appearance: none;
+  border: 0;
+  border-right: 1px solid var(--la-line);
+  background: transparent;
+  color: var(--la-ink-2);
+  font: 600 var(--la-size-sm) / 1 var(--la-font);
+  padding: var(--la-space-2) var(--la-space-4);
+  cursor: default;
+}
+.field-picker__layer:last-child {
+  border-right: 0;
+}
+.field-picker__layer.is-active {
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
+/* Leaflet gives a divIcon a white background and a border by default, and
+   this one is an arrow over imagery. */
+.field-picker__marker {
+  background: transparent;
+  border: 0;
+}
+
+/* Two buttons sharing one field's control slot -- Pick on map and the
+   Reset that undoes it. Stacked so the second sits directly under the
+   first, and both inherit the control width from the rule below. */
+.app-simtray__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-width: 0;
+}
+
+/* Every control in the tray is one width, so the panel reads as a column
+   of choices rather than a stack of differently-sized boxes -- a dropdown
+   of build names and one of physics models are the same kind of thing and
+   should not be sized by whichever happens to hold the longest string.
+
+   The label column takes what is left rather than the control taking what
+   is left, which is the way round that keeps the controls aligned when a
+   label is longer on one row than another. */
+.app-simtray__panel .la-field {
+  grid-template-columns: minmax(0, 1fr) var(--app-simtray-control-w);
+}
+.app-simtray__panel .la-select,
+.app-simtray__panel .la-input,
+/* A button standing in for a control -- "Pick on map…" is what the home
+   location has instead of a text box -- lines up with the dropdowns above
+   it rather than shrinking to its own label. Scoped to a field, so the
+   buttons in the rows below keep their natural size. */
+.app-simtray__panel .la-field .la-btn {
+  width: 100%;
+  min-width: 0;
+}
+/* The name-a-field input shares its row with the button that saves it, so
+   it takes the row instead of the control width -- the row as a whole is
+   what lines up with everything above it. */
+.app-simtray__panel .la-row .la-input {
+  flex: 1;
+}
+
 /* Top-level mode switch, in the app bar. Not orange: the bar already has
    one primary action (Connect), and two competing oranges would make
    neither read as the action. The active segment inverts instead. */
@@ -1459,15 +1751,25 @@
 /* The column cap, and only where it is wanted.
  
    It was a max-width on the grid, which capped the *width* rather than the
-   count -- so the moment four columns fit, the tracks stopped growing and
+   count -- so the moment the last column fit, the tracks stopped growing and
    the slack became side padding. On an ordinary 16:9 that is padding nobody
    asked for, on the screen this was meant to fill. Capping the count instead
    leaves the tracks at 1fr, so they always take the whole width, and only a
-   genuinely ultrawide window is stopped from growing a fifth and sixth
-   column of short cards. */
-@media (min-width: 2600px) {
+   genuinely wide window is stopped from growing another column of short
+   cards.
+
+   Three, which is where Betaflight's own configurator tops out (its tabs are
+   authored at one or two columns and reach three only on the receiver
+   screen). Four columns of settings is a row nobody reads across.
+
+   The breakpoint is arithmetic, not taste: a fourth 460px track appears once
+   the content pane reaches 4*460 + 3*16 = 1888px, and the pane is the window
+   less the 200px rail and 2*24px of padding. So 2136px of window is the
+   exact point, and the query has to sit at or below it or a fourth column
+   flashes into existence just before the cap catches it. */
+@media (min-width: 2136px) {
   .app-content {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1478,7 +1780,8 @@
    fixed label column also lines every control in a card up with the others,
    which a shrink-to-fit one does not. Scoped here rather than changed in
    lofted-aero.css, which is frozen and shared with three other apps. */
-.app-content .la-card .la-field {
+.app-content .la-card .la-field,
+.app-content .app-band .la-field {
   grid-template-columns: minmax(0, 20ch) auto;
   justify-content: start;
 }
@@ -1490,7 +1793,91 @@
   grid-column: 1 / -1;
 }
 
+/* --- A setup tab as one document, rather than a tray of cards ---------
+ 
+   The tiled grid gives every group the same box, and on a wide window that
+   box is mostly padding -- a three-field group in a 1,050px column puts its
+   controls in the left 450 and leaves the rest empty. A document spends the
+   width the other way: one surface, a band per group, and the fields
+   flowing across the band, so a wider window shows more fields per row
+   rather than wider empty boxes.
 
+   It is a card's materials without a card's edges, so the surface, border
+   and radius all come from `.la-card` -- what is dropped is the repetition
+   of them, six times down a screen. */
+.app-doc {
+  background: var(--la-surface);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius);
+  box-shadow: var(--la-shadow-1);
+  padding: 0 var(--la-space-5) var(--la-space-4);
+}
+
+.app-band {
+  padding: var(--la-space-4) 0 var(--la-space-2);
+}
+/* The band above already ends in a rule of its own kind; a second line
+   between them would be two dividers doing one job. */
+.app-band + .app-band {
+  border-top: 1px solid var(--la-line);
+}
+
+.app-band__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-3);
+  padding-bottom: var(--la-space-2);
+  /* The rule a `.la-card__title` carries, mixed back toward the surface: a
+     card shows one and a document shows six, and six at full strength read
+     as a warning rather than as structure. */
+  border-bottom: 2px solid color-mix(in srgb, var(--la-orange) 55%, transparent);
+  margin-bottom: var(--la-space-3);
+}
+.app-band__title {
+  margin: 0;
+  color: var(--la-charcoal);
+  font-size: var(--la-size-lg);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+/* The card's subtitle -- "Copter", "Plane" -- which in a band sits beside
+   the heading instead of under it. */
+.app-band__tag {
+  color: var(--la-ink-3);
+  font-size: var(--la-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The whole point of the arrangement: fields flow across the width.
+ 
+   Capped at four columns, and the cap is the `max()` idiom rather than a
+   media query -- a track that must be at least a quarter of the container
+   cannot be joined by a fifth. That makes the cap relative to *this
+   container*, so it holds whatever the rail is doing, which a breakpoint in
+   window pixels does not. Below that the 300px floor wins and fewer fit. */
+.app-band__fields {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(300px, (100% - 3 * var(--la-space-6)) / 4), 1fr)
+  );
+  gap: 0 var(--la-space-6);
+  align-content: start;
+}
+
+/* A matrix is already a two-axis grid, so it is placed whole rather than
+   poured through the field flow -- and capped, because four gain columns
+   spread across three thousand pixels stop reading as a row.
+
+   The cap is per column rather than flat: a flat one made the two-column
+   angle matrix as wide as the four-column rate matrix above it, which is
+   the same stretching this arrangement exists to stop, one band down. The
+   count is already on the element as `--matrix-cols`. */
+.app-band .matrix-grid {
+  max-width: calc(80px + var(--matrix-cols, 3) * 165px);
+}
 
 /* Fly and Mission own their own layout; the pane just holds them, and is not
    a grid at all -- they arrange their whole window themselves. */
@@ -2330,10 +2717,44 @@
   border-bottom: 1px solid var(--la-line);
 }
 
+/* Parameters that vary on two axes: the axis down the left, the gain
+   across the top. Column count comes in as --matrix-cols because a matrix
+   has as many as it has, and equal fractions keep the header sitting over
+   its own column whatever the card's width. */
+.matrix-grid {
+  display: grid;
+  grid-template-columns: 72px repeat(var(--matrix-cols, 3), minmax(0, 1fr));
+  gap: var(--la-space-3);
+  align-items: center;
+  padding: var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+.matrix-grid--head {
+  /* Centered over the inputs, which are centered in their own cells --
+     left-aligned headings drift away from a control that is not. */
+  text-align: center;
+}
+.matrix-grid__cell {
+  display: flex;
+  justify-content: center;
+}
+.matrix-grid__unit {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+/* The numeric input has a fixed width from the design system, so a wide
+   card would otherwise leave the gains huddled at the left of each column. */
+.matrix-grid .la-input--num {
+  width: 100%;
+  max-width: 7em;
+}
+
 .ports-grid--head,
 .aux-grid--head,
 .outputs-grid--head,
-.modes-grid--head {
+.modes-grid--head,
+.matrix-grid--head {
   font-size: var(--la-size-xs);
   font-weight: 600;
   color: var(--la-ink-3);
@@ -2343,7 +2764,8 @@
 
 .ports-grid__label,
 .aux-grid__label,
-.modes-grid__label {
+.modes-grid__label,
+.matrix-grid__label {
   font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
   display: flex;
   align-items: center;
@@ -2736,6 +3158,31 @@
 /* The canvas is taken out of flow and pinned to the box. In normal flow its
    own height counts toward the container's content height, so sizing it from
    that height feeds back on itself and the panel creeps taller every frame. */
+/* The same well with nothing in it. Centered and quiet: it is holding the
+   model's space so the card does not resize the moment a vehicle appears,
+   not announcing anything. */
+.vehicle-view--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-space-1);
+  padding: var(--la-space-4);
+  text-align: center;
+}
+.vehicle-view__empty-title {
+  margin: 0;
+  color: var(--la-ink-2);
+  font-size: var(--la-size-lg);
+  font-weight: 600;
+}
+.vehicle-view__empty-hint {
+  margin: 0;
+  max-width: 40ch;
+  color: var(--la-ink-3);
+  font-size: var(--la-size-sm);
+}
+
 .vehicle-view canvas {
   position: absolute;
   inset: 0;
@@ -2745,13 +3192,27 @@
 }
 
 /* Angles float over the model's top-left corner, as in the reference. */
+/* The well and the angles that float over it. The readout is positioned
+   against this rather than against the card, so its inset is measured from
+   the edge it visually sits inside -- with a hardcoded top it was guessing
+   where the card title ended, and the guess had drifted 8px past the well's
+   own top border. */
+.model-well {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .attitude-readout {
   position: absolute;
-  top: 52px;
-  left: var(--la-space-5);
+  top: var(--la-space-4);
+  left: var(--la-space-4);
   z-index: 1;
   margin: 0;
-  padding: var(--la-space-2) var(--la-space-3);
+  /* The inset above does the spacing; the block has no ground of its own to
+     pad away from. */
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -3363,11 +3824,36 @@
   padding: var(--la-space-1) var(--la-space-2) 0;
   border-bottom: 1px solid var(--la-line);
   background: var(--la-surface-2);
+  /* Wraps once the tabs have stopped shrinking -- see the floor on the tab
+     itself. It was `overflow-x: auto`, which is wrong twice over: setting
+     one overflow axis away from `visible` forces the other to `auto`, and
+     the active tab's `margin-bottom: -1px` overflows vertically by exactly
+     that pixel -- so the strip drew a scrollbar to offer one pixel of
+     scrolling. Wrapping also beats scrolling on the merits here: a second
+     row costs height only when the pane is too narrow for one, where a
+     scroller hides tabs at every width. */
+  flex-wrap: wrap;
 }
+/* Equal shares of the strip, so the seven tabs read as one control rather
+   than as a left-packed list with a gap after it -- and so the active
+   underline is the same length wherever it is, instead of being as wide as
+   whichever word happens to be under it.
+
+   `flex: 1 1 0` rather than `flex: 1`: the labels differ by more than double
+   ("View" against "Preflight"), and a basis of auto would hand the long
+   ones more room and leave the strip uneven.
+
+   The floor is `max-content` rather than a measured number -- it is exactly
+   "as narrow as this word can be and still be read". Dragged to the
+   narrowest the divider allows, an even share is 30px and every label
+   clipped to three characters; below the floor the strip wraps instead and
+   the words survive. */
 .log-pane__tab {
+  flex: 1 1 0;
+  min-width: max-content;
   border: none;
   background: none;
-  padding: var(--la-space-2) var(--la-space-3);
+  padding: var(--la-space-2) var(--la-space-1);
   color: var(--la-ink-3);
   font: 600 var(--la-size-sm) / 1 var(--la-font);
   cursor: pointer;
@@ -3375,6 +3861,11 @@
      nav rail marks its active item. */
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
+  /* A pane narrow enough to crowd them truncates rather than wrapping the
+     strip onto a second line, which would move the content below it. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .log-pane__tab:hover {
   color: var(--la-ink);
@@ -3383,10 +3874,38 @@
   color: var(--la-ink);
   border-bottom-color: var(--la-orange);
 }
+/* A pane with nothing to show yet renders a bare placeholder, and a
+   placeholder is exactly the case nobody built a container for -- so it sat
+   against the pane's own edge while everything around it (the filter above
+   it, the preflight list that replaces it) was inset. */
+.log-pane > .app-placeholder,
+.status-list > .app-placeholder {
+  padding: var(--la-space-2) var(--la-space-3);
+}
+
+/* The log stops being a box here and becomes the pane. The system sheet
+   gives `.la-log` a border, a radius and the inset well tone, all of which
+   are right for a log sitting *on* a card and none of which are right when
+   it is the whole body -- the border and radius were already dropped, and
+   the fill was the one left, which made this the only tab with a different
+   background. */
 .log-pane .flight-log {
   border: none;
   border-radius: 0;
+  background: transparent;
   min-height: 0;
+  /* Matched to the placeholders beside it, so a message and an empty state
+     start at the same place whichever tab is showing. */
+  padding: var(--la-space-2) var(--la-space-3);
+}
+/* The empty state, in the app's placeholder voice rather than the log's.
+   Left alone it inherited the log's monospace at --la-size-xs, so the same
+   sentence looked like two different things one tab apart. */
+.log-pane .flight-log::placeholder {
+  font-family: var(--la-font);
+  font-size: var(--la-size-md);
+  color: var(--la-ink-2);
+  opacity: 1;
 }
 
 .status-list {
@@ -3837,19 +4356,35 @@ body.is-splitting .flight-map {
   gap: var(--la-space-2);
   padding: var(--la-space-3);
 }
-/* Matched to .la-btn--lg so the mode picker and Arm sit on one line rather
-   than stepping. */
+/* One height across the top row. The mode picker and Arm were 38px and the
+   three jumps 30px, which is a step small enough to read as a mistake
+   rather than as a hierarchy -- and the hierarchy is already carried by
+   color and width: Arm is the only orange thing on the screen and keeps
+   `--lg`'s wider padding, so raising the jumps to meet it costs nothing. */
+.flight-controls__primary .la-btn {
+  min-height: 38px;
+}
+
+/* Fixed, not `min-width`. At a minimum the picker grew for a longer mode
+   name, so switching from Loiter to Return to Launch shoved Arm and all
+   three jumps sideways -- the whole row moving because a word got longer. */
 .flight-controls__mode {
   height: 38px;
-  min-width: 150px;
+  width: 168px;
+  flex: none;
   font-weight: 600;
 }
 
+/* The gap between groups is what makes them groups.
+   It was 12px between fields against 8px inside one -- 1.5x, which reads as
+   slightly uneven rather than as grouping, so nine controls sat in a row
+   looking like nine controls. Six times the inner gap and the three groups
+   separate themselves, with no rule, border or heading drawn to do it. */
 .flight-controls__secondary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--la-space-2) var(--la-space-3);
+  gap: var(--la-space-2) var(--la-space-5);
   padding: var(--la-space-2) var(--la-space-3);
   background: var(--la-surface-2);
   border-top: 1px solid var(--la-line);
@@ -3866,8 +4401,23 @@ body.is-splitting .flight-map {
 .flight-controls__secondary .la-field__label {
   font-size: var(--la-size-xs);
 }
+/* Fixed for the same reason as the mode picker: the action names differ in
+   length, and Run should not move when the list changes. */
 .flight-controls__action {
-  max-width: 170px;
+  width: 170px;
+  flex: none;
+}
+
+/* The occasional command, at the far end. `margin-left: auto` rather than a
+   spacer element before it: a spacer holds the end of whatever line it
+   lands on, so once the strip wrapped -- and at this panel's width it does
+   -- the spacer sat at the end of the first line and the action list began
+   the second one at the left, which is the opposite of where it belongs. */
+.flight-controls__run {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  margin-left: auto;
 }
 
 .flight-controls__sep {
@@ -3879,60 +4429,31 @@ body.is-splitting .flight-map {
 .flight-controls__field {
   display: flex;
   align-items: center;
-  gap: var(--la-space-2);
+  /* Tight, so the group reads as one thing against the wide gap between
+     groups. Label, value and Set are one control in three parts. */
+  gap: var(--la-space-1);
 }
+/* Right-aligned and tabular, so 12 and 1200 share an edge and the three
+   fields read as one instrument rather than three boxes. The same figures
+   the vitals column and the inspector already use -- this was the one place
+   numbers are typed rather than read, and the only one still proportional. */
 .flight-controls__num {
   width: 62px;
+  text-align: right;
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pushed to the top row's right-hand end. Both rows now run frequent-left,
+   occasional-right, which draws a vertical edge down the bar that nothing
+   has to render -- and fills the one piece of always-visible space on this
+   screen with something worth reading. */
+.flight-controls__primary .flight-progress {
+  margin-left: auto;
 }
 .flight-controls__status {
   margin: 0;
   padding: 0 var(--la-space-3) var(--la-space-2);
-}
-
-/* View switches, behind a button so arranging the window does not carry the
-   same weight as flying the aircraft. */
-.layout-menu {
-  position: relative;
-}
-/* Positioned against the viewport by the component, not anchored to the
-   button: anchored above it, the panel went off the top of the window
-   whenever the controls sat at the top of the column -- which is what
-   happens with the HUD switched off. */
-.layout-menu__panel {
-  position: fixed;
-  z-index: 900;
-  width: 210px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-2);
-  padding: var(--la-space-3);
-  background: var(--la-surface);
-  border: 1px solid var(--la-line-strong);
-  border-radius: var(--la-radius);
-  box-shadow: var(--la-shadow-2);
-}
-.layout-menu__heading {
-  margin: 0;
-  font-size: var(--la-size-xs);
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--la-ink-3);
-}
-.layout-menu__heading + * {
-  margin-top: calc(var(--la-space-1) * -1);
-}
-/* Toggles pinned to the right edge. Left to sit after their labels they
-   land at a different x on every row, which reads as sloppy in a list and
-   makes the on/off state harder to scan down. */
-.layout-menu__panel .la-switch {
-  justify-content: space-between;
-}
-.layout-menu__actions {
-  display: flex;
-  gap: var(--la-space-2);
-  padding-top: var(--la-space-2);
-  border-top: 1px solid var(--la-line);
 }
 
 /* The log takes the rest of the stack under the panel, so it is what

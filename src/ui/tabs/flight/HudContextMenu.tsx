@@ -78,7 +78,7 @@ export default function HudContextMenu({ point, onClose, onVideo }: HudContextMe
             onVideo()
           }}
         >
-          HUD video…
+          HUD video
         </LaButton>
       </div>
     </div>

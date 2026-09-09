@@ -6,7 +6,7 @@ import PreferencesModal from './ui/shell/PreferencesModal'
 import SerialChooserModal from './ui/shell/SerialChooserModal'
 import PreviewNotice from './ui/shell/PreviewNotice'
 import UnsavedChangesModal from './ui/shell/UnsavedChangesModal'
-import { useUiStore } from './stores/ui-store'
+import { tabFills, useUiStore } from './stores/ui-store'
 import { useGuideStore } from './stores/guide-store'
 import GuideRunner from './ui/guides/GuideRunner'
 import OverviewTab from './ui/tabs/overview/OverviewTab'
@@ -27,6 +27,7 @@ import FilesTab from './ui/tabs/files/FilesTab'
 import InspectorTab from './ui/tabs/inspector/InspectorTab'
 import FlightTab from './ui/tabs/flight/FlightTab'
 import MissionTab from './ui/tabs/mission/MissionTab'
+import SimFieldPicker from './ui/shell/SimFieldPicker'
 
 function SetupContent() {
   const activeTab = useUiStore((s) => s.activeTab)
@@ -68,17 +69,21 @@ function SetupContent() {
 
 export default function App() {
   const mode = useUiStore((s) => s.mode)
+  const activeTab = useUiStore((s) => s.activeTab)
   const guideActive = useGuideStore((s) => s.activeGuide !== null)
   // A running guide replaces the rail as well as the content: it is a
   // sequence to follow, and half-leaving it mid-step loses the thread.
   const showRail = mode === 'setup' && !guideActive
+  // Fly and Mission always take the window; inside Setup, so do the tabs
+  // that lay out their own full height rather than tiling cards.
+  const flush = mode !== 'setup' || (!guideActive && tabFills(activeTab))
 
   return (
     <div className="la-app">
       <AppBar />
       <main className={showRail ? 'la-main app-main' : 'la-main app-main app-main--full'}>
         {showRail && <NavRail />}
-        <div className={mode === 'setup' ? 'app-content' : 'app-content app-content--flush'}>
+        <div className={flush ? 'app-content app-content--flush' : 'app-content'}>
           {mode === 'setup' && (guideActive ? <GuideRunner /> : <SetupContent />)}
           {mode === 'fly' && <FlightTab />}
           {mode === 'mission' && <MissionTab />}
@@ -86,6 +91,7 @@ export default function App() {
       </main>
       <ActionBar />
       <ConnectModal />
+      <SimFieldPicker />
       <PreferencesModal />
       <SerialChooserModal />
       <UnsavedChangesModal />

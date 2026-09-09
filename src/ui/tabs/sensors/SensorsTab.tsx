@@ -75,7 +75,7 @@ function AccelCard() {
     >
       <div className="la-row">
         <LaButton variant="secondary" onClick={() => setWizardOpen(true)}>
-          Calibrate accelerometer…
+          Calibrate accelerometer
         </LaButton>
         <LaButton variant="ghost" onClick={() => void levelHorizon()}>
           Set level horizon

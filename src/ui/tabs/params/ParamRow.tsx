@@ -103,7 +103,7 @@ export default memo(function ParamRow({ name }: { name: string }) {
           className="param-row__options"
           onClick={() => setBitmaskOpen(true)}
         >
-          Edit bits…
+          Edit bits
         </LaButton>
       ) : (
         <span className="param-row__options" />
@@ -219,9 +219,7 @@ function BitmaskEditor({
         <LaButton
           variant="ghost"
           size="sm"
-          onClick={() =>
-            setV(allOn ? 0 : bits.reduce((acc, [bit]) => acc | (1 << Number(bit)), 0))
-          }
+          onClick={() => setV(allOn ? 0 : bits.reduce((acc, [bit]) => acc | (1 << Number(bit)), 0))}
         >
           {allOn ? 'Clear all' : 'Set all'}
         </LaButton>

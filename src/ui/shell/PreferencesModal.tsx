@@ -2,8 +2,13 @@ import { LaButton, LaField, LaHint, LaModal, LaSelect } from '../components/La'
 import { useUiStore } from '../../stores/ui-store'
 import { usePreferencesStore } from '../../stores/preferences-store'
 import { useThemeStore, type ThemeChoice } from '../../stores/theme-store'
-import { DISTANCE_CHOICES, SPEED_CHOICES, verticalSpeedLabel } from '../../units'
-import type { DistanceUnit, SpeedUnit } from '../../units'
+import {
+  DISTANCE_CHOICES,
+  SPEED_CHOICES,
+  VERTICAL_SPEED_CHOICES,
+  verticalSpeedLabel,
+} from '../../units'
+import type { DistanceUnit, SpeedUnit, VerticalSpeedUnit } from '../../units'
 
 // Everything about the person rather than the aircraft.
 //
@@ -25,6 +30,7 @@ export default function PreferencesModal() {
   const units = usePreferencesStore((s) => s.units)
   const setDistanceUnit = usePreferencesStore((s) => s.setDistanceUnit)
   const setSpeedUnit = usePreferencesStore((s) => s.setSpeedUnit)
+  const setVerticalSpeedUnit = usePreferencesStore((s) => s.setVerticalSpeedUnit)
   const reset = usePreferencesStore((s) => s.reset)
   const themeChoice = useThemeStore((s) => s.choice)
   const setThemeChoice = useThemeStore((s) => s.setChoice)
@@ -72,14 +78,22 @@ export default function PreferencesModal() {
             ))}
           </LaSelect>
         </LaField>
-        {/* Climb rate has no control of its own: aviation reads it in feet
-            per minute wherever distance is in feet, whatever the airspeed
-            unit, so it follows the choice above. Saying so beats a third
-            dropdown nobody wants to think about. */}
-        <LaHint>
-          Climb rate follows distance, and reads in {verticalSpeedLabel(units.distance)}. The
-          vehicle is always commanded in SI — only what you read and type changes.
-        </LaHint>
+        <LaField label="Climb rate" htmlFor="pref-vspeed">
+          <LaSelect
+            id="pref-vspeed"
+            value={units.verticalSpeed}
+            onChange={(e) => setVerticalSpeedUnit(e.target.value as VerticalSpeedUnit)}
+          >
+            {VERTICAL_SPEED_CHOICES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {/* The default says what it currently resolves to, so
+                    "Follow distance" is not a thing to work out. */}
+                {c.id === 'follow' ? `${c.label} (${verticalSpeedLabel(units)})` : c.label}
+              </option>
+            ))}
+          </LaSelect>
+        </LaField>
+        <LaHint>Display units only — the vehicle is always commanded in SI</LaHint>
       </section>
 
       <section className="prefs__group">
@@ -97,10 +111,6 @@ export default function PreferencesModal() {
             ))}
           </LaSelect>
         </LaField>
-        <LaHint>
-          The sun and moon button in the app bar switches light and dark directly; this is where
-          &ldquo;match the system&rdquo; lives.
-        </LaHint>
       </section>
     </LaModal>
   )

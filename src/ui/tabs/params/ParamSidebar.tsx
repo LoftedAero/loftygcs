@@ -92,7 +92,7 @@ function CompareButton() {
         }}
       />
       <LaButton variant="secondary" size="block" onClick={() => fileRef.current?.click()}>
-        Compare with file…
+        Compare with file
       </LaButton>
       <ParamCompareModal
         open={state !== null}
@@ -171,18 +171,18 @@ function ImportButton() {
         }
       >
         <p className="app-placeholder">
-          Import stages <strong>every</strong> difference between the file and this vehicle,
-          without asking about any of them.
+          Import stages <strong>every</strong> difference between the file and this vehicle, without
+          asking about any of them.
         </p>
         <p className="app-placeholder">
-          A parameter set describes one particular aircraft. Accelerometer and compass
-          calibration, radio trims and tuning gains were all measured on the machine the file
-          came from — taking them wholesale onto a different airframe replaces good numbers with
-          numbers that were true somewhere else.
+          A parameter set describes one particular aircraft. Accelerometer and compass calibration,
+          radio trims and tuning gains were all measured on the machine the file came from — taking
+          them wholesale onto a different airframe replaces good numbers with numbers that were true
+          somewhere else.
         </p>
         <p className="app-placeholder">
-          If the file came from another aircraft, use <strong>Compare with file</strong> instead
-          and pick what you actually want.
+          If the file came from another aircraft, use <strong>Compare with file</strong> instead and
+          pick what you actually want.
         </p>
       </LaModal>
 
@@ -196,9 +196,8 @@ function ImportButton() {
         }
       >
         <p className="app-placeholder">
-          Staged {result?.applied ?? 0} change{result?.applied === 1 ? '' : 's'} from{' '}
-          {result?.file} — nothing has been written yet. Review them with Write params, or Revert
-          to drop them.
+          Staged {result?.applied ?? 0} change{result?.applied === 1 ? '' : 's'} from {result?.file}{' '}
+          — nothing has been written yet. Review them with Write params, or Revert to drop them.
         </p>
         {(result?.skipped ?? 0) > 0 && (
           <LaHint error>

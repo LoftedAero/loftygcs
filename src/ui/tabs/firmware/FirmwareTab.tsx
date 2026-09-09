@@ -64,8 +64,9 @@ function SourceCard() {
     () =>
       [
         ...new Set(
-          options?.filter((o) => o.vehicle === vehicle && o.channel === channel).map((o) => o.platform) ??
-            [],
+          options
+            ?.filter((o) => o.vehicle === vehicle && o.channel === channel)
+            .map((o) => o.platform) ?? [],
         ),
       ].sort(),
     [options, vehicle, channel],
@@ -179,7 +180,11 @@ function SourceCard() {
             ))}
           </datalist>
           <div className="la-row">
-            <LaButton variant="secondary" disabled={!selected || busy} onClick={() => void download()}>
+            <LaButton
+              variant="secondary"
+              disabled={!selected || busy}
+              onClick={() => void download()}
+            >
               {busy ? 'Downloading…' : 'Download firmware'}
             </LaButton>
             <LaButton
@@ -212,7 +217,7 @@ function SourceCard() {
           }}
         />
         <LaButton variant="ghost" onClick={() => fileRef.current?.click()}>
-          Open firmware file…
+          Open firmware file
         </LaButton>
       </div>
       {loadError && <LaHint error>{loadError}</LaHint>}
@@ -322,7 +327,9 @@ function SerialFlashCard() {
       </div>
       <LaHint>{hint}</LaHint>
       {firmware && firmware.kind !== 'apj' && (
-        <LaHint>Serial flashing takes an .apj — the loaded file is a hex image (use DFU below).</LaHint>
+        <LaHint>
+          Serial flashing takes an .apj — the loaded file is a hex image (use DFU below).
+        </LaHint>
       )}
       <FlashProgress />
       {confirmInfo && firmware?.kind === 'apj' && (
@@ -378,8 +385,8 @@ function DfuCard() {
       note="For blank or bricked boards: this talks to the STM32's built-in ROM loader over USB and flashes the with-bootloader image. On Windows the DFU device must have the WinUSB driver (install with Zadig)."
     >
       <p className="app-placeholder">
-        Hold the board's BOOT0 button (or bridge its DFU pads) while plugging in USB — it
-        enumerates as "STM32 BOOTLOADER". Load a with-bootloader .hex above, then flash.
+        Hold the board's BOOT0 button (or bridge its DFU pads) while plugging in USB — it enumerates
+        as "STM32 BOOTLOADER". Load a with-bootloader .hex above, then flash.
       </p>
       <div className="la-row">
         <LaButton
@@ -391,7 +398,9 @@ function DfuCard() {
         </LaButton>
       </div>
       {firmware && firmware.kind !== 'hex' && (
-        <LaHint>DFU takes a .hex image — the loaded file is an .apj (use the bootloader flash above).</LaHint>
+        <LaHint>
+          DFU takes a .hex image — the loaded file is an .apj (use the bootloader flash above).
+        </LaHint>
       )}
       {confirming && firmware?.kind === 'hex' && (
         <LaModal

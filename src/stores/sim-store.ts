@@ -25,14 +25,33 @@ interface SimState {
   waitingForRealFlight: boolean
   setWaitingForRealFlight: (waiting: boolean) => void
   appendLog: (chunk: string) => void
-  /** Where the next simulator boots, as typed. Empty means the default. */
-  homeText: string
+  /**
+   * Where the next simulator boots, one remembered place per physics.
+   *
+   * Two slots rather than one because the two simulators fly different
+   * ground: a home chosen for RealFlight belongs to RealFlight's scenery
+   * and means nothing to SITL's own model, and vice versa. Sharing one
+   * value made choosing a field for one silently move the other, so
+   * switching physics quietly relocated the aircraft.
+   *
+   * An empty slot means "that physics' default" -- CMAC or Eli Field -- so
+   * the defaults stay defaults and are never written in as if chosen.
+   */
+  homes: Record<HomeSlot, string>
+  /** Writes the slot the current physics uses. */
   setHomeText: (text: string) => void
 
-  /** Saved flying fields, name -> the home text that puts you there. */
-  fields: Record<string, string>
-  saveField: (name: string) => void
-  deleteField: (name: string) => void
+  /**
+   * Where the next file dialog opens.
+   *
+   * One folder for both pickers rather than one each, because they are the
+   * same folder in practice: an aircraft ships as an executable beside its
+   * `<model>/eeprom.bin`, so picking the build is what tells the app where
+   * the parameters live. Remembered, because the second session at the same
+   * aircraft should not start at the top of the disk again.
+   */
+  browseDir: string
+  setBrowseDir: (dir: string) => void
 
   /**
    * How the next simulator is launched.
@@ -51,41 +70,26 @@ interface SimState {
 }
 
 const LOG_CAP = 200
+// One home, remembered, rather than a named collection of them.
+//
+// Fields could be saved by name and picked back from a dropdown. That was
+// built when home was four numbers someone had typed and would not want to
+// type again; picking it off a map takes a few seconds, so the library was
+// carrying more than it earned -- a select, a text box, a save and a forget,
+// for a value most people set once. The heading is still the point of it:
+// with FlightAxis, ArduPilot sets its origin to home and maps RealFlight's
+// local coordinates around it, so home decides both where the field sits on
+// Earth and which way its runway points.
 const HOME_KEY = 'loftgcs.sim.home'
-const FIELDS_KEY = 'loftgcs.sim.fields'
-
-/**
- * Somewhere a simulator boots, saved by name.
- *
- * The heading is the point, not a detail. With FlightAxis, ArduPilot sets
- * its origin to home and maps RealFlight's local coordinates around it, so
- * home decides both where the field sits on Earth and which way its runway
- * points. Get the heading wrong and every mission is rotated relative to
- * the scenery, which is exactly the mismatch this exists to remove.
- *
- * These are the user's own measurements. RealFlight has no geodetic
- * reference for its fields -- its content archives carry no latitude or
- * longitude at all -- so nothing here can be shipped pre-filled without
- * inventing it.
- */
-function loadFields(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(FIELDS_KEY)
-    const parsed: unknown = raw ? JSON.parse(raw) : null
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveFields(fields: Record<string, string>): void {
-  try {
-    localStorage.setItem(FIELDS_KEY, JSON.stringify(fields))
-  } catch {
-    // Not remembering a field is a nuisance, never a failure.
-  }
-}
 const RIG_KEY = 'loftgcs.sim.rig'
+const BROWSE_KEY = 'loftgcs.sim.browseDir'
+
+/** Which remembered home a physics choice uses. */
+export type HomeSlot = 'builtin' | 'flightaxis'
+
+export function homeSlot(physicsKind: string): HomeSlot {
+  return physicsKind === 'flightaxis' ? 'flightaxis' : 'builtin'
+}
 
 interface Rig {
   build: SimBuildChoice | null
@@ -125,18 +129,57 @@ function saveRig(rig: Rig): void {
   }
 }
 
+const NO_HOMES: Record<HomeSlot, string> = { builtin: '', flightaxis: '' }
+
 /**
- * The home text is remembered rather than the parsed location: what the
- * user typed is what they want to see when they come back, including the
- * altitude they left off.
+ * The homes are remembered as text rather than parsed: the string is what
+ * was chosen, altitude and heading included, and it survives a build that
+ * parses differently.
+ *
+ * Older builds stored a bare string here, for the one home there was. It is
+ * migrated into the slot for whichever physics was selected at the time,
+ * which the rig records -- assuming `builtin` would silently move a
+ * RealFlight user's field onto ground it was not measured against.
  */
-function loadHome(): string {
+function loadHomes(): Record<HomeSlot, string> {
   try {
-    return localStorage.getItem(HOME_KEY) ?? ''
+    const raw = localStorage.getItem(HOME_KEY)
+    if (!raw) return NO_HOMES
+    if (raw.startsWith('{')) {
+      const parsed = JSON.parse(raw) as Partial<Record<HomeSlot, string>>
+      return {
+        builtin: typeof parsed.builtin === 'string' ? parsed.builtin : '',
+        flightaxis: typeof parsed.flightaxis === 'string' ? parsed.flightaxis : '',
+      }
+    }
+    return { ...NO_HOMES, [homeSlot(loadRig().physics.kind)]: raw }
   } catch {
-    return ''
+    return NO_HOMES
   }
 }
+
+function saveHomes(homes: Record<HomeSlot, string>): void {
+  try {
+    localStorage.setItem(HOME_KEY, JSON.stringify(homes))
+  } catch {
+    // Not remembering the field is a nuisance, never a failure.
+  }
+}
+
+/**
+ * The home in force, given what is selected.
+ *
+ * A function rather than a field, so there is one source of truth: a stored
+ * `homeText` kept alongside `homes` would be a second copy to forget to
+ * update the moment physics changed, which is exactly the bug the slots
+ * exist to fix.
+ */
+export function currentHomeText(s: Pick<SimState, 'homes' | 'physics'>): string {
+  return s.homes[homeSlot(s.physics.kind)]
+}
+
+/** The same, as a hook -- a string, so it re-renders only when it changes. */
+export const useHomeText = (): string => useSimStore(currentHomeText)
 
 export const useSimStore = create<SimState>((set, get) => ({
   status: null,
@@ -168,27 +211,28 @@ export const useSimStore = create<SimState>((set, get) => ({
     saveRig({ build: get().build, physics: get().physics, params })
   },
 
-  fields: loadFields(),
-  saveField: (name) => {
-    const fields = { ...get().fields, [name.trim()]: get().homeText.trim() }
-    set({ fields })
-    saveFields(fields)
-  },
-  deleteField: (name) => {
-    const fields = { ...get().fields }
-    delete fields[name]
-    set({ fields })
-    saveFields(fields)
+  browseDir: (() => {
+    try {
+      return localStorage.getItem(BROWSE_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })(),
+  setBrowseDir: (browseDir) => {
+    set({ browseDir })
+    try {
+      localStorage.setItem(BROWSE_KEY, browseDir)
+    } catch {
+      // Starting the next dialog at the top of the disk is a nuisance,
+      // never a failure.
+    }
   },
 
-  homeText: loadHome(),
-  setHomeText: (homeText) => {
-    set({ homeText })
-    try {
-      localStorage.setItem(HOME_KEY, homeText)
-    } catch {
-      // Not remembering the field is a nuisance, never a failure.
-    }
+  homes: loadHomes(),
+  setHomeText: (text) => {
+    const homes = { ...get().homes, [homeSlot(get().physics.kind)]: text }
+    set({ homes })
+    saveHomes(homes)
   },
   appendLog: (chunk) =>
     set((s) => ({

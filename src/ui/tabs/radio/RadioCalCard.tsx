@@ -40,7 +40,7 @@ export default function RadioCalCard() {
             disabled={channels.length === 0 || !paramsReady}
             onClick={() => setWizardOpen(true)}
           >
-            Calibrate radio…
+            Calibrate radio
           </LaButton>
         </div>
         {channels.length > 0 && !paramsReady && <LaHint>Waiting for parameters…</LaHint>}

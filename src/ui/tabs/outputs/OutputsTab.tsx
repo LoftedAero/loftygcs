@@ -162,7 +162,7 @@ function MotorTestCard() {
       {!interlocked ? (
         <div className="la-row">
           <LaButton variant="secondary" onClick={() => setConfirming(true)}>
-            Enable motor test…
+            Enable motor test
           </LaButton>
         </div>
       ) : (
@@ -187,7 +187,9 @@ function MotorTestCard() {
               max={10}
               step={0.5}
               value={duration}
-              onChange={(e) => setDuration(Math.min(10, Math.max(0.5, Number(e.target.value) || 2)))}
+              onChange={(e) =>
+                setDuration(Math.min(10, Math.max(0.5, Number(e.target.value) || 2)))
+              }
             />
           </LaField>
           <div className="la-row la-row--wrap">

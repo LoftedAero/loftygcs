@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { LaCard } from './La'
 import ParamField from './ParamField'
+import SetupBand from './SetupBand'
+import { useInDoc } from './SetupDoc'
 import { useParamStore } from '../../stores/param-store'
 
 // A card built from a list of parameters. Fields the connected vehicle does
@@ -29,8 +31,39 @@ export default function ParamCard({
   className?: string
 }) {
   const entries = useParamStore((s) => s.entries)
+  const inDoc = useInDoc()
   const present = fields.filter((f) => entries.has(f.param))
   if (present.length === 0 && !children) return null
+
+  const controls = (
+    <>
+      {present.map((f) => (
+        <ParamField
+          key={f.param}
+          param={f.param}
+          label={f.label}
+          {...(f.unit ? { unit: f.unit } : {})}
+        />
+      ))}
+      {children}
+    </>
+  )
+
+  // Inside a document the same declaration becomes a band: the fields flow
+  // across the width instead of down a column, so nothing about the tab
+  // changes except the shape it is poured into.
+  if (inDoc) {
+    return (
+      <SetupBand
+        title={title}
+        {...(subtitle !== undefined ? { tag: subtitle } : {})}
+        {...(note !== undefined ? { note } : {})}
+      >
+        <div className="app-band__fields">{controls}</div>
+      </SetupBand>
+    )
+  }
+
   return (
     <LaCard
       title={title}
@@ -38,10 +71,7 @@ export default function ParamCard({
       {...(note !== undefined ? { note } : {})}
       {...(className !== undefined ? { className } : {})}
     >
-      {present.map((f) => (
-        <ParamField key={f.param} param={f.param} label={f.label} {...(f.unit ? { unit: f.unit } : {})} />
-      ))}
-      {children}
+      {controls}
     </LaCard>
   )
 }

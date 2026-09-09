@@ -2,7 +2,11 @@
 // documented MAVLink action and returns the vehicle's verdict.
 import { connectionService } from './connection'
 import { useVehicleStore } from '../stores/vehicle-store'
+import { useParamStore } from '../stores/param-store'
 import { modeNumberByName, vehicleClass } from '../protocol/modes'
+
+/** MAV_RESULT_UNSUPPORTED: this vehicle has no handler for the request. */
+const MAV_RESULT_UNSUPPORTED = 3
 
 const MAV_CMD_DO_SET_MODE = 176
 const MAV_CMD_COMPONENT_ARM_DISARM = 400
@@ -85,13 +89,62 @@ export function disarm(force = false): Promise<number> {
  * the mode change behind the button, so this does too: ask for Guided,
  * confirm it from the heartbeat, then command the climb.
  *
- * Plane is left alone -- its takeoff is a mission item and its Guided is a
- * different thing entirely.
+ * Three airframes, two routes, all of it measured against SITL rather than
+ * inferred -- and the ack alone is not enough to tell them apart, because a
+ * quadplane accepts *both* and flies them very differently:
+ *
+ *   copter      Guided + NAV_TAKEOFF   climbs to the altitude asked for
+ *   quadplane   Guided + NAV_TAKEOFF   ACCEPTED; 20 m up, 3 m of ground
+ *                                      track -- a vertical takeoff
+ *               mode TAKEOFF           also accepted, but 277 m of ground
+ *                                      track: a runway takeoff run, which
+ *                                      is not what a VTOL aircraft is for
+ *   fixed wing  NAV_TAKEOFF            FAILED, even armed and in Guided
+ *               mode TAKEOFF           climbs away down the runway
+ *
+ * NAV_VTOL_TAKEOFF is UNSUPPORTED on both plane types -- a mission item
+ * with no runtime handler -- so there is no third command to reach for.
+ *
+ * The split therefore needs `Q_ENABLE`, because **MAV_TYPE cannot tell a
+ * quadplane from a fixed wing**: both report FIXED_WING(1).
  */
+export type TakeoffStyle = 'guided' | 'mode' | 'unsupported'
+
+/**
+ * How this airframe leaves the ground.
+ *
+ * Pure and exported so the button and the command agree by construction --
+ * a screen that decides this separately is a screen that can label one
+ * thing and do another.
+ *
+ * `Q_ENABLE` absent means the parameters have not arrived yet, and the two
+ * wrong answers are not equally wrong: guessing fixed wing on a quadplane
+ * starts a 277 m runway run in a VTOL aircraft, while guessing quadplane on
+ * a fixed wing gets FAILED back and nothing happens. So an unknown takes
+ * the route that fails harmlessly.
+ */
+export function takeoffStyle(vehicleType: number, qEnable: number | undefined): TakeoffStyle {
+  const cls = vehicleClass(vehicleType)
+  if (cls === 'copter') return 'guided'
+  if (cls !== 'plane') return 'unsupported'
+  return qEnable === undefined || qEnable > 0 ? 'guided' : 'mode'
+}
+
 export async function takeoff(altitudeM: number, guidedWaitMs = GUIDED_WAIT_MS): Promise<number> {
   const v = useVehicleStore.getState()
+  const style = takeoffStyle(v.vehicleType, useParamStore.getState().entries.get('Q_ENABLE')?.value)
+
+  if (style === 'unsupported') return MAV_RESULT_UNSUPPORTED
+  if (style === 'mode') {
+    // A fixed wing. The altitude is the vehicle's own TKOFF_ALT; ours is
+    // not offered, because ArduPlane's takeoff sequence owns it.
+    const takeoffMode = modeNumberByName(v.vehicleType, 'Takeoff')
+    if (takeoffMode === undefined) return MAV_RESULT_UNSUPPORTED
+    return setModeConfirmed(takeoffMode)
+  }
+
   const guided = modeNumberByName(v.vehicleType, 'Guided')
-  if (guided !== undefined && v.customMode !== guided && vehicleClass(v.vehicleType) === 'copter') {
+  if (guided !== undefined && v.customMode !== guided) {
     // Retried, not asked once: "requires position" is the refusal a vehicle
     // gives while its EKF is still settling, and it clears within a couple
     // of seconds. One attempt lands on it often enough that a single press
@@ -148,11 +201,7 @@ export function clearRoi(): Promise<number> {
  * be worse than no number at all.
  */
 export function setHome(latDeg: number, lonDeg: number): Promise<number> {
-  return connectionService.runCommand(
-    MAV_CMD_DO_SET_HOME,
-    [0, 0, 0, 0, latDeg, lonDeg, 0],
-    5000,
-  )
+  return connectionService.runCommand(MAV_CMD_DO_SET_HOME, [0, 0, 0, 0, latDeg, lonDeg, 0], 5000)
 }
 
 /**
@@ -177,11 +226,7 @@ export function setCurrentMissionItem(seq: number): Promise<number> {
 /** Fire the camera shutter now. */
 export function triggerCamera(): Promise<number> {
   // param5 = 1 is "shoot", the rest of DIGICAM_CONTROL's fields are unused.
-  return connectionService.runCommand(
-    MAV_CMD_DO_DIGICAM_CONTROL,
-    [0, 0, 0, 0, 1, 0, 0],
-    5000,
-  )
+  return connectionService.runCommand(MAV_CMD_DO_DIGICAM_CONTROL, [0, 0, 0, 0, 1, 0, 0], 5000)
 }
 
 /** The preflight calibration ArduPilot runs on the ground (barometer etc.). */
@@ -189,11 +234,7 @@ export function preflightCalibration(): Promise<number> {
   // param3 = 1 is the ground-pressure/airspeed calibration; the gyro and
   // accel entries are deliberately left off, since those have their own
   // guided flows on the Sensors tab.
-  return connectionService.runCommand(
-    MAV_CMD_PREFLIGHT_CALIBRATION,
-    [0, 0, 1, 0, 0, 0, 0],
-    10000,
-  )
+  return connectionService.runCommand(MAV_CMD_PREFLIGHT_CALIBRATION, [0, 0, 1, 0, 0, 0, 0], 10000)
 }
 
 /** Stop and restart onboard Lua scripting. */

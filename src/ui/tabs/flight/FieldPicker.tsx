@@ -66,7 +66,7 @@ export default function FieldPicker({ open, selected, onToggle, onClose }: Field
         ref={inputRef}
         className="la-input field-picker__filter"
         type="search"
-        placeholder={`Filter ${names.length} fields…`}
+        placeholder={`Filter ${names.length} fields`}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         aria-label="Filter fields"

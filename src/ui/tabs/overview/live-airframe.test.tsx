@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { useVehicleStore } from '../../../stores/vehicle-store'
+import { useConnectionStore } from '../../../stores/connection-store'
 
 // The live half of the airframe easter egg: a boot banner has to reach the
 // model the Overview draws. The store latch and the frame matcher have
@@ -24,12 +25,18 @@ vi.mock('../../components/VehicleView', () => ({
 beforeEach(() => {
   seen.length = 0
   useVehicleStore.getState().reset()
+  // The panel draws no model at all without a vehicle, so every case about
+  // *which* model it draws needs one connected first.
+  useConnectionStore.setState({ phase: 'connected' })
   // The panel's instruments draw to canvases jsdom does not implement; the
   // noise is not the subject here.
   HTMLCanvasElement.prototype.getContext = (() =>
     null) as unknown as HTMLCanvasElement['getContext']
 })
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  useConnectionStore.setState({ phase: 'idle' })
+})
 
 const boot = (text: string) =>
   act(() => useVehicleStore.getState().appendStatusText({ severity: 6, text, at: 0 }))
@@ -62,6 +69,19 @@ describe('the Overview airframe', () => {
     render(<LiveVehiclePanel />)
     // CC-BY requires the credit to travel with the model. It must not
     // travel with a model it does not cover.
+    expect(creditHidden()).toBe(true)
+  })
+
+  it('draws no model, and no credit, with nothing connected', async () => {
+    const { default: LiveVehiclePanel } = await import('./LiveVehiclePanel')
+    useConnectionStore.setState({ phase: 'idle' })
+    render(<LiveVehiclePanel />)
+    // The well stays so the card does not resize on connect, but nothing is
+    // in it: an unidentified vehicle falls back to the fixed wing, so a
+    // model here would announce an aeroplane nobody has connected.
+    expect(screen.queryByTestId('vehicle-view')).toBeNull()
+    // And the CC-BY credit is owed for showing the biplane, so it must not
+    // be on screen when the biplane is not.
     expect(creditHidden()).toBe(true)
   })
 

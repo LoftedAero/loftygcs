@@ -68,21 +68,33 @@ describe('speed', () => {
 })
 
 describe('vertical speed', () => {
-  it('reads feet per minute wherever distance is in feet', () => {
+  const prefs = (distance: 'm' | 'ft', verticalSpeed: 'follow' | 'ms' | 'fpm' = 'follow') =>
+    ({ distance, speed: 'ms', verticalSpeed }) as const
+
+  it('follows distance by default, which is the aviation convention', () => {
     // A pilot flying in knots still calls a climb "500 feet a minute", so
-    // this follows the distance unit rather than the speed unit.
-    expect(toVerticalSpeed(2.54, 'ft')).toBeCloseTo(500, 6)
-    expect(verticalSpeedLabel('ft')).toBe('ft/min')
+    // the default follows the distance unit rather than the speed unit.
+    expect(toVerticalSpeed(2.54, prefs('ft'))).toBeCloseTo(500, 6)
+    expect(verticalSpeedLabel(prefs('ft'))).toBe('ft/min')
   })
 
   it('stays meters per second in metric', () => {
-    expect(toVerticalSpeed(2.5, 'm')).toBe(2.5)
-    expect(verticalSpeedLabel('m')).toBe('m/s')
+    expect(toVerticalSpeed(2.5, prefs('m'))).toBe(2.5)
+    expect(verticalSpeedLabel(prefs('m'))).toBe('m/s')
+  })
+
+  it('lets an explicit choice override the convention, both ways', () => {
+    // The reason the control exists: feet on the altitude tape does not
+    // oblige anyone to read climb in feet per minute, or the reverse.
+    expect(verticalSpeedLabel(prefs('ft', 'ms'))).toBe('m/s')
+    expect(toVerticalSpeed(2.5, prefs('ft', 'ms'))).toBe(2.5)
+    expect(verticalSpeedLabel(prefs('m', 'fpm'))).toBe('ft/min')
+    expect(toVerticalSpeed(2.54, prefs('m', 'fpm'))).toBeCloseTo(500, 6)
   })
 
   it('keeps the sign of a descent', () => {
-    expect(toVerticalSpeed(-2.54, 'ft')).toBeCloseTo(-500, 6)
-    expect(formatVerticalSpeed(-2.54, 'ft')).toBe('-500')
+    expect(toVerticalSpeed(-2.54, prefs('ft'))).toBeCloseTo(-500, 6)
+    expect(formatVerticalSpeed(-2.54, prefs('ft'))).toBe('-500')
   })
 })
 

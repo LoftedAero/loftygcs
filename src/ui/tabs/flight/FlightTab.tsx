@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useVehicleStore } from '../../../stores/vehicle-store'
+import { useConnectionStore } from '../../../stores/connection-store'
 import {
   LOG_PANES,
   useFlightLayoutStore,
@@ -18,7 +19,8 @@ import StatusList from './StatusList'
 import PreflightPanel from './PreflightPanel'
 import CameraPanel from './CameraPanel'
 import JoystickPanel from './JoystickPanel'
-import VideoSourceModal from './VideoSourceModal'
+import VideoPane from './VideoPane'
+import ViewPane from './ViewPane'
 
 // The flight screen, arranged as Mission Planner arranges it: one panel
 // pinned left at a fixed aspect ratio, the controls and messages filling the
@@ -35,9 +37,28 @@ export default function FlightTab() {
   const [target, setTarget] = useState<{ lat: number; lon: number } | null>(null)
   const [home, setHomePin] = useState<{ lat: number; lon: number } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [videoOpen, setVideoOpen] = useState(false)
+
   const gridRef = useRef<HTMLDivElement>(null)
   const layout = useFlightLayoutStore()
+
+  // The HUD's right-click shortcut to the video settings. It has to open the
+  // pane as well as select it: with the lower pane switched off, changing
+  // which tab is active would have done nothing anyone could see.
+  const showVideoPane = () => {
+    layout.setLogPane('video')
+    if (!layout.showMessages) layout.toggle('showMessages')
+  }
+
+  // Pins belong to the vehicle that was sent them: a guided target is where
+  // *that* aircraft was told to go, and a home pin is where it said its
+  // home was. Both are meaningless once it is gone, and leaving them up
+  // reads as instructions still standing.
+  const linked = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
+  useEffect(() => {
+    if (linked) return
+    setTarget(null)
+    setHomePin(null)
+  }, [linked])
 
   // Drawn with or without a vehicle. It used to be a card saying what the
   // screen would have shown, which meant the app opened on a description of
@@ -89,7 +110,7 @@ export default function FlightTab() {
       {/* Always present: it carries the controls even when the panel above
           them is switched off. */}
       <div className="flight-grid__below">
-        <FlightControls onVideo={() => setVideoOpen(true)} />
+        <FlightControls />
         {layout.showMessages && (
           <LogPane
             pane={layout.logPane}
@@ -118,13 +139,6 @@ export default function FlightTab() {
     <div className="flight-screen">
       <div className="flight-panels">{grid}</div>
 
-      <VideoSourceModal
-        open={videoOpen}
-        url={layout.videoUrl}
-        onUrl={layout.setVideoUrl}
-        onClose={() => setVideoOpen(false)}
-      />
-
       <FieldPicker
         open={pickerOpen}
         selected={layout.plotFields}
@@ -133,11 +147,7 @@ export default function FlightTab() {
       />
 
       {hudMenu && (
-        <HudContextMenu
-          point={hudMenu}
-          onClose={() => setHudMenu(null)}
-          onVideo={() => setVideoOpen(true)}
-        />
+        <HudContextMenu point={hudMenu} onClose={() => setHudMenu(null)} onVideo={showVideoPane} />
       )}
 
       {menu && (
@@ -208,6 +218,8 @@ function LogPane({
       {pane === 'preflight' && <PreflightPanel />}
       {pane === 'camera' && <CameraPanel />}
       {pane === 'joystick' && <JoystickPanel />}
+      {pane === 'video' && <VideoPane />}
+      {pane === 'view' && <ViewPane />}
     </div>
   )
 }
@@ -220,11 +232,15 @@ function FlightMessages() {
     if (el) el.scrollTop = el.scrollHeight
   }, [statusTexts])
   return (
+    // The placeholder gives this the same empty state the Status pane has.
+    // A vehicle that has said nothing yet and no vehicle at all otherwise
+    // look identical here -- an empty box, which reads as a fault.
     <textarea
       ref={logRef}
       className="la-log flight-log"
       readOnly
       aria-label="Status messages"
+      placeholder="Waiting for telemetry…"
       value={statusTexts.map((s) => s.text).join('\n')}
     />
   )

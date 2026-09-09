@@ -35,7 +35,10 @@ export default function PreflightPanel() {
   }, [])
 
   if (!connected) {
-    return <p className="app-placeholder">Connect a vehicle to see its preflight state.</p>
+    // The same words the Messages and Status panes use, because it is the
+    // same state: nothing has arrived yet. Three panes describing one
+    // situation three ways made the tab strip read as three failures.
+    return <p className="app-placeholder">Waiting for telemetry…</p>
   }
 
   const readiness = armReadiness(armed, present, health, SENSOR_BITS.prearm)
@@ -67,12 +70,13 @@ export default function PreflightPanel() {
         </ul>
       ) : readiness === 'notReady' ? (
         // The bit says no and the vehicle has not said why -- which happens
-        // when the GCS connected after the messages were sent. Say that,
-        // rather than showing an empty list that looks like nothing is wrong.
-        <p className="preflight__note">
-          The vehicle reports a failing check but has not said which. It repeats the reason about
-          every thirty seconds; it should appear shortly.
-        </p>
+        // when the GCS connected after the messages went past. Say that,
+        // rather than showing an empty list that looks like nothing is
+        // wrong. ArduPilot repeats the reason roughly every thirty seconds,
+        // so the wait is short; that is the sort of thing a note is tempted
+        // to explain and should not -- the three notes around it are one
+        // short sentence each, and a paragraph here read as an error.
+        <p className="preflight__note">The vehicle reports an unspecified failing check.</p>
       ) : (
         <p className="preflight__note">
           {readiness === 'armed'

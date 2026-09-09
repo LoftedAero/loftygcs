@@ -15,7 +15,13 @@ describe('app shell', () => {
     for (const tab of TABS) {
       expect(screen.getByRole('button', { name: tab.label })).toBeTruthy()
     }
-    expect(screen.getByText('Ground control for ArduPilot')).toBeTruthy()
+    // Overview draws its readouts with no vehicle, the way Fly does -- it
+    // used to be a card describing the app, which is what this line used to
+    // assert. Pinned on the readouts rather than on any one label: the
+    // property is that the screen renders itself instead of describing
+    // itself.
+    expect(screen.getByRole('heading', { name: 'GPS' })).toBeTruthy()
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
     // Found through TABS rather than by a hardcoded label: this broke on a
     // rename that had nothing to do with what it is testing, which is that
     // clicking a rail item mounts its screen.

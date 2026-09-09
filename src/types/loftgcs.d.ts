@@ -21,7 +21,7 @@ export interface LinkOpenOptions {
  * optional except the vehicle: the defaults are the managed build, its own
  * physics, and a wipe -- what someone gets who just presses Start.
  */
-export type SimPhysics = { kind: 'builtin' } | { kind: 'flightaxis'; host?: string }
+export type SimPhysics = { kind: 'builtin' } | { kind: 'flightaxis' }
 
 export type SimParams =
   | { kind: 'keep' }
@@ -87,8 +87,9 @@ export interface LoftGcsBridge {
     start(launch: SimLaunch): Promise<{ port: number; waitingForRealFlight: boolean }>
     stop(): Promise<void>
     /** Native file pickers: SITL needs a path, not a file's contents. */
-    pickBuild(): Promise<SimBuildChoice | null>
-    pickParams(): Promise<string | null>
+    /** `startIn` is a folder to open the dialog at; ignored if it is gone. */
+    pickBuild(startIn?: string): Promise<SimBuildChoice | null>
+    pickParams(startIn?: string): Promise<string | null>
     onProgress(cb: (p: { file: string; done: number; total: number }) => void): () => void
     onLog(cb: (line: string) => void): () => void
     onExit(cb: () => void): () => void
@@ -130,6 +131,9 @@ declare global {
     vendorId?: string
     productId?: string
     serialNumber?: string
+    /** Windows only. Carries the USB interface, which is what separates a
+        board's MAVLink port from its SLCAN one. */
+    deviceInstanceId?: string
   }
 
   interface Window {

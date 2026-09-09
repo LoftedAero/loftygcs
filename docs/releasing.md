@@ -19,6 +19,10 @@ on a laptop.
    `build/icon.png`. A missing or stale icon does not fail a build —
    electron-builder quietly substitutes Electron's default.
 4. `npm test && npm run lint && npm run typecheck`.
+5. Walk `docs/screen-review.md`. Every screen is looked at **connected and
+   disconnected** — they are two different screens, and the disconnected one
+   is the one a new tester sees first. Ticks are per screen and survive
+   between releases; re-approve anything that changed since its last one.
 
 ## 1. The web app
 

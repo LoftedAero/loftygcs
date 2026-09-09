@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useVehicleStore } from '../stores/vehicle-store'
+import { useParamStore } from '../stores/param-store'
 
 // The commands the connection would have sent, and the answers it gives back.
 const sent: { command: number; params: number[] }[] = []
@@ -26,6 +27,12 @@ const DO_SET_MODE = 176
 const NAV_TAKEOFF = 22
 const ARM = 400
 const COPTER = 2
+/** ArduPlane's Takeoff mode, and its Guided. */
+const PLANE_TAKEOFF = 13
+const PLANE_GUIDED = 15
+
+/** A parameter entry, for the one value that separates the two planes. */
+const qParam = (value: number) => ({ name: 'Q_ENABLE', value, mavType: 2, dirty: false }) as never
 const GUIDED = 4
 const STABILIZE = 0
 
@@ -102,9 +109,54 @@ describe('takeoff', () => {
     expect(sent.map((s) => s.command)).toEqual([NAV_TAKEOFF])
   })
 
-  it('leaves a Plane alone -- its takeoff is a mission item', async () => {
+  it('takes a quadplane off the copter way, which is the vertical one', async () => {
+    // Measured against SITL: Guided + NAV_TAKEOFF gives 20 m of climb and
+    // 3 m of ground track, where mode TAKEOFF gives 51 m and 277 m -- a
+    // runway takeoff run, which is not what a VTOL aircraft is for. Both
+    // are ACCEPTED, so the ack alone cannot tell them apart.
+    useParamStore.setState({ entries: new Map([['Q_ENABLE', qParam(1)]]) })
+    useVehicleStore.setState({ vehicleType: 1, customMode: 5, armed: true })
+    setTimeout(() => useVehicleStore.setState({ customMode: PLANE_GUIDED }), 30)
+    await expect(takeoff(20)).resolves.toBe(0)
+    expect(sent.map((s) => s.command)).toEqual([DO_SET_MODE, NAV_TAKEOFF])
+    expect(sent[0]?.params[1]).toBe(PLANE_GUIDED)
+    // And it climbs to the altitude asked for, not to TKOFF_ALT.
+    expect(sent[1]?.params[6]).toBe(20)
+  })
+
+  it('falls to the harmless route when Q_ENABLE has not arrived', async () => {
+    // Parameters download after the link comes up, so there is a window
+    // where the airframe is unknown. Guessing fixed wing on a quadplane
+    // starts a runway run in a VTOL aircraft; guessing quadplane on a fixed
+    // wing gets FAILED back and nothing happens. Only one of those is safe
+    // to be wrong about.
+    useParamStore.setState({ entries: new Map() })
+    useVehicleStore.setState({ vehicleType: 1, customMode: 5, armed: true })
+    setTimeout(() => useVehicleStore.setState({ customMode: PLANE_GUIDED }), 30)
+    await takeoff(20)
+    expect(sent.map((s) => s.command)).toEqual([DO_SET_MODE, NAV_TAKEOFF])
+  })
+
+  it('takes a plane off by mode, because the command does not work there', async () => {
+    // Measured against SITL, armed and in Guided: a fixed wing answers
+    // NAV_TAKEOFF with FAILED, and NAV_VTOL_TAKEOFF is UNSUPPORTED on both
+    // plane types -- it is a mission item with no runtime handler. Mode
+    // TAKEOFF is accepted by both and actually leaves the ground. So the
+    // button sends a mode change and no command at all.
+    useParamStore.setState({ entries: new Map([['Q_ENABLE', qParam(0)]]) })
     useVehicleStore.setState({ vehicleType: 1, customMode: 0 })
-    await takeoff(30)
-    expect(sent.map((s) => s.command)).toEqual([NAV_TAKEOFF])
+    setTimeout(() => useVehicleStore.setState({ customMode: PLANE_TAKEOFF }), 30)
+    await expect(takeoff(30)).resolves.toBe(0)
+    expect(sent.map((s) => s.command)).toEqual([DO_SET_MODE])
+    expect(sent[0]?.params[1]).toBe(PLANE_TAKEOFF)
+    expect(sent.some((s) => s.command === NAV_TAKEOFF)).toBe(false)
+  })
+
+  it('refuses on a vehicle with no takeoff at all', async () => {
+    // A rover. Better to say unsupported than to send a climb command to
+    // something that drives.
+    useVehicleStore.setState({ vehicleType: 10, customMode: 0 })
+    await expect(takeoff(30)).resolves.toBe(3)
+    expect(sent).toEqual([])
   })
 })
