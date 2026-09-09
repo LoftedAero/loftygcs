@@ -93,6 +93,89 @@ design decisions are recorded there and in code comments.
   it when a review produces a preference that will apply again, and leave anything that applies
   to one screen only in a comment there. `docs/screen-review.md` is the per-screen gate those
   conventions are checked against before a preview build.
+- **The app bar is a three-track grid, not a flex row, and only the middle track may change
+  size.** Left is what the app is — brand, the mode switch, the SITL tray, preferences; right is
+  the link — transport, Connect, Disconnect; the vehicle status sits between them. The outer two
+  are anchored so nothing a status can do ever moves a control someone is reaching for.
+  **Spacers cannot do this job, for two separate reasons.** The first is geometric: a pair of
+  spacers centers the middle band between the two groups, and these groups differ by about
+  230px, so the status sat visibly right of the window's midline — `1fr auto 1fr` puts it *on*
+  the midline (measured at 0px off center from 1440 to 3440) and, because a `1fr` track is
+  `minmax(auto, 1fr)`, gives way rather than overlapping when a side band outgrows its share.
+  The second is a trap in the system sheet: `.la-appbar__spacer` is declared `flex: 1 1 auto`
+  and then disabled twelve lines later by `.la-appbar > * { flex: none }` — same sheet, higher
+  specificity, later in the cascade — **so the sheet's own spacer has never sprung**, and the
+  bar's only flexible child was `.la-appbar .la-readout--wide` at (0,2,0). That quietly made the
+  readout load-bearing for the *layout* as well as the status, which is why taking it out let
+  the connection controls slide with whatever the status said. There are now no spacers in this
+  bar at all.
+- **The app bar reports the vehicle as indicators, and draws none of them when
+  there is nothing to report** (`ui/shell/AppStatus.tsx` + `app-status.ts`). It held a
+  `.la-readout--wide` inherited from the other Lofted Aero apps, where that element is the
+  app's own main live value and `flex: 1 1 auto` is right. Here it carried
+  `Name · Mode · Armed` and still absorbed every spare pixel — measured at 691px in a 1600px
+  window and 1651px at 2560, against a longest-ever string of 203px — while saying the wrong
+  things: mode and armed state are also in the flight controls, and battery, GPS, link and
+  prearm were drawn *only* on the HUD canvas, behind an overlays toggle, on one screen out of
+  three. **Nothing in a bar may absorb the window's slack**, and room is made by dropping whole
+  items at a breakpoint rather than letting them squeeze: a clipped `15.9V 24.1A 61%` is a
+  wrong reading, not a short one, so `.app-status__item` is `flex: none` and the breakpoints
+  (1500px for the readings, 1080px for the word) were measured against the *longest* strings a
+  real vehicle produces — the readings' moved up from 1400 the moment the bands stopped being
+  allowed to shrink under their own content, which is a second trap: **`min-width: 0` on a grid
+  band lets its `1fr` track shrink under its content**, and the side bands then ran into the
+  centered status between 1410px and 1700px rather than pushing it aside. Leave the auto minimum
+  alone and the grid gives the space up from the middle, which is the graceful failure this
+  layout is meant to have. **The three gauges share one slot width**
+  (`--app-status-slot-w`), which puts their icons on a constant 128px pitch — sized to their own
+  worst cases they came out 152/116/170 and the row read as items scattered at uneven distances.
+  The mode is exempt: it is last and has only a floor, because its length is set by firmware
+  rather than by this app, so it is allowed to grow off the end of the row instead of shoving
+  four gauges sideways. Two things paid for the equal slot: the bar formats its *own* battery and
+  link strings (pack current and the packet rate move to the tooltip), because carrying the HUD's
+  full versions would have needed 148px a slot; and **a filled shape is read by its edge, not by
+  where its text ends** — the state pill's edge sat 20px from the first icon while the gauges
+  were 37px apart, so it looked shoved against them even though the gap from its *text* was the
+  widest in the row. Measuring the wrong thing is how that goes unnoticed. — measured, and named in the CSS beside each — so a value
+  changing never drags its neighbours sideways, and the chip's `min-width` covers every state
+  that can appear beside the readings, which makes the whole row one constant width for as long
+  as a vehicle is connected. Per-slot rather than one shared width, unlike a *column* of
+  controls: four equal slots would have to match the widest, total 576px and overflow a 1600px
+  bar, where these total 484px — and the alignment a shared width buys is vertical, which a row
+  has none of. **The readings are labelled by icon, and the icons are drawn here** (the app bar's
+  gear already was): three glyphs is not a reason to take on an icon set, and they have to take
+  `currentColor` so a warning tone reaches them on a permanently dark ground. GPS is a *globe*
+  rather than the conventional satellite because three attempts at a satellite — dish on a mast,
+  dish with a feed horn, body with solar panels — were all illegible at 16px, which is the only
+  size they are ever drawn at; they were fine at 96px, and that is not the test. Check a new one
+  by rendering it at the size it will be used — and 20px, not 16: at 16 the battery's fill and
+  the signal's lit-bar count, which are the whole reason they are pictures rather than words,
+  were not legible on a 52px bar. **With no vehicle the row is not drawn at all** — the component
+  returns null, the way QGroundControl instantiates no vehicle indicators without a vehicle and
+  Betaflight sets its cluster to `display: none`; neither has an element reading "not
+  connected". **Inside a connected vehicle, though, the set of readings is fixed.** They were
+  first gated on SYS_STATUS's present mask too, which meant a flight controller with no GPS had
+  no GPS reading — telling a pilot nothing, reading as a layout fault, and hiding the fact that
+  decides whether the position modes can be flown. "No GPS" is a reading; Betaflight draws all
+  six of its sensor cells for the same reason, and a fixed set also makes the row one shape
+  across every aircraft. What survives from the stricter rule is that a *value* the vehicle
+  never gave is a dash, never a zero: `0.0V` is both "no monitor fitted" and "a monitor reading
+  a dead pack", and `battery_remaining` of -1 draws an empty cell rather than a flat one.
+  **Color comes from the vehicle's own thresholds or not at all** — `BATT_LOW_VOLT` and
+  `BATT_CRT_VOLT` for the pack, ArduPilot's own 3D-fix gate for GPS — because a threshold
+  invented here would put this app's opinion on the bar in the aircraft's voice; a *level* (the
+  battery's fill, the lit bar count) needs no threshold, being a picture of the number beside
+  it. The one exception is a *failed* connection:
+  "connect ECONNREFUSED" separates a simulator that is not running from a port typed wrong, and
+  it was the one load-bearing thing the old readout showed. The status word is QGC's
+  `MainStatusIndicator` shape — link, then failsafe, then arm, then readiness, fused into one
+  word and one tint — and it shares `armReadiness` with the Preflight pane, so the two cannot
+  contradict each other; only the wording is shorter, because a 52px bar is not where an
+  explanation fits. Every string comes from `hud-draw.ts`'s formatters for the same reason.
+  Colors are pinned for a **permanently dark ground** (the bar is charcoal in both themes), so
+  each tone lifts its own token toward white with `color-mix` rather than duplicating the dark
+  palette's value — the trap the `.la-select` chevron fell into — with `--app-on-dark` text
+  over the tint. Measured 7.4:1 to 9.8:1.
 - **Setup lays its cards out as a grid, not a column** (`.app-content`). They were a flex column
   of 860px cards, which on the full-screen window this app is actually used in put every card in
   a third-width ribbon down the left — measured at 39% of the content area used. Cards are

@@ -1,9 +1,9 @@
 import { BRAND } from '../../brand'
-import { LaButton, LaReadout, LaSelect } from '../components/La'
+import { LaButton, LaSelect } from '../components/La'
 import { useConnectionStore } from '../../stores/connection-store'
-import { useVehicleStore } from '../../stores/vehicle-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
+import AppStatus from './AppStatus'
 import SimTray from './SimTray'
 import ThemeToggle from './ThemeToggle'
 import { hasIpLinks } from '../../env'
@@ -33,42 +33,19 @@ function ModeSwitch() {
   )
 }
 
-// The charcoal app bar: brand badge, title, link status, connection
-// controls. Connect stays the one orange action in the bar (DESIGN.md
-// color hierarchy).
+// The charcoal app bar: brand badge, title, mode switch, vehicle status,
+// connection controls. Connect stays the one orange action in the bar
+// (DESIGN.md color hierarchy) -- which is why the status indicators beside
+// it are color-as-status only and never look pressable.
 export default function AppBar() {
   const phase = useConnectionStore((s) => s.phase)
-  const error = useConnectionStore((s) => s.error)
   const selectedKind = useConnectionStore((s) => s.selectedKind)
   const ipLinks = hasIpLinks()
   const setSelectedKind = useConnectionStore((s) => s.setSelectedKind)
-  const vehicleName = useVehicleStore((s) => s.vehicleName)
-  const vehicleMode = useVehicleStore((s) => s.modeName)
-  const vehicleArmed = useVehicleStore((s) => s.armed)
-  const vehiclePresent = useVehicleStore((s) => s.present)
   const setConnectModalOpen = useUiStore((s) => s.setConnectModalOpen)
   const setPreferencesOpen = useUiStore((s) => s.setPreferencesOpen)
 
   const busy = phase === 'opening' || phase === 'handshaking'
-
-  const status = (() => {
-    switch (phase) {
-      case 'idle':
-        return undefined // readout shows its placeholder
-      case 'opening':
-        return 'Opening link…'
-      case 'handshaking':
-        return 'Waiting for heartbeat…'
-      case 'linkLost':
-        return 'Link lost — no heartbeat'
-      case 'error':
-        return error ?? 'Connection failed'
-      case 'connected':
-        return vehiclePresent
-          ? `${vehicleName} · ${vehicleMode} · ${vehicleArmed ? 'ARMED' : 'Disarmed'}`
-          : 'Connected'
-    }
-  })()
 
   const connect = () => {
     if (selectedKind === 'serial') {
@@ -81,58 +58,78 @@ export default function AppBar() {
   }
 
   return (
+    // Three bands, and the middle one is centered on the *window* rather
+    // than on the space the other two leave. That needs three tracks: a
+    // pair of spacers can only center between the groups, and this bar's
+    // groups differ by about 230px, so the status sat visibly right of
+    // center. `1fr auto 1fr` puts it on the window's midline whenever both
+    // sides fit, and gives way gracefully when they do not.
+    //
+    // Grid rather than the sheet's flex row for the same reason -- and it
+    // avoids a trap: `lofted-aero.css` sets `.la-appbar__spacer { flex: 1 1
+    // auto }` and then `.la-appbar > * { flex: none }` twelve lines later,
+    // at higher specificity, so its spacer has never actually sprung.
     <header className="la-appbar">
-      <img
-        className="la-appbar__logo la-appbar__logo--badge"
-        src={BRAND.iconPath}
-        alt={BRAND.name}
-      />
-      <span className="la-appbar__title">{BRAND.name}</span>
-      <ModeSwitch />
-      <span className="la-appbar__spacer"></span>
-      <SimTray />
-      <button
-        type="button"
-        className="app-theme-toggle"
-        title="Preferences — units, appearance"
-        aria-label="Preferences"
-        onClick={() => setPreferencesOpen(true)}
-      >
-        <GearIcon />
-      </button>
-      <ThemeToggle />
-      <LaReadout wide placeholder="Not connected" value={status} />
-      <LaSelect
-        value={selectedKind}
-        disabled={busy || phase === 'connected' || phase === 'linkLost'}
-        onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
-        title="Connection type"
-      >
-        <option value="serial">USB serial</option>
-        {/* A browser tab cannot open a raw socket, so offering TCP and UDP
+      <div className="app-bar__band">
+        <img
+          className="la-appbar__logo la-appbar__logo--badge"
+          src={BRAND.iconPath}
+          alt={BRAND.name}
+        />
+        <span className="la-appbar__title">{BRAND.name}</span>
+        <ModeSwitch />
+        <SimTray />
+        <button
+          type="button"
+          className="app-theme-toggle"
+          title="Preferences — units, appearance"
+          aria-label="Preferences"
+          onClick={() => setPreferencesOpen(true)}
+        >
+          <GearIcon />
+        </button>
+        <ThemeToggle />
+      </div>
+
+      {/* Always rendered, empty or not: it is the grid's middle track, and
+          without it the connection controls would fall into it. */}
+      <div className="app-bar__band app-bar__band--center">
+        <AppStatus />
+      </div>
+
+      <div className="app-bar__band app-bar__band--right">
+        <LaSelect
+          value={selectedKind}
+          disabled={busy || phase === 'connected' || phase === 'linkLost'}
+          onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
+          title="Connection type"
+        >
+          <option value="serial">USB serial</option>
+          {/* A browser tab cannot open a raw socket, so offering TCP and UDP
             there is offering two ways to fail. They are the first thing
             anyone opens this menu to look at, which made the web build read
             as broken before it had done anything. A WebSocket bridge is the
             browser's route to the same simulators and radios, and it stays. */}
-        {ipLinks && <option value="tcp">TCP</option>}
-        {ipLinks && <option value="udp">UDP</option>}
-        <option value="ws">WebSocket</option>
-        <option value="virtual">Demo</option>
-      </LaSelect>
-      <LaButton
-        variant="primary"
-        disabled={busy || phase === 'connected' || phase === 'linkLost'}
-        onClick={connect}
-      >
-        Connect
-      </LaButton>
-      <LaButton
-        variant="ghost"
-        disabled={phase === 'idle' || phase === 'error'}
-        onClick={() => void connectionService.disconnect()}
-      >
-        Disconnect
-      </LaButton>
+          {ipLinks && <option value="tcp">TCP</option>}
+          {ipLinks && <option value="udp">UDP</option>}
+          <option value="ws">WebSocket</option>
+          <option value="virtual">Demo</option>
+        </LaSelect>
+        <LaButton
+          variant="primary"
+          disabled={busy || phase === 'connected' || phase === 'linkLost'}
+          onClick={connect}
+        >
+          Connect
+        </LaButton>
+        <LaButton
+          variant="ghost"
+          disabled={phase === 'idle' || phase === 'error'}
+          onClick={() => void connectionService.disconnect()}
+        >
+          Disconnect
+        </LaButton>
+      </div>
     </header>
   )
 }

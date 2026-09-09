@@ -55,6 +55,52 @@ both stopped.
 > page's elements with some sort of null or placeholders when nothing is
 > connected."*
 
+### A panel with nothing to say is not drawn — but absence is a reading
+
+Two halves, and the second was learned by getting the first too enthusiastic.
+
+**The panel.** With no vehicle, draw nothing: not greyed, not zeroed, not a
+box holding a placeholder. The app bar's status row renders nothing at all
+without a connection. Both references landed here independently —
+QGroundControl instantiates no vehicle indicators when there is no vehicle,
+Betaflight sets its whole status cluster to `display: none` — and neither has
+an element reading "not connected", which is what this app's inherited
+`.la-readout` showed, in a box measured at 691px in a 1600px window and
+1651px at 2560 against a longest-ever string of 203px.
+
+**The readings inside it.** Once there *is* a vehicle, the set is fixed. The
+three readings were first gated on the SYS_STATUS present mask, so a flight
+controller with no GPS had no GPS reading — which tells a pilot nothing,
+reads as a layout fault, and hides the one fact that decides whether the
+position modes can be flown. "No GPS" is a reading. Betaflight draws all six
+of its sensor cells for exactly this reason.
+
+> *"This flight controller doesn't have a GPS plugged in right now, but I'd
+> still like to see what the GPS display would look like in that case even if
+> it says 0 satellites or no fix"*
+
+A fixed set also means the row is one shape across every aircraft rather than
+one per sensor fit.
+
+**Still never draw a value the vehicle did not give.** `0.0V` is both "no
+monitor fitted" and "a monitor reading a dead pack"; the slot stays, the
+number becomes a dash. Same for a battery whose charge estimate is MAVLink's
+-1: an empty cell, not a flat one.
+
+### Color a reading with the vehicle's thresholds, or not at all
+
+A percentage is only low against a threshold, and a threshold invented here
+puts this app's opinion on the bar in the aircraft's voice. The battery
+carried no color at all until `BATT_LOW_VOLT` and `BATT_CRT_VOLT` were read
+from the vehicle; GPS turns amber below a 3D fix because 3 is what ArduPilot
+itself refuses Loiter, Auto and RTL on. Where the vehicle has configured
+nothing, show no opinion.
+
+A *level* is not a judgement, so it needs no threshold: a battery drawn 22%
+full and one lit signal bar are pictures of the numbers beside them.
+
+> *"It would be great if the battery and RSSI bars reflected the state"*
+
 ### Empty is null, not zero
 
 A dash, not a `0`. And a value with nothing behind it carries no status
@@ -90,6 +136,41 @@ ragged right-hand edge.
 
 Derive the two from **one** token rather than measuring one and copying the
 number into the other, or a reworded label silently breaks the alignment.
+
+### Nothing in a bar absorbs the window's slack
+
+A status element sized `flex: 1 1 auto` grows to whatever is spare, which on
+the full-screen windows this app is used in means a short sentence in a very
+long box — 64% of the bar at 2560px, 88% of it empty. Give a bar's contents
+their own size and let the spacer take the slack.
+
+The corollary is that room is made by *dropping whole items* at a
+breakpoint, never by letting them squeeze: a clipped `15.9V 24.1A 61%` is not
+a shorter reading, it is a wrong one. Set the breakpoint against the longest
+string a real vehicle produces, not the one a bench copter happens to show.
+
+> *"we inherited this from the other Lofted Aero apps, but it arguably
+> doesn't serve the same purpose here"*
+
+### A control never moves because a reading changed
+
+Anchor a bar's fixed groups to its edges and let only the live part float
+between them, so nothing you are reaching for slides out from under the
+cursor. The app bar is three bands for exactly this: what the app is on the
+left, what the vehicle is in the middle, the link on the right.
+
+Use three grid tracks, not two spacers. Spacers center the middle band
+between the groups, which is only the window's midline when the groups happen
+to be the same width — ours differ by 230px, and it showed.
+
+Inside the live part, the same rule applies one level down: give each reading
+a slot as wide as the longest string it can hold, so a value changing does
+not drag its neighbours. Measure the slot against the worst case and write
+the string it was measured against beside the number.
+
+> *"I'd prefer the connect UI remain on the right side of the screen in a
+> manner that doesn't shift around if the new elements that appear change
+> size"* · *"For that matter, try and keep that from happening in general"*
 
 ### One dialog asking three questions keeps one shape
 
@@ -137,6 +218,39 @@ buttons. The column is for what persists — vehicle actions, files, settings.
 > *"Put the fence inclusion, exclusion, circle, etc. buttons on something
 > that looks like the mission item graphical menu instead of buttons in the
 > column"*
+
+### A filled shape is read by its edge, not by its text
+
+When something in a row has a background — a pill, a chip, a badge — the eye
+measures the gap from its *edge*. The app bar's state pill sat 20px from the
+next icon while the readings were 37px apart, so it looked crowded against
+them even though the distance from its text was the widest gap in the row.
+Measure what the eye measures.
+
+> *"The failsafe looks closer to the other elements than the other elements
+> are to each other"*
+
+### One width for a row of gauges too
+
+The column rule has a row form: give repeated readings one slot width and
+their icons land on a constant pitch, which is what makes a strip read as a
+set rather than as things scattered at uneven distances. Sized to their own
+worst cases they came out 152, 116 and 170px, and the whitespace between them
+ran 49, 57 and 41.
+
+Buy the equal slot by cutting what the row does not need rather than by
+widening it: a bar with an icon showing the level does not also need the
+number the icon is a picture of, so pack current and packet rate moved to the
+tooltip and every slot fits in 116px.
+
+### Judge an icon at the size it will be drawn
+
+Three attempts at a satellite for the GPS reading all read correctly at 96px
+and turned to mush at 16px, which is the only size the app bar ever draws
+them. A globe survives the size and cannot be mistaken for the signal bars
+beside it, so a legible non-convention beat an illegible convention.
+
+> *"Can you use iconography of some sort?"*
 
 ### An icon matches its siblings exactly
 

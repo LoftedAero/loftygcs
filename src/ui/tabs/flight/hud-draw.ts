@@ -143,21 +143,24 @@ export function batteryLabel(volts: number, amps: number, pct: number): string {
  * fix, and the RTK types are named because someone who has set up an RTK
  * base wants to see it took.
  */
+export function gpsKind(fixType: number): string {
+  return fixType >= 6
+    ? 'RTK fixed'
+    : fixType === 5
+      ? 'RTK float'
+      : fixType === 4
+        ? 'DGPS'
+        : fixType === 3
+          ? '3D'
+          : fixType === 2
+            ? '2D'
+            : fixType === 1
+              ? 'No fix'
+              : 'No GPS'
+}
+
 export function gpsLabel(fixType: number, sats: number): string {
-  const kind =
-    fixType >= 6
-      ? 'RTK fixed'
-      : fixType === 5
-        ? 'RTK float'
-        : fixType === 4
-          ? 'DGPS'
-          : fixType === 3
-            ? '3D'
-            : fixType === 2
-              ? '2D'
-              : fixType === 1
-                ? 'No fix'
-                : 'No GPS'
+  const kind = gpsKind(fixType)
   // Satellites only once there are some to count: "No fix 0" says the same
   // thing twice, and a receiver that has not reported yet says nothing.
   // Named, because the line opposite says "RSSI 83%" and "28 pkt/s" -- a

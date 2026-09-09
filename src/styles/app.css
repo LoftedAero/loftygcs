@@ -36,6 +36,10 @@
      WebSocket URL, measured at 109px for `ws://127.0.0.1:5678` -- with room
      for a hostname in place of an address. */
   --app-connect-control-w: 200px;
+  /* One slot for every gauge in the app bar's status row. Sized to the
+     widest of the three at 13px Work Sans -- the GPS reading's
+     "RTK fixed · 22", 87px -- plus a 20px icon and the 4px between them. */
+  --app-status-slot-w: 116px;
 }
 
 /* The system sheet puts modals at z-index 10, which is plenty for a window
@@ -1588,6 +1592,306 @@
    what lines up with everything above it. */
 .app-simtray__panel .la-row .la-input {
   flex: 1;
+}
+
+/* The app bar is three tracks, not a flex row.
+
+   It carries three bands -- what the app is, what the vehicle is, what the
+   link is -- and the middle one has to sit on the *window's* midline, not in
+   the middle of whatever the other two leave. A pair of spacers cannot do
+   that: they center between the groups, and these groups differ by about
+   230px, which put the status visibly right of center. `1fr auto 1fr` does,
+   and because a `1fr` track is `minmax(auto, 1fr)` it gives way rather than
+   overlapping once a side band outgrows its share -- which is the best any
+   layout can do, since below about 1750px there is no midline a row this
+   wide can sit on without colliding.
+
+   It also sidesteps a trap in the system sheet: `.la-appbar__spacer` is
+   declared `flex: 1 1 auto` and then disabled twelve lines later by
+   `.la-appbar > * { flex: none }` -- same sheet, higher specificity, later
+   in the cascade -- so the sheet's own spacer has never sprung. The bar's
+   only flexible child was `.la-appbar .la-readout--wide` at (0,2,0), which
+   quietly made that readout load-bearing for the layout as well as the
+   status. There are now no spacers in this bar at all. */
+.la-appbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0;
+}
+.app-bar__band {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+  /* Deliberately no `min-width: 0`. A `1fr` track is `minmax(auto, 1fr)`,
+     and zeroing the band's minimum lets the track shrink under its own
+     content -- which does not clip or shrink anything, it just lets the
+     side bands run into the centered status. Measured: it did, between
+     1410px and 1700px. Leaving the auto minimum in place makes the grid
+     give the space up from the middle instead, which is the graceful
+     failure this layout is supposed to have. */
+}
+.app-bar__band--center {
+  justify-content: center;
+}
+.app-bar__band--right {
+  justify-content: flex-end;
+}
+
+/* Named for what it does rather than hidden with `.hidden`, which would take
+   it from assistive technology too. The readings are labelled by icon on
+   screen; this is the same label for anyone not looking at it. */
+.app-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Vehicle status in the app bar: a row of indicators, not a sentence.
+
+   It replaced a `.la-readout--wide`, which is `flex: 1 1 auto` in the system
+   sheet -- right in the apps that element came from, where the readout is
+   the app's own main live value, and wrong here. Measured: 691px of box in a
+   1600px window, 1651px at 2560, holding a longest-ever string of 203px.
+
+   Three rules, all of them the reason the row reads as a row:
+
+   1. Nothing is drawn for a thing that is not there. The component returns
+      null with no vehicle and each item is gated on the SYS_STATUS present
+      mask, so the bar shrinks back to brand + modes + connection controls --
+      which is what QGroundControl and Betaflight both do, and why neither
+      has a box saying "not connected".
+   2. Color is status and never an action. The bar's one action is orange and
+      belongs to Connect; these tint a ground and never a border or a fill
+      that could read as a button.
+   3. The colors are pinned for a permanently dark ground. The app bar is
+      charcoal in *both* themes, so `--la-ok` at its light-theme value would
+      be a mid green on near-black. Rather than duplicate the dark token (the
+      trap the `.la-select` chevron already fell into), each tone lifts its
+      own token toward white with `color-mix` and the text above it stays
+      `--app-on-dark`: white on a tint, which is legible whichever value the
+      token currently holds. */
+.app-status {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+  /* Its own size and no more. `flex: none` here is the whole point of the
+     change: the element this replaced was `flex: 1 1 auto` and grew to 64%
+     of a 2560px bar to hold 203px of text. Nothing in this row absorbs
+     slack, and nothing in it is allowed to squeeze either -- a clipped
+     "15.9V 24.1A 61%" is not a shorter reading, it is a wrong one. Room is
+     made by dropping whole items at a breakpoint instead. */
+  flex: none;
+}
+
+/* The fused word: link state, arm state and prearm health, in that
+   precedence. One element because they answer one question and only one of
+   them is ever the most important thing on screen. */
+.app-status__state {
+  display: inline-flex;
+  align-items: center;
+  /* Centered inside its own fixed width. The pill is sized for the longest
+     state that can appear beside the readings, so a short one like "Ready"
+     leaves ~30px over; packed to the start that all pooled on the right and
+     the pill read as lopsided. The dot shifts a few pixels between states as
+     a result, which is the better trade: it moves *inside* a box whose edges
+     never move, and the edges are what everything else is measured against. */
+  justify-content: center;
+  gap: var(--la-space-2);
+  flex: none;
+  /* Wide enough for every state that can appear *beside* the readings --
+     Ready, Armed, Not ready, Failsafe, Link lost, Connected, the longest of
+     which measures 111px -- so the word changes without the row after it
+     moving. The connecting states are longer and overrun this, which costs
+     nothing: they only occur before a vehicle exists, so there is nothing
+     to their right, and the bar's spacer takes the difference. */
+  min-width: 112px;
+  height: 30px;
+  padding: 0 var(--la-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--la-radius-sm);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--app-on-dark);
+  font-family: inherit;
+  font-size: var(--la-size-md);
+  font-weight: 600;
+  white-space: nowrap;
+  /* The error phase puts the transport's own words here and they can be
+     long, so this one element may ellipsize -- but only down to a width
+     that still carries a useful prefix. Every other state is two words. */
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Only the vehicle-present chip is a button, and it is the one route to the
+   preflight checks. It is not a `.la-btn`: an action in the bar is orange,
+   and this must not look like a second one. */
+button.app-status__state {
+  cursor: pointer;
+}
+button.app-status__state:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+button.app-status__state:focus-visible {
+  outline: none;
+  border-color: var(--app-on-dark);
+}
+.app-status__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.app-status__state--ok {
+  background: color-mix(in srgb, var(--la-ok) 34%, transparent);
+}
+.app-status__state--ok .app-status__dot {
+  background: color-mix(in srgb, var(--la-ok) 55%, white);
+}
+.app-status__state--warn {
+  background: color-mix(in srgb, var(--la-warn) 34%, transparent);
+}
+.app-status__state--warn .app-status__dot {
+  background: color-mix(in srgb, var(--la-warn) 55%, white);
+}
+.app-status__state--bad {
+  background: color-mix(in srgb, var(--la-bad) 40%, transparent);
+}
+.app-status__state--bad .app-status__dot {
+  background: color-mix(in srgb, var(--la-bad) 55%, white);
+}
+button.app-status__state--ok:hover {
+  background: color-mix(in srgb, var(--la-ok) 46%, transparent);
+}
+button.app-status__state--warn:hover {
+  background: color-mix(in srgb, var(--la-warn) 46%, transparent);
+}
+button.app-status__state--bad:hover {
+  background: color-mix(in srgb, var(--la-bad) 52%, transparent);
+}
+
+/* One reading: a caption over its value. Captioned rather than left to speak
+   for itself because "3D · 14" does not say what it is and "12.4V 78%" does
+   -- and a row where only some items carry a label reads as a row that was
+   never designed. Two lines fit: 52px of bar against 11px + 13px of text. */
+.app-status__item {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  flex: none;
+}
+/* 20px, not 16: at 16 these read as specks on a 52px bar, and the battery's
+   fill and the signal's lit-bar count -- the whole reason they are pictures
+   rather than words -- were not legible at all. */
+.app-status__icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: rgba(255, 255, 255, 0.72);
+}
+/* Each reading gets a slot as wide as the longest string it can produce, so
+   a value changing never moves its neighbours. Measured at 13px Work Sans
+   against the worst case named beside each.
+
+   Per-slot rather than one shared width, which is what the rest of the app
+   does for a *column* of controls: four equal slots would have to be as wide
+   as the widest, totalling 576px, and that overflows a 1600px bar -- a real
+   window size. These total 484px. The alignment a shared width buys is
+   vertical, and there is no vertical edge in a row. */
+/* One width for all three, which is the point: an equal slot puts the icons
+   on a constant pitch, and a constant pitch is what makes a row of gauges
+   read as a set rather than as items scattered at uneven distances. They had
+   three widths sized to their own worst cases, and the visible whitespace
+   between readings then ran 49px, 57px and 41px while the state chip sat
+   16px from the first icon -- the reading was that the chip had been shoved
+   up against the gauges, when in fact the gauges were drifting apart.
+
+   Sized to the widest of the three: "RTK fixed · 22" at 87px plus the icon
+   and its gap. It is only affordable because the bar formats its own battery
+   and link strings (see app-status.ts) -- carrying the HUD's pack current
+   and packet rate as well would have needed 148px a slot. */
+.app-status__item--battery,
+.app-status__item--gps,
+.app-status__item--link {
+  width: var(--app-status-slot-w);
+}
+/* The mode is last and is the one reading with no reserved width, only a
+   floor: its length is set by firmware rather than by this app, so it is
+   allowed to grow off the end of the row instead of shoving the gauges. */
+.app-status__item--mode {
+  min-width: 104px; /* "Heli_Autorotate" / "Loiter to QLand", the longest
+                       names ArduPilot ships */
+}
+
+/* Three groups, not seven things in a line: the state, the gauges, the mode.
+   The state and the mode are the two that are not gauges -- one is a filled
+   pill, the other is a bare word with no icon -- so a wider gap on each side
+   of the gauge block says so.
+
+   The pill's margin is the larger of the two on purpose. A filled shape is
+   read by its *edge*, not by where its text ends, and that edge sat 20px
+   from the first icon while the gauges were 37-57px apart -- so the pill
+   looked shoved against them even though the gap from its text was the
+   widest in the row. Measuring the wrong thing is exactly how that happens.
+   With the margin its edge clears the block by 36px, against the 37px
+   between the first two gauges -- measured, not eyeballed. */
+.app-status__state {
+  margin-right: var(--la-space-5);
+}
+.app-status__item--mode {
+  margin-left: var(--la-space-2);
+}
+.app-status__val {
+  color: var(--app-on-dark);
+  font-size: var(--la-size-md);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Amber and red on a reading come only from the vehicle's own thresholds --
+   a GPS fix below 3D, which is what ArduPilot itself refuses Loiter, Auto
+   and RTL on, and a pack at or under BATT_LOW_VOLT / BATT_CRT_VOLT. The icon
+   takes the color with the value: it is the label, so leaving it grey while
+   the number turned amber would read as two different states. */
+.app-status__item--warn .app-status__val,
+.app-status__item--warn .app-status__icon {
+  color: color-mix(in srgb, var(--la-warn) 62%, white);
+}
+.app-status__item--bad .app-status__val,
+.app-status__item--bad .app-status__icon {
+  color: color-mix(in srgb, var(--la-bad) 55%, white);
+}
+
+/* Narrow windows drop the readings whole, and the fused word is what
+   survives: it is the only element that says the aircraft is not ready to
+   fly, and the readings are all repeated on the Fly screen.
+
+   1400px rather than something tighter because the widths here are set by
+   content, not by the box -- "15.9V 24.1A 61%" and "RTK fixed · 22" are the
+   longest a real vehicle produces, and the breakpoint has to clear those
+   rather than the ones a bench copter happens to show. Measured against
+   both. */
+@media (max-width: 1500px) {
+  .app-status__item {
+    display: none;
+  }
+}
+/* And below 1080px the word goes too, because the rest of the bar needs the
+   room. The breakpoint clears the *longest* state ("Waiting for heartbeat",
+   179px) rather than the common ones: a bar that fits while the vehicle is
+   Ready and overflows the moment it starts connecting is a layout that
+   breaks exactly when something is happening. Measured -- 1080px is where
+   the bar stops overflowing with that string in it. Nothing is lost that
+   was there before; this whole row is new. */
+@media (max-width: 1080px) {
+  .app-status {
+    display: none;
+  }
 }
 
 /* Top-level mode switch, in the app bar. Not orange: the bar already has

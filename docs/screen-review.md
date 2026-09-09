@@ -220,10 +220,17 @@ that is still a fact worth having written down.
 
 ### App bar
 
-Connection controls, link status, the mode switch.
+Connection controls, the vehicle status row, the mode switch. The row has
+more states than the two below and they do not all need a vehicle: opening,
+waiting for a heartbeat, a failed connect (which shows the transport's own
+words), link lost, connected-but-unidentified, Not ready, Ready, Armed,
+Failsafe.
 
 - [ ] Disconnected
 - [ ] Connected
+- [ ] A vehicle with no battery monitor and no GPS — those readings should be
+      absent, not zero
+- [ ] Narrow: readings drop at 1400px, the word at 1080px
 
 ### Action bar
 
