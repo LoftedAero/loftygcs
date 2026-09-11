@@ -35,7 +35,10 @@ const ALLOWED = [
   '.files__scroll',
   '.inspector__scroll',
   '.log-main',
-  '.params-scroll',
+  // The parameters pane, not its scroll box: the search and the count sit
+  // inside the frame with the table so the panel is the full height of the
+  // screen and matches the actions column beside it.
+  '.params-pane',
   // Panes that are not beside a column but are the same kind of surface.
   '.app-doc',
   '.flight-controls',
@@ -46,6 +49,7 @@ const ALLOWED = [
   // Repeated items *inside* a panel, which are framed to separate them from
   // it rather than to be one.
   '.fence-item',
+  '.fw-vehicle',
   '.plotted',
   '.preset__load',
 ]

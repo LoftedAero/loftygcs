@@ -67,7 +67,7 @@ export default function InspectorTab() {
 
   if (!connected) {
     return (
-      <LaCard title="MAVLink inspector" note="Every message on the link, live.">
+      <LaCard title="MAVLink inspector">
         {tabs}
         <p className="app-placeholder">
           Connect a vehicle (or start Demo mode) and this fills with what it is saying: each message

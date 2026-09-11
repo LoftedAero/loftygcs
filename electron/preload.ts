@@ -42,6 +42,19 @@ contextBridge.exposeInMainWorld('loftgcs', {
       return () => ipcRenderer.removeListener('serial:ports', handler)
     },
     choose: (portId: string) => ipcRenderer.send('serial:choose', portId),
+    /** Main answered the open request itself; the chooser should close. */
+    onDone: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('serial:done', handler)
+      return () => ipcRenderer.removeListener('serial:done', handler)
+    },
+    /**
+     * Answer the next port request yourself if exactly one bootloader is on
+     * the machine; `wait` holds the chooser back a moment for one that is
+     * still re-enumerating.
+     */
+    autoPickNew: (opts?: { wait?: boolean }) =>
+      ipcRenderer.send('serial:auto-pick-new', opts ?? {}),
     cancel: () => ipcRenderer.send('serial:cancel'),
   },
 

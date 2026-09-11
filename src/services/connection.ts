@@ -10,7 +10,8 @@ import { WorkerClient } from '../worker/worker-client'
 import type { FirmwareVersion, MissionItem, ProtocolEvent, TelemetryDelta } from '../protocol/types'
 import { modeName, vehicleTypeName } from '../protocol/modes'
 import { setConnectionState, useConnectionStore } from '../stores/connection-store'
-import { describeLinkError } from './link-error'
+import { describeLinkError, describeSilentLink } from './link-error'
+import { WebSerialTransport } from '../transport/web-serial'
 import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { useCalStore } from '../stores/cal-store'
@@ -57,7 +58,7 @@ class ConnectionService {
     setConnectionState({ phase: 'opening', kind: opts.kind, error: null })
     try {
       const worker = this.ensureWorker()
-      await this.manager.open(
+      const transport = await this.manager.open(
         opts,
         (bytes) => worker.pushBytes(bytes),
         (reason) => this.onTransportClosed(reason),
@@ -67,9 +68,14 @@ class ConnectionService {
       this.handshakeTimer = setTimeout(() => {
         // A silent link usually means wrong baud/port -- or a board sitting
         // in its bootloader, which the firmware flow will learn to detect.
-        void this.disconnect(
-          'No heartbeat received. Check the connection settings, and that the board is running ArduPilot.',
-        )
+        // On serial the port itself narrows that down: a flight controller's
+        // own USB vendor going quiet is far more likely to be the wrong one
+        // of its several ports than a dead board.
+        const usb =
+          opts.kind === 'serial' && transport instanceof WebSerialTransport
+            ? transport.openedPort?.getInfo()
+            : undefined
+        void this.disconnect(describeSilentLink(usb))
       }, HANDSHAKE_TIMEOUT_MS)
       this.snapshotTimer = setInterval(() => this.flushSnapshot(), SNAPSHOT_INTERVAL_MS)
     } catch (err) {

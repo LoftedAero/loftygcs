@@ -4,10 +4,11 @@ import { approachSlopes, homeElevation, type LegSlope } from '../../../services/
 import { useTerrain } from './use-terrain'
 import { distanceLabel, formatDistance, fromDistance, toDistance } from '../../../units'
 import { useMissionStore } from '../../../stores/mission-store'
+import { usePlanVehicleClass } from './plan-vehicle'
 import { legStats, hasCoords, type PlanItem } from '../../../protocol/mission-plan'
 import {
   MAV_FRAMES,
-  MISSION_COMMANDS,
+  commandsFor,
   commandSpec,
   commandLabel,
 } from '../../../protocol/mission-commands'
@@ -169,6 +170,10 @@ function Row({
   onRemove: () => void
   onMove: (to: number) => void
 }) {
+  // Which commands this aircraft accepts. Read here rather than passed in:
+  // it is the same answer for every row, and threading it through the table
+  // would put a prop on Row that has nothing to do with the row.
+  const planClass = usePlanVehicleClass()
   const units = useUnits()
   const spec = commandSpec(item.command)
   const params = spec?.params ?? []
@@ -194,7 +199,7 @@ function Row({
               reaching into this column is working from the mission command
               reference, and a friendlier word only makes them guess which
               of ours is the one they read about. */}
-          {MISSION_COMMANDS.map((c) => (
+          {commandsFor(planClass).map((c) => (
             <option key={c.id} value={c.id}>
               {c.mavName}
             </option>

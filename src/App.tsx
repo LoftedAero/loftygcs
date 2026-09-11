@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import AppBar from './ui/shell/AppBar'
 import NavRail from './ui/shell/NavRail'
 import ActionBar from './ui/shell/ActionBar'
@@ -6,8 +7,9 @@ import PreferencesModal from './ui/shell/PreferencesModal'
 import SerialChooserModal from './ui/shell/SerialChooserModal'
 import PreviewNotice from './ui/shell/PreviewNotice'
 import UnsavedChangesModal from './ui/shell/UnsavedChangesModal'
-import { tabFills, useUiStore } from './stores/ui-store'
+import { tabFills, useUiStore, visibleTabs } from './stores/ui-store'
 import { useGuideStore } from './stores/guide-store'
+import { useConnectionStore } from './stores/connection-store'
 import GuideRunner from './ui/guides/GuideRunner'
 import OverviewTab from './ui/tabs/overview/OverviewTab'
 import FirmwareTab from './ui/tabs/firmware/FirmwareTab'
@@ -70,6 +72,22 @@ function SetupContent() {
 export default function App() {
   const mode = useUiStore((s) => s.mode)
   const activeTab = useUiStore((s) => s.activeTab)
+  const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
+
+  // A tab that leaves the rail must not leave someone staring at it. Losing
+  // the link while on, say, Radio drops you to the top of what is left --
+  // Betaflight does the same, returning to its Welcome tab. The destination
+  // is read from the list rather than named here, so changing which tabs
+  // survive a disconnect needs nothing of this file. Nothing is prompted
+  // about on the way: the parameters those screens stage against are cleared
+  // by the disconnect, so there is nothing left to lose.
+  useEffect(() => {
+    if (connected) return
+    const offline = visibleTabs(false)
+    if (offline.some((t) => t.id === activeTab)) return
+    const first = offline[0]
+    if (first) useUiStore.setState({ activeTab: first.id })
+  }, [connected, activeTab])
   const guideActive = useGuideStore((s) => s.activeGuide !== null)
   // A running guide replaces the rail as well as the content: it is a
   // sequence to follow, and half-leaving it mid-step loses the thread.

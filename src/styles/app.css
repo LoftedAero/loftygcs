@@ -44,6 +44,7 @@
      widest of the three at 13px Work Sans -- the GPS reading's
      "RTK fixed · 22", 87px -- plus a 20px icon and the 4px between them. */
   --app-status-slot-w: 116px;
+  --app-status-fw-w: 150px;
 }
 
 /* The system sheet puts modals at z-index 10, which is plenty for a window
@@ -2896,7 +2897,7 @@ button.app-status__state--bad:hover {
   flex: 1;
   min-height: 0;
 }
-/* The count under the table. `.la-card__note`'s job, outside a card. */
+/* The count, in the pane's footer. `.la-card__note`'s job, outside a card. */
 .params-note {
   margin: 0;
   color: var(--la-ink-3);
@@ -2913,36 +2914,57 @@ button.app-status__state--bad:hover {
    58px taller than the panel beside it. Two framed panels that nearly line
    up read as a mistake; a column that is exactly the height of the table
    reads as a pair. */
+/* Two panels, both the full height of the screen.
+
+   The search and the count belong to the table -- one filters it, the other
+   describes it -- so they live *inside* its panel rather than above and
+   below it. As three grid rows with the frame on the table alone, the
+   table's box started below the search and ended above the count, standing
+   58px shorter than the column beside it; two framed panels that nearly
+   line up read as a mistake.
+
+   The pane is the frame now, and `.params-scroll` is only the scrolling
+   middle of it: the header and the footer are `flex: none`, so rows scroll
+   *under* neither of them. */
 .params-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--app-col-w);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   column-gap: var(--app-col-gap);
   flex: 1;
   min-height: 0;
 }
+.params-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+}
 .params-toolbar {
-  grid-area: 1 / 1;
-  margin-bottom: var(--la-space-3);
+  flex: none;
+  padding: var(--la-space-2);
+  border-bottom: 1px solid var(--la-line);
 }
-.params-layout > .params-scroll {
-  grid-area: 2 / 1;
-}
-.params-layout > .app-col-shell {
-  grid-area: 2 / 2;
-}
-.params-layout > .params-note {
-  grid-area: 3 / 1;
-  margin-top: var(--la-space-2);
+.params-note {
+  flex: none;
+  padding: var(--la-space-2);
+  border-top: 1px solid var(--la-line);
 }
 
 .params-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  background: var(--la-surface);
+}
+/* The table's empty state. Padded rather than centered: it reads as the
+   first line of a list that has none, which is what it is, and a centered
+   one in a full-height pane sits marooned in the middle of the screen. */
+.params-empty {
+  margin: 0;
+  padding: var(--la-space-3);
 }
 
 /* One row: name | control | unit | (bits) | range hint. Names are
@@ -5983,4 +6005,304 @@ body.is-splitting .flight-map {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* The firmware screen's vehicle symbols.
+ *
+ * A grid of choices rather than a dropdown, which is Mission Planner's
+ * arrangement and earns its space here: the vehicle is the first question
+ * the screen asks, the eight answers are fixed, and a picture of an
+ * airframe is read faster than "FIXED_WING". `auto-fill` at a 108px
+ * minimum puts all eight on one row in a full-width card and reflows to
+ * two on a narrow one -- never `auto-fit`, which would stretch a lone tile
+ * across the card the way it did on the Setup grid.
+ */
+.fw-vehicles {
+  display: grid;
+  /* Sized so the ten tiles land in two rows in a half-width card rather
+     than three: the strip is the tallest thing on this screen and every row
+     it gains is a row the card beside it has to match with white space. */
+  grid-template-columns: repeat(auto-fill, minmax(88px, 112px));
+  gap: var(--la-space-2);
+}
+.fw-vehicle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--la-space-1);
+  padding: var(--la-space-3) var(--la-space-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius);
+  background: var(--la-surface);
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-sm);
+  cursor: pointer;
+  transition: var(--la-ease);
+  transition-property: border-color, background, color;
+}
+.fw-vehicle:hover:not(:disabled) {
+  border-color: var(--la-line-strong);
+  color: var(--la-ink);
+}
+/* Off until a board is known, and for a vehicle this board has no build
+   for. Dimmed rather than removed, so the strip keeps its shape. */
+.fw-vehicle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.fw-vehicle:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+/* Blue, not orange: picking an airframe is a working control, and the one
+   primary action on this screen is the flash itself. */
+.fw-vehicle--on,
+.fw-vehicle--on:hover {
+  border-color: var(--la-blue);
+  background: var(--la-blue-soft);
+  color: var(--la-blue-deep);
+}
+/* The drawings take currentColor, so the tile's own state tints them. */
+.fw-vehicle__icon {
+  flex: none;
+}
+.fw-vehicle__name {
+  text-align: center;
+  line-height: 1.25;
+}
+/* The radios are a group for a screen reader and nothing for the layout:
+   `display: contents` hands their tiles straight to the grid above, so the
+   two action tiles that follow sit on the same pitch instead of being
+   pushed into a second strip. */
+.fw-vehicles__group {
+  display: contents;
+}
+/* Same tile, dashed: these open a file and a web page rather than naming an
+   aircraft, and the border is what says so without changing the size or the
+   pitch. They never take the selected state, because they are not a
+   choice -- nothing about them can be "currently picked". */
+.fw-vehicle--action {
+  border-style: dashed;
+  color: var(--la-ink-3);
+}
+/* `:not(:disabled)` for the same reason the vehicle tiles have it, and it
+   was missing here: Open file is disabled until a board is known, and a
+   disabled control that lights up under the pointer is telling the user it
+   can be pressed. Most visible in the browser build, where there is no
+   manifest and the tile stays disabled until a file-capable board is
+   detected. */
+.fw-vehicle--action:hover:not(:disabled) {
+  border-style: dashed;
+  border-color: var(--la-blue);
+  color: var(--la-blue-deep);
+}
+
+/* One card, the width of the screen: it holds a ten-tile strip and two
+   sections, and a single Setup grid cell would put all of that in a third of
+   the window. */
+.fw-tab {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.fw-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-3);
+}
+/* Every control in this card is one width, from one token: the board
+   readout, the release dropdown, Detect board and Flash board all start on
+   the same left edge and end on the same right one. Sized to the longest
+   thing any of them holds -- "CubeOrange - id 140 - bootloader rev 5" -- so
+   the readout is not the one control that has to be wider than its
+   neighbours. Deriving both from a token rather than measuring one and
+   copying the number is what keeps a reworded label from breaking it. */
+/* `px`, not `ch`. The label column and the status line under it sit at
+   different font sizes, and `ch` is font-relative -- so one token resolved
+   to two widths and the status text landed 7px left of the controls it
+   belongs under. Measured, not eyeballed. */
+.fw-card {
+  --fw-label-w: 100px;
+  --fw-control-w: 300px;
+  /* The frame stops where its content does. Everything in this card is one
+     label column plus two controls wide, so a card stretched across the
+     Setup grid was 1032px of frame around 720px of content. */
+  max-width: calc(
+    var(--fw-label-w) + var(--la-space-3) + var(--fw-control-w) * 2 + var(--la-space-2) +
+      var(--la-space-4) * 2
+  );
+}
+
+/* A step is its numbered label and the controls that answer it. */
+.fw-step {
+  display: grid;
+  grid-template-columns: var(--fw-label-w) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--la-space-3);
+}
+/* `start`, with the label given a control's height and centring inside it:
+   a one-row step still reads as label-beside-control, and the tall vehicle
+   step gets its number at the top where the eye starts rather than floating
+   halfway down two rows of tiles. */
+.fw-step__label {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  gap: var(--la-space-2);
+  font-size: var(--la-size-md);
+  color: var(--la-ink);
+}
+/* The number is the sequence made visible, so it is a marker rather than a
+   word -- in the working-control blue, never the one orange this card
+   spends on the flash.
+
+   A *soft* disc with deep-blue ink rather than a filled one with white ink,
+   which is what makes it legible in both themes without a special case:
+   white on `--la-blue` is about 3.5:1, and at 11px that is a number you
+   squint at. The soft/deep pair inverts with the palette on its own --
+   #E4EDF7 with #2F6EA8 in light, #17293a with #8fc0ee in dark -- so both
+   sides clear 7:1 from the same two tokens. */
+.fw-step__n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--la-blue-soft);
+  box-shadow: inset 0 0 0 1px var(--la-blue);
+  color: var(--la-blue-deep);
+  font-size: var(--la-size-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* The controls: one width each, laid in a row so a button can sit beside
+   the readout it acts on without either of them resizing. */
+.fw-step__body {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  min-width: 0;
+}
+.fw-step__body > .la-readout,
+.fw-step__body > .la-select,
+.fw-step__body > .la-btn {
+  width: var(--fw-control-w);
+  flex: none;
+}
+/* A board line longer than the slot is trimmed, not allowed to widen the
+   row -- the whole string is in the title. */
+.fw-step__body > .la-readout {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The vehicle strip is a grid in its own right, capped so it ends where the
+   board row above it ends: two controls and the gap between them. Five
+   columns rather than `auto-fill`, so ten tiles are two even rows instead of
+   whatever the width happens to allow -- it was seven and then three. */
+.fw-step__body--wide {
+  display: block;
+  max-width: calc(var(--fw-control-w) * 2 + var(--la-space-2));
+}
+.fw-step__body--wide .fw-vehicles {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* One fixed-height slot, and it is the whole reason the card no longer
+   jumps: everything that used to be a conditional hint writes into it, so
+   the text changes and the box does not. Sized in `em` off the line height
+   and clipped, so a message longer than its slot is trimmed rather than
+   allowed to push the controls down.
+
+   Text, not a panel. A filled box drew a border around whatever happened to
+   be true at that moment -- "pick a vehicle" framed like a warning -- and
+   the reserved height alone is enough to hold the layout still. */
+.fw-state {
+  margin-left: calc(var(--fw-label-w) + var(--la-space-3));
+  max-width: calc(var(--fw-control-w) * 2 + var(--la-space-2));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--la-space-1);
+  min-height: 2.6em;
+  font-size: var(--la-size-sm);
+  overflow: hidden;
+}
+.fw-state__text {
+  color: var(--la-ink-2);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.fw-state__text--bad {
+  color: var(--la-bad);
+}
+.fw-state__text--warn {
+  color: var(--la-warn);
+}
+/* The target prompt's list. Capped and scrolling, because a vehicle can have
+   three hundred build targets and the dialog must not grow past the window. */
+.fw-targets {
+  list-style: none;
+  margin: var(--la-space-2) 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+}
+.fw-target {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  border-bottom: 1px solid var(--la-line);
+  background: transparent;
+  color: var(--la-ink);
+  font: var(--la-size-sm) / 1.4 var(--la-font-mono);
+  padding: var(--la-space-2) var(--la-space-3);
+  cursor: pointer;
+}
+.fw-target:hover {
+  background: var(--la-blue-soft);
+  color: var(--la-blue-deep);
+}
+.fw-target:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+.fw-targets__none {
+  padding: var(--la-space-3);
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-3);
+}
+
+/* The firmware slot. Not a gauge -- it is the one value in this row that is
+   fixed for the life of a connection -- so it sits beside the state rather
+   than in the gauge block, and it carries a reserved width for the same
+   reason the gauges do: AUTOPILOT_VERSION lands a beat after the heartbeat,
+   and a slot that grows from nothing at that moment shoves four gauges
+   sideways just as they are being read.
+
+   Sized to the longest string this can actually produce, not the common one:
+   `vehicleTypeName` yields Copter/Plane/Rover/Sub/GCS or a bare `Type 99`
+   fallback, so the worst case is "Type 255 4.10.0-alpha" at ~141px against
+   "Copter 4.7.1" at 79px -- measured in the bar's own font, not estimated. */
+.app-status__item--firmware {
+  width: var(--app-status-fw-w);
+  margin-right: var(--la-space-4);
+}
+/* First out when the window narrows, because it is the least urgent thing
+   here: static identity, and the Overview screen carries it too. Dropping it
+   above the gauges' own breakpoint buys them ~150px before any reading has
+   to go. */
+@media (max-width: 1700px) {
+  .app-status__item--firmware {
+    display: none;
+  }
 }

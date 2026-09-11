@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  barFirmware,
   barStatus,
   batteryFill,
   batteryTone,
@@ -133,5 +134,26 @@ describe('coloring the battery by the vehicle own thresholds', () => {
 
   it('has no opinion about a pack it cannot see', () => {
     expect(batteryTone(0, 10.5, 10.0)).toBeUndefined()
+  })
+})
+
+describe('the firmware readout', () => {
+  it('names the vehicle type and version', () => {
+    expect(barFirmware('Copter', { major: 4, minor: 7, patch: 1, type: 255 })).toBe('Copter 4.7.1')
+  })
+
+  it('says so when the build is not a release, and stays quiet when it is', () => {
+    // "You are not on stable" is the one thing about FIRMWARE_VERSION_TYPE
+    // worth a pilot's attention; spelling out "official" on every ordinary
+    // vehicle would be noise on a 52px bar.
+    expect(barFirmware('Plane', { major: 4, minor: 8, patch: 0, type: 128 })).toBe(
+      'Plane 4.8.0-beta',
+    )
+    expect(barFirmware('Plane', { major: 4, minor: 8, patch: 0, type: 0 })).toBe('Plane 4.8.0-dev')
+    expect(barFirmware('Plane', { major: 4, minor: 8, patch: 0, type: 255 })).toBe('Plane 4.8.0')
+  })
+
+  it('is a dash until the vehicle has said, never a zero version', () => {
+    expect(barFirmware('Copter', null)).toBe('—')
   })
 })

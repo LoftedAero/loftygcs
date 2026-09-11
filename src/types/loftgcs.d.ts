@@ -68,9 +68,24 @@ export interface LoftGcsBridge {
   serialPicker: {
     // Electron's select-serial-port flow: main forwards the candidate list,
     // the renderer shows its own chooser and answers with a portId (or '').
+    /**
+     * The candidate list for the open request. Fires again whenever a port
+     * appears or goes away while the request is open, so a chooser drawn
+     * from it is live rather than a snapshot.
+     */
     onPortsAvailable(cb: (ports: SerialPortChoice[]) => void): () => void
+    /** Main answered the open request itself (see autoPickNew); close the chooser. */
+    onDone(cb: () => void): () => void
     choose(portId: string): void
     cancel(): void
+    /**
+     * Answer the next port request from the list difference rather than
+     * showing the chooser, when exactly one port has appeared since the last
+     * request. Armed by the flash path just before it reboots a board into
+     * its bootloader, which enumerates as a new device; one-shot, and it
+     * expires on its own.
+     */
+    autoPickNew(opts?: { wait?: boolean }): void
   }
   /** A locally managed ArduPilot SITL, for demos and testing without hardware. */
   sim: {

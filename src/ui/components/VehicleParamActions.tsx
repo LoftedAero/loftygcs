@@ -25,6 +25,13 @@ export default function VehicleParamActions({ title = 'Vehicle' }: VehicleParamA
   const lastWrite = useParamStore((s) => s.lastWrite)
   const metadata = useParamStore((s) => s.metadata)
   const connected = useConnectionStore((s) => s.phase === 'connected')
+  // A set read from a file is a document, not an aircraft. Write and Reload
+  // are the two buttons that need something on the other end -- exactly the
+  // pair Mission Planner greys out, for the same reason. Revert is local and
+  // stays live, because reverting an edit to a file is still an edit to a
+  // file.
+  const fromFile = useParamStore((s) => s.source === 'file')
+  const canReachVehicle = connected && !fromFile
   const [confirming, setConfirming] = useState(false)
 
   const needsReboot = (lastWrite?.written ?? []).some((n) => metadata[n]?.rebootRequired)
@@ -46,7 +53,7 @@ export default function VehicleParamActions({ title = 'Vehicle' }: VehicleParamA
       <LaButton
         variant="primary"
         size="block"
-        disabled={dirtyCount === 0 || writeBusy}
+        disabled={dirtyCount === 0 || writeBusy || !canReachVehicle}
         onClick={() => setConfirming(true)}
       >
         {writeBusy ? 'Writing…' : 'Write params'}
@@ -62,12 +69,18 @@ export default function VehicleParamActions({ title = 'Vehicle' }: VehicleParamA
       <LaButton
         variant="ghost"
         size="block"
-        disabled={writeBusy}
+        disabled={writeBusy || !canReachVehicle}
         onClick={() => void connectionService.refreshParams()}
       >
         Reload from vehicle
       </LaButton>
-      {!connected && <LaHint>Connect a vehicle to write or reload.</LaHint>}
+      {!canReachVehicle && (
+        <LaHint>
+          {fromFile
+            ? 'These came from a file. Connect a vehicle to write them to it.'
+            : 'Connect a vehicle to write or reload.'}
+        </LaHint>
+      )}
       {lastWrite && (
         <LaHint error={lastWrite.failed.length > 0}>
           {lastWrite.failed.length > 0

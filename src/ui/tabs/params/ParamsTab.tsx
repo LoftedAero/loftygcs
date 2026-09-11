@@ -13,8 +13,11 @@ export default function ParamsTab() {
   const phase = useConnectionStore((s) => s.phase)
   const loadState = useParamStore((s) => s.loadState)
   const progress = useParamStore((s) => s.progress)
+  const source = useParamStore((s) => s.source)
+  const fileName = useParamStore((s) => s.fileName)
   const error = useParamStore((s) => s.error)
   const order = useParamStore((s) => s.order)
+  const offline = phase !== 'connected' && phase !== 'linkLost'
   const metadataSource = useParamStore((s) => s.metadataSource)
   const [filter, setFilter] = useState('')
 
@@ -34,18 +37,18 @@ export default function ParamsTab() {
     overscan: 12,
   })
 
-  if (phase !== 'connected' && phase !== 'linkLost') {
-    return (
-      <LaCard title="Parameters" note="Connect a vehicle to load its parameters.">
-        <p className="app-placeholder">
-          The full parameter table with search, official metadata, dirty-change highlighting, and
-          file import/export.
-        </p>
-      </LaCard>
-    )
-  }
-
-  if (loadState === 'downloading') {
+  // With nothing connected this screen still has a job: a saved parameter
+  // file is a document, and reading, searching, comparing and editing one
+  // needs no aircraft. Mission Planner has had exactly this for years and it
+  // is the one page its disconnected Config screen keeps.
+  //
+  // The empty case is not special-cased at all. It renders the ordinary
+  // screen with an empty table, and the column beside it already has the
+  // control that fills it -- "Import all from file", which is the same
+  // button whether it is opening a set or staging one against a vehicle. A
+  // second opener that appeared only while disconnected would be one more
+  // thing to keep in step with the first, for a state that is not special.
+  if (!offline && loadState === 'downloading') {
     return (
       <LaCard title="Parameters">
         <p className="app-placeholder">
@@ -62,7 +65,7 @@ export default function ParamsTab() {
     )
   }
 
-  if (loadState === 'error') {
+  if (!offline && loadState === 'error') {
     return (
       <LaCard title="Parameters">
         <LaHint error>{error}</LaHint>
@@ -88,43 +91,64 @@ export default function ParamsTab() {
           all three rows and stood 58px taller than the table it sits beside,
           which reads as a misalignment rather than as a taller column. */}
       <div className="params-layout">
-        {/* Search stays with the list it filters. It wants the width, and
+        {/* The search, the table and the count are one panel, so its frame
+            runs the full height of the screen and matches the column's.
+            They were three grid rows with the frame on the table alone,
+            which left the table's box shorter than the column beside it at
+            both ends. Header and footer do not scroll; only the rows do. */}
+        <div className="params-pane">
+          {/* Search stays with the list it filters. It wants the width, and
               it is the one control used while reading rather than between
               tasks -- which is what the actions column is for. */}
-        <div className="la-row params-toolbar">
-          <LaInput
-            placeholder="Search parameters"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="la-grow"
-          />
-        </div>
-        <div className="params-scroll" ref={scrollRef}>
-          <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-            {virtualizer.getVirtualItems().map((item) => (
-              <div
-                key={names[item.index]}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${item.start}px)`,
-                }}
-              >
-                <ParamRow name={names[item.index]!} />
-              </div>
-            ))}
+          <div className="la-row params-toolbar">
+            <LaInput
+              placeholder="Search parameters"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="la-grow"
+            />
           </div>
-        </div>
-        <p className="params-note">
-          {names.length} of {order.length} parameters. Changes stage here and are written from the
-          column beside them.
-          {/* Which documentation is on screen. Parameters are added and
+          <div className="params-scroll" ref={scrollRef}>
+            {/* The table's own empty state, inside the frame where the rows
+                would be -- not a card standing in for the screen. It covers
+                a filter that matched nothing as well as a set that has not
+                been loaded, because both are the same news: there is
+                nothing here to read. */}
+            {names.length === 0 && (
+              <p className="app-placeholder params-empty">
+                {order.length === 0
+                  ? 'Connect a vehicle or open a file to view parameters.'
+                  : `Nothing matches “${filter}”.`}
+              </p>
+            )}
+            <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+              {virtualizer.getVirtualItems().map((item) => (
+                <div
+                  key={names[item.index]}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${item.start}px)`,
+                  }}
+                >
+                  <ParamRow name={names[item.index]!} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="params-note">
+            {names.length} of {order.length} parameters
+            {source === 'file' ? ` from ${fileName ?? 'a file'} — not a vehicle.` : '.'}
+            {source === 'vehicle' &&
+              ' Changes stage here and are written from the column beside them.'}
+            {/* Which documentation is on screen. Parameters are added and
                 re-scaled between releases, so a hint from the wrong version
                 is worse than no hint -- worth one line to say. */}
-          {metadataSource && ` Hints from ArduPilot ${metadataSource}.`}
-        </p>
+            {metadataSource && ` Hints from ArduPilot ${metadataSource}.`}
+          </p>
+        </div>
 
         <aside className="app-col-shell">
           <ParamSidebar />

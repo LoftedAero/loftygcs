@@ -80,7 +80,7 @@ export default function LogsTab() {
 
         <div className="log-main">
           {!log ? (
-            <Welcome status={status} busy={busy} onOpen={() => void open()} />
+            <Welcome status={status} />
           ) : upper === 'none' ? (
             <LogReplay />
           ) : (
@@ -222,31 +222,27 @@ export default function LogsTab() {
   )
 }
 
-function Welcome({
-  status,
-  busy,
-  onOpen,
-}: {
-  status: ReturnType<typeof useLogStore.getState>['status']
-  busy: boolean
-  onOpen: () => void
-}) {
+/**
+ * The empty pane, before a log is open.
+ *
+ * No Open button: the actions column beside it already has one, and two
+ * copies of a control are two things to keep in step. What is left here is
+ * the one line saying what the screen is for, and the progress of a file
+ * being read -- which is not a control and appears nowhere else, the column
+ * showing only a log's name once there is one.
+ */
+function Welcome({ status }: { status: ReturnType<typeof useLogStore.getState>['status'] }) {
   return (
     <div className="log-welcome">
-      <h2 className="log-welcome__title">Flight logs</h2>
+      {/* One line, and no heading: the rail already says which screen this
+          is, and what was here described the screen to someone standing on
+          it. What the two paragraphs said -- that parsing happens in this
+          window, and that channels are named from the log's own parameters
+          -- is true of every log opened here and needs saying no more than
+          any other implementation detail does. */}
       <p className="app-placeholder">
-        Open a dataflash <code>.bin</code> to plot it and read its records. Parsing happens in this
-        window — the log is not uploaded anywhere.
+        Open a dataflash <code>.bin</code> to plot and review a log.
       </p>
-      <p className="app-placeholder">
-        RC and servo channels are named by what they do on the aircraft that flew, read from the
-        parameters stored inside the log itself.
-      </p>
-      <div className="la-row">
-        <LaButton variant="primary" disabled={busy} onClick={onOpen}>
-          Open log file
-        </LaButton>
-      </div>
       {status.kind === 'reading' && (
         <LaHint>
           Reading {status.name} — {Math.round((status.got / Math.max(1, status.total)) * 100)}%

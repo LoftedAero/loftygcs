@@ -115,13 +115,35 @@ function CompareButton() {
 function ImportButton() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [warning, setWarning] = useState(false)
-  const [result, setResult] = useState<{ file: string; applied: number; skipped: number } | null>(
-    null,
-  )
+  const [result, setResult] = useState<{
+    file: string
+    applied: number
+    /** True when the file *became* the set rather than staging against one. */
+    opened: boolean
+    skipped: number
+  } | null>(null)
 
   const onFile = async (file: File) => {
     const { entries, skipped } = parseParamFile(await file.text())
-    const { entries: current, edit } = useParamStore.getState()
+    const { entries: current, edit, loadedFile } = useParamStore.getState()
+
+    // Nothing loaded: the file becomes what is on screen. "Import" means
+    // bring this file in, and with an empty table that is the whole of it --
+    // staging differences against nothing applies nothing, which is what
+    // this did before and looked like a broken button. A file opened this
+    // way is marked as a file, so nothing offers to write it to an aircraft.
+    if (current.size === 0) {
+      loadedFile(
+        // A file says nothing about a parameter's MAVLink type. REAL32 is
+        // what Mission Planner assumes, and it only matters for a set that
+        // can be written -- which this one cannot be, being a file.
+        entries.map((e) => ({ name: e.name, value: e.value, mavType: 9 })),
+        file.name,
+      )
+      setResult({ file: file.name, applied: entries.length, opened: true, skipped: skipped.length })
+      return
+    }
+
     let applied = 0
     for (const e of entries) {
       const cur = current.get(e.name)
@@ -130,7 +152,7 @@ function ImportButton() {
         applied++
       }
     }
-    setResult({ file: file.name, applied, skipped: skipped.length })
+    setResult({ file: file.name, applied, opened: false, skipped: skipped.length })
   }
 
   return (
@@ -146,7 +168,17 @@ function ImportButton() {
           e.target.value = ''
         }}
       />
-      <LaButton variant="ghost" size="block" onClick={() => setWarning(true)}>
+      <LaButton
+        variant="ghost"
+        size="block"
+        onClick={() => {
+          // The warning is about taking one aircraft's measured numbers onto
+          // another. With nothing loaded there is no aircraft to take them
+          // onto, so asking would be a dialog about a risk that is not there.
+          if (useParamStore.getState().entries.size === 0) fileRef.current?.click()
+          else setWarning(true)
+        }}
+      >
         Import all from file
       </LaButton>
 
@@ -188,7 +220,7 @@ function ImportButton() {
 
       <LaModal
         open={result !== null}
-        title="Imported"
+        title={result?.opened ? 'Opened' : 'Imported'}
         actions={
           <LaButton variant="primary" onClick={() => setResult(null)}>
             Close
@@ -196,8 +228,9 @@ function ImportButton() {
         }
       >
         <p className="app-placeholder">
-          Staged {result?.applied ?? 0} change{result?.applied === 1 ? '' : 's'} from {result?.file}{' '}
-          — nothing has been written yet. Review them with Write params, or Revert to drop them.
+          {result?.opened
+            ? `Opened ${result.applied} parameter${result.applied === 1 ? '' : 's'} from ${result.file}. These are the file's, not a vehicle's.`
+            : `Staged ${result?.applied ?? 0} change${result?.applied === 1 ? '' : 's'} from ${result?.file} — nothing has been written yet. Review them with Write params, or Revert to drop them.`}
         </p>
         {(result?.skipped ?? 0) > 0 && (
           <LaHint error>

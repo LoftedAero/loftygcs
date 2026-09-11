@@ -1,5 +1,6 @@
 import type { ConnectionPhase } from '../../stores/connection-store'
 import { SENSOR_BITS } from '../../protocol/sensors'
+import type { FirmwareVersion } from '../../protocol/types'
 import { armReadiness, isFailsafe } from '../tabs/flight/hud-draw'
 
 // What the app bar says about the vehicle, as one word.
@@ -170,4 +171,34 @@ export function barLink(rcRssi: number, packetsPerSec: number | undefined): stri
   if (rcRssi >= 0) return `RSSI ${Math.round((rcRssi / 254) * 100)}%`
   if (packetsPerSec !== undefined && packetsPerSec > 0) return `${packetsPerSec.toFixed(0)} pkt/s`
   return ''
+}
+
+/**
+ * What the vehicle is running: the firmware's vehicle type and version.
+ *
+ * The only value in this row that is not a live reading -- it is fixed for
+ * the life of a connection -- which is why it sits beside the state chip
+ * rather than among the gauges, and why it carries a reserved width with a
+ * dash in it: AUTOPILOT_VERSION arrives a beat after the heartbeat, and a
+ * slot that grows from nothing at that moment would shove four gauges
+ * sideways just as someone starts reading them.
+ *
+ * The release type is shown only when it is *not* an official build.
+ * FIRMWARE_VERSION_TYPE is 255 for a release and 0/64/128/192 for dev,
+ * alpha, beta and rc, and "you are not on a stable build" is the one thing
+ * about it worth a pilot's attention -- spelling out "official" on every
+ * ordinary vehicle would be noise on a 52px bar.
+ */
+export function barFirmware(vehicleName: string, fw: FirmwareVersion | null): string {
+  if (!fw) return '—'
+  const v = `${fw.major}.${fw.minor}.${fw.patch}`
+  const kind = FIRMWARE_KIND[fw.type]
+  return `${vehicleName || 'Vehicle'} ${v}${kind ? `-${kind}` : ''}`
+}
+
+const FIRMWARE_KIND: Record<number, string> = {
+  0: 'dev',
+  64: 'alpha',
+  128: 'beta',
+  192: 'rc',
 }

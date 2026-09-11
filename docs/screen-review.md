@@ -73,9 +73,11 @@ menus.
 
 - [ ] Overlays
 
-## Mission
+## Plan
 
-**Approved 2026-09-08.** Covers all three plans and the shared column.
+**Approved 2026-09-08.** Covers all three plans and the shared column. The
+mode is labeled "Plan"; the plan it opens on is still called Mission, and the
+tab id is still `mission`.
 
 - [x] Disconnected
 - [x] Connected
@@ -105,8 +107,95 @@ Note: its normal state *is* disconnected — a board in bootloader mode is not
 a connection. Flashing itself is still gated on hardware
 (`docs/hardware-checklist.md`).
 
+Board first, then firmware, in three numbered steps. **1 Board** holds Detect
+board and, beside it, the readout of what was found (`—` until there is
+something). Detect identifies what is attached *and* how it can be flashed —
+the ArduPilot bootloader takes the `.apj` over its port, a board in DFU mode
+takes the `_with_bl.hex` over USB. Only then are **2 Vehicle**'s tiles, **3
+Release**'s list and the file picker offered, each narrowed to that board;
+Flash board sits beside the release rather than on a row of its own. Every
+control is one width from one token, and the status is plain text under
+them rather than a panel.
+
 - [ ] Disconnected
 - [ ] Connected
+- [ ] Nothing is offered before a board is detected: tiles and Open file
+      disabled, the line reads "Detect a board to flash. A board that has
+      never run ArduPilot must be in DFU mode."
+- [ ] The three steps line up: one left edge for the readout, the dropdown
+      and both buttons, and the status text starts on it too
+- [ ] The card is its own width, not the width of the page
+- [ ] The step numbers are legible in **both** themes (soft disc, deep ink —
+      white on blue was ~3.5:1 at 11px)
+- [ ] Detect board is refused while armed, while flying, and during a
+      failsafe — disabled, with the reason on the status line
+- [ ] Detect board while connected and standing still: asks before it
+      reboots, and says nothing is erased
+- [ ] The symbols draw immediately on a cold start, before the build list
+      lands, and do not reorder when it does
+- [ ] Nothing on the card changes height on any input; the status line
+      says what is happening at every step
+- [ ] Detect board with a board running ArduPilot: **one** port chooser,
+      then the board line shows the right id (a Cube Orange is 140, a Cube
+      Orange+ 1063)
+- [ ] Detect board while **connected** over MAVLink: the link drops, no
+      chooser — it is not refused. Armed is refused
+- [ ] Detect board with a board already in its bootloader: no chooser
+- [ ] A detect that finds nothing says "Could not detect board, please
+      retry." rather than a browser exception
+- [ ] Cancelling the port chooser stops quietly, and DFU is still offered
+- [ ] A vehicle with no build for this board is disabled, not missing
+- [ ] A board id that fits several builds prompts on the vehicle click,
+      narrowed to those builds
+- [ ] No vehicle picked yet reads "Pick a vehicle type."
+- [ ] Copter, Heli and Plane carry no warning; Rover, Sub, Tracker, Blimp
+      and AP Periph read "This app is tested for Copter and Plane — some
+      functions may not work properly for X"
+- [ ] Flash, then cancel at the confirm: the board boots its existing
+      firmware, and the board line clears — it is not that board any more
+- [ ] Detecting again, and leaving the tab, both boot the old board
+- [ ] An older release picked from the dropdown, and a beta at the same
+      version number as the stable
+
+With a firmware file opened (Open file, or a build fetched from the custom
+builder) — the file wins over the release, so both rows must say so:
+
+- [ ] Step 3 shows the file's name, and the dropdown is closed: no version
+      is displayed that is not what will be written
+- [ ] No vehicle tile is lit while a file is loaded
+- [ ] Clicking a vehicle tile drops the file and returns to the release list
+
+With a board in DFU mode (BOOT0 held while plugging in):
+
+- [ ] Detect board finds it and asks for the target, from the flat catalog
+- [ ] First detect of a board this browser has never been granted: it is
+      reached *after* the serial path fails, so a port chooser may appear
+      first — check the wording gets somebody through it
+- [ ] The board line reads "DFU mode · TARGET" and fits without clipping
+- [ ] Open file offers only `.hex`; an `.apj` dragged past it is refused
+      with "this board takes the _with_bl.hex"
+- [ ] An app-only `.hex` (first record not at 0x08000000) is refused
+- [ ] An image bigger than the board's flash is refused before any erase
+- [ ] Custom build says to download the `_with_bl.hex`
+- [ ] A full flash: erase, write, verify, leave, and the board re-enumerates
+      with its MAVLink and SLCAN ports. Validated once on a TBS_LUCID_H7_WING
+      at 208 s total (erase 76, write 124, verify 8) — a write much slower
+      than that is the per-block regression described in `CLAUDE.md`
+- [ ] The phase labels read as one voice: Contacting / Erasing / Writing /
+      Verifying / Rebooting / Leaving
+- [ ] A stalled board says to unplug it and hold BOOT, not "controlTransferOut
+      failed"
+
+In the **browser** build, where there is no manifest (CORS) and no shell to
+answer the choosers:
+
+- [ ] The line reads "The web version of this app can only flash firmware
+      from a file.", tiles and release stay disabled, Open file works
+- [ ] A `.apj` opened from a file flashes over the serial bootloader
+- [ ] DFU is Chrome/Edge only — Firefox has Web Serial but no WebUSB, and
+      should say so rather than fail obscurely
+- [ ] A board in DFU mode is adopted with no target prompt (there is no
+      catalog to pick from) and the line reads "DFU mode · N KB flash"
 
 ### Configuration
 
@@ -180,14 +269,17 @@ Now split into subtabs, with the gains drawn as a matrix.
 
 ### Parameter List
 
-- [ ] Disconnected
+- [ ] Disconnected — opens a .param file; Write and Reload stay greyed even
+      once a vehicle connects, because a file is not that aircraft
 - [ ] Connected
 - [ ] Search, a bitmask editor, dirty highlighting
 - [ ] File import/export and the compare dialog
 
 ## Data
 
-### Logs
+### Log Review
+
+Still the tab id `logs`.
 
 - [ ] Disconnected
 - [ ] Connected
@@ -212,6 +304,18 @@ merged view and a file written there never comes back in the listing.
 
 ---
 
+### The Setup rail itself
+
+With nothing connected it lists only Firmware, Parameter List and Logs;
+everything else needs a live aircraft and leaves, Overview included. Worth
+checking that the three group headings still earn their space with one item
+each, and that losing the link while on a vehicle-only tab lands somewhere
+rather than nowhere.
+
+- [ ] Disconnected
+- [ ] Connected
+- [ ] Disconnecting while on Sensors (or any vehicle-only tab)
+
 ## Dialogs, overlays and the app bar
 
 Not screens in the rail, but everything here is something someone sees, and
@@ -230,7 +334,10 @@ Failsafe.
 - [ ] Connected
 - [ ] A vehicle with no battery monitor and no GPS — those readings should be
       absent, not zero
-- [ ] Narrow: readings drop at 1400px, the word at 1080px
+- [ ] The firmware and version readout, which is what a flash changes —
+      cross-check it against the Firmware tab after one
+- [ ] Narrow: the firmware readout drops at 1700px, the other readings at
+      1500px, the status word at 1080px
 
 ### Action bar
 

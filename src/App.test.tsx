@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, fireEvent } from '@testing-library/react'
 import App from './App'
 import AppBar from './ui/shell/AppBar'
-import { MODES, TABS, useUiStore } from './stores/ui-store'
+import { MODES, TABS, useUiStore, visibleTabs } from './stores/ui-store'
+import { useConnectionStore } from './stores/connection-store'
 
 // Testing Library only auto-cleans between tests when the runner exposes
 // globals; we keep globals off, so unmount explicitly.
@@ -10,24 +11,54 @@ afterEach(cleanup)
 beforeEach(() => useUiStore.setState({ mode: 'setup', activeTab: 'overview' }))
 
 describe('app shell', () => {
-  it('renders every setup section in the rail and switches between them', () => {
+  it('lists only the sections that work with no vehicle, and switches between them', () => {
+    // The rail is a list of what can be done now. A vehicle-only screen is
+    // not in it -- Mission Planner's behaviour, and its wiki says so: "You
+    // will only see this menu item if the autopilot is connected." What this
+    // replaced was a card on each of eleven tabs describing the screen you
+    // could not use, which none of QGC, Mission Planner or Betaflight does.
     render(<App />)
-    for (const tab of TABS) {
+    for (const tab of visibleTabs(false)) {
       expect(screen.getByRole('button', { name: tab.label })).toBeTruthy()
     }
-    // Overview draws its readouts with no vehicle, the way Fly does -- it
-    // used to be a card describing the app, which is what this line used to
-    // assert. Pinned on the readouts rather than on any one label: the
-    // property is that the screen renders itself instead of describing
-    // itself.
-    expect(screen.getByRole('heading', { name: 'GPS' })).toBeTruthy()
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    for (const tab of TABS.filter((t) => !visibleTabs(false).some((v) => v.id === t.id))) {
+      expect(screen.queryByRole('button', { name: tab.label })).toBeNull()
+    }
+    // Sensors is the shape of the ones that go: nothing on it can be done
+    // without an aircraft answering. So is Overview -- it draws itself
+    // rather than describing itself, which is why it survived the earlier
+    // pass, but what it draws is a vehicle.
+    expect(screen.queryByRole('button', { name: 'Sensors' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Overview' })).toBeNull()
     // Found through TABS rather than by a hardcoded label: this broke on a
     // rename that had nothing to do with what it is testing, which is that
     // clicking a rail item mounts its screen.
     const params = TABS.find((t) => t.id === 'parameters')!
     fireEvent.click(screen.getByRole('button', { name: params.label }))
-    expect(screen.getByText(/Connect a vehicle to load its parameters/)).toBeTruthy()
+    // The ordinary screen with an empty table, not a disconnected-only card:
+    // the column beside it already carries the control that fills it.
+    expect(screen.getByPlaceholderText('Search parameters')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Import all from file/i })).toBeTruthy()
+  })
+
+  it('leaves a vehicle-only tab when the vehicle goes', () => {
+    // Nobody should be left looking at a screen the rail no longer offers.
+    useUiStore.setState({ mode: 'setup', activeTab: 'sensors' })
+    render(<App />)
+    // The top of what is left, read from the list rather than named here.
+    expect(useUiStore.getState().activeTab).toBe(visibleTabs(false)[0]!.id)
+  })
+
+  it('draws the Overview readouts once there is a vehicle to read', () => {
+    // Overview renders itself rather than describing itself -- it used to be
+    // a card describing the app. Asserted with a vehicle now, because that
+    // is the only state it is reachable in.
+    useConnectionStore.setState({ phase: 'connected' })
+    useUiStore.setState({ mode: 'setup', activeTab: 'overview' })
+    render(<App />)
+    expect(screen.getByRole('heading', { name: 'GPS' })).toBeTruthy()
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    useConnectionStore.setState({ phase: 'idle' })
   })
 
   it('switches top-level modes and hides the rail outside Setup', () => {
@@ -46,12 +77,14 @@ describe('app shell', () => {
     // is the property that makes drawing it safe, so it is the one pinned.
     expect(screen.getByRole('button', { name: 'RTL' }).hasAttribute('disabled')).toBe(true)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Mission' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Plan' }))
     // The planner stands on its own without a vehicle: a mission can be
     // built and saved to a file before anything is connected.
     // The actions column's heading, not one of its buttons: this is asserting
     // that the planner mounted, and it has now broken twice on button wording
-    // that was being tuned for entirely unrelated reasons.
+    // that was being tuned for entirely unrelated reasons. Still "Mission"
+    // while the mode above it is "Plan": the mode edits three plans and this
+    // names the one selected.
     expect(screen.getByRole('heading', { name: 'Mission' })).toBeTruthy()
     expect(screen.getByText(/No items yet/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Firmware' })).toBeNull()
@@ -64,7 +97,9 @@ describe('app shell', () => {
     render(<App />)
     expect(screen.getByRole('tab', { name: 'Setup' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tab', { name: 'Fly' }).getAttribute('aria-selected')).toBe('false')
-    expect(screen.getByRole('button', { name: 'Overview' }).getAttribute('aria-current')).toBe(
+    const first = visibleTabs(false)[0]!
+    useUiStore.setState({ activeTab: first.id })
+    expect(screen.getByRole('button', { name: first.label }).getAttribute('aria-current')).toBe(
       'page',
     )
   })

@@ -8,6 +8,7 @@ import { batteryLabel, gpsKind, gpsUsable, linkLabel } from '../tabs/flight/hud-
 import { useParamStore } from '../../stores/param-store'
 import {
   barBattery,
+  barFirmware,
   barLink,
   barStatus,
   batteryFill,
@@ -52,6 +53,7 @@ export default function AppStatus() {
   const sensorsHealth = useVehicleStore((s) => s.sensorsHealth)
   const vehicleName = useVehicleStore((s) => s.vehicleName)
   const modeName = useVehicleStore((s) => s.modeName)
+  const firmware = useVehicleStore((s) => s.firmware)
   const batteryV = useVehicleStore((s) => s.batteryV)
   const batteryA = useVehicleStore((s) => s.batteryA)
   const batteryPct = useVehicleStore((s) => s.batteryPct)
@@ -119,6 +121,24 @@ export default function AppStatus() {
           <span className="app-status__dot" aria-hidden="true" />
           <span className="app-status__word">{status.text}</span>
         </span>
+      )}
+
+      {/* Not a reading: what the vehicle is running, fixed for the life of
+          the connection. It sits with the state rather than among the
+          gauges because those three change and this does not, and it keeps
+          a reserved width with a dash in it so the moment
+          AUTOPILOT_VERSION lands is not the moment the gauges jump. */}
+      {present && (
+        <Item
+          slot="firmware"
+          cap="Firmware"
+          value={barFirmware(vehicleName, firmware)}
+          title={
+            firmware
+              ? `Firmware — ${barFirmware(vehicleName, firmware)}`
+              : 'Firmware — the vehicle has not reported its version'
+          }
+        />
       )}
 
       {/* The three readings are always drawn while a vehicle is connected,
@@ -201,7 +221,7 @@ function Item({
   tone,
   title,
 }: {
-  slot: 'mode' | 'battery' | 'gps' | 'link'
+  slot: 'mode' | 'firmware' | 'battery' | 'gps' | 'link'
   cap: string
   icon?: ReactNode
   value: string

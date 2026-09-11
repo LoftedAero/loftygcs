@@ -100,7 +100,7 @@ export default function OsdWorkspace() {
     <div className="osd-workspace">
       <LaCard
         title="Panels"
-        note="Panels this firmware does not support are not listed. Positions are per screen."
+        note="Positions are per screen."
         className="osd-workspace__panels"
       >
         <div className="osd-palette-scroll">

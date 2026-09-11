@@ -30,6 +30,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@mdi/js": "^7.4.47",
     "@tanstack/react-virtual": "^3.14.10",
     "cesium": "^1.145.0",
     "leaflet": "^1.9.4",

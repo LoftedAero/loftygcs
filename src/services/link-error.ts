@@ -95,3 +95,52 @@ export function describeLinkError(err: unknown, opts: TransportOptions): string 
   if (code) return BY_CODE[code]!(linkTarget(opts))
   return message || 'The connection failed.'
 }
+
+/**
+ * Flight-controller USB vendors, for telling "wrong port" from "wrong kind
+ * of thing plugged in".
+ *
+ * Deliberately vendors rather than vendor/product pairs, and deliberately
+ * short. The point is not to identify the board -- `identifyBoard` does that
+ * properly, by asking its bootloader -- but to decide which of two sentences
+ * is more useful when a port opens and then says nothing. Getting it wrong
+ * in either direction costs a slightly-off hint, never a wrong action.
+ *
+ * `0x1209` is the generic ArduPilot/pid.codes vendor, measured on the bench
+ * as the Cube's own (`VID_1209&PID_5740`); `0x2dae` is CubePilot and
+ * `0x26ac` Hex/3DR.
+ */
+const FC_VENDORS = new Set([0x1209, 0x2dae, 0x26ac])
+
+/**
+ * Why a serial link opened, stayed open, and never said anything.
+ *
+ * The generic answer covers a wrong baud rate, a board running something
+ * that is not ArduPilot, and a USB-serial adapter with nothing on the other
+ * end. But there is a case worth naming, because the browser cannot: **a
+ * flight controller exposes more than one serial port**. A Cube offers
+ * MAVLink and SLCAN, and Chrome's port chooser labels neither -- it is the
+ * browser's own dialog, outside the page, showing the USB product string
+ * rather than the Windows driver name the desktop shell can read. Picking
+ * SLCAN opens perfectly well and answers nothing, which reads as a dead
+ * vehicle rather than as the wrong port of a healthy one.
+ *
+ * So when the thing that went quiet is a flight controller's own USB
+ * vendor, the likeliest explanation is named.
+ *
+ * Both branches open on "No heartbeat received", which is Mission Planner's
+ * phrase for this condition and therefore the one an ArduPilot user already
+ * knows. Only the second sentence differs, by what the port let us work out:
+ * the condition is the same either way, and giving it two names would make
+ * the same failure look like two.
+ */
+export function describeSilentLink(usb?: {
+  usbVendorId?: number | undefined
+  usbProductId?: number | undefined
+}): string {
+  const vendor = usb?.usbVendorId
+  if (vendor !== undefined && FC_VENDORS.has(vendor)) {
+    return 'No heartbeat received. For flight controllers offering multiple ports, choose the MAVLink port rather than SLCAN.'
+  }
+  return 'No heartbeat received. Check the connection settings, and that the board is running ArduPilot.'
+}

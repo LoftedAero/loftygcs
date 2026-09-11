@@ -54,11 +54,21 @@ describe('the app bar status row', () => {
   })
 
   it('keeps the same set of readings whatever the vehicle carries', () => {
-    // No battery monitor, no GPS, no RC. All four are still drawn, so the
+    // No battery monitor, no GPS, no RC. All five are still drawn, so the
     // row is one shape across aircraft rather than one per sensor fit.
     connected({ sensorsPresent: SENSOR_BITS.prearm, batteryV: 0, batteryPct: -1, rcRssi: -1 })
     const { container } = render(<AppStatus />)
-    expect(container.querySelectorAll('.app-status__item')).toHaveLength(4)
+    expect(container.querySelectorAll('.app-status__item')).toHaveLength(5)
+  })
+
+  it('draws the firmware slot before the vehicle has reported a version', () => {
+    // AUTOPILOT_VERSION arrives a beat after the heartbeat. The slot has to
+    // be there already, holding a dash: appearing later would shove the four
+    // gauges sideways exactly as someone starts reading them.
+    connected({ sensorsPresent: SENSOR_BITS.prearm })
+    const { container } = render(<AppStatus />)
+    const fw = container.querySelector('.app-status__item--firmware .app-status__val')
+    expect(fw?.textContent).toBe('—')
   })
 
   it('shows a dash rather than a zero for a reading the vehicle has not made', () => {

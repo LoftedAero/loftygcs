@@ -62,7 +62,7 @@ export default function FilesTab() {
 
   if (!connected) {
     return (
-      <LaCard title="MAVFTP" note="The files on the vehicle.">
+      <LaCard title="MAVFTP">
         <p className="app-placeholder">Connect a vehicle to browse its files.</p>
       </LaCard>
     )

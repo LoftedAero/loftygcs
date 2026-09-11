@@ -45,6 +45,28 @@ reads across.
 
 ## What a screen says when it has nothing to say
 
+### A navigation list offers what can be done now
+
+With nothing connected, a screen that needs a live aircraft leaves the rail
+rather than sitting there describing itself. Eleven Setup tabs each rendered a
+card naming the screen and listing its contents; none of QGroundControl,
+Mission Planner or Betaflight does that, and Mission Planner's wiki states the
+rule outright — *"You will only see this menu item if the autopilot is
+connected."*
+
+> *"I'm starting to think about what we should and should not show when a
+> vehicle is not connected at all."*
+
+The line is not planning-vs-setup. It is **does this need a live exchange with
+this aircraft**: a screen whose subject is a *document* — a mission, a
+parameter file, a firmware image, the app's own settings — works offline; one
+whose subject is *live vehicle state* does not.
+
+Two things that follow. Somebody on a screen that disappears has to be taken
+somewhere, not left staring at it. And a screen kept for offline use has to
+say what it is working on: a parameter file opened with nothing connected must
+not offer to write itself to an aircraft, even after one connects.
+
 ### A screen renders itself, never a description of itself
 
 Disabled, not absent. If a screen cannot be used yet, draw it and switch its
@@ -395,6 +417,53 @@ rather than occupying a row of its own forever.
 > *"Can the 'from vehicle' button be something that appears when the user
 > clicks on the home icon and not a dedicated one below it?"*
 
+### Work the screen starts by itself may not prompt
+
+A screen that can answer a question for you should try, and the attempt has
+to be silent. The Firmware tab probes the attached bootloader the moment a
+vehicle is picked, because that click is the user gesture opening a serial
+port requires — but `requestPort()` also puts the browser's port chooser on
+screen, so the first version asked which port to use every time somebody
+clicked a vehicle symbol and then sat on "Checking the board…" until it was
+answered. A prompt raised by work nobody asked for is worse than not doing
+the work.
+
+> *"Run the board detection in the background after the user chooses, only
+> prompting the user to specify the target if it fails."*
+
+So the automatic probe reads only a port already granted and gives up
+otherwise; the flash, which somebody pressed, is allowed to ask. The same
+split applies to anything speculative: it may use what it has and must not
+go looking.
+
+And when the app *can* answer, it should not ask at all. The bootloader's
+port is a fact -- the one that appeared while the board rebooted -- so the
+desktop shell answers that request itself and only shows a chooser when the
+difference is not exactly one port.
+
+> *"can we make it automatically detect the bootloader port? Especially
+> since we know the list of available ports from the choice right before?"*
+
+Say that it is running, though. A field appearing by itself a second after a
+click reads as the app changing its mind.
+
+### Ask first for the thing that cannot be derived
+
+Order the questions on a screen by which ones the screen can answer itself.
+A board says which hardware it is and never which airframe it should run, so
+Firmware asks for the vehicle first — as symbols, since there are eight of
+them and a picture is faster to find than a line in a dropdown — and derives
+the board, the version and everything below it from that one answer.
+
+> *"Mission Planner seems to be able to tell which build target is
+> appropriate for a connected board without asking. It only prompts if
+> that's somehow ambiguous."* · *"I would like to use symbols for the various
+> ArduPilot firmware vehicle choices, just like Mission Planner."*
+
+A question the screen has answered outright is then not asked: the board
+field is drawn only when detection found several builds, or none. Keep the
+readout either way, so what was chosen is still visible.
+
 ### A setting that stamps the next thing goes on that thing's header
 
 Default altitude and altitude frame sit on the item list's title bar,
@@ -504,6 +573,31 @@ Two lines that are never both true are one line.
 
 > *"Does 'Imagery ends at zoom n' and 'X of Y tiles missing' ever appear at
 > the same time? If not, we can merge that row"*
+
+### Never explain what the app is about to do
+
+A line describing behavior before it happens is a line nobody needs. *"The
+board is identified when you flash, and asked for if it cannot be"* is true,
+and it still went: if the app can work it out, it should do so silently, and
+if it cannot, the question it asks at that moment explains itself.
+
+> *"technically true - but the user doesn't have to know this in advance"*
+
+The test is what the reader does differently for having read it, **right
+now**. No answer means cut it, and prefer an empty slot to a filled one.
+
+Two corollaries. Reassurance about something that has not happened — *"this
+is recoverable"*, *"nothing is erased until…"* — belongs in the confirm
+dialog for that action, where it is actually read, not as standing text on
+the screen beside it; safety copy is not exempt, it is the strongest case,
+because standing warnings are the ones people learn to skip. And pre-emptive
+copy rots: the same card carried *"press Detect board"* for a while after
+that button was deleted, because nothing about the sentence knew.
+
+This does not mean deleting domain knowledge. *"Set them from a real flight
+log, not a bench reading"* changes the number someone types and earns its
+place. The rule is about describing **the app's own machinery**, not about
+telling somebody something true about their aircraft.
 
 ### Trim the explanation once the mechanism is settled
 

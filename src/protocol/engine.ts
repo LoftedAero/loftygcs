@@ -246,6 +246,7 @@ export class ProtocolEngine {
           this.streamsRequested = true
           this.requestStreams()
           this.requestVersion()
+          this.requestBanner()
         }
         return
       }
@@ -384,6 +385,28 @@ export class ProtocolEngine {
   private requestVersion() {
     if (this.vehicleSysid === null) return
     void this.commands.run(520, [1, 0, 0, 0, 0, 0, 0]).catch(() => {})
+  }
+
+  /**
+   * Ask the vehicle to say its boot banner again.
+   *
+   * MAV_CMD_DO_SEND_BANNER (42428), ArduPilot's own, and what Mission
+   * Planner sends for the same reason. The banner is where the **frame**
+   * is announced -- "QuadPlane initialised, Frame: F-35B" -- and
+   * `vehicle-store` latches that to draw the aircraft as itself rather than
+   * as a generic plane.
+   *
+   * Without this the line is only ever heard by a GCS that happened to be
+   * attached when the vehicle booted: it is sent once, and the status feed
+   * is a capped ring it scrolls out of. Connect to a vehicle already
+   * running -- which is the normal case -- and the app could not know what
+   * it was looking at. The command is fired and forgotten like the version
+   * request: a vehicle that does not implement it answers UNSUPPORTED and
+   * nothing here depends on the reply, only on the STATUSTEXTs that follow.
+   */
+  private requestBanner() {
+    if (this.vehicleSysid === null) return
+    void this.commands.run(42428, [0, 0, 0, 0, 0, 0, 0]).catch(() => {})
   }
 
   private sendFtpPayload(payload: number[]) {

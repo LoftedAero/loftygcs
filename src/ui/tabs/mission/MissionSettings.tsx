@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { LaField, LaHint, LaInput } from '../../components/La'
+import { LaField, LaHint, LaInput, LaSelect } from '../../components/La'
 import { useParamStore } from '../../../stores/param-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { connectionService } from '../../../services/connection'
+import { usePreferencesStore } from '../../../stores/preferences-store'
+import { usePlanVehicleIsAssumed } from './plan-vehicle'
+import type { VehicleClass } from '../../../protocol/modes'
 
 // What is left of the mission settings column: the vehicle parameters that
 // happen to be about mission flying.
@@ -35,17 +38,56 @@ const RADIUS_PARAMS = [
 export default function RadiusParams() {
   const entries = useParamStore((s) => s.entries)
   const connected = useConnectionStore((s) => s.phase === 'connected')
+  const assumed = usePlanVehicleIsAssumed()
   const present = RADIUS_PARAMS.filter((p) => entries.has(p.name))
-  if (present.length === 0) return null
+  // The class picker stands on its own: with nothing connected there are no
+  // radius parameters to show, and that is exactly when it is needed.
+  if (present.length === 0 && !assumed) return null
 
   return (
     <section className="app-col__group">
       <h3 className="app-col__head">Vehicle</h3>
+      {assumed && <PlanForPicker />}
       {present.map((p) => (
         <RadiusField key={p.name} name={p.name} label={p.label} unit={p.unit} enabled={connected} />
       ))}
-      <LaHint>Stored on the vehicle, not in the mission. Written when you press Enter.</LaHint>
+      {present.length > 0 && (
+        <LaHint>Stored on the vehicle, not in the mission. Written when you press Enter.</LaHint>
+      )}
     </section>
+  )
+}
+
+/**
+ * What to plan for when nothing is connected.
+ *
+ * The command set is not the same for every aircraft -- spline waypoints and
+ * payload place are Copter-only, and ArduPlane refuses them on upload -- so a
+ * plan made offline has to be made *for* something. QGroundControl asks the
+ * same question for the same stated reason; Mission Planner does not, always
+ * assumes Copter, and has an open issue about it.
+ *
+ * Shown only while the vehicle is unknown. A connected aircraft answers this
+ * itself and is never overridden by a preference.
+ */
+function PlanForPicker() {
+  const planFor = usePreferencesStore((s) => s.planFor)
+  const setPlanFor = usePreferencesStore((s) => s.setPlanFor)
+  return (
+    <>
+      <LaField label="Planning for" htmlFor="plan-for">
+        <LaSelect
+          id="plan-for"
+          value={planFor}
+          onChange={(e) => setPlanFor(e.target.value as VehicleClass)}
+        >
+          <option value="copter">Copter</option>
+          <option value="plane">Plane</option>
+          <option value="rover">Rover</option>
+        </LaSelect>
+      </LaField>
+      <LaHint>Decides which commands this plan can use. A connected vehicle sets it itself.</LaHint>
+    </>
   )
 }
 

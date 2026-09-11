@@ -21,6 +21,17 @@ interface ParamState {
   entries: Map<string, ParamEntry>
   order: string[]
   loadState: ParamLoadState
+  /**
+   * Where the set on screen came from.
+   *
+   * A file is not an aircraft. Everything that writes has to know the
+   * difference, and so does the person reading the table -- editing a saved
+   * configuration and editing the thing in front of you look identical
+   * otherwise.
+   */
+  source: 'vehicle' | 'file' | null
+  /** The file's name, when `source` is 'file'. */
+  fileName: string | null
   progress: { got: number; total: number; source: 'ftp' | 'stream' } | null
   error: string | null
   dirtyCount: number
@@ -39,6 +50,7 @@ interface ParamState {
   beginDownload: () => void
   setProgress: (p: { got: number; total: number; source: 'ftp' | 'stream' }) => void
   loaded: (records: ParamRecord[]) => void
+  loadedFile: (records: ParamRecord[], fileName: string) => void
   merged: (records: ParamRecord[]) => void
   failed: (error: string) => void
   edit: (name: string, value: number) => void
@@ -67,6 +79,8 @@ export const useParamStore = create<ParamState>((set, get) => ({
   entries: new Map(),
   order: [],
   loadState: 'idle',
+  source: null,
+  fileName: null,
   progress: null,
   error: null,
   dirtyCount: 0,
@@ -86,7 +100,15 @@ export const useParamStore = create<ParamState>((set, get) => ({
       order.push(r.name)
     }
     order.sort()
-    set({ entries, order, loadState: 'ready', progress: null, dirtyCount: 0 })
+    set({
+      entries,
+      order,
+      loadState: 'ready',
+      progress: null,
+      dirtyCount: 0,
+      source: 'vehicle',
+      fileName: null,
+    })
   },
   /**
    * A second download folded into the set already on screen.
@@ -101,6 +123,32 @@ export const useParamStore = create<ParamState>((set, get) => ({
    * the vehicle now says it is staged *against*: if the vehicle has caught
    * up to the staged value, the edit is no longer an edit.
    */
+  /**
+   * A parameter file opened with nothing connected.
+   *
+   * Mission Planner has had this for years and it is the one thing its
+   * disconnected Config screen keeps: open a saved set, read it, compare it,
+   * edit it, save it again. Marked as a file so nothing offers to write it
+   * to an aircraft that is not there.
+   */
+  loadedFile: (records, fileName) => {
+    const entries = new Map<string, ParamEntry>()
+    const order: string[] = []
+    for (const r of records) {
+      const value = tidy(r.value)
+      entries.set(r.name, { value, origValue: value, mavType: r.mavType, dirty: false })
+      order.push(r.name)
+    }
+    set({
+      entries,
+      order,
+      loadState: 'ready',
+      progress: null,
+      dirtyCount: 0,
+      source: 'file',
+      fileName,
+    })
+  },
   merged: (records) => {
     const prev = get().entries
     const entries = new Map<string, ParamEntry>()
@@ -154,6 +202,8 @@ export const useParamStore = create<ParamState>((set, get) => ({
       entries: new Map(),
       order: [],
       loadState: 'idle',
+      source: null,
+      fileName: null,
       progress: null,
       error: null,
       dirtyCount: 0,

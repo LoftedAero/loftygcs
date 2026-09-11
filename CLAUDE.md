@@ -59,8 +59,12 @@ design decisions are recorded there and in code comments.
 - **Electron security**: contextIsolation + sandbox stay on. The whole privileged surface is
   `electron/preload.ts`, mirrored by `src/types/loftgcs.d.ts` — change them together.
 - **Branding**: app identity lives in `src/brand.ts` only ("Loft GCS" is a working name).
-- **Navigation** (`src/stores/ui-store.ts`): two levels. Top level is a *mode* — Fly, Mission,
-  Setup — switched from the app bar; only Setup has the tab rail, and the others
+- **Navigation** (`src/stores/ui-store.ts`): two levels. Top level is a *mode* — Fly, Plan,
+  Setup — switched from the app bar. **Labels move, ids never do**: `plan` is still `mission`
+  and "Log Review" is still `logs`, because a saved tab and every deep link already say the id.
+  "Plan" is QGroundControl's and Mission Planner's word for that view and the more accurate one
+  here, since the mode edits three plans and only one is a mission — the switch *inside* it
+  keeps "Mission" for the plan it names; only Setup has the tab rail, and the others
   (plus a running guide) take the whole window. **The app opens on Fly, and Fly draws with or
   without a vehicle.** It used to be a card describing what the screen would have shown, which
   meant the app opened on a description of itself; the map is worth looking at before anything is
@@ -87,6 +91,40 @@ design decisions are recorded there and in code comments.
   to it. The dot is the part that earns the bar space: a SITL left running in the background
   is otherwise invisible, and the cost of forgetting is a mystery TCP connection or a second
   simulator that will not bind.
+- **With no vehicle the rail lists only what can be done now** (`visibleTabs` in `ui-store`).
+  Eleven Setup tabs each rendered a card naming the screen and describing its contents, which
+  **none of QGroundControl, Mission Planner or Betaflight does** — researched rather than
+  assumed. The line the field draws is not planning-vs-setup but *does this need a live exchange
+  with this autopilot*: a screen whose subject is a **document** works offline, one whose subject
+  is **live vehicle state** does not. So `offline: true` marks Firmware (flashing is a
+  no-vehicle workflow in all three references), Parameter List (opens a `.param` file) and Logs
+  (opens a `.bin`); everything else leaves the rail, which is Mission Planner's behaviour and
+  stated in its own wiki. **Overview is deliberately not one** — it draws itself rather than
+  describing itself, which is why it survived the earlier pass, but what it draws *is* a
+  vehicle. Losing the link while on a vehicle-only tab drops to the top of what is left, read
+  from the list rather than named in `App.tsx`, so changing the offline set needs nothing of
+  that file; Betaflight returns to its Welcome tab for the same reason. The `NeedsVehicle` cards
+  stay in those tabs deliberately: there is one render between the disconnect and the redirect,
+  and Mission Planner keeps its own "you are not connected" messages as exactly that defence.
+- **A parameter file is a document, not an aircraft.** The Parameters screen opens a `.param`
+  with nothing connected — Mission Planner's offline mode, the one page its disconnected Config
+  screen keeps — and `param-store`'s `source` says where the set came from. **Write and Reload
+  are disabled while `source` is `'file'`, even once a vehicle connects**: connecting does not
+  turn a saved configuration into the aircraft in front of you, and sending one nobody chose it
+  for is the failure worth designing against. Revert stays live, because reverting an edit to a
+  file is still an edit to a file. Those are the same three buttons Mission Planner greys, which
+  are the *only* three controls its entire codebase disables on connection state.
+- **A plan is written for an aircraft, and the command set differs** (`commandsFor`). Spline
+  waypoints and payload place are Copter-only — ArduPlane refuses them on upload — and that
+  knowledge lived **only in `mission-commands.integration.test.ts`**, as a bare set of ids. So
+  the test knew something the app did not, and the palette offered splines to a fixed wing
+  whether or not one was connected. It is a `copterOnly` field on the catalog now and the test
+  reads it, so what the UI offers and what SITL is asked to accept are one list. A connected
+  vehicle answers the question itself; with nothing connected the answer is `planFor`, a
+  preference, because it is a property of the person rather than of the plan. QGroundControl
+  asks the same question and its docs say why; Mission Planner does not, always assumes Copter,
+  and has an open issue about it. **An unrecognized MAV_TYPE gets the whole catalog** — unknown
+  is not absent, the same rule the MAVFTP capability bit taught.
 - **`docs/ui-conventions.md` is the layer above the design system**: how screens in *this* app
   are put together, as opposed to what a button looks like. Every rule in it is kept with the
   feedback that produced it, so a rule can be argued with and a wrong one can be found — add to
@@ -169,7 +207,8 @@ design decisions are recorded there and in code comments.
   controls: four equal slots would have to match the widest, total 576px and overflow a 1600px
   bar, where these total 484px — and the alignment a shared width buys is vertical, which a row
   has none of. **The readings are labelled by icon, and the icons are drawn here** (the app bar's
-  gear already was): three glyphs is not a reason to take on an icon set, and they have to take
+  gear already was): three glyphs is not a reason to take on an icon set (eight was — see
+  `ui/tabs/firmware/VehicleIcon.tsx`), and they have to take
   `currentColor` so a warning tone reaches them on a permanently dark ground. GPS is a *globe*
   rather than the conventional satellite because three attempts at a satellite — dish on a mast,
   dish with a feed horn, body with solar panels — were all illegible at 16px, which is the only
@@ -256,7 +295,13 @@ design decisions are recorded there and in code comments.
   of it and standing 58px taller than the panel it sits beside. A pane's toolbar and caption go
   in that pane's *track* (the search filters the list, the path bar names the listing, the count
   describes the table); only something that changes what the whole screen shows, like the
-  Inspector's view switcher, spans both tracks. The gap between pane and column is
+  Inspector's view switcher, spans both tracks. Parameters goes one further and puts them
+  *inside* the frame: `.params-pane` is a flex column of a `flex: none` header, the scrolling
+  rows, and a `flex: none` footer, so the panel is the full height of the screen and the frame
+  belongs to the pane rather than to `.params-scroll`. Rows then scroll *between* the search and
+  the count rather than under either — checked with `elementFromPoint` rather than with bounding
+  rects, which run past a scroll box even when `overflow` clips them and so answer the wrong
+  question. The gap between pane and column is
   `--app-col-gap`, which was four different values across five screens. The rules: width is `var(--app-col-w)`, never a bespoke number; buttons are always
   `size="block"`, one per row (two to a row only fits by shortening labels past the point of
   saying anything); groups are `<section class="app-col__group">` with an `<h3
@@ -581,6 +626,238 @@ design decisions are recorded there and in code comments.
   *bits* (0,1,2) — so the field wins whenever both are present. The version is rounded *down*
   to the newest published release that is not newer. `NET=1 npm test` runs the live check
   against the real server, which is the only thing that catches a path change.
+- **The firmware manifest is mostly the parts an earlier reading threw away**
+  (`services/firmware-manifest.ts`). Every number here is measured against the live
+  `manifest.json.gz` (97,248 entries), not estimated. Three fields decide whether it is read
+  correctly. **`mav-type`, never `vehicletype`**: `vehicletype: "Copter"` covers multirotors
+  *and* traditional helis — 14,708 rows that `mav-type` splits into Copter and HELICOPTER,
+  which are different images, so keyed on `vehicletype` the screen offered both under one name
+  and flashed whichever sorted first. **`mav-firmware-version-type` has four shapes, not
+  three**: `OFFICIAL` (what the `/stable/` path serves), `BETA`, `DEV`, and `STABLE-4.6.3` for
+  every release ever published — which is 28,143 of the 33,915 flashable rows, so reading only
+  the first three discarded every firmware older than today's, exactly what someone downgrading
+  is after. **A `board_id` of 0 is "not stated", not board zero**, and 65% of the file has no
+  id at all (every hex/elf/bin row); both would poison the join. Two traps in the tidying that
+  follows. `Copter/stable/CubeOrange` and `Copter/stable-4.7.1/CubeOrange` are the same build
+  listed twice (1,683 of 1,786 current rows), and dropping the twin **must test the channel**:
+  ArduPilot cuts beta and stable at the same version number, so a key without it collided
+  `beta 4.7.1` with `stable 4.7.1` and quietly removed all 1,787 beta rows. And versions
+  compare numerically per segment or "4.10.0" sorts before "4.9.0" and the downgrade list
+  offers the wrong build at the top. **Which release is current comes from the `OFFICIAL` flag,
+  not from the top of a sorted list** — they agree for every board today, but by coincidence:
+  `/stable/` is authoritative about what is current where an ordering is only a fact about
+  strings, and the manifest already carries rows whose reported version disagrees with the
+  directory serving them (Rover's stable-3.4.2 reports 3.5.0). The fallback through beta to dev
+  is load-bearing rather than polite: **Blimp has never had a stable release** and exists only
+  on `dev`, so "current stable or nothing" leaves one of the eight vehicles permanently empty.
+- **A board is identified by asking its bootloader, and by nothing else** (`identifyBoard` in
+  `services/flash.ts`). `GET_DEVICE`/`BOARD_ID` is the whole of Mission Planner's detection and
+  the only authoritative identifier either app has. **USB ids cannot stand in for it** — checked
+  rather than assumed: 44 distinct USBIDs against 317 board ids, and the generic ArduPilot pair
+  `0x1209/0x5741` alone covers 18,551 rows, so a board resolved from them is not resolved. Nor
+  can the live link answer it, since ArduPilot's flash path is bootloader-only and the port
+  re-enumerates as a different device on the way in. What the id buys is Mission Planner's
+  narrowing: among current builds, board id × `mav-type` is exactly one platform for 198 of 317
+  boards, several for 32 (usually a `-bdshot` sibling, which is a real choice and not something
+  to guess at) and none for 87 — so a lone match is chosen outright and anything else is left to
+  the list, which by then holds only builds that board can take. Keyed on `vehicletype` it is
+  *never* exactly one, because the heli twin is always beside it. **The rule that is easiest to
+  get wrong is that a probe running behind the screen must not be able to prompt.** Opening a
+  serial port needs `requestPort()`, which needs a user gesture *and* shows a port chooser; the
+  one exception is a port already granted, which `getPorts()` returns with neither. So the
+  automatic probe passes `askForPort: false` and gives up unless exactly one port is already
+  granted, and only the flash — which somebody pressed — passes `true`. Driven headless, the
+  first version put the browser's chooser up on every click of a vehicle symbol and sat on
+  "Checking the board…" until it was answered. **The flash is one button and it reboots the
+  board itself** (`identifyBoard({ reboot: true })`): a board plugged in to be flashed is
+  normally running its firmware, which answers the bootloader handshake with silence, and the
+  first version skipped the reboot unless the app was already MAVLink-connected — so a healthy
+  Cube reported that it would not identify itself. The reboot is `PREFLIGHT_REBOOT_SHUTDOWN`
+  written blind down the same port, broadcast ids, no ack awaited, which is what `uploader.py`
+  does. Three traps around the port, every one found with a Cube Orange+ on the bench. The port
+  is acquired **once** and passed to both the probe and the reboot — letting each transport ask
+  for its own put the same chooser up twice for the same device. The "before" snapshot for
+  spotting the bootloader's port is taken **after** the chooser, or the port just picked is the
+  newest grant and gets handed back as if it were the bootloader. And the bootloader is a
+  *different* USB device, so Web Serial's per-device grant does not cover it: the browser build
+  polls `getPorts()` and listens for `connect` (which fires for an already-granted device
+  re-enumerating — the second flash of a board) inside a budget kept under the ~5 s a click
+  stays a gesture, because a `requestPort()` fallback outside it is refused. **The desktop shell
+  does better because it owns the chooser**: `electron/main.ts` intercepts `select-serial-port`,
+  so it sees every port on the machine, and `serial-port-added` fires while a request is held
+  open — so the flash path arms `serialPicker.autoPickNew()`, asks at once while the gesture is
+  fresh, and main holds the callback until exactly one new port appears
+  (`electron/serial-autopick.ts`, tested), falling back to the chooser with everything that
+  arrived in it. Two new ports is a choice, not a guess. **The chooser itself is live**: main
+  keeps one open request's list current from `serial-port-added`/`-removed` and re-sends it, so
+  a board plugged in with the chooser already up appears in it, and a bootloader announcing
+  itself while the chooser is up answers the request and closes it. It had been a snapshot,
+  and the bench showed a chooser with no bootloader in it while a restart showed one with. Two
+  facts the recogniser depends on: an ArduPilot bootloader's product string is the hwdef name
+  with `-BL` on it (the manifest's `bootloader_str`), and **Electron hands over
+  `vendorId`/`productId` as decimal strings built from uint16s** — `0x1209` arrives as `"4617"`,
+  and a hex parse of that is a vendor that does not exist. The chooser's own `hex()` helper
+  documents the same rule; a test that passed a hex string was passing for the wrong reason.
+  **And Windows keeps a phantom.** Traced with the main process instrumented
+  (`LOFTGCS_DEBUG_SERIAL=1`) and the Cube on the bench: after the board reboots into its
+  bootloader, the old MAVLink port stays in Chromium's list, not openable (`FILE_ERROR_NOT_FOUND`),
+  and Chromium re-reads *its* product string as `CubeOrange-BL` as well — two bootloaders by
+  product string, so "exactly one or ask" correctly refused, and the chooser came up. The Windows
+  driver names (`serial-names.ts`, the source Mission Planner reads) are the truth — "Cube Orange
+  Mavlink" versus "Cube Orange Bootloader" — so the recogniser fetches them first and lets a
+  driver name that says MAVLink or SLCAN veto a product string that says bootloader, and a port
+  that *arrived* during the request outranks any lookalike already in it. The flash path also
+  arms the shell before its *first* ask, without a hold: a board already in its bootloader — a
+  fresh plug-in, or a flash cancelled at the confirm — is answered for with no chooser at all.
+  Measured end to end: from the Flash click to the confirm dialog with the right board id, zero
+  choosers with the board in its bootloader, one with it running firmware. **Three rounds of
+  reasoning about this from the code were each confidently wrong; one instrumented run settled
+  it in a minute.** When the hardware is on the bench, drive it before theorising.
+  **Flashing while connected works, and is not refused** (Mission Planner throws "can't flash
+  while connected"). The flash reboots the vehicle over the live link with a 400 ms ack timeout
+  — the ack never comes, the vehicle obeys first, and `runCommand`'s two retries at the default
+  5 s had it sitting on "Rebooting…" for fifteen seconds — drops the link, and carries on; the
+  first port ask then holds like the post-reboot one does, because the board is mid-way back.
+  Measured from the live link: confirm dialog with the right board id at 2.5 s, no chooser. A
+  **cancelled** flash sends the bootloader's REBOOT so the board boots the firmware it still
+  has; left in its bootloader it sat there until a power cycle, which is what the bench showed. And `preferredPlatform` picks the plain
+  build when the others are suffixed variants of it (`-bdshot`, `-SimOnHardWare`): board id 1063
+  fits three, and "exactly one match or ask" prompted for one of the commonest boards there is
+  every single time. A board with no build for the chosen
+  vehicle falls back to every release it ever had rather than an empty list, which would read as
+  "this app does not know your board" when the truth is that the vehicle was dropped from it.
+- **DFU is not a recovery path, it is how most boards get ArduPilot in the first place.** A
+  flight controller ships with Betaflight, INAV or nothing, so it has no ArduPilot bootloader
+  and cannot take an `.apj` at all; it takes the `_with_bl.hex`, which is the bootloader and the
+  firmware in one image, over the STM32's own ROM loader. So the Firmware tab is **board first, then firmware** —
+  QGroundControl's ordering, and the one that dissolves the problem rather than fencing it. You
+  cannot choose the right firmware without knowing the board, so **Detect board** comes before
+  anything is offered — and it sits in the Board row it fills, not at the foot with the flash,
+  which had put "find out what this is" below everything that depends on knowing — and *the way the board turns up is the way it gets flashed*: answering the
+  ArduPilot bootloader handshake means the `.apj` over its port; enumerating as `0483:DF11` means
+  the `_with_bl.hex` over USB. Nothing about that is a setting, and a toggle would only have
+  asked the user to declare something the app must verify anyway. It went through two cards side
+  by side, then two sections with a button each, then one button that sniffed for DFU at flash
+  time — every one of those asked the user to know which kind of board they had, and the last
+  left **a hole for a file the user brings**, since the builder and Open file hand over an `.apj`
+  *or* a `_with_bl.hex` and which one fits depends on the board. With the board known first the
+  file picker's `accept` is the one extension that can work, the vehicle tiles are disabled for
+  a vehicle this board has no build for, the release list is exact for this board, and the
+  custom-build tile says which artifact to download. The DFU target is asked for once, up front,
+  from the flat catalog, because DFU has no board id and nothing in the manifest narrows it
+  (there is no MCU field; measured); the user is trusted to pick. **A board identified over
+  serial is left running nothing**, so "Change board" and unmounting the screen both call
+  `bootBoard` to jump it back into the firmware it still has — the bench stranded a Cube three
+  times before that existed; pressing Detect again releases the previous board the same way, so
+  there is no separate "change board". **Detecting reboots the board, so it is guarded**: armed
+  is refused outright (an armed vehicle is one whose motors can turn, on the ground or not), and
+  so are MAV_STATE ACTIVE and the two failsafe states, CRITICAL and EMERGENCY — ArduPilot's own
+  words for flying and for a failsafe running. Connected but standing still is *asked* rather
+  than blocked, because it still drops the link and stops the firmware; the dialog says so and
+  says nothing is erased. `FirmwareTab.test.tsx` pins all five states, because this is the one
+  control on the screen whose worst case is a crash. The refusal also sits directly under the
+  two error lines in the state line's priority, above anything informational — it was below
+  "browsing builds needs the desktop app", which is how a safety line ends up hidden behind a
+  notice. Calling the DFU path "recovery" before all this was wrong too,
+  and made the common case look like an emergency. **Deciding the path in the app opened a hole
+  for a file the user brings**: Open file and the custom builder hand over an `.apj` *or* a
+  `_with_bl.hex`, and only one of them fits the board in front of them. So the rule is that
+  **the file decides the path** — `.hex` over DFU, `.apj` over the serial bootloader — the
+  loaded line says which, and a mismatch is explained at Flash in terms of the *file*: an
+  `.apj` with the board in DFU mode says to use the `_with_bl.hex`, a `_with_bl.hex` with a
+  board running ArduPilot says to hold BOOT0. Opening the custom builder sets a line saying
+  which artifact to download, from what is plugged in at that moment. And **a `.hex` whose
+  first record is not at `0x08000000` is refused**: ArduPilot's `make_intel_hex.py` writes
+  *either* a `_with_bl.hex` at the flash base *or* an app-only `.hex` at the board's reserve
+  offset, never both — its own comment says users confused them — and the app-only one over DFU
+  lands an application where the bootloader should be. **The shaded state line is the one place verbosity is allowed**:
+  it narrates every step of a flash in a sentence — rebooting, waiting for the bootloader,
+  reading the id, downloading which build, erasing, writing, verifying — because a flash is the
+  one operation where somebody is watching a bar and wants to know what it is doing. The DFU path
+  is now flown end to end on hardware (a TBS_LUCID_H7_WING, erase 76 s, write 124 s, verify 8 s,
+  208 s in total, board rebooting into ArduPlane 4.7.1 with its MAVLink and SLCAN ports back) —
+  and every one of the things below is a bug that flight took out, none of which a test could
+  have found first. **The alternate setting must be chosen, never inherited**: an STM32 in ROM DFU
+  exposes `@Internal Flash`, `@Option Bytes`, `@OTP Memory` and `@Device Feature` on one
+  interface, and this code took `interfaces[0].alternate` — whatever the device came up on —
+  and never called `selectAlternateInterface`, so which region got written was the device's
+  choice. OTP is one-time programmable and the option bytes decide whether the chip boots, so
+  two of the four are worse than a wrong firmware. **There is no board id.** Every STM32 in ROM
+  DFU is `0483:DF11` whatever it is soldered to, and the serial number is the chip's unique id,
+  not a model; the serial bootloader's board-id gate has no equivalent here. Worse, the board
+  *afterwards* reports whatever board id the flashed bootloader was compiled with
+  (`AP_Bootloader.cpp`'s `.board_type = APJ_BOARD_ID`), so a wrong image leaves `identifyBoard`
+  confidently naming the wrong board — a failure that looks exactly like success, which is why
+  the screen says so where the decision is made rather than in the confirm. The one automatic
+  check available is the image's top address against the flash the descriptor reports, which
+  catches a wrong-MCU image and never a MatekH743-for-CubeOrange mix-up. **Verify is not
+  optional.** ST's AN3156 says of the erase command: *"No error is returned when performing
+  Erase operations on write protected sectors"* — so a clean run of acks is not evidence
+  anything was written, and a protected board completes the whole sequence and boots its old
+  firmware. Betaflight's configurator verifies unconditionally and STM32CubeProgrammer's own
+  Rev 29 figure ships with "Verify programming" ticked; `DfuseFlasher.flash` reads back and
+  compares, with a flag to skip it only for a ROM that will not serve an upload. The
+  write-protected board is modelled in `dfu.test.ts` rather than assumed — and that fake is
+  deliberately **strict** rather than permissive now: it stalls an oversized payload, a
+  CLRSTATUS outside dfuERROR, an UPLOAD outside idle, and a block number that does not
+  increment in either direction. Each of those was added after the silicon refused the same
+  thing, and each was checked by reverting the fix and watching the test fail; a permissive
+  fake had been passing every one of these for the wrong reason.
+  **The layout string is read from the descriptors, not from `interfaceName`.** ST encodes the
+  memory map in the interface name — `@Internal Flash /0x08000000/16*128Kg` — and every DFU
+  feature here reads it, but Chromium on Windows returns `interfaceName: null` for a
+  WinUSB-bound device that is otherwise perfectly healthy. That made the whole path
+  unreachable: `identifyDfu` threw "reports no internal flash" and both callers dropped the
+  reason. `dfuDescriptors` now fetches the configuration descriptor, walks it for each
+  interface's `iInterface` index and asks for those string descriptors, the way dfu-util does;
+  `interfaceName` is still preferred where a browser fills it in. Reading it also gives the
+  sharpest argument for selecting by name: on that board alternate 0 is the flash and
+  **alternate 1 is `@Option Bytes`**.
+  **`wTransferSize` is a limit the device sets, not a constant.** It rides in the DFU
+  functional descriptor (type 0x21) in the same block, and DFU 1.1 §6.1.1 forbids a DNLOAD
+  payload larger than it. This was hardcoded at 2048 against a board declaring 1024: the first
+  data block stalled, the STM32 latched into **dfuERROR**, and it then refused everything —
+  CLRSTATUS included — across app restarts until it was physically power-cycled. A device that
+  declares nothing gets 1024, which every STM32 ROM loader accepts; never a guess in the caller.
+  **Which request returns a device to idle depends on the state it is in** (`toIdle`, ported
+  from Betaflight Configurator's `src/js/protocols/usbdfu.js`, GPL-3.0 as this is): ABORT from
+  dfuDNLOAD_IDLE or dfuUPLOAD_IDLE, CLRSTATUS *only* from dfuERROR, and otherwise poll while
+  the device says it is busy, bounded so a wedged ROM errors instead of hanging. A blind
+  CLRSTATUS is not harmless — a strict ROM stalls it exactly per spec, which killed the
+  read-back the instant it started, and Betaflight's own comment names that symptom. Their file
+  carries the H7 exception too: some H743 Rev.V bootloaders wedge in dfuDNBUSY after an erase
+  and never settle, and STM32CubeProgrammer unsticks them with an undocumented CLRSTATUS pair
+  (the first answers errUNKNOWN/dfuERROR, the second OK/dfuIDLE) — opt-in via `busyIsStuck`,
+  because a strict ROM must never be sent one it would rightly refuse. **`leave()` is the same
+  rule one step later**: the read-back ends in dfuUPLOAD_IDLE, and a DfuSe command is itself a
+  DNLOAD, so it must reach idle first. That was the last thing standing between a complete
+  write and a finished flash.
+  **The address is set once per segment and the device walks it** as wBlockNum counts up from
+  the DFU-mandated 2, for reads and writes alike. Re-sending it per chunk looks harmless and is
+  not: a DfuSe command is a DNLOAD, so the device goes busy and reports a poll timeout for it
+  exactly as for a real write, and every block paid **two** busy-waits — one for an
+  address-pointer write that touches no flash. Measured: 151 ms a block, 247 s for 1.6 MB,
+  against a read-back of the same bytes over the same bus in 8 s. Setting it once halved the
+  write to 124 s.
+  **And the DFU device is probed under the same rule as the serial one**: `getDevices()` for
+  the silent look, `requestDevice()` only from something somebody pressed, because work the
+  screen starts by itself may not raise a chooser. (This entry used to claim a re-probe on
+  every USB connect/disconnect. There was no such listener and never had been — worth
+  remembering that a claim in this file is not evidence.) The silent look sees only what this
+  origin was already granted, which for a board nobody has granted yet is nothing, so the ask
+  happens **after the serial path fails** rather than only when its chooser was cancelled: a
+  board in DFU mode has no serial port at all, so reaching the prompt by dismissing a chooser
+  full of unrelated ports meant a first detect could not succeed. In the shell there is no
+  chooser to dismiss — `electron/main.ts` answers `select-usb-device` itself from the
+  `0483:DF11` permission handler, and **holds the request** for 2.5 s when the list is empty,
+  because Chromium has been measured enumerating a device 1.2 s after the request for one that
+  was plugged in before the app started. `LOFTGCS_DEBUG_USB=1` traces that side the way
+  `LOFTGCS_DEBUG_SERIAL=1` traces the other, and it is what made all of this visible: the shell
+  shows nobody a chooser, so a DFU board that is not found leaves no trace on screen at all.
+  **Betaflight's `usbdfu.js` is the reference implementation to read before theorising here.**
+  Three of the four bugs above are described in its comments, H7 quirks included. Several
+  rounds of reasoning from our own code reached confident wrong answers first, at one bench
+  power-cycle each — the same lesson the serial bootloader taught, learned again.
 - **The mission command catalog is checked against the firmware, not against the spec.**
   `protocol/mission-commands.ts` is hand-written data, and two entries were wrong in ways no
   type or unit test could see: `DO_GRIPPER` was listed as 212, which is `DO_AUTOTUNE_ENABLE`, so
@@ -739,7 +1016,15 @@ design decisions are recorded there and in code comments.
   after it, never the surrounding phrase: 4.2.2 writes "QuadPlane Frame: F-35B" and 4.6.3
   writes "QuadPlane initialised, Frame: F-35B", so matching the current wording would miss
   every log that already exists. The live value is *latched* in `vehicle-store` as the banner
-  goes past, because the status feed is a capped ring the line scrolls out of. `KnownAirframe`
+  goes past, because the status feed is a capped ring the line scrolls out of. **And the banner
+  is asked for rather than waited for** -- `MAV_CMD_DO_SEND_BANNER` (42428), sent on the first
+  heartbeat beside the version request, which is what Mission Planner does and for the same
+  reason. ArduPilot emits the banner once, at boot, so a GCS that attaches to a vehicle already
+  running -- the normal case -- never heard it and drew a generic airframe for an aircraft that
+  had said exactly what it was. Verified against SITL rather than assumed
+  (`banner.integration.test.ts`): a simulator long past boot answers with
+  `ArduCopter V4.7.1-beta1`, its board name, and `Frame: QUAD/PLUS` -- the line the latch reads.
+  `KnownAirframe`
   grows one aircraft at a time and never by pattern: each entry needs a model this repo may
   ship, and a loose matcher would put the wrong aeroplane on someone else's screen.
 

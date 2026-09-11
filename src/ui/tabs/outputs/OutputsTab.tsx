@@ -62,7 +62,7 @@ function OutputsCard() {
   return (
     <LaCard
       title="Servo outputs"
-      note="Function assigns what each output drives; min/trim/max are the µs endpoints. Stage edits here and send them with Write Params."
+      note="Function assigns what each output drives; min/trim/max are the µs endpoints."
     >
       <div className="outputs-grid outputs-grid--head">
         <span>Output</span>

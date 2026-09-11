@@ -9,11 +9,22 @@ export default function SerialChooserModal() {
   const [ports, setPorts] = useState<SerialPortChoice[] | null>(null)
   const [selected, setSelected] = useState('')
 
+  // The list is live: main re-sends it whenever a port appears or goes away
+  // while the request is open, which is what makes plugging a board in with
+  // the chooser already up work. A re-send keeps whatever was selected if it
+  // is still there -- resetting to the first row on every update would move
+  // the dot out from under somebody's cursor each time the bus changed --
+  // and main can end the request itself, when the answer was a fact.
   useEffect(() => {
-    return window.loftgcs?.serialPicker.onPortsAvailable((list) => {
+    const offPorts = window.loftgcs?.serialPicker.onPortsAvailable((list) => {
       setPorts(list)
-      setSelected(list[0]?.portId ?? '')
+      setSelected((cur) => (list.some((p) => p.portId === cur) ? cur : (list[0]?.portId ?? '')))
     })
+    const offDone = window.loftgcs?.serialPicker.onDone(() => setPorts(null))
+    return () => {
+      offPorts?.()
+      offDone?.()
+    }
   }, [])
 
   if (!ports) return null

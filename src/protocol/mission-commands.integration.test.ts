@@ -22,8 +22,11 @@ import type { MissionItem, ProtocolEvent } from './types'
 
 const run = process.env.SITL === '1' ? describe : describe.skip
 
-/** Copter flies splines; Plane refuses the command outright. */
-const COPTER_ONLY = new Set([82, 94])
+// Which commands are Copter-only is no longer known here. It was a bare set
+// of ids in this file, which meant the test knew something the app did not:
+// the palette offered spline waypoints to a fixed wing. It is a `copterOnly`
+// field on the catalog now, and this reads it -- so what the UI offers and
+// what this uploads are the same list by construction.
 /** MAV_TYPE values that are copters, from the heartbeat. */
 const COPTER_TYPES = new Set([2, 13, 14, 15, 3])
 
@@ -52,64 +55,58 @@ function itemFor(seq: number, command: number): MissionItem {
 }
 
 run('the mission command catalog', () => {
-  it(
-    'offers only commands this vehicle accepts',
-    async () => {
-      const events: ProtocolEvent[] = []
-      let socket: net.Socket | null = null
-      const engine = new ProtocolEngine((out) => {
-        if (out.t === 'tx') socket?.write(out.bytes)
-        else if (out.t === 'evt') events.push(out.evt)
-      })
-      // Retried: the runner relaunches SITL between files, and connecting
-      // into that gap is a race, not a result.
-      const sock = await connectSitl()
-      socket = sock
-      sock.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
-      engine.start()
+  it('offers only commands this vehicle accepts', async () => {
+    const events: ProtocolEvent[] = []
+    let socket: net.Socket | null = null
+    const engine = new ProtocolEngine((out) => {
+      if (out.t === 'tx') socket?.write(out.bytes)
+      else if (out.t === 'evt') events.push(out.evt)
+    })
+    // Retried: the runner relaunches SITL between files, and connecting
+    // into that gap is a race, not a result.
+    const sock = await connectSitl()
+    socket = sock
+    sock.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
+    engine.start()
 
-      const waitFor = async (what: string, cond: () => boolean, ms: number) => {
-        const deadline = Date.now() + ms
-        while (!cond()) {
-          if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`)
-          await new Promise((r) => setTimeout(r, 100))
+    const waitFor = async (what: string, cond: () => boolean, ms: number) => {
+      const deadline = Date.now() + ms
+      while (!cond()) {
+        if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`)
+        await new Promise((r) => setTimeout(r, 100))
+      }
+    }
+    await waitFor('a heartbeat', () => events.some((e) => e.t === 'heartbeat'), 30000)
+    // Mission storage is not ready at the first heartbeat: every upload
+    // before it is answered "No space on vehicle", which reads exactly
+    // like a rejected command and is not one.
+    await waitFor(
+      'the vehicle to finish booting',
+      () => events.some((e) => e.t === 'statustext' && /ready|initialised|EKF/i.test(e.text)),
+      30000,
+    )
+    await new Promise((r) => setTimeout(r, 3000))
+    const hb = events.find((e) => e.t === 'heartbeat')
+    const isCopter = hb?.t === 'heartbeat' && COPTER_TYPES.has(hb.vehicleType)
+
+    const refused: string[] = []
+    try {
+      for (const spec of MISSION_COMMANDS) {
+        if (!isCopter && spec.copterOnly) continue
+        try {
+          await engine.uploadMission([itemFor(0, 16), itemFor(1, spec.id)], 0)
+        } catch (err) {
+          refused.push(
+            `${spec.mavName} (${spec.id}): ${err instanceof Error ? err.message : String(err)}`,
+          )
         }
       }
-      await waitFor('a heartbeat', () => events.some((e) => e.t === 'heartbeat'), 30000)
-      // Mission storage is not ready at the first heartbeat: every upload
-      // before it is answered "No space on vehicle", which reads exactly
-      // like a rejected command and is not one.
-      await waitFor(
-        'the vehicle to finish booting',
-        () => events.some((e) => e.t === 'statustext' && /ready|initialised|EKF/i.test(e.text)),
-        30000,
-      )
-      await new Promise((r) => setTimeout(r, 3000))
-      const hb = events.find((e) => e.t === 'heartbeat')
-      const isCopter = hb?.t === 'heartbeat' && COPTER_TYPES.has(hb.vehicleType)
+    } finally {
+      await engine.clearMission(0).catch(() => {})
+      engine.stop()
+      sock.destroy()
+    }
 
-      const refused: string[] = []
-      try {
-        for (const spec of MISSION_COMMANDS) {
-          if (!isCopter && COPTER_ONLY.has(spec.id)) continue
-          try {
-            await engine.uploadMission([itemFor(0, 16), itemFor(1, spec.id)], 0)
-          } catch (err) {
-            refused.push(
-              `${spec.mavName} (${spec.id}): ${err instanceof Error ? err.message : String(err)}`,
-            )
-          }
-        }
-      } finally {
-        await engine.clearMission(0).catch(() => {})
-        engine.stop()
-        sock.destroy()
-      }
-
-      expect(refused, `${isCopter ? 'Copter' : 'Plane'} refused:\n${refused.join('\n')}`).toEqual(
-        [],
-      )
-    },
-    240000,
-  )
+    expect(refused, `${isCopter ? 'Copter' : 'Plane'} refused:\n${refused.join('\n')}`).toEqual([])
+  }, 240000)
 })

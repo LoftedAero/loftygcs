@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { MISSION_COMMANDS, commandSpec } from '../../../protocol/mission-commands'
+import { commandSpec, commandsFor } from '../../../protocol/mission-commands'
+import { usePlanVehicleClass } from './plan-vehicle'
 import { useMissionStore } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { homeFromVehicle } from '../../../services/mission'
@@ -45,6 +46,9 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
   const cancelSurvey = useMissionStore((s) => s.cancelSurvey)
   const surveying = useMissionStore((s) => s.survey !== null)
   const [moreOpen, setMoreOpen] = useState(false)
+  // Only the commands this aircraft will accept. With nothing connected that
+  // is the chosen plan-for class rather than a guess at Copter.
+  const commands = commandsFor(usePlanVehicleClass())
   // Where the flyout goes, in viewport coordinates. It has to be `fixed`:
   // the palette is a scroll box (it must never outgrow a map dragged short)
   // and an absolutely positioned child of a scroll box is clipped to it --
@@ -229,27 +233,29 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
                 commands underneath already say. */}
             {(['nav', 'condition', 'do'] as const).map((cat) => (
               <div key={cat} className="mission-palette__group">
-                {MISSION_COMMANDS.filter((c) => c.category === cat).map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    role="menuitem"
-                    className="mission-palette__item"
-                    title={`${c.name} — ${c.summary}`}
-                    onClick={() => {
-                      setMoreOpen(false)
-                      pick(c.id)
-                    }}
-                  >
-                    {/* ArduPilot's own command names here, not our friendlier
+                {commands
+                  .filter((c) => c.category === cat)
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="menuitem"
+                      className="mission-palette__item"
+                      title={`${c.name} — ${c.summary}`}
+                      onClick={() => {
+                        setMoreOpen(false)
+                        pick(c.id)
+                      }}
+                    >
+                      {/* ArduPilot's own command names here, not our friendlier
                         ones: anyone reaching past the five common items is
                         working from the ArduPilot mission docs or a Mission
                         Planner habit, and a translation only makes them guess
                         which of ours is the one they read about. The plain
                         name still shows on hover and in the table. */}
-                    {c.mavName}
-                  </button>
-                ))}
+                      {c.mavName}
+                    </button>
+                  ))}
               </div>
             ))}
           </div>

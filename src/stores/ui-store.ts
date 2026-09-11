@@ -17,7 +17,12 @@ import { useParamStore } from './param-store'
 // It also means the app opens on the screen someone is most often after.
 export const MODES = [
   { id: 'fly', label: 'Fly' },
-  { id: 'mission', label: 'Mission' },
+  // "Plan" rather than "Mission", which is both QGroundControl's and Mission
+  // Planner's word for this view -- and the more accurate one here, since the
+  // mode edits three plans and only one of them is a mission. The id stays
+  // `mission`: a saved mode and every deep link already say it. The switch
+  // *inside* the mode keeps "Mission" for the plan it names.
+  { id: 'mission', label: 'Plan' },
   { id: 'setup', label: 'Setup' },
 ] as const
 
@@ -58,6 +63,23 @@ export type TabGroup = (typeof TAB_GROUPS)[number]
  * Those tabs get the same treatment Fly and Mission get: the content pane
  * stops being a grid and hands them the window.
  *
+ * `offline` marks a tab that is worth opening with nothing connected --
+ * because it works on a *document* rather than on a live aircraft. Overview
+ * is deliberately not one: it draws itself rather than describing itself,
+ * which is why it survived the earlier pass, but what it draws is a vehicle,
+ * and with none there is nothing on it to read. That is
+ * the line Mission Planner draws and QGroundControl draws with it: a mission,
+ * a parameter file, a firmware image and the app's own settings all have
+ * something to do offline; accelerometer calibration does not. Everything
+ * without the flag leaves the rail while disconnected, which is Mission
+ * Planner's behaviour and stated in its own wiki -- "You will only see this
+ * menu item if the autopilot is connected."
+ *
+ * The alternative was a card on each of them saying what the screen would
+ * have shown, which is what this app did and what none of the three
+ * references do. A rail that lists only what can be done now is a shorter
+ * lie-free answer than eleven descriptions of screens you cannot use.
+ *
  * The four screens with an actions column need it for a second reason, and
  * went without it for a while: each one's root sets `flex: 1; min-height: 0`
  * expecting to fill, and on the card grid -- whose `align-items` is `start`
@@ -71,7 +93,7 @@ export type TabGroup = (typeof TAB_GROUPS)[number]
  */
 export const TABS = [
   { id: 'overview', label: 'Overview', group: 'Initial Setup', fills: true },
-  { id: 'firmware', label: 'Firmware', group: 'Initial Setup' },
+  { id: 'firmware', label: 'Firmware', group: 'Initial Setup', offline: true },
   // The curated cards lead the rest: it is where a new airframe starts, and
   // the things they cover -- battery monitor, failsafe, arming checks -- are
   // exactly the ones a first bring-up would not think to look for under
@@ -89,15 +111,22 @@ export const TABS = [
   { id: 'tuning', label: 'Tuning', group: 'Config/Tuning' },
   // The label changed, the id did not: `parameters` is what a saved tab and
   // every deep link already say, and renaming it would strand both.
-  { id: 'parameters', label: 'Parameter List', group: 'Config/Tuning', fills: true },
+  { id: 'parameters', label: 'Parameter List', group: 'Config/Tuning', fills: true, offline: true },
 
   // Not steps at all: what you reach for when a step misbehaves.
-  { id: 'logs', label: 'Logs', group: 'Data', fills: true },
+  // The label changed, the id did not -- the same rule the parameters tab
+  // follows: `logs` is what a saved tab and every deep link already say.
+  { id: 'logs', label: 'Log Review', group: 'Data', fills: true, offline: true },
   { id: 'files', label: 'MAVFTP', group: 'Data', fills: true },
   { id: 'inspector', label: 'Inspector', group: 'Data', fills: true },
 ] as const
 
 export type TabId = (typeof TABS)[number]['id']
+
+/** The tabs to show, given whether a vehicle is on the link. */
+export function visibleTabs(connected: boolean): typeof TABS {
+  return (connected ? TABS : TABS.filter((t) => 'offline' in t && t.offline)) as typeof TABS
+}
 
 /** Whether this tab lays out its own window instead of tiling cards. */
 export function tabFills(tab: TabId): boolean {

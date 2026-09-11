@@ -11,6 +11,8 @@
 // generic MAVLink spec where the two differ -- this is an ArduPilot station,
 // and the firmware's interpretation is the one the aircraft flies.
 
+import type { VehicleClass } from './modes'
+
 export interface MissionParamSpec {
   /** Which of param1..param4 this describes. */
   index: 1 | 2 | 3 | 4
@@ -36,6 +38,16 @@ export interface MissionCommandSpec {
    * at a time, which is why the distinction is worth showing.
    */
   category: 'nav' | 'condition' | 'do'
+  /**
+   * Copter (and heli) only. ArduPlane and Rover refuse these on upload, so
+   * offering them anywhere else is a menu entry that can only ever fail.
+   *
+   * This lived in `mission-commands.integration.test.ts` as a bare set of
+   * ids, which meant the test knew something the app did not: the palette
+   * offered spline waypoints to a fixed wing whether or not one was
+   * connected. The test now reads this field, so the two cannot drift.
+   */
+  copterOnly?: true
   /** Uses x/y as a position on the map. */
   location: boolean
   /** Uses z as an altitude. */
@@ -151,6 +163,7 @@ export const MISSION_COMMANDS: readonly MissionCommandSpec[] = [
     name: 'Spline waypoint',
     mavName: 'NAV_SPLINE_WAYPOINT',
     category: 'nav',
+    copterOnly: true,
     location: true,
     altitude: true,
     params: [{ index: 1, label: 'Hold', unit: 's', min: 0 }],
@@ -432,6 +445,7 @@ export const MISSION_COMMANDS: readonly MissionCommandSpec[] = [
     name: 'Place payload',
     mavName: 'NAV_PAYLOAD_PLACE',
     category: 'nav',
+    copterOnly: true,
     location: true,
     altitude: true,
     params: [{ index: 1, label: 'Max descent', unit: 'm', min: 0 }],
@@ -726,6 +740,21 @@ export const MISSION_COMMANDS: readonly MissionCommandSpec[] = [
 ]
 
 const BY_ID = new Map(MISSION_COMMANDS.map((c) => [c.id, c]))
+
+/**
+ * The commands worth offering for one kind of aircraft.
+ *
+ * Verified against the firmware rather than the spec -- see
+ * `mission-commands.integration.test.ts`, which uploads every command this
+ * returns to whichever vehicle SITL is serving and fails on any refusal.
+ * `other` (an unrecognized MAV_TYPE) gets everything: unknown is not the
+ * same as absent, and hiding commands from a vehicle that simply has not
+ * said what it is would be this app guessing on its behalf.
+ */
+export function commandsFor(cls: VehicleClass): readonly MissionCommandSpec[] {
+  if (cls === 'copter' || cls === 'other') return MISSION_COMMANDS
+  return MISSION_COMMANDS.filter((c) => !c.copterOnly)
+}
 
 export function commandSpec(id: number): MissionCommandSpec | undefined {
   return BY_ID.get(id)

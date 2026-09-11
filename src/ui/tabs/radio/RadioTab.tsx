@@ -37,7 +37,7 @@ export default function RadioTab() {
       <RadioCalCard />
       <ParamCard
         title="Stick mapping"
-        note="Calibration sets these for you. Edit them by hand only if the transmitter cannot be remapped instead; changes take effect after a reboot."
+        note="Edit these by hand only if the transmitter cannot be remapped instead; changes take effect after a reboot."
         fields={[
           { param: 'RCMAP_ROLL', label: 'Roll channel' },
           { param: 'RCMAP_PITCH', label: 'Pitch channel' },
