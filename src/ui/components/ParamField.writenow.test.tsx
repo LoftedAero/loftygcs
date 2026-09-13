@@ -38,13 +38,25 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('a field that writes as soon as it is chosen', () => {
-  it('sends the value and then re-reads in the background', async () => {
-    render(<ParamField param="OSD_TYPE" label="OSD type" writeNow />)
+  it('sends the value and then re-reads in the background, when it gates others', async () => {
+    render(<ParamField param="OSD_TYPE" label="OSD type" writeNow gatesOthers />)
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '5' } })
     await vi.waitFor(() => expect(refreshed.length).toBe(1))
     expect(sent).toEqual([['OSD_TYPE', 5]])
     // Quiet: a refresh nobody asked for must not blank the curated tabs.
     expect(refreshed[0]).toEqual({ quiet: true })
+  })
+
+  it('does NOT re-read for a field that only writes', async () => {
+    // The two are separate claims. Writing immediately says "this reaches the
+    // vehicle now"; gating says "this changes which parameters exist". Most
+    // immediate writes -- every compass setting on Sensors -- are the first
+    // without the second, and a refresh after each is ~1,400 parameters read
+    // back to learn nothing, which over a telemetry radio is tens of seconds.
+    render(<ParamField param="OSD_TYPE" label="OSD type" writeNow />)
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '5' } })
+    await vi.waitFor(() => expect(sent).toEqual([['OSD_TYPE', 5]]))
+    expect(refreshed).toEqual([])
   })
 
   it('falls back to staging when the write does not land', async () => {

@@ -24,6 +24,9 @@ import type {
 // GCS identity on the link. 255 is the conventional GCS system id;
 // 190 is MAV_COMP_ID_MISSIONPLANNER, the generic GCS component.
 const GCS_SYSID = 255
+
+/** The vehicle uses this to ask for a side; the GCS uses it to answer. */
+const MAV_CMD_ACCELCAL_VEHICLE_POS = 42429
 const GCS_COMPID = 190
 
 const HEARTBEAT_INTERVAL_MS = 1000
@@ -307,6 +310,19 @@ export class ProtocolEngine {
       case 'MISSION_ACK':
         this.mission.handleMessage(msg.msgName, msg.fields)
         return
+      case 'COMMAND_LONG':
+        // The vehicle asking the GCS for something. The only one this app
+        // answers is the accelerometer calibration's position request; our
+        // own outbound commands cannot be confused with it, because reflected
+        // GCS traffic is dropped above.
+        if (msg.fields.command === MAV_CMD_ACCELCAL_VEHICLE_POS) {
+          this.emit({
+            t: 'evt',
+            // `_param1` is what mavlink-mappings calls this field.
+            evt: { t: 'accelCalPosition', position: msg.fields._param1 as number },
+          })
+        }
+        return
       case 'COMMAND_ACK':
         this.commands.handleAck(msg.fields)
         this.emit({
@@ -327,6 +343,14 @@ export class ProtocolEngine {
             calStatus: msg.fields.calStatus as number,
             pct: msg.fields.completionPct as number,
             completionMask: msg.fields.completionMask as number[],
+            // "Body frame direction vector for display" -- where the vehicle
+            // is pointing right now, which is what makes the coverage
+            // picture navigable rather than merely informative.
+            direction: [
+              msg.fields.directionX as number,
+              msg.fields.directionY as number,
+              msg.fields.directionZ as number,
+            ],
           },
         })
         return

@@ -38,7 +38,7 @@ describe('app shell', () => {
     // The ordinary screen with an empty table, not a disconnected-only card:
     // the column beside it already carries the control that fills it.
     expect(screen.getByPlaceholderText('Search parameters')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Import all from file/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Import from file/i })).toBeTruthy()
   })
 
   it('leaves a vehicle-only tab when the vehicle goes', () => {

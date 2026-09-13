@@ -21,6 +21,8 @@ export interface ParamFieldSpec {
    * second kind of card.
    */
   writeNow?: boolean
+  /** Also re-read the set afterwards -- see ParamField. */
+  gatesOthers?: boolean
 }
 
 export default function ParamCard({
@@ -52,6 +54,7 @@ export default function ParamCard({
           label={f.label}
           {...(f.unit ? { unit: f.unit } : {})}
           {...(f.writeNow ? { writeNow: true } : {})}
+          {...(f.gatesOthers ? { gatesOthers: true } : {})}
         />
       ))}
       {children}

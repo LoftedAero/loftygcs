@@ -32,8 +32,8 @@ const ALLOWED = [
   // The one shared definition. Every actions column composes this.
   '.app-col-shell',
   // Main panes: the scrolling body a column sits beside.
-  '.files__scroll',
-  '.inspector__scroll',
+  '.files__pane',
+  '.inspector__pane',
   '.log-main',
   // The parameters pane, not its scroll box: the search and the count sit
   // inside the frame with the table so the panel is the full height of the

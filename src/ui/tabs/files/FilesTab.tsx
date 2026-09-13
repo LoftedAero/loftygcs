@@ -70,54 +70,59 @@ export default function FilesTab() {
 
   return (
     <div className="files">
-      {/* No wrapper around the bar and the table: the actions column is
-          placed in the table's row, so the two framed panels line up. */}
-      <div className="files__bar">
-        <span className="files__path" title={path}>
-          {path}
-        </span>
-        <LaButton
-          variant="ghost"
-          disabled={busy || path === '/'}
-          onClick={() => void goUp()}
-          title={`Up to ${parentPath(path)}`}
-        >
-          Up
-        </LaButton>
-      </div>
+      {/* The path bar is the pane's header, inside the frame -- the shape
+          Parameters already has. It used to sit above the frame in a row of
+          its own, which pushed both the listing and the column down the page
+          and left the top of the screen empty beside it. What names the
+          listing belongs to the listing. */}
+      <div className="files__pane">
+        <div className="files__bar">
+          <span className="files__path" title={path}>
+            {path}
+          </span>
+          <LaButton
+            variant="ghost"
+            disabled={busy || path === '/'}
+            onClick={() => void goUp()}
+            title={`Up to ${parentPath(path)}`}
+          >
+            Up
+          </LaButton>
+        </div>
 
-      <div className="files__scroll">
-        <table className="files__table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th className="num">Size</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((e) => (
-              <tr
-                key={e.name}
-                className={e.name === selectedName ? 'is-selected' : undefined}
-                onClick={() => select(e.name)}
-                onDoubleClick={() => {
-                  if (e.kind === 'directory') void enterDirectory(e.name)
-                }}
-              >
-                <td>
-                  <span className="files__kind">{e.kind === 'directory' ? 'DIR' : 'FILE'}</span>
-                  {e.name}
-                </td>
-                <td className="num">{e.kind === 'directory' ? '' : formatSize(e.size ?? 0)}</td>
-              </tr>
-            ))}
-            {entries.length === 0 && !busy && (
+        <div className="files__scroll">
+          <table className="files__table">
+            <thead>
               <tr>
-                <td colSpan={2}>Nothing here.</td>
+                <th>Name</th>
+                <th className="num">Size</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {entries.map((e) => (
+                <tr
+                  key={e.name}
+                  className={e.name === selectedName ? 'is-selected' : undefined}
+                  onClick={() => select(e.name)}
+                  onDoubleClick={() => {
+                    if (e.kind === 'directory') void enterDirectory(e.name)
+                  }}
+                >
+                  <td>
+                    <span className="files__kind">{e.kind === 'directory' ? 'DIR' : 'FILE'}</span>
+                    {e.name}
+                  </td>
+                  <td className="num">{e.kind === 'directory' ? '' : formatSize(e.size ?? 0)}</td>
+                </tr>
+              ))}
+              {entries.length === 0 && !busy && (
+                <tr>
+                  <td colSpan={2}>Nothing here.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <aside className="app-col-shell">

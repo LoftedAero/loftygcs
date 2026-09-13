@@ -5,7 +5,12 @@
 export type TransportKind = 'serial' | 'tcp' | 'udp' | 'ws' | 'virtual'
 
 export type TransportOptions =
-  | { kind: 'serial'; baudRate: number }
+  /**
+   * `port` skips the chooser: a port already granted to this origin, which
+   * reopening after a commanded reboot needs. `requestPort()` requires a user
+   * gesture, and a vehicle coming back from a restart is not one.
+   */
+  | { kind: 'serial'; baudRate: number; port?: SerialPort }
   | { kind: 'tcp'; host: string; port: number }
   | { kind: 'udp'; localPort: number; host?: string; port?: number }
   | { kind: 'ws'; url: string }

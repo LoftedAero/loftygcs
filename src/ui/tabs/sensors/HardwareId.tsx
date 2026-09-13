@@ -97,16 +97,6 @@ export default function HardwareId() {
         </p>
       )}
 
-      {/* Empty slots are worth naming rather than hiding: "the second
-          compass is configured and reads zero" is a different fault from
-          "there is no second compass", and only the first has a row here. */}
-      {found.length > live.length && (
-        <LaHint>
-          {found.length - live.length} further{' '}
-          {found.length - live.length === 1 ? 'slot is' : 'slots are'} configured but empty — the
-          firmware has the parameter and found nothing on it.
-        </LaHint>
-      )}
       {/* Only when something is unnamed. It explains a row that is already
           on screen, and with every part recognised it is a paragraph about
           a situation the reader is not in. */}

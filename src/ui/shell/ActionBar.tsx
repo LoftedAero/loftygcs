@@ -13,7 +13,13 @@ import WriteParamsModal from './WriteParamsModal'
 
 // Setup sections with no parameters to edit: showing them a Write button
 // would be offering an action the page cannot produce work for.
-const PARAMLESS_TABS = new Set<TabId>(['overview', 'firmware', 'logs'])
+// Tabs with no Write of their own to offer. `sensors` is here because it
+// writes as you go: a Write button there would be a second answer to a
+// question the screen has already answered. The rule below still applies to
+// it, and that is the point -- if one of those immediate writes fails, the
+// value falls back to staged and the bar comes back to carry it, rather than
+// leaving an edit on screen with no way to send it.
+const PARAMLESS_TABS = new Set<TabId>(['overview', 'firmware', 'logs', 'sensors'])
 
 // The bottom action bar: per-tab actions on the left, version link on the
 // right. Write Params is the one orange action for the tabs that edit
@@ -44,11 +50,7 @@ function ParamActions({ tab }: { tab: TabId }) {
           because edits stage from anywhere -- a curated Setup card, the
           compare tool, the table -- and this button is what sends all of
           them. One list, wherever they came from. */}
-      <WriteParamsModal
-        open={confirming}
-        onConfirm={write}
-        onCancel={() => setConfirming(false)}
-      />
+      <WriteParamsModal open={confirming} onConfirm={write} onCancel={() => setConfirming(false)} />
       <LaButton
         variant="primary"
         size="lg"

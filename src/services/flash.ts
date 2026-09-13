@@ -415,12 +415,19 @@ function wrapUsbDevice(
   // dfuERROR and refuses everything after it, CLRSTATUS included, until its
   // power is cycled -- measured on the bench. So the only useful instruction
   // is the physical one.
-  const stalled = (err: unknown) =>
-    new Error(
-      `The board stopped accepting DFU commands (${
-        err instanceof Error ? err.message : String(err)
-      }). Unplug it, hold BOOT while plugging it back in, then detect it again.`,
+  //
+  // The browser's own wording goes to the flash log rather than on screen.
+  // It is the first thing worth having when this needs diagnosing again --
+  // controlTransferIn and Out fail at different points in the sequence --
+  // and it is nothing to the person who just has to re-plug the board.
+  const stalled = (err: unknown) => {
+    useFlashStore
+      .getState()
+      .appendLog(`DFU stalled: ${err instanceof Error ? err.message : String(err)}`)
+    return new Error(
+      'The board stopped accepting DFU commands. Please reboot and reconnect it, still in DFU mode.',
     )
+  }
   return {
     transferSize: transferSize ?? undefined,
     async controlOut(request, value, data) {

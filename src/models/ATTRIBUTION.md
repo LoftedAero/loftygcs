@@ -2,8 +2,8 @@
 
 Both models come from [betaflight-configurator](https://github.com/betaflight/betaflight-configurator)
 (`resources/models/`). The files are byte-identical to upstream; the biplane's colors are
-overridden at load time (see `REPAINT` in `src/ui/components/VehicleView.tsx`), which CC-BY
-counts as a change and so is stated below.
+overridden at load time (see `REPAINT` in `src/ui/components/VehicleView.tsx`) and again in
+the pre-rendered calibration art, which CC-BY counts as a change and so is stated below.
 
 ## airplane.gltf — CC-BY-4.0, credit required
 
@@ -14,9 +14,14 @@ changed: the stock red livery is repainted to the neutral grey of the Lofted Aer
 the struts, undercarriage and propeller re-toned so they stay legible against it.
 
 The license requires that credit travels with the model, so the app shows it wherever the
-model is drawn — not only here. That is two places now: the Overview tab, and the Logs
-tab's 3D replay when the log says a plane flew. Do not remove either line without
-replacing the model, and add one anywhere else the biplane appears.
+model is drawn — not only here. That is three places now: the Overview tab, the Logs
+tab's 3D replay when the log says a plane flew, and the compass-calibration attitude tiles
+on Sensors. Do not remove any of those lines without replacing the model, and add one
+anywhere else the biplane appears — **including a picture of it**. The calibration tiles
+draw no model at runtime at all: they are `cal-attitudes-plane.png`, rendered from this
+file by `npm run cal-art` (scripts/make-cal-art.mjs). A rendering is still the work, so it
+carries the same credit, and the credit is dropped there for the same reason it is on
+Overview — when the vehicle is an F-35B, the biplane is not on screen.
 
 The upstream notice is kept verbatim in `airplane.license.txt`.
 

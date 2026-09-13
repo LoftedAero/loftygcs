@@ -32,6 +32,14 @@ describe('the app bar status word', () => {
     expect(at({ phase: 'idle' })).toBeNull()
   })
 
+  it('does not paint a reboot we asked for as a fault', () => {
+    // The bug this fixes: rebooting after a compass calibration -- which the
+    // app itself tells people to do -- put a red "Link closed: The device
+    // has been lost" on the bar. The link is down because we asked, and it
+    // is coming back, so the tone is the same one "Opening link" gets.
+    expect(at({ phase: 'rebooting' })).toEqual({ text: 'Rebooting', tone: 'idle' })
+  })
+
   it('keeps a failed connection on screen', () => {
     // The one thing the readout this replaced was genuinely good for:
     // "connection refused" separates a simulator that is not running from a

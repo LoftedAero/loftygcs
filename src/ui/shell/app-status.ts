@@ -62,6 +62,10 @@ export function barStatus(v: VehicleStatusInput): BarStatus | null {
       return { text: 'Waiting for heartbeat', tone: 'idle' }
     case 'linkLost':
       return { text: 'Link lost', tone: 'bad' }
+    case 'rebooting':
+      // Not a fault tone: the link is down because this app asked for it,
+      // and it is coming back on its own.
+      return { text: 'Rebooting', tone: 'idle' }
   }
   // Connected, but the vehicle has not identified itself yet.
   if (!v.present) return { text: 'Connected', tone: 'idle' }

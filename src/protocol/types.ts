@@ -90,8 +90,22 @@ export type ProtocolEvent =
       calStatus: number
       pct: number
       completionMask: number[]
+      /** Body-frame direction the vehicle is pointing, for the sphere. */
+      direction: [number, number, number]
     }
   | { t: 'magCalReport'; compassId: number; calStatus: number; fitness: number; autosaved: number }
+  /**
+   * The side the accelerometer calibration is waiting to be placed in.
+   *
+   * ArduPilot *asks*, repeatedly, with a COMMAND_LONG of its own
+   * (`send_accelcal_vehicle_position`, every second) -- where the
+   * "Place vehicle on its LEFT side" text is printed once and never again.
+   * A ground station driven by the text alone therefore cannot rejoin a
+   * calibration already in progress, which is the state the vehicle is left
+   * in whenever a wizard is closed mid-run: there is no MAVLink way to cancel
+   * one, so it sits waiting until the vehicle is armed or restarted.
+   */
+  | { t: 'accelCalPosition'; position: number }
   /**
    * What the vehicle answered about itself: firmware version and the
    * capability bits. Sent once per connection, after the first heartbeat.
@@ -116,7 +130,16 @@ export interface FirmwareVersion {
 }
 
 export type TelemetryDelta =
-  | { k: 'attitude'; rollRad: number; pitchRad: number; yawRad: number }
+  | {
+      k: 'attitude'
+      rollRad: number
+      pitchRad: number
+      yawRad: number
+      /** Body angular rates, rad/s, from the same ATTITUDE message. */
+      rollRateRad: number
+      pitchRateRad: number
+      yawRateRad: number
+    }
   /** Where the camera mount says it is pointed, in degrees. */
   | { k: 'gimbal'; rollDeg: number; pitchDeg: number; yawDeg: number }
   | {

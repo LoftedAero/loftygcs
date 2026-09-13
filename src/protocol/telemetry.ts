@@ -16,6 +16,14 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           rollRad: f.roll as number,
           pitchRad: f.pitch as number,
           yawRad: f.yaw as number,
+          // The body rates come with the same message and were being
+          // dropped. Compass calibration needs them: how fast the vehicle is
+          // turning about *earth vertical* is a projection of these, and
+          // that is the one measure that still works nose-down, where Euler
+          // yaw is degenerate.
+          rollRateRad: f.rollspeed as number,
+          pitchRateRad: f.pitchspeed as number,
+          yawRateRad: f.yawspeed as number,
         },
       ]
     case 'GLOBAL_POSITION_INT':

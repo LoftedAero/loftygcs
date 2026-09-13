@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { LaButton, LaCard, LaHint } from '../../components/La'
-import ParamCard, { NeedsVehicle } from '../../components/ParamCard'
+import ParamField from '../../components/ParamField'
+import WriteFeedback from '../../components/WriteFeedback'
+import { NeedsVehicle } from '../../components/ParamCard'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { connectionService } from '../../../services/connection'
 import { MAV_RESULT } from '../../../protocol/commands'
 import AccelCalWizard from './AccelCalWizard'
 import CompassCalCard from './CompassCalCard'
+import HardwareId from './HardwareId'
 
 const MAV_CMD_PREFLIGHT_CALIBRATION = 241
 
-// Inertial and magnetic calibration. Set board orientation on the
-// Configuration tab first -- calibrating around a wrong orientation bakes
-// the error into the offsets.
+// Inertial and magnetic calibration.
 export default function SensorsTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   if (!connected) {
@@ -23,29 +24,24 @@ export default function SensorsTab() {
     )
   }
   return (
-    <>
-      <AccelCard />
-      <CompassCalCard />
-      <ParamCard
-        title="Compasses"
-        note="Disable a compass rather than fighting it: an interference-swamped external mag is worse than none."
-        fields={[
-          { param: 'COMPASS_USE', label: 'Use compass 1' },
-          { param: 'COMPASS_USE2', label: 'Use compass 2' },
-          { param: 'COMPASS_USE3', label: 'Use compass 3' },
-          { param: 'COMPASS_ORIENT', label: 'Compass 1 orientation' },
-          { param: 'COMPASS_AUTODEC', label: 'Auto declination' },
-        ]}
-      />
-      <ParamCard
-        title="Filtering"
-        note="Lower filter frequencies are calmer but add delay. Change these only with a log to justify it."
-        fields={[
-          { param: 'INS_GYRO_FILTER', label: 'Gyro filter', unit: 'Hz' },
-          { param: 'INS_ACCEL_FILTER', label: 'Accel filter', unit: 'Hz' },
-        ]}
-      />
-    </>
+    <div className="sensors-screen">
+      {/* The two calibrations are the work, so they stack in one column and
+          are read top to bottom. */}
+      <div className="sensors-screen__stack">
+        <AccelCard />
+        <CompassCalCard />
+      </div>
+      {/* What the firmware actually found, beside the calibrations that fail
+          when it found nothing. It was a view inside the Inspector, three
+          groups away in the rail: a compass that will not calibrate is
+          usually a compass that was never detected, and nothing about that
+          suggests going to look at a message list. Beside *both* of them
+          rather than under whichever card happened to be shorter, which is
+          where the card grid put it. */}
+      <LaCard title="Hardware ID" subtitle="The sensors this firmware has detected.">
+        <HardwareId />
+      </LaCard>
+    </div>
   )
 }
 
@@ -68,11 +64,13 @@ function AccelCard() {
     }
   }
 
+  // What you set, then what you do -- the same order on both calibration
+  // cards. Orientation is first because it has to be right before a run:
+  // written straight through rather than staged, since a pending edit in the
+  // Write queue would not be on the vehicle when the calibration starts.
   return (
-    <LaCard
-      title="Accelerometer"
-      note="Full calibration holds the vehicle in six orientations; level trim only needs it sitting the way it flies."
-    >
+    <LaCard title="Accelerometer">
+      <ParamField param="AHRS_ORIENTATION" label="Orientation" writeNow />
       <div className="la-row">
         <LaButton variant="secondary" onClick={() => setWizardOpen(true)}>
           Calibrate accelerometer
@@ -80,6 +78,11 @@ function AccelCard() {
         <LaButton variant="ghost" onClick={() => void levelHorizon()}>
           Set level horizon
         </LaButton>
+        <span className="la-grow" />
+        {/* In the row rather than in a band of its own: the row is already
+            here and already the right height, where a reserved empty line
+            was 22px of nothing in the middle of the card. */}
+        <WriteFeedback />
       </div>
       <LaHint>{levelState}</LaHint>
       {wizardOpen && <AccelCalWizard onClose={() => setWizardOpen(false)} />}

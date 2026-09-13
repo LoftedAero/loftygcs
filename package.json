@@ -1,6 +1,6 @@
 {
   "name": "loftgcs",
-  "version": "0.1.0",
+  "version": "0.8.0",
   "author": "Lofted Aero <info@loftedaero.com>",
   "description": "Loft GCS — a modern cross-platform ground control station for ArduPilot",
   "license": "GPL-3.0-only",
@@ -20,6 +20,7 @@
     "build:demo": "node scripts/build-artifact.mjs",
     "package:web": "node scripts/package-web.mjs",
     "icon": "electron scripts/make-icon.mjs",
+    "cal-art": "electron scripts/make-cal-art.mjs",
     "dist": "npm run build:electron && electron-builder --publish never",
     "test": "vitest run",
     "sitl": "node scripts/sitl.mjs run",

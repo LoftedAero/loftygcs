@@ -20,9 +20,11 @@ export interface RebootButtonProps {
   /** Shown under the button when a written parameter needs the reboot. */
   note?: string
   size?: 'block' | 'sm'
+  /** Called once the reboot has been sent, so a prompt can retire itself. */
+  onRebooted?: () => void
 }
 
-export default function RebootButton({ note, size = 'block' }: RebootButtonProps) {
+export default function RebootButton({ note, size = 'block', onRebooted }: RebootButtonProps) {
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const armed = useVehicleStore((s) => s.armed)
   const [asking, setAsking] = useState(false)
@@ -31,12 +33,13 @@ export default function RebootButton({ note, size = 'block' }: RebootButtonProps
   const reboot = () => {
     setAsking(false)
     setStatus('Rebooting…')
-    void rebootAutopilot().then(
-      // The vehicle stops answering mid-command about as often as it acks,
-      // so a rejection here is not news. The link status says the rest.
-      () => setStatus('Rebooting. It will reconnect on its own.'),
-      () => setStatus('Rebooting. It will reconnect on its own.'),
-    )
+    const sent = () => {
+      setStatus('Rebooting. It will reconnect on its own.')
+      onRebooted?.()
+    }
+    // The vehicle stops answering mid-command about as often as it acks, so
+    // a rejection here is not news. The link status says the rest.
+    void rebootAutopilot().then(sent, sent)
   }
 
   return (

@@ -124,6 +124,20 @@ export default function TuningTab() {
             { label: 'Yaw', params: ['ATC_ANG_YAW_P', 'ATC_ACCEL_Y_MAX'] },
           ]}
         />
+        {/* Filtering sat on Sensors, next to the calibrations, because these
+            are INS_ parameters. But a filter frequency is not something you
+            set while calibrating a board -- it is a tuning decision, made
+            against a log, and it is the rate loop above that it changes the
+            feel of. Grouped by what the number does, not by the prefix it
+            happens to carry. */}
+        <ParamCard
+          title="Filtering"
+          note="Lower filter frequencies are calmer but add delay. Change these only with a log to justify it."
+          fields={[
+            { param: 'INS_GYRO_FILTER', label: 'Gyro filter', unit: 'Hz' },
+            { param: 'INS_ACCEL_FILTER', label: 'Accel filter', unit: 'Hz' },
+          ]}
+        />
         <ParamCard
           title="Autotune"
           note="Autotune flies the vehicle to find its own gains. Read the ArduPilot procedure before switching into it — it needs space and calm air."

@@ -7,10 +7,13 @@ import { ElectronLinkTransport } from './electron-link'
 import { WebSocketTransport } from './websocket'
 import { VirtualFcTransport } from './virtual-fc'
 
-export function createTransport(kind: TransportKind): Transport {
+export function createTransport(kind: TransportKind, opts?: TransportOptions): Transport {
   switch (kind) {
     case 'serial':
-      return new WebSerialTransport()
+      // A port carried in the options was granted earlier and is handed
+      // straight to the transport, which is what lets a reconnect happen
+      // without a chooser nobody could have answered.
+      return new WebSerialTransport(opts?.kind === 'serial' ? opts.port : undefined)
     case 'tcp':
       return new ElectronLinkTransport('tcp')
     case 'udp':
@@ -31,7 +34,7 @@ export class TransportManager {
     onClose: (reason?: string) => void,
   ): Promise<Transport> {
     await this.close()
-    const transport = createTransport(opts.kind)
+    const transport = createTransport(opts.kind, opts)
     // Gate on identity: if this transport has been replaced, its events are
     // history speaking and must not reach the parser.
     transport.onData((bytes) => {

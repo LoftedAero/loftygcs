@@ -95,6 +95,25 @@ export function parseAccelPrompt(text: string): AccelPosition | null {
   return null
 }
 
+/**
+ * The vehicle's prompt without its keyboard-era tail, and without punctuation.
+ *
+ * ArduPilot prints "Place vehicle on its LEFT side and press any key." -- the
+ * key belongs to a console it no longer has, and the screen showing that line
+ * has a button on it. The pose half is the useful half and is the firmware's
+ * own wording, which is why it is kept rather than paraphrased; the caller
+ * says what to press.
+ *
+ * Anything that does not end that way comes back as it was: a firmware whose
+ * wording changed should still put its own words on screen.
+ */
+export function posePrompt(text: string): string {
+  return text
+    .replace(/[\s,]*and\s+press\s+any\s+key\s*[.!]?\s*$/i, '')
+    .replace(/[.\s]+$/, '')
+    .trim()
+}
+
 export function isCalibrationSuccess(text: string): boolean {
   return /calibration successful/i.test(text)
 }

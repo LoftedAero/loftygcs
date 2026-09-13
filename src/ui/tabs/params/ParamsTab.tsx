@@ -44,7 +44,7 @@ export default function ParamsTab() {
   //
   // The empty case is not special-cased at all. It renders the ordinary
   // screen with an empty table, and the column beside it already has the
-  // control that fills it -- "Import all from file", which is the same
+  // control that fills it -- "Import from file", which is the same
   // button whether it is opening a set or staging one against a vehicle. A
   // second opener that appeared only while disconnected would be one more
   // thing to keep in step with the first, for a state that is not special.

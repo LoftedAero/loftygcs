@@ -5,7 +5,7 @@ import type { GuideCheck, GuideStep } from '../../profiles/types'
 import { useGuideStore } from '../../stores/guide-store'
 import { useVehicleStore } from '../../stores/vehicle-store'
 import { useParamStore } from '../../stores/param-store'
-import { useCalStore } from '../../stores/cal-store'
+import { magCalFinished, magCalList, useCalStore } from '../../stores/cal-store'
 import { useConnectionStore } from '../../stores/connection-store'
 import { connectionService } from '../../services/connection'
 import { MAV_RESULT } from '../../protocol/commands'
@@ -257,7 +257,12 @@ function CalibrationStep({
   const markDone = useMarkDone(index)
   const [accelOpen, setAccelOpen] = useState(false)
   const [state, setState] = useState('')
-  const magReport = useCalStore((s) => s.magCal.report)
+  // A guide step completes when the run finishes and at least one compass
+  // succeeded -- the run is per-compass now, so there is no single report.
+  const magCal = useCalStore((s) => s.magCal)
+  const magReport = magCalFinished(magCal)
+    ? (magCalList(magCal).find(([, c]) => c.report?.calStatus === 4)?.[1].report ?? null)
+    : null
 
   // Compass: the embedded card drives the calibration; success in the cal
   // store is what completes the step.

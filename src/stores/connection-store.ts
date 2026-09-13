@@ -10,6 +10,7 @@ export type ConnectionPhase =
   | 'handshaking' // link open, waiting for the first vehicle HEARTBEAT
   | 'connected'
   | 'linkLost' // no HEARTBEAT for 3 s; the link may recover
+  | 'rebooting' // we asked the vehicle to restart; waiting for it to come back
   | 'error'
 
 interface ConnectionState {

@@ -149,6 +149,35 @@ saying so. Put whatever prompt is needed where the absence already shows.
 > *"No need for the notice bar — the 'No vehicle' on the visualization is
 > enough."*
 
+### A screen is controls, not prose
+
+Do not narrate. A card is a set of controls with their labels; it does not
+need a sentence explaining what the control is for, what the procedure
+involves, or why the setting matters. Those belong in a code comment, where
+they cost the reader nothing. The exceptions are narrow and each earns its
+place: a `.la-hint` saying why a control is **disabled** or why a value was
+**refused**, and the shaded state line on Firmware, which narrates a flash
+because that is the one operation somebody watches a bar through.
+
+Descriptions accumulate one reasonable-looking sentence at a time, and the
+result is a screen people learn to skim. If a control needs explaining, the
+label is wrong.
+
+> *"Getting a little irritated at how frequently random text and
+> descriptions are being placed throughout the app."*
+
+### What you set, then what you do
+
+Within a card, the settings come first and the action that uses them last.
+The accelerometer card reads orientation → Calibrate; the compass card reads
+priority, then its settings, then Calibrate. (The *actions column* on the
+full-height screens is the other way round — vehicle actions, then files,
+then settings — because a column is scanned from the top for something to
+press, where a card is read through.)
+
+> *"Just place the rotation setting at the top for flow… Similarly, place
+> the calibration button for compass at the bottom."*
+
 ---
 
 ## Alignment and rhythm

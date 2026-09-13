@@ -245,6 +245,10 @@ export function restartScripting(): Promise<number> {
 
 /** Reboot the autopilot. The link drops and has to be reconnected. */
 export function rebootAutopilot(): Promise<number> {
+  // Say so before sending it. ArduPilot obeys without acking, so on USB the
+  // device can be gone before this promise settles -- and a drop the app
+  // asked for is not a failure to report, it is a wait to sit through.
+  connectionService.expectReboot()
   // param1 = 1 reboots the autopilot; anything higher shuts it down instead.
   return connectionService.runCommand(
     MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,

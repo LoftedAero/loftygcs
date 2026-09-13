@@ -5,6 +5,7 @@ import {
   isCalibrationFailure,
   isCalibrationSuccess,
   parseAccelPrompt,
+  posePrompt,
 } from './accel-cal'
 
 // The wizard follows the vehicle's prompts, so this parser is the whole
@@ -43,6 +44,21 @@ describe('parseAccelPrompt', () => {
   it('tolerates case and wording drift', () => {
     expect(parseAccelPrompt('place the vehicle on its left side')?.id).toBe('LEFT')
     expect(parseAccelPrompt('PLACE VEHICLE ON ITS BACK')?.id).toBe('BACK')
+  })
+})
+
+describe('the pose half of the vehicle prompt', () => {
+  it('drops the key it no longer has, and the punctuation with it', () => {
+    expect(posePrompt('Place vehicle on its LEFT side and press any key.')).toBe(
+      'Place vehicle on its LEFT side',
+    )
+    expect(posePrompt('Place vehicle level and press any key')).toBe('Place vehicle level')
+  })
+
+  it('leaves wording it does not recognize alone', () => {
+    // A firmware that rephrases this should still put its own words on
+    // screen rather than have half of them cut off.
+    expect(posePrompt('Put the aircraft on its nose')).toBe('Put the aircraft on its nose')
   })
 })
 

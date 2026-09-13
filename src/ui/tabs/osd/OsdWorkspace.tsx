@@ -98,11 +98,7 @@ export default function OsdWorkspace() {
 
   return (
     <div className="osd-workspace">
-      <LaCard
-        title="Panels"
-        note="Positions are per screen."
-        className="osd-workspace__panels"
-      >
+      <LaCard title="Panels" note="Positions are per screen." className="osd-workspace__panels">
         <div className="osd-palette-scroll">
           {noPanels && (
             <p className="app-placeholder">
@@ -268,7 +264,7 @@ export default function OsdWorkspace() {
             // leaves this page empty however many times you choose a
             // backend. The write is followed by a quiet re-read, which is
             // where the panel parameters come from.
-            { param: 'OSD_TYPE', label: 'OSD type', writeNow: true },
+            { param: 'OSD_TYPE', label: 'OSD type', writeNow: true, gatesOthers: true },
             { param: 'OSD_UNITS', label: 'Units' },
             { param: 'OSD_MSG_TIME', label: 'Message time', unit: 's' },
             { param: 'OSD_SW_METHOD', label: 'Switch method' },

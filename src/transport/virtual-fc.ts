@@ -436,6 +436,23 @@ function demoMission(): Record<string, FieldValue>[] {
   ]
 }
 
+/**
+ * A plausible completion mask for a simulated calibration at `pct`.
+ *
+ * Deterministic, so a demo looks the same twice, and scattered by a stride
+ * that is coprime with 80 so the sections light up all over the sphere
+ * rather than sweeping one band.
+ */
+function magCalMask(pct: number): number[] {
+  const mask = new Array<number>(10).fill(0)
+  const filled = Math.min(80, Math.round((80 * pct) / 100))
+  for (let n = 0; n < filled; n++) {
+    const section = (n * 31) % 80
+    mask[Math.floor(section / 8)]! |= 1 << (section % 8)
+  }
+  return mask
+}
+
 export class VirtualFcTransport implements Transport {
   readonly kind = 'virtual' as const
   private dataCb: ((bytes: Uint8Array) => void) | null = null
@@ -447,6 +464,8 @@ export class VirtualFcTransport implements Transport {
   private rxFramer = new MavFramer()
   private params = new Map(SIM_PARAMS.map(([n, v, t]) => [n, { value: v, mavType: t }]))
   private magCalTimer: ReturnType<typeof setInterval> | null = null
+  /** Running while an accelerometer calibration is waiting for a side. */
+  private accelCalTimer: ReturnType<typeof setInterval> | null = null
   private accelCalPositions = 0
   private airborne = false
   // A stored mission (item 0 = home), so Mission mode has something real to
@@ -528,6 +547,8 @@ export class VirtualFcTransport implements Transport {
     this.timers = []
     if (this.magCalTimer) clearInterval(this.magCalTimer)
     this.magCalTimer = null
+    if (this.accelCalTimer) clearInterval(this.accelCalTimer)
+    this.accelCalTimer = null
   }
 
   write(bytes: Uint8Array) {
@@ -651,7 +672,14 @@ export class VirtualFcTransport implements Transport {
 
   private handleCommand(command: number, param1: number, param2: number, param5: number) {
     const ack = (result = 0) =>
-      this.emit('COMMAND_ACK', { command, result, progress: 0, resultParam2: 0, targetSystem: 255, targetComponent: 190 })
+      this.emit('COMMAND_ACK', {
+        command,
+        result,
+        progress: 0,
+        resultParam2: 0,
+        targetSystem: 255,
+        targetComponent: 190,
+      })
 
     switch (command) {
       case 42424: {
@@ -668,7 +696,20 @@ export class VirtualFcTransport implements Transport {
               calStatus: 3, // RUNNING_STEP_TWO
               attempt: 1,
               completionPct: pct,
-              completionMask: new Array(10).fill(0),
+              // The mask a real vehicle fills as samples arrive, rather than
+              // the ten zero bytes this used to send. Not an invented rule --
+              // ArduPilot derives the percentage *from* this coverage, so a
+              // progress message with none of it is the one shape the real
+              // thing never takes, and it left the coverage sphere blank for
+              // the whole of a demo calibration. Scattered rather than
+              // filled in index order, because a vehicle being turned over
+              // does not visit the sections in the order they are numbered.
+              completionMask: magCalMask(pct),
+              // Zeros, because that is what ArduPilot sends: its
+              // `mavlink_msg_mag_cal_progress_send` passes 0.0f for all three
+              // direction fields. A demo that filled them in taught this app
+              // a lesson the real firmware never gives -- which is the whole
+              // reason the virtual FC is held to what SITL does.
               directionX: 0,
               directionY: 0,
               directionZ: 0,
@@ -707,11 +748,22 @@ export class VirtualFcTransport implements Transport {
       case 241: // preflight calibration
         ack()
         if (param5 === 1) {
+          // **A start while one is already running does nothing.**
+          // `AP_AccelCal::start` returns immediately on `_started`, and the
+          // command handler acks anyway -- so a GCS that closed its wizard
+          // part-way and opened it again gets an ACCEPTED and silence. That
+          // is the state this models: there is no MAVLink cancel, so the run
+          // in progress is still the run in progress.
+          if (this.accelCalTimer) return
           // Walk the six sides the way AP_AccelCal does, in its wording --
           // the GCS is meant to read these prompts rather than assume an
           // order, so the demo has to actually speak them.
           this.accelCalPositions = 0
           setTimeout(() => this.sendStatusText(6, ACCEL_CAL_PROMPTS[0]!), 300)
+          // And it *asks*, over and over, which is the half a GCS can rejoin
+          // a calibration from: the text above is said once per side.
+          this.accelCalTimer = setInterval(() => this.askAccelPosition(), 1000)
+          setTimeout(() => this.askAccelPosition(), 300)
         } else if (param5 === 2) {
           setTimeout(() => this.sendStatusText(6, 'Level horizon set'), 200)
         }
@@ -721,8 +773,14 @@ export class VirtualFcTransport implements Transport {
         this.accelCalPositions++
         setTimeout(() => {
           const next = ACCEL_CAL_PROMPTS[this.accelCalPositions]
-          if (next) this.sendStatusText(6, next)
-          else this.sendStatusText(6, 'Calibration successful')
+          if (next) {
+            this.sendStatusText(6, next)
+            this.askAccelPosition()
+          } else {
+            if (this.accelCalTimer) clearInterval(this.accelCalTimer)
+            this.accelCalTimer = null
+            this.sendStatusText(6, 'Calibration successful')
+          }
         }, 500)
         return
       case 176: {
@@ -731,7 +789,10 @@ export class VirtualFcTransport implements Transport {
         // until the EKF has one -- ack 4 plus a STATUSTEXT saying why, which
         // is the pair the Fly screen now reports together.
         if (NEEDS_POSITION.has(param2) && !this.positionOk) {
-          this.sendStatusText(4, `Mode change to ${MODE_LABEL[param2] ?? param2} failed: requires position`)
+          this.sendStatusText(
+            4,
+            `Mode change to ${MODE_LABEL[param2] ?? param2} failed: requires position`,
+          )
           return ack(4)
         }
         this.mode = param2
@@ -835,7 +896,8 @@ export class VirtualFcTransport implements Transport {
 
   private sendRcChannels() {
     const t = this.t()
-    const wiggle = (base: number, amp: number, f: number) => Math.round(base + amp * Math.sin(t * f))
+    const wiggle = (base: number, amp: number, f: number) =>
+      Math.round(base + amp * Math.sin(t * f))
     // With the on-screen transmitter in use, the sticks drive the channels
     // instead of the idle wiggle -- a wandering channel would defeat the
     // radio calibration's whole job of spotting which one the user moved.
@@ -931,9 +993,10 @@ export class VirtualFcTransport implements Transport {
     const r = this.flying() ? 120 : 0
     const angle = t * 0.1
     const latDeg = HOME_LAT + ((r * Math.cos(angle)) / 111320) * 1
-    const lonDeg = HOME_LON + (r * Math.sin(angle)) / (111320 * Math.cos((HOME_LAT * Math.PI) / 180))
+    const lonDeg =
+      HOME_LON + (r * Math.sin(angle)) / (111320 * Math.cos((HOME_LAT * Math.PI) / 180))
     const relAlt = this.flying() ? 50 + 5 * Math.sin(t * 0.3) : 0
-    const heading = this.flying() ? (((angle * 180) / Math.PI + 90) % 360 + 360) % 360 : 34
+    const heading = this.flying() ? ((((angle * 180) / Math.PI + 90) % 360) + 360) % 360 : 34
     this.emit('GLOBAL_POSITION_INT', {
       timeBootMs: Math.round(t * 1000),
       lat: Math.round(latDeg * 1e7),
@@ -992,5 +1055,32 @@ export class VirtualFcTransport implements Transport {
 
   private sendStatusText(severity: number, text: string) {
     this.emit('STATUSTEXT', { severity, text })
+  }
+
+  /**
+   * "Put it on this side", as a command to the GCS.
+   *
+   * ArduPilot's `send_accelcal_vehicle_position` -- a COMMAND_LONG carrying
+   * MAV_CMD_ACCELCAL_VEHICLE_POS with the step in param1, broadcast with no
+   * target, repeated every second for as long as it is waiting.
+   */
+  private askAccelPosition() {
+    this.emit('COMMAND_LONG', {
+      targetSystem: 0,
+      targetComponent: 0,
+      command: 42429,
+      confirmation: 0,
+      // `_param1`, not `param1`: that is what mavlink-mappings calls the
+      // field, and the encoder takes any key it is given -- a wrong one
+      // produces a well-formed message full of zeros, which is a request to
+      // be placed in side 0 and matches nothing.
+      _param1: this.accelCalPositions + 1,
+      _param2: 0,
+      _param3: 0,
+      _param4: 0,
+      _param5: 0,
+      _param6: 0,
+      _param7: 0,
+    })
   }
 }

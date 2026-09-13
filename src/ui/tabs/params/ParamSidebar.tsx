@@ -179,7 +179,7 @@ function ImportButton() {
           else setWarning(true)
         }}
       >
-        Import all from file
+        Import from file
       </LaButton>
 
       <LaModal
@@ -197,24 +197,23 @@ function ImportButton() {
                 fileRef.current?.click()
               }}
             >
-              Choose a file
+              Continue
             </LaButton>
           </>
         }
       >
+        {/* Two sentences: the one fact that makes this dangerous, and the
+            control that does it safely. It was three paragraphs -- the first
+            restating the title, the second explaining what a parameter set
+            is. Nobody reading a confirm dialog needs the concept explained;
+            they need to know that calibration belongs to the airframe it was
+            measured on, and where the other door is. */}
         <p className="app-placeholder">
-          Import stages <strong>every</strong> difference between the file and this vehicle, without
-          asking about any of them.
+          This may overwrite calibrations and hardware-specific values. Only perform this action if
+          you know it is safe for this parameter set.
         </p>
         <p className="app-placeholder">
-          A parameter set describes one particular aircraft. Accelerometer and compass calibration,
-          radio trims and tuning gains were all measured on the machine the file came from — taking
-          them wholesale onto a different airframe replaces good numbers with numbers that were true
-          somewhere else.
-        </p>
-        <p className="app-placeholder">
-          If the file came from another aircraft, use <strong>Compare with file</strong> instead and
-          pick what you actually want.
+          Use <strong>Compare with file</strong> to perform a selective import.
         </p>
       </LaModal>
 
@@ -228,9 +227,18 @@ function ImportButton() {
         }
       >
         <p className="app-placeholder">
-          {result?.opened
-            ? `Opened ${result.applied} parameter${result.applied === 1 ? '' : 's'} from ${result.file}. These are the file's, not a vehicle's.`
-            : `Staged ${result?.applied ?? 0} change${result?.applied === 1 ? '' : 's'} from ${result?.file} — nothing has been written yet. Review them with Write params, or Revert to drop them.`}
+          {result?.opened ? (
+            `Opened ${result.applied} parameter${result.applied === 1 ? '' : 's'} from ${result.file}. These are the file's, not a vehicle's.`
+          ) : (
+            /* The two routes out are named as they are labelled in the
+               column beside this, and emphasized so they read as the
+               controls they are rather than as a description of them. */
+            <>
+              Staged {result?.applied ?? 0} change{result?.applied === 1 ? '' : 's'} from{' '}
+              {result?.file} - review and choose <strong>Write params</strong> or{' '}
+              <strong>Revert changes</strong>
+            </>
+          )}
         </p>
         {(result?.skipped ?? 0) > 0 && (
           <LaHint error>

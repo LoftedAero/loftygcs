@@ -480,7 +480,7 @@ design decisions are recorded there and in code comments.
   `SYSID_THISMAV` looks like the obvious marker and is not — it does not reach the heartbeat
   from a defaults file, so a test built on it can only ever pass.
 - **ArduPilot device IDs are packed, and the device type means nothing without its class**
-  (`protocol/device-id.ts`, shown as Inspector ▸ Hardware ID). Every detected sensor gets a
+  (`protocol/device-id.ts`, shown as Sensors ▸ Hardware ID). Every detected sensor gets a
   `bus_type:3, bus:5, address:8, devtype:8` word stored in a parameter — INS_ACC_ID,
   COMPASS_DEV_ID, BARO1_DEVID and their siblings — and the tables that name a devtype are
   **per driver**: 0x0B is an ICM20948 to the compass and an MS5611 to the barometer, so a
@@ -871,6 +871,26 @@ design decisions are recorded there and in code comments.
   on vehicle", which reads exactly like a rejected command; and a `DO_JUMP` to item 0 is
   rejected as *invalid* rather than unsupported, which looks like a catalog error and is not.
 
+- **An accelerometer calibration cannot be cancelled, and it asks rather than tells.**
+  `AP_AccelCal::cancel()` exists and is reachable from exactly one place — arming the vehicle
+  — so there is no MAVLink way to stop a run part-way, and `start()` returns immediately while
+  one is already running, acking anyway. A wizard closed mid-run therefore leaves the vehicle
+  waiting for a side indefinitely, and the next PREFLIGHT_CALIBRATION is silently ignored.
+  What makes that survivable is that the firmware **repeats its request**:
+  `send_accelcal_vehicle_position` sends a COMMAND_LONG carrying MAV_CMD_ACCELCAL_VEHICLE_POS
+  with the step in param1, every second, for as long as it waits — where the matching
+  "Place vehicle on its LEFT side and press any key" STATUSTEXT is printed **once** per side.
+  So the wizard follows the command and keeps the text only for the wording and the verdict,
+  which is what lets it rejoin a run it did not start; the text path stays as a fallback for a
+  firmware that stops repeating itself. Two traps: the same message carries a terminal
+  SUCCESS/FAILED that the vehicle goes on repeating long after a run is over, so a wizard that
+  trusted it would show the last run's verdict a second after starting a new one (hence the
+  arrival time beside the value, and reading only steps 1-6); and the param fields are
+  **`_param1`…`_param7`** in mavlink-mappings, not `param1` — the encoder takes any key it is
+  given, so the wrong one produces a well-formed request to be placed in side zero. The
+  sides are walked in order and `_step` only counts up, so the side being asked for is also
+  how far the run has got, which is the only way to fill in the tiles when rejoining.
+
 - **Do not gate a feature on a capability bit.** A real flight controller reported no
   MAV_PROTOCOL_CAPABILITY_FTP while serving files perfectly well, and the MAVFTP screen believed
   it and told the user their working feature did not exist. SITL sets the bit, so nothing here
@@ -1035,8 +1055,10 @@ design decisions are recorded there and in code comments.
   renderers apply the same rotation to whatever they load; check a new one against the biplane
   numerically rather than by eye. The biplane is
   CC-BY-4.0 and its credit must stay visible in the app (Overview, under the model), not just
-  in the repo — see `src/models/ATTRIBUTION.md`. The quad is GPL-3.0, usable only because this
-  app is GPL-3.0. Imported with `?url`; the demo build inlines them via `assetsInlineLimit`.
+  in the repo — see `src/models/ATTRIBUTION.md`. **A picture of a model is still the model**:
+  the compass-calibration tiles are a sprite sheet pre-rendered from these files by
+  `npm run cal-art`, and they carry the same credit line for the same reason. The quad is
+  GPL-3.0, usable only because this app is GPL-3.0. Imported with `?url`; the demo build inlines them via `assetsInlineLimit`.
 - Comments say *why*, not what.
 
 ## Commands

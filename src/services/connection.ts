@@ -11,7 +11,7 @@ import type { FirmwareVersion, MissionItem, ProtocolEvent, TelemetryDelta } from
 import { modeName, vehicleTypeName } from '../protocol/modes'
 import { setConnectionState, useConnectionStore } from '../stores/connection-store'
 import { describeLinkError, describeSilentLink } from './link-error'
-import { WebSerialTransport } from '../transport/web-serial'
+import { WebSerialTransport, grantedSerialPorts } from '../transport/web-serial'
 import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { useCalStore } from '../stores/cal-store'
@@ -35,6 +35,19 @@ const HANDSHAKE_TIMEOUT_MS = 5000
 const LINK_LOST_AFTER_MS = 3000
 const SNAPSHOT_INTERVAL_MS = 200
 
+/**
+ * How long to wait for a vehicle we told to restart.
+ *
+ * ArduPilot is back on the bus in a few seconds; the budget is generous
+ * because a USB flight controller re-enumerates on its own schedule, and a
+ * board that boots slowly is not a board that has failed. Past it, the
+ * silence is news.
+ */
+const REBOOT_RETURN_MS = 45000
+
+/** How often to try the link again while waiting for it. */
+const REBOOT_RETRY_MS = 1000
+
 class ConnectionService {
   private manager = new TransportManager()
   private worker: WorkerClient | null = null
@@ -47,6 +60,16 @@ class ConnectionService {
   // a few Hz no matter how fast telemetry arrives.
   /** What the current link was opened with, for naming it in a message. */
   private openedWith: TransportOptions | null = null
+  /**
+   * The serial port this link is open on, so a reboot can reopen *it*.
+   *
+   * Web Serial's grant belongs to the device and outlives the reboot, but
+   * only a port already in hand can be opened without a chooser.
+   */
+  private openedPort: SerialPort | null = null
+  /** When to stop waiting for a reboot we commanded; 0 when not waiting. */
+  private rebootUntil = 0
+  private rebootTimer: ReturnType<typeof setTimeout> | null = null
   private pending: Partial<VehicleSnapshot> = {}
   private pendingDirty = false
 
@@ -54,30 +77,9 @@ class ConnectionService {
     const { phase } = useConnectionStore.getState()
     if (phase !== 'idle' && phase !== 'error') await this.disconnect()
 
-    this.openedWith = opts
     setConnectionState({ phase: 'opening', kind: opts.kind, error: null })
     try {
-      const worker = this.ensureWorker()
-      const transport = await this.manager.open(
-        opts,
-        (bytes) => worker.pushBytes(bytes),
-        (reason) => this.onTransportClosed(reason),
-      )
-      worker.start()
-      setConnectionState({ phase: 'handshaking' })
-      this.handshakeTimer = setTimeout(() => {
-        // A silent link usually means wrong baud/port -- or a board sitting
-        // in its bootloader, which the firmware flow will learn to detect.
-        // On serial the port itself narrows that down: a flight controller's
-        // own USB vendor going quiet is far more likely to be the wrong one
-        // of its several ports than a dead board.
-        const usb =
-          opts.kind === 'serial' && transport instanceof WebSerialTransport
-            ? transport.openedPort?.getInfo()
-            : undefined
-        void this.disconnect(describeSilentLink(usb))
-      }, HANDSHAKE_TIMEOUT_MS)
-      this.snapshotTimer = setInterval(() => this.flushSnapshot(), SNAPSHOT_INTERVAL_MS)
+      await this.openLink(opts)
     } catch (err) {
       // Cancelling the port chooser is not a failure, and reported as one it
       // left a red chip on the app bar for choosing not to connect.
@@ -88,7 +90,162 @@ class ConnectionService {
     }
   }
 
+  /**
+   * Open the transport and start waiting for a heartbeat.
+   *
+   * Split out of `connect` because the reboot wait below opens the same link
+   * over and over, and must not announce each attempt as a new connection or
+   * report each failure as one.
+   */
+  private async openLink(opts: TransportOptions) {
+    this.openedWith = opts
+    const worker = this.ensureWorker()
+    const transport = await this.manager.open(
+      opts,
+      (bytes) => worker.pushBytes(bytes),
+      (reason) => this.onTransportClosed(reason),
+    )
+    worker.start()
+    this.openedPort = transport instanceof WebSerialTransport ? transport.openedPort : null
+    // While a reboot is outstanding the bar keeps saying so: the link coming
+    // up is a step in that rather than a separate event, and flicking
+    // through "Waiting for heartbeat" on every retry would read as a link
+    // that cannot make up its mind.
+    if (!this.rebooting) setConnectionState({ phase: 'handshaking' })
+    this.handshakeTimer = setTimeout(() => {
+      // A silent link usually means wrong baud/port -- or a board sitting
+      // in its bootloader, which the firmware flow will learn to detect.
+      // On serial the port itself narrows that down: a flight controller's
+      // own USB vendor going quiet is far more likely to be the wrong one
+      // of its several ports than a dead board.
+      const usb =
+        opts.kind === 'serial' && transport instanceof WebSerialTransport
+          ? transport.openedPort?.getInfo()
+          : undefined
+      this.linkFailed(describeSilentLink(usb))
+    }, HANDSHAKE_TIMEOUT_MS)
+    this.snapshotTimer = setInterval(() => this.flushSnapshot(), SNAPSHOT_INTERVAL_MS)
+  }
+
+  private get rebooting(): boolean {
+    return Date.now() < this.rebootUntil
+  }
+
+  /**
+   * The next link drop is one we asked for.
+   *
+   * Called before the reboot command goes out, because the vehicle obeys it
+   * without acking and the USB device can be gone before the promise
+   * settles. Until this existed, restarting a board after a compass
+   * calibration -- which this app *tells* people to do -- put "Link closed:
+   * The device has been lost" on the app bar in red: the app reporting its
+   * own instruction as a fault, and leaving the reconnect to be done by
+   * hand.
+   *
+   * Harmless when the reboot is refused (an armed vehicle): the link never
+   * drops and the next heartbeat clears the phase a second later.
+   */
+  expectReboot() {
+    const { phase } = useConnectionStore.getState()
+    if (phase === 'idle' || phase === 'error') return
+    this.rebootUntil = Date.now() + REBOOT_RETURN_MS
+    setConnectionState({ phase: 'rebooting', error: null })
+  }
+
+  /**
+   * A link that went away: a step in a reboot, or news.
+   *
+   * Everything that ends a link badly comes through here, so that
+   * distinction is made in exactly one place.
+   */
+  private linkFailed(message?: string) {
+    if (!this.rebooting) {
+      void this.disconnect(message)
+      return
+    }
+    void this.teardown().then(() => {
+      setConnectionState({ phase: 'rebooting', error: null, linkStats: null })
+      this.scheduleRebootRetry()
+    })
+  }
+
+  private scheduleRebootRetry() {
+    if (this.rebootTimer) clearTimeout(this.rebootTimer)
+    this.rebootTimer = setTimeout(() => void this.retryAfterReboot(), REBOOT_RETRY_MS)
+  }
+
+  /**
+   * Try the link again, and keep trying until the vehicle is back.
+   *
+   * **Opening it is the probe.** `getPorts()` lists what this origin was
+   * granted whether or not the device is plugged in -- measured, in the
+   * flash path -- so it cannot say when the board came back. `open()` can:
+   * it fails while the device is away and succeeds the moment it is not.
+   */
+  private async retryAfterReboot() {
+    this.rebootTimer = null
+    if (useConnectionStore.getState().phase !== 'rebooting') return
+    const opts = this.openedWith
+    if (opts) {
+      try {
+        await this.openLink(await this.withGrantedPort(opts))
+        return
+      } catch {
+        // Normal for the first several seconds: the device re-enumerates
+        // when the firmware's USB stack is up, and not before.
+      }
+    }
+    if (!this.rebooting) {
+      await this.disconnect('The vehicle did not come back after the reboot. Reconnect to retry.')
+      return
+    }
+    this.scheduleRebootRetry()
+  }
+
+  /**
+   * The serial options with a port attached, so no chooser is needed.
+   *
+   * Usually the very port the link was open on -- Chromium keeps that object
+   * across a re-enumeration for a device that reports a serial number, which
+   * a flight controller does. But not always: a device without one is
+   * dropped and comes back as a *new* port object, while the old one stays
+   * in `getPorts()` and can never be opened again. So the choice is made by
+   * USB ids and takes the **newest** match, which is the same object in the
+   * first case and the replacement in the second. Checking that the held
+   * port is still listed proves nothing, because the list keeps ports whose
+   * devices are unplugged.
+   */
+  private async withGrantedPort(opts: TransportOptions): Promise<TransportOptions> {
+    if (opts.kind !== 'serial') return opts
+    const held = this.openedPort
+    if (!held) return opts
+    const want = held.getInfo()
+    // Nothing to match on (a Bluetooth or virtual COM port): the object in
+    // hand is the only candidate there is.
+    if (want.usbVendorId === undefined) return { ...opts, port: held }
+    const ports = await grantedSerialPorts()
+    const same = ports.filter((p) => {
+      const info = p.getInfo()
+      return info.usbVendorId === want.usbVendorId && info.usbProductId === want.usbProductId
+    })
+    return { ...opts, port: same.at(-1) ?? held }
+  }
+
   async disconnect(error?: string) {
+    // Disconnecting is an answer to the question the reboot wait is asking.
+    this.rebootUntil = 0
+    if (this.rebootTimer) clearTimeout(this.rebootTimer)
+    this.rebootTimer = null
+    await this.teardown()
+    setConnectionState(
+      error
+        ? { phase: 'error', error, linkStats: null }
+        : { phase: 'idle', kind: null, error: null, linkStats: null },
+    )
+  }
+
+  /** Everything a disconnect does except say so: shared with the reboot wait. */
+  private async teardown() {
     if (this.handshakeTimer) clearTimeout(this.handshakeTimer)
     if (this.snapshotTimer) clearInterval(this.snapshotTimer)
     this.handshakeTimer = null
@@ -106,11 +263,7 @@ class ConnectionService {
     // on the map would show the last flight's sky over the next field.
     useTrafficStore.getState().clear()
     useCalStore.getState().magCalReset()
-    setConnectionState(
-      error
-        ? { phase: 'error', error, linkStats: null }
-        : { phase: 'idle', kind: null, error: null, linkStats: null },
-    )
+    useCalStore.getState().setAccelAsked(null)
   }
 
   private ensureWorker(): WorkerClient {
@@ -129,22 +282,42 @@ class ConnectionService {
     // options are the ones this link was opened with.
     const opts = this.openedWith
     const said = reason && opts ? describeLinkError(new Error(reason), opts) : reason
-    void this.disconnect(said ? `Link closed: ${said}` : undefined)
+    this.linkFailed(said ? `Link closed: ${said}` : undefined)
   }
 
   private onEvent(evt: ProtocolEvent) {
     const conn = useConnectionStore.getState()
     switch (evt.t) {
       case 'heartbeat': {
-        if (conn.phase === 'handshaking' || conn.phase === 'linkLost') {
+        if (
+          conn.phase === 'handshaking' ||
+          conn.phase === 'linkLost' ||
+          conn.phase === 'rebooting'
+        ) {
           if (this.handshakeTimer) clearTimeout(this.handshakeTimer)
           this.handshakeTimer = null
+          // Back. A link that never dropped -- a telemetry radio, or a
+          // reboot the vehicle refused -- recovers here too, which is why
+          // the wait ends on a heartbeat rather than on a port.
+          this.rebootUntil = 0
           setConnectionState({ phase: 'connected' })
-          if (conn.phase === 'handshaking') {
+          if (conn.phase === 'handshaking' || conn.phase === 'rebooting') {
             // A configurator without the parameters is an empty shell:
-            // fetch them as soon as the vehicle exists.
+            // fetch them as soon as the vehicle exists -- and again once a
+            // restart is over, which is the whole point of the restart. Both
+            // kinds of reboot need it for different reasons: a link that
+            // dropped had the parameter set cleared with it, so the screens
+            // would come back empty; a link that never dropped is holding
+            // values from before the vehicle re-read its own storage. Not
+            // `linkLost` -- nothing restarted there, and re-downloading
+            // 1,400 parameters over a radio that just recovered is the last
+            // thing that link needs.
             void this.refreshParams()
-            // Metadata waits a moment for AUTOPILOT_VERSION, because the
+          }
+          if (conn.phase === 'handshaking') {
+            // Metadata survives a reboot (`reset` leaves it alone) and the
+            // firmware has not changed, so this is first-connection only.
+            // It waits a moment for AUTOPILOT_VERSION, because the
             // version picks which metadata to fetch. Only a moment: a
             // vehicle that never answers still gets hints, just the
             // current release's, which is what it got before this existed.
@@ -234,10 +407,17 @@ class ConnectionService {
           .setTransfer({ kind: 'busy', dir: evt.dir, got: evt.got, total: evt.total })
         return
       case 'magCalProgress':
-        useCalStore.getState().magCalProgress(evt.pct, evt.calStatus)
+        // Keyed by compass: ArduPilot calibrates every used compass from one
+        // command and they progress at different rates.
+        useCalStore
+          .getState()
+          .magCalProgress(evt.compassId, evt.pct, evt.calStatus, evt.completionMask, evt.direction)
+        return
+      case 'accelCalPosition':
+        useCalStore.getState().setAccelAsked(evt.position)
         return
       case 'magCalReport':
-        useCalStore.getState().magCalReport({
+        useCalStore.getState().magCalReport(evt.compassId, {
           calStatus: evt.calStatus,
           fitness: evt.fitness,
           autosaved: evt.autosaved,
@@ -253,6 +433,14 @@ class ConnectionService {
     const p = this.pending
     switch (d.k) {
       case 'attitude':
+        // Compass calibration counts turns from these, and only while one is
+        // running -- the store's own guard, so nothing accumulates in the
+        // background.
+        useCalStore.getState().magCalAttitude(d.rollRad, d.pitchRad, {
+          rollRateRad: d.rollRateRad,
+          pitchRateRad: d.pitchRateRad,
+          yawRateRad: d.yawRateRad,
+        })
         telemetryRings.rollRad.push(d.rollRad)
         telemetryRings.pitchRad.push(d.pitchRad)
         telemetryRings.yawRad.push(d.yawRad)

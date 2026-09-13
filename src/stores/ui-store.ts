@@ -100,7 +100,8 @@ export const TABS = [
   // their own tabs.
   { id: 'configuration', label: 'Configuration', group: 'Initial Setup' },
   { id: 'ports', label: 'Ports', group: 'Initial Setup' },
-  { id: 'sensors', label: 'Sensors', group: 'Initial Setup' },
+  // Two columns of its own rather than the card grid: see `.sensors-screen`.
+  { id: 'sensors', label: 'Sensors', group: 'Initial Setup', fills: true },
 
   { id: 'radio', label: 'Radio', group: 'Config/Tuning' },
   { id: 'modes', label: 'Flight Modes', group: 'Config/Tuning' },

@@ -1,4 +1,5 @@
 import { memo, useState } from 'react'
+import { mdiRestore } from '@mdi/js'
 import { createPortal } from 'react-dom'
 import { LaButton, LaModal, LaSelect } from '../../components/La'
 import { useParamStore } from '../../../stores/param-store'
@@ -76,10 +77,44 @@ export default memo(function ParamRow({ name }: { name: string }) {
           a unit for the option list. */}
       <span className="param-row__unit">{meta?.units ?? ''}</span>
 
+      {/* Undo this one edit, beside the value it undoes.
+          The column's Revert changes throws away every staged edit at once,
+          which is the wrong instrument for "that one was a typo" in a table
+          of eight hundred rows -- there was no way to put a single value
+          back except remembering it and typing it again. The cell is always
+          in the grid so a row does not move when it becomes staged, and it
+          carries the old value in its label rather than only in a tooltip:
+          "revert" is only actionable if you can see what it reverts to. */}
+      <span className="param-row__revert">
+        {entry.dirty && (
+          <button
+            type="button"
+            className="param-row__revert-btn"
+            title={`Revert to ${entry.origValue}`}
+            aria-label={`Revert ${name} to ${entry.origValue}`}
+            onClick={() => edit(name, entry.origValue)}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path fill="currentColor" d={mdiRestore} />
+            </svg>
+          </button>
+        )}
+      </span>
+
       {/* The number and the dropdown are separate fields rather than one
           control that changes shape: the number is what the vehicle stores
           and what a .param file carries, and it stays editable even when the
-          value is not one of the listed options. */}
+          value is not one of the listed options.
+
+          Which is also why the options carry no number of their own. They
+          read "Disabled", not "0 - Disabled": the value is already in the
+          field two columns left, on every row, and repeating it put the same
+          digit twice on one line. Mission Planner's raw parameter list makes
+          the same split -- its combo binds `DisplayMember = "Value"`, the
+          description, against `ValueMember = "Key"`, the number -- and it is
+          the list every ArduPilot user has already read. The cost is that a
+          wiki page saying "set this to 2" cannot be matched against the open
+          list; typing 2 into the field is the shorter route to that anyway. */}
       {meta?.values && !meta.bitmask ? (
         <LaSelect
           value={String(entry.value)}
@@ -89,21 +124,20 @@ export default memo(function ParamRow({ name }: { name: string }) {
         >
           {Object.entries(meta.values).map(([v, label]) => (
             <option key={v} value={v}>
-              {v} — {label}
+              {label}
             </option>
           ))}
           {meta.values[entry.value] === undefined && (
-            <option value={String(entry.value)}>{entry.value} — not a listed option</option>
+            <option value={String(entry.value)}>Not a listed option</option>
           )}
         </LaSelect>
       ) : meta?.bitmask ? (
         <LaButton
           variant="ghost"
-          size="sm"
           className="param-row__options"
           onClick={() => setBitmaskOpen(true)}
         >
-          Edit bits
+          Edit bitmask
         </LaButton>
       ) : (
         <span className="param-row__options" />
@@ -176,7 +210,6 @@ function BitmaskEditor({
 }) {
   const [v, setV] = useState(Math.trunc(value))
   const bits = Object.entries(bitmask)
-  const allOn = bits.every(([bit]) => (v & (1 << Number(bit))) !== 0)
 
   return (
     <LaModal
@@ -198,9 +231,8 @@ function BitmaskEditor({
           const mask = 1 << Number(bit)
           return (
             <label className="la-switch bitmask-row" key={bit}>
-              <span className="la-field__unit">
-                {label} <span className="bitmask-row__bit">bit {bit}</span>
-              </span>
+              <span className="bitmask-row__name">{label}</span>
+              <span className="bitmask-row__bit">bit {bit}</span>
               <input
                 type="checkbox"
                 checked={(v & mask) !== 0}
@@ -211,18 +243,14 @@ function BitmaskEditor({
           )
         })}
       </div>
+      {/* What the switches add up to, which is the number the vehicle
+          actually stores and the only thing here a `.param` file carries. */}
       <div className="bitmask-foot">
-        <span className="param-row__hint">
-          Value <strong className="bitmask-foot__value">{v}</strong>
-          {v !== Math.trunc(value) && <> (was {Math.trunc(value)})</>}
-        </span>
-        <LaButton
-          variant="ghost"
-          size="sm"
-          onClick={() => setV(allOn ? 0 : bits.reduce((acc, [bit]) => acc | (1 << Number(bit)), 0))}
-        >
-          {allOn ? 'Clear all' : 'Set all'}
-        </LaButton>
+        <span className="bitmask-foot__label">Value</span>
+        <span className="bitmask-foot__value">{v}</span>
+        {v !== Math.trunc(value) && (
+          <span className="bitmask-foot__was">was {Math.trunc(value)}</span>
+        )}
       </div>
     </LaModal>
   )

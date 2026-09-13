@@ -106,7 +106,6 @@ export default function ParamCompareModal({
             tick rows is one you have to read every time before pressing. */}
         <LaButton
           variant="ghost"
-          size="sm"
           disabled={selectable.length === 0 || allShown}
           onClick={() =>
             setSelected((prev) => {
@@ -120,7 +119,6 @@ export default function ParamCompareModal({
         </LaButton>
         <LaButton
           variant="ghost"
-          size="sm"
           disabled={selectable.every((r) => !selected.has(r.name))}
           onClick={() =>
             setSelected((prev) => {
@@ -133,7 +131,7 @@ export default function ParamCompareModal({
           Select none
         </LaButton>
         <label className="la-switch param-compare__toggle">
-          <span className="la-field__unit">Show identical</span>
+          <span className="param-compare__toggle-label">Show identical</span>
           <input
             type="checkbox"
             checked={showUnchanged}
@@ -148,9 +146,7 @@ export default function ParamCompareModal({
         {summary.missing > 0 && (
           <>
             {' · '}
-            <span className="param-compare__missing">
-              {summary.missing} not on this vehicle
-            </span>
+            <span className="param-compare__missing">{summary.missing} not on this vehicle</span>
           </>
         )}
       </p>
@@ -164,10 +160,16 @@ export default function ParamCompareModal({
           <table className="param-compare__table">
             <thead>
               <tr>
-                <th scope="col"><span className="mission-table__sr">Take</span></th>
+                <th scope="col">
+                  <span className="mission-table__sr">Take</span>
+                </th>
                 <th scope="col">Parameter</th>
-                <th scope="col" className="mission-table__num">On vehicle</th>
-                <th scope="col" className="mission-table__num">In file</th>
+                <th scope="col" className="mission-table__num">
+                  On vehicle
+                </th>
+                <th scope="col" className="mission-table__num">
+                  In file
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -190,9 +192,7 @@ export default function ParamCompareModal({
                   <td>
                     <span className="param-compare__name la-selectable">{r.name}</span>
                     {metadata[r.name]?.displayName && (
-                      <span className="param-compare__desc">
-                        {metadata[r.name]!.displayName}
-                      </span>
+                      <span className="param-compare__desc">{metadata[r.name]!.displayName}</span>
                     )}
                   </td>
                   <td className="mission-table__num">

@@ -1,5 +1,6 @@
 import { LaSelect } from './La'
 import { useParamStore } from '../../stores/param-store'
+import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
 import { connectionService } from '../../services/connection'
 
 // One control bound to a parameter by name -- the building block of every
@@ -28,12 +29,26 @@ export default function ParamField({
   unit,
   bare,
   writeNow,
+  gatesOthers,
 }: {
   param: string
   label: string
   unit?: string
   bare?: boolean
   writeNow?: boolean
+  /**
+   * Re-read the parameter set after writing this one.
+   *
+   * Only for a parameter that *exposes or hides other parameters* --
+   * OSD_TYPE is the case, because at 0 the vehicle reports no panel
+   * positions at all. It is separate from `writeNow` because the two are
+   * different claims and bundling them was a real cost: every compass
+   * setting on the Sensors screen writes immediately, and none of them
+   * changes which parameters exist, so a refresh after each was ~1,400
+   * parameters re-read to learn nothing. Over a telemetry radio that is
+   * tens of seconds.
+   */
+  gatesOthers?: boolean
 }) {
   const entry = useParamStore((s) => s.entries.get(param))
   const meta = useParamStore((s) => s.metadata[param])
@@ -53,8 +68,32 @@ export default function ParamField({
     }
     void connectionService
       .setParamNow(param, v)
-      .then(() => connectionService.refreshParams({ quiet: true }))
-      .catch(() => edit(param, v))
+      .then(() => {
+        useWriteFeedbackStore.getState().report({ ok: true, param })
+        // ArduPilot says which parameters it only reads at boot, so nothing
+        // here needs a list of them: the metadata this field already has is
+        // the authority.
+        if (meta?.rebootRequired) {
+          useWriteFeedbackStore.getState().needReboot(`${param} takes effect after a restart`)
+        }
+        if (!gatesOthers) return
+        // Quiet on purpose: it skips `beginDownload`, so curated tabs are not
+        // blanked to a loading card, and it merges rather than rebuilding, so
+        // staged edits elsewhere survive. The app bar's blue bar still shows
+        // it happening -- that reads off `progress`, which a quiet refresh
+        // does set.
+        return connectionService.refreshParams({ quiet: true })
+      })
+      .catch((err: unknown) => {
+        // The value the user chose is still what they want, so it stays --
+        // staged, which is the honest state of a write that did not land.
+        edit(param, v)
+        useWriteFeedbackStore.getState().report({
+          ok: false,
+          param,
+          ...(err instanceof Error && err.message ? { error: err.message } : {}),
+        })
+      })
   }
 
   if (!entry) {

@@ -30,6 +30,10 @@
      ("Kilometers per hour"); the buttons then take it rather than setting
      it, so the two cannot drift apart when a label is reworded. */
   --app-prefs-control-w: 210px;
+  /* The calibration tiles' aircraft. Half the rendered frame (144px), so a
+     2x display draws the sheet pixel for pixel -- change one and regenerate
+     the other with `npm run cal-art`. */
+  --app-cal-art: 72px;
   /* Same idea in the SITL tray, sized to what its 320px panel leaves after
      the widest label ("RealFlight host") and the panel's own padding. */
   --app-simtray-control-w: 168px;
@@ -114,16 +118,31 @@
 
 /* --- Parameter compare, and the write confirmation -------------------- */
 
+/* Filter, the two select buttons, and the identical-rows switch. They are
+   one row of controls, so they are one height: the buttons were `size="sm"`
+   against a full-height input, which left them floating in the middle of a
+   row that is otherwise flush. */
 .param-compare__tools {
   align-items: center;
   gap: var(--la-space-2);
+  margin-bottom: var(--la-space-4);
 }
 .param-compare__toggle {
   flex: none;
   white-space: nowrap;
 }
+/* The switch's own label, at the size the controls beside it use. It was
+   `.la-field__unit` -- the class for "m/s" after a number -- which is both
+   the wrong thing to call it and why it read a size smaller than everything
+   else on the row. */
+.param-compare__toggle-label {
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-2);
+}
+/* The count is a caption for the table, so it sits with it rather than
+   halfway between it and the controls. */
 .param-compare__summary {
-  margin: 0;
+  margin: 0 0 var(--la-space-2);
   font-size: var(--la-size-sm);
   color: var(--la-ink-2);
 }
@@ -1096,23 +1115,31 @@
 .files {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--app-col-w);
-  grid-template-rows: auto minmax(0, 1fr);
   column-gap: var(--app-col-gap);
   min-height: 0;
   flex: 1;
 }
+/* One frame holding a fixed header and the listing that scrolls under it,
+   the same shape as `.params-pane`: the path names the listing, so it sits
+   inside the panel rather than in a row above it. That row also started the
+   screen's whole content one line down, which the actions column then had to
+   match -- so the top of the page was empty on both sides. */
+.files__pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+}
 .files__bar {
-  grid-area: 1 / 1;
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--la-space-3);
-  margin-bottom: var(--la-space-2);
-}
-.files > .files__scroll {
-  grid-area: 2 / 1;
-}
-.files > .app-col-shell {
-  grid-area: 2 / 2;
+  padding: var(--la-space-2);
+  border-bottom: 1px solid var(--la-line);
 }
 .files__path {
   font-family: var(--la-font-mono);
@@ -1122,13 +1149,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The frame belongs to the pane now, so this is only the scrolling part --
+   rows run under the path bar rather than past the panel's own edge. */
 .files__scroll {
   overflow: auto;
   min-height: 0;
   flex: 1;
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  background: var(--la-surface);
 }
 .files__table {
   width: 100%;
@@ -1190,7 +1216,7 @@
 .inspector {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--app-col-w);
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   column-gap: var(--app-col-gap);
   min-height: 0;
   flex: 1;
@@ -1199,11 +1225,22 @@
   grid-area: 1 / 1 / 2 / -1;
   margin-bottom: var(--la-space-3);
 }
-.inspector > .inspector__scroll {
-  grid-area: 3 / 1;
+.inspector > .inspector__pane {
+  grid-area: 2 / 1;
 }
 .inspector > .app-col-shell {
-  grid-area: 3 / 2;
+  grid-area: 2 / 2;
+}
+/* One frame: a fixed filter bar and the message list scrolling under it.
+   Same shape as `.params-pane` and `.files__pane`. */
+.inspector__pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
 }
 /* A second level of tabs inside one screen -- the Inspector's messages and
    hardware, Tuning's attitude and navigation. One segmented control, in the
@@ -1299,11 +1336,12 @@
 }
 
 .inspector__bar {
-  grid-area: 2 / 1;
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--la-space-4);
-  margin-bottom: var(--la-space-2);
+  padding: var(--la-space-2);
+  border-bottom: 1px solid var(--la-line);
 }
 .inspector__bar .la-input {
   max-width: 260px;
@@ -1316,13 +1354,11 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+/* The frame belongs to the pane, so this is only the scrolling part. */
 .inspector__scroll {
   overflow: auto;
   min-height: 0;
   flex: 1;
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-sm);
-  background: var(--la-surface);
 }
 .inspector__table {
   width: 100%;
@@ -1790,9 +1826,18 @@
   font-weight: 600;
   white-space: nowrap;
   /* A failed connection puts a whole sentence here; every other state is two
-     words. It may ellipsize, but only down to a width that still carries a
-     useful prefix. */
-  max-width: 34ch;
+     words. It may ellipsize, but only after spending the room that is
+     actually there -- and a flat 34ch was not spending it. Measured on the
+     bar: the two side bands need 791px whatever the window is, being
+     `flex: none` content, so 1280px leaves 457px free in the middle and
+     34ch (282px) gave 175px of it back; at 1920 it gave back 815px. So the
+     cap follows the window and stops at 64ch, because a pill longer than a
+     line of text has stopped being a pill and the tooltip carries the rest.
+     No floor, deliberately: 34ch was one *on* a narrow window, and at 1024
+     it overflowed the bar by 111px -- which does not clip the message, it
+     pushes Connect and Disconnect off the end of it. A short message with a
+     tooltip is a worse reading and a better bar. */
+  max-width: min(64ch, calc(100vw - 860px));
   overflow: hidden;
 }
 /* The truncation happens on the word, not on the pill.
@@ -2282,6 +2327,32 @@ button.app-status__state--bad:hover {
    any other tab is a card. It keeps a card's width instead. */
 .app-content--flush > .la-card {
   max-width: 860px;
+}
+
+/* The write answer riding in a card's action row: no reserved band above the
+   row, and no shift when it appears, because the row's height is the
+   button's. */
+.la-row > .write-feedback {
+  margin-top: 0;
+  text-align: right;
+}
+
+/* Sensors lays itself out rather than flowing into the card grid. The two
+   calibrations stack on the left and the sensor list stands beside both --
+   in the grid it landed under whichever of them was shorter, which reads as
+   "belongs to the accelerometer". The row is as tall as the taller column,
+   so the list's frame comes down level with the stack instead of ending in
+   mid air. `auto-fit` returns it to one column when two will not fit. */
+.sensors-screen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+  gap: var(--la-space-4);
+  align-content: start;
+}
+.sensors-screen__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
 }
 
 /* Leaflet paints its popups and tooltips from its own sheet -- white card,
@@ -2979,6 +3050,7 @@ button.app-status__state--bad:hover {
     minmax(180px, 250px) /* parameter name */
     112px /* the number, always present */
     52px /* its unit, beside the number it qualifies */
+    22px /* revert, present on every row so none moves when staged */
     minmax(150px, 230px) /* options dropdown, or the bits button */
     minmax(0, 1fr); /* decoded value, description, range */
   align-items: center;
@@ -3002,15 +3074,44 @@ button.app-status__state--bad:hover {
   min-width: 0;
   width: 100%;
 }
+/* The bits button is the dropdown's opposite number -- same column, same
+   job, one row apart -- so it takes the same width rather than shrinking to
+   its label and leaving the column ragged wherever a bitmask appears. */
 .param-row__options.la-btn {
-  width: auto;
-  justify-self: start;
+  width: 100%;
 }
 .param-row__unit {
   font-size: var(--la-size-sm);
   color: var(--la-ink-3);
   overflow: hidden;
   white-space: nowrap;
+}
+/* Only drawn on a staged row, but its cell is always there: a control that
+   appears is fine, a column that appears would shift every value on screen
+   the moment one of them was touched. */
+.param-row__revert {
+  display: flex;
+  justify-content: center;
+}
+.param-row__revert-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--la-radius-sm);
+  background: none;
+  /* Orange is this row's own staged-change color, so the control that undoes
+     it reads as part of that state rather than as a sixth thing to look at. */
+  color: var(--la-orange-deep);
+  cursor: pointer;
+}
+.param-row__revert-btn:hover {
+  background: var(--la-surface);
+}
+.param-row__revert-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
 }
 
 .param-row__meta {
@@ -3066,21 +3167,55 @@ button.app-status__state--bad:hover {
   max-height: 46vh;
   overflow-y: auto;
 }
+/* One grid per row, so every switch lands on the same edge. The names are
+   ArduPilot's own identifiers -- DisableDCMFallbackFW beside
+   DontDisableAirspeedUsingEKF -- and following each one immediately with its
+   switch scattered them across the dialog at every width the labels happened
+   to be. `.la-switch` is `inline-flex` in the frozen sheet; this overrides
+   the layout only, and none of its colors. */
+.bitmask-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--la-space-3);
+  padding: var(--la-space-1) 0;
+  font-size: var(--la-size-sm);
+}
+.bitmask-row__name {
+  color: var(--la-ink);
+  overflow-wrap: anywhere;
+}
+/* The bit number is what the documentation cites, so it is kept -- but as a
+   marker beside the name rather than as part of it. */
 .bitmask-row__bit {
   font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
   color: var(--la-ink-3);
+  text-align: right;
 }
+/* The sum, which is the number the vehicle stores. A readout, not a row of
+   controls: "Set all" lived here and was a second way to do what the
+   switches already do, one click from Apply. */
 .bitmask-foot {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: baseline;
   gap: var(--la-space-2);
-  padding-top: var(--la-space-2);
+  margin-top: var(--la-space-2);
+  padding-top: var(--la-space-3);
   border-top: 1px solid var(--la-line);
+  font-size: var(--la-size-sm);
+}
+.bitmask-foot__label {
+  color: var(--la-ink-2);
 }
 .bitmask-foot__value {
   font-family: var(--la-font-mono);
   color: var(--la-ink);
+}
+.bitmask-foot__was {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
 }
 
 /* The staged-change highlight uses the brand highlight fill, same as the
@@ -3105,11 +3240,6 @@ button.app-status__state--bad:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.bitmask-row {
-  display: flex;
-  margin-bottom: var(--la-space-2);
 }
 
 /* --- Ports, aux functions, flight modes: label + control tables ------ */
@@ -3730,87 +3860,8 @@ button.app-status__state--bad:hover {
 
 /* The six sides as a progress rail: captured, being held now, or still to
    come. The check mark carries the state as well as the color. */
-.accel-rail {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--la-space-2);
-  margin: 0 0 var(--la-space-4);
-  padding: 0;
-}
-
-.accel-rail__item {
-  display: flex;
-  align-items: center;
-  gap: var(--la-space-1);
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-3);
-  border: 1px solid var(--la-line);
-  border-radius: var(--la-radius-pill);
-  padding: var(--la-space-1) var(--la-space-3);
-}
-
-.accel-rail__dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1px solid var(--la-line-strong);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  line-height: 1;
-}
-
-.accel-rail__item--done {
-  color: var(--la-ink-2);
-}
-
-.accel-rail__item--done .accel-rail__dot {
-  background: var(--la-ok);
-  border-color: var(--la-ok);
-  color: var(--app-on-dark);
-}
-
-.accel-rail__item--active {
-  color: var(--la-ink);
-  font-weight: 600;
-  border-color: var(--la-blue);
-  background: var(--la-blue-soft);
-}
-
-.accel-rail__item--active .accel-rail__dot {
-  border-color: var(--la-blue);
-  background: var(--la-blue);
-}
-
-/* Guidance in the pre-calibration dialog: advice about getting the setup
-   right, distinct from the step instructions that come after. */
-.accel-note {
-  margin: 0 0 var(--la-space-3);
-  font-size: var(--la-size-sm);
-  color: var(--la-ink-2);
-  max-width: 58ch;
-}
-
-.accel-switch {
-  display: flex;
-  margin-bottom: var(--la-space-4);
-}
-
-.accel-stage {
-  display: grid;
-  /* Wide enough for the 3D model to be seen at a useful size; squeezed into
-     a narrow column it rendered as a tall slice of an airframe. */
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: var(--la-space-5);
-  align-items: center;
-}
-
-.vehicle-view--cal {
-  height: 230px;
-}
-
+/* The step instruction, under the tiles: the vehicle's own words in the line
+   below it, so what is on screen matches what is in the message log. */
 .accel-stage__instruction {
   margin: 0 0 var(--la-space-2);
   font-size: var(--la-size-lg);
@@ -5223,7 +5274,7 @@ body.is-splitting .flight-map {
     grid-template-columns: 140px minmax(0, 1fr);
   }
   .param-row {
-    grid-template-columns: 180px 120px 48px auto minmax(0, 1fr);
+    grid-template-columns: 180px 120px 48px 22px auto minmax(0, 1fr);
   }
 }
 
@@ -6305,4 +6356,368 @@ body.is-splitting .flight-map {
   .app-status__item--firmware {
     display: none;
   }
+}
+
+/* --- Compass priority: which one the EKF believes first --------------- */
+
+/* ArduPilot stores an order as three device ids (COMPASS_PRIO1_ID..3), so
+   this is a list of slots rather than of compasses: a slot can be empty, and
+   it can hold a device the firmware no longer reports. */
+.compass-prio {
+  margin-top: var(--la-space-3);
+}
+.compass-prio__head {
+  margin: 0 0 var(--la-space-2);
+  font-size: var(--la-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--la-ink-3);
+  font-weight: 600;
+}
+/* Number, device, its yaw switch, its orientation, then the moves. One grid
+   for the head and every row, so the columns line up whatever the part names
+   happen to be. */
+/* One grid for the head and every row. The last track is `--prio-moves-w`
+   rather than `auto` so the heading over the arrows is centered on them
+   instead of on whatever width the buttons happened to take. */
+.compass-prio {
+  --prio-moves-w: 64px;
+}
+.compass-prio__row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 116px 152px var(--prio-moves-w);
+  align-items: center;
+  gap: var(--la-space-2);
+  padding: var(--la-space-1) 0;
+  font-size: var(--la-size-sm);
+}
+.compass-prio__row--head {
+  font-size: var(--la-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--la-ink-3);
+  border-bottom: 1px solid var(--la-line);
+  padding-bottom: var(--la-space-2);
+}
+/* A column heading sits over its own control, so the ones above a dropdown
+   take the dropdown's own left padding -- `.la-select` insets its text, and
+   a heading flush to the track's edge reads as belonging to the column
+   before it. The heading over the arrows is centered, because they are. */
+.compass-prio__row--head > :nth-child(3),
+.compass-prio__row--head > :nth-child(4) {
+  padding-left: var(--la-space-2);
+}
+.compass-prio__row--head > :nth-child(5) {
+  text-align: center;
+}
+.compass-prio__cell {
+  min-width: 0;
+}
+/* `min-width` as well as `width`: the system sheet gives `.la-select` a
+   `min-width: 9em`, which at this font is 117px -- wider than the track it
+   was put in, so it overflowed and the next column's text was drawn on top
+   of it. A grid track does not clip its contents. */
+.compass-prio__cell .la-select {
+  width: 100%;
+  min-width: 0;
+}
+/* What a cell says when there is no control to draw: an empty slot, or an
+   internal compass, whose orientation ArduPilot takes from AHRS_ORIENT. */
+.compass-prio__na {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+.compass-prio__part {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compass-prio__tag {
+  flex: none;
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+.compass-prio__n {
+  font-family: var(--la-font-mono);
+  color: var(--la-ink-3);
+}
+.compass-prio__device {
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compass-prio__empty {
+  color: var(--la-ink-3);
+}
+/* A slot naming a device that is not in the detected list: the compass was
+   unplugged or moved buses, and the slot it holds is doing nothing. */
+.compass-prio__missing {
+  flex: none;
+  font-size: var(--la-size-xs);
+  color: var(--la-warn);
+}
+.compass-prio__moves {
+  display: flex;
+  justify-content: center;
+  gap: var(--la-space-1);
+}
+/* Borderless, like the parameter row's revert: bordered with a surface fill
+   it matched the panel-frame trio, and `panel-frame.test.ts` rightly refused
+   it -- a 24px icon button is not a panel, and the allowlist is not the place
+   to settle that.
+   
+   Bigger than that first attempt, though. These are the only controls in the
+   table that do something the moment they are pressed, and at 24px with a
+   16px glyph they read as decoration next to two dropdowns. */
+.compass-prio__move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--la-radius-sm);
+  background: var(--la-blue-soft);
+  color: var(--la-blue-deep);
+  cursor: pointer;
+}
+.compass-prio__move:hover:not(:disabled) {
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
+.compass-prio__move:disabled {
+  background: none;
+}
+.compass-prio__move:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.compass-prio__move:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+
+/* --- "Did that reach the vehicle?" ------------------------------------ */
+
+/* For screens that write as you go. The slot is always rendered, empty, so
+   the card does not change height the moment somebody touches a control --
+   the same reason the firmware card reserves its status line. */
+.write-feedback {
+  min-height: 1.6em;
+  margin-top: var(--la-space-2);
+  font-size: var(--la-size-sm);
+  transition: opacity var(--la-ease);
+}
+/* Green: this is status, never an action. */
+.write-feedback--ok {
+  color: var(--la-ok);
+}
+.write-feedback--bad {
+  color: var(--la-bad);
+}
+
+/* The compass card's own settings: one width for every control, so the three
+   dropdowns under the table line up with each other rather than each sizing
+   to its longest option. */
+.compass-card .la-field {
+  grid-template-columns: minmax(0, 20ch) 152px;
+}
+.compass-card .la-field .la-select {
+  width: 152px;
+  min-width: 0;
+}
+
+/* "Restart to apply." Raised by a reboot-required parameter or a finished
+   calibration; it appears only when there is something to apply. */
+.reboot-prompt {
+  margin-top: var(--la-space-3);
+  padding: var(--la-space-3);
+  background: var(--la-orange-soft);
+  border-radius: var(--la-radius-sm);
+}
+.reboot-prompt__why {
+  margin: 0 0 var(--la-space-2);
+  font-size: var(--la-size-sm);
+  color: var(--la-ink);
+}
+
+/* One row per compass during a calibration: name, bar, percentage. They are
+   separate calibrations from one command and they finish at different times,
+   so each says where it is rather than averaging into one number. */
+.cal-compass {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: var(--la-space-2);
+  margin-bottom: var(--la-space-2);
+  font-size: var(--la-size-sm);
+}
+.cal-compass__name {
+  color: var(--la-ink-2);
+}
+.cal-compass__pct {
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One coverage sphere per compass, side by side while there is room. They
+   are separate calibrations and they can genuinely differ, so this shows
+   each rather than averaging them into a single picture. */
+.cal-spheres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--la-space-4);
+  margin-bottom: var(--la-space-3);
+}
+.cal-sphere-cell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: var(--la-space-1) var(--la-space-2);
+  align-items: center;
+}
+.cal-sphere-cell > .cal-sphere {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+.cal-sphere-cell > .cal-compass__name {
+  grid-column: 1 / -1;
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-2);
+}
+
+/* --- Compass calibration: six attitudes, two turns each --------------- */
+
+/* A procedure laid out as six things to do, rather than one picture to
+   interpret. Wraps to two rows at the card's width. */
+.cal-att {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: var(--la-space-2);
+  margin: 0 0 var(--la-space-3);
+  padding: 0;
+  list-style: none;
+}
+/* The credit belongs to the tiles above it, not to the sentence below: with
+   no gap the two ran together and the attribution read as the first line of
+   the instruction. */
+.cal-att + .model-credit {
+  margin-bottom: var(--la-space-3);
+}
+/* The fitness setting rides in the action row, in the space left of the
+   buttons and sharing their baseline. It is a condition of the run rather
+   than a step in it, and the dialog renders inside the Compass card, so
+   without this the card's own field grid reaches in and parks it
+   two-thirds of the way across a row of its own. */
+.la-modal:has(.cal-att) .la-modal__actions {
+  align-items: end;
+}
+.la-modal:has(.cal-att) .la-modal__actions .la-field {
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: var(--la-space-2);
+  margin-right: auto;
+}
+/* Cancel and Start are one pair of choices, so they are one size. Sized to
+   their own words, a narrow ghost beside a wide primary reads as an
+   afterthought rather than the other half of a decision. A floor rather than
+   a fixed width, so a longer label still fits. */
+.la-modal:has(.cal-att) .la-modal__actions .la-btn {
+  min-width: 7em;
+}
+/* In a dialog the six go three and three. The auto-fit track above lands on
+   four-and-two at a modal's width, which reads as a row that ran out rather
+   than as a set. */
+.la-modal .cal-att {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cal-att__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--la-space-1);
+  padding: var(--la-space-2);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  text-align: center;
+  color: var(--la-ink-3);
+  fill: var(--la-ink-3);
+}
+/* Blue for the one you are doing now: this is a working control's job --
+   telling you where you are in a task -- not a status verdict. */
+.cal-att__tile.is-here {
+  border-color: var(--la-blue);
+  background: var(--la-blue-soft);
+  color: var(--la-blue-deep);
+  fill: var(--la-blue-deep);
+}
+/* Green for finished, which is a status and nothing else. */
+.cal-att__tile.is-done {
+  border-color: color-mix(in srgb, var(--la-ok) 45%, var(--la-line));
+  color: var(--la-ok);
+  fill: var(--la-ok);
+}
+.cal-att__label {
+  font-size: var(--la-size-xs);
+  line-height: 1.2;
+}
+/* Progress across the turns, under the tile being worked on. A slot rather
+   than an appearing element -- every tile holds the space whether or not it
+   draws a bar, so the row does not grow by three pixels each time the
+   highlight moves. */
+.cal-att__bar {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 22%, transparent);
+  overflow: hidden;
+}
+/* The reserved space, on the five tiles that are not being worked on. */
+.cal-att__bar--empty {
+  background: transparent;
+}
+.cal-att__bar-fill {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transition: width var(--la-ease);
+}
+/* The aircraft, and the turn it is being asked to make, in one square. */
+.cal-att__art {
+  position: relative;
+  display: block;
+  width: var(--app-cal-art);
+  height: var(--app-cal-art);
+}
+/* One pre-rendered sheet, six frames across, indexed by background position
+   (see CalAttitudes.tsx). Sized to the sheet's own frame count so a percentage
+   position lands exactly on a frame edge. */
+.cal-att__craft {
+  position: absolute;
+  inset: 0;
+  background-size: 600% 100%;
+  background-repeat: no-repeat;
+}
+/* Drawn behind the aircraft, so the arc reads as the path the vehicle takes
+   rather than as a symbol parked under it. Faint on the attitudes still to
+   come: the instruction is the same for all six, and drawing it only on the
+   active tile made the other five read as a different kind of step. */
+.cal-att__spin {
+  position: absolute;
+  inset: 0;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  fill: currentColor;
+  opacity: 0.4;
+}
+.cal-att__tile.is-here .cal-att__spin {
+  opacity: 1;
 }

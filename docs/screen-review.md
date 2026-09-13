@@ -183,8 +183,11 @@ With a board in DFU mode (BOOT0 held while plugging in):
       than that is the per-block regression described in `CLAUDE.md`
 - [ ] The phase labels read as one voice: Contacting / Erasing / Writing /
       Verifying / Rebooting / Leaving
-- [ ] A stalled board says to unplug it and hold BOOT, not "controlTransferOut
-      failed"
+- [ ] A stalled board reads "The board stopped accepting DFU commands.
+      Please reboot and reconnect it, still in DFU mode." — not a bare
+      "Failed to execute 'controlTransferOut'", which goes to the flash log
+      instead. A stall inside the write or the read-back also names where:
+      "— failed at 0x8100000 (block 1025 of 1634, …)"
 
 In the **browser** build, where there is no manifest (CORS) and no shell to
 answer the choosers:
@@ -214,7 +217,10 @@ answer the choosers:
 - [ ] Disconnected
 - [ ] Connected
 - [ ] Accel calibration wizard, run to the end
-- [ ] Compass calibration, including the coverage sphere
+- [ ] Compass calibration wizard, run to the end: the six attitude tiles, the
+      per-compass bars, the verdict, and the reboot prompt behind it
+- [ ] Compass priority, and the settings on the card
+- [ ] Hardware ID
 
 ## Config/Tuning
 
