@@ -30,9 +30,11 @@ export default function OsdActions() {
         <VehicleParamActions title="OSD" />
         <section className="app-col__group">
           <h3 className="app-col__head">Layout file</h3>
+          {/* That these touch only the OSD parameters is what the buttons
+              say by being in a group called Layout file, and is the whole
+              subject of this file's header comment. */}
           <SaveLayout />
           <LoadLayout />
-          <LaHint>Only the OSD parameters — the rest of the vehicle is untouched.</LaHint>
         </section>
       </div>
     </div>
@@ -63,7 +65,9 @@ function SaveLayout() {
       <LaButton variant="secondary" size="block" onClick={save}>
         Save layout to file
       </LaButton>
-      {note && <LaHint>{note}</LaHint>}
+      {/* Always drawn: the result sits between the two buttons, and mounting
+          it on demand pushed Load layout down the column. */}
+      <LaHint>{note}</LaHint>
     </>
   )
 }
@@ -142,15 +146,15 @@ function LoadLayout() {
         {(result?.ignoredNonOsd ?? 0) > 0 && (
           <p className="app-placeholder">
             {result?.ignoredNonOsd} non-OSD parameter
-            {result?.ignoredNonOsd === 1 ? ' was' : 's were'} ignored — this loads screen layout
-            only.
+            {result?.ignoredNonOsd === 1 ? ' was' : 's were'} ignored.
           </p>
         )}
+        {/* Usually a different firmware version or panel set -- which is not
+            something the reader can act on here. */}
         {(result?.absent ?? 0) > 0 && (
           <LaHint>
             {result?.absent} OSD parameter{result?.absent === 1 ? '' : 's'} in the file
-            {result?.absent === 1 ? ' is' : ' are'} not on this vehicle, usually a different
-            firmware version or panel set.
+            {result?.absent === 1 ? ' is' : ' are'} not on this vehicle.
           </LaHint>
         )}
       </LaModal>

@@ -90,7 +90,8 @@ export default function UnsavedChangesModal() {
         staged, but nothing here will remind you they exist.
       </p>
 
-      <div className="param-compare__scroll">
+      {/* Marks this dialog for the equal-width action row in app.css. */}
+      <div className="param-compare__scroll leave-prompt">
         <table className="param-compare__table">
           <thead>
             <tr>

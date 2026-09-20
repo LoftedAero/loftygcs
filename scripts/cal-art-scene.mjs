@@ -14,6 +14,7 @@
 // contradicts another.
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { ROTATION_COUNT, boardRotation } from '../src/protocol/board-rotation.ts'
 
 const HALF = Math.PI / 2
 
@@ -196,12 +197,176 @@ async function sheet(source, frame, scale) {
   return { url, distance }
 }
 
+/**
+ * Steeper than the aircraft tiles' view -- about 40 degrees down rather than
+ * 23. The board is read by its arrows and the vehicle by its silhouette, all
+ * flat, and all lost to foreshortening from a shallow angle.
+ */
+const BOARD_VIEW_DIR = new THREE.Vector3(0, 0.85, 1).normalize()
+
+/** Board frames per row of the orientation sheet: 44 rotations in 11 x 4. */
+export const BOARD_COLUMNS = 11
+
+const GROUND_Y = -0.53
+
+/** Triangles in the XZ plane at height y, from [x, z] triples, wound to face up or down. */
+function flat(tris, y, faceUp, material) {
+  const pos = []
+  for (const tri of tris) {
+    const ordered = faceUp ? tri : [tri[0], tri[2], tri[1]]
+    for (const [x, z] of ordered) pos.push(x, y, z)
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  return new THREE.Mesh(geo, material)
+}
+
+/** The board's arrow: forward is -Z. One-sided, so it is culled when turned away. */
+function arrow(y, faceUp, material) {
+  const a = 0.035
+  return flat(
+    [
+      [[0, -0.27], [-0.14, -0.02], [0.14, -0.02]],
+      [[-a, -0.02], [-a, 0.2], [a, 0.2]],
+      [[-a, -0.02], [a, 0.2], [a, -0.02]],
+    ],
+    y,
+    faceUp,
+    material,
+  )
+}
+
+/**
+ * A top-down airplane lying on the ground, nose forward -- the vehicle the
+ * board is mounted in. It replaced a grey disc with a pointer, which said
+ * "forward" but not "aircraft".
+ */
+function silhouette() {
+  const outline = [
+    [24, 3], [25.8, 4.6], [26.9, 7.4], [27.3, 10.5], [27.6, 20], [45, 29], [45, 32.5],
+    [27.6, 28], [27.6, 37], [31.5, 41.5], [31.5, 44], [24, 41.8], [16.5, 44], [16.5, 41.5],
+    [20.4, 37], [20.4, 28], [3, 32.5], [3, 29], [20.4, 20], [20.7, 10.5], [21.1, 7.4],
+    [22.2, 4.6],
+  ]
+  const shape = new THREE.Shape()
+  outline.forEach(([x, y], i) => {
+    const X = ((x - 24) / 21) * 0.62
+    // Local +Y becomes world -Z once the mesh is laid flat, so the nose is forward.
+    const Y = ((23.5 - y) / 20.5) * 0.7
+    if (i === 0) shape.moveTo(X, Y)
+    else shape.lineTo(X, Y)
+  })
+  shape.closePath()
+  const mesh = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape),
+    new THREE.MeshBasicMaterial({ color: 0xcdd1d8, side: THREE.DoubleSide }),
+  )
+  mesh.rotation.x = -Math.PI / 2
+  mesh.position.y = GROUND_Y
+  return mesh
+}
+
+/**
+ * The autopilot board: a slab with a forward arrow on each face, the faces told
+ * apart by tone -- blue with a white arrow on top, charcoal with a grey arrow
+ * underneath.
+ *
+ * An arrow on both faces, because a board mounted face down still has to say
+ * which way it points. Two tones, because with the same color all round, the
+ * arrow was the only thing marking the top, and a board turned so its arrow
+ * faced away could not be told from one mounted the other way up.
+ */
+function buildBoard() {
+  const g = new THREE.Group()
+  const W = 0.5
+  const T = 0.06
+  const L = 0.66
+  const FACE = T / 2 + 0.002
+  const top = new THREE.MeshStandardMaterial({ color: 0x3f7cc0, roughness: 0.85 })
+  const side = new THREE.MeshStandardMaterial({ color: 0x33669f, roughness: 0.85 })
+  const under = new THREE.MeshStandardMaterial({ color: 0x2d2f33, roughness: 0.9 })
+  // BoxGeometry face groups: +x, -x, +y, -y, +z, -z.
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(W, T, L), [side, side, top, under, side, side]))
+  g.add(arrow(FACE, true, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  g.add(arrow(-FACE, false, new THREE.MeshBasicMaterial({ color: 0x9aa1ab })))
+  return g
+}
+
+/**
+ * The autopilot board in every fixed AHRS_ORIENTATION, one frame per enum
+ * value, so the card can show the setting as a picture beside its dropdown.
+ *
+ * The board alone rather than mounted in a live aircraft: at card size an
+ * airframe with a board inside it was two busy things competing, and the board
+ * is the subject. The silhouette under it is the frame of reference, because a
+ * board turned 90 degrees and seen from a three-quarter angle is otherwise just
+ * the same board from somewhere else.
+ */
+async function boardSheet(frame, scale) {
+  const big = frame * scale
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
+  renderer.setPixelRatio(1)
+  renderer.setSize(big, big, false)
+
+  const scene = new THREE.Scene()
+  scene.add(new THREE.AmbientLight(0xffffff, AMBIENT))
+  const key = new THREE.DirectionalLight(0xffffff, KEY)
+  key.position.set(4, 8, 6)
+  scene.add(key)
+  const fill = new THREE.DirectionalLight(0xffffff, FILL_LIGHT)
+  fill.position.set(-6, 2, -4)
+  scene.add(fill)
+
+  // The whole rig turns to the tiles' three-quarter view; the board turns
+  // inside it, relative to a vehicle whose forward is -Z.
+  const world = new THREE.Group()
+  world.rotation.y = -PRESENTATION_YAW
+  scene.add(world)
+  world.add(silhouette())
+  const board = buildBoard()
+  world.add(board)
+
+  // Every rotation of the board (0.63 at most) and the silhouette's tail
+  // (0.81) sit within this radius of a point just below the board, so one
+  // distance frames all 44 -- as close as that allows, because at card size
+  // the board is the part that has to read.
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100)
+  const distance = 0.86 / Math.sin((camera.fov * Math.PI) / 360)
+  camera.position.copy(BOARD_VIEW_DIR.clone().multiplyScalar(distance))
+  camera.position.y -= 0.12
+  camera.lookAt(0, -0.12, 0)
+  camera.updateProjectionMatrix()
+
+  const rows = Math.ceil(ROTATION_COUNT / BOARD_COLUMNS)
+  const out = document.createElement('canvas')
+  out.width = frame * BOARD_COLUMNS
+  out.height = frame * rows
+  const ctx = out.getContext('2d')
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  for (let value = 0; value < ROTATION_COUNT; value++) {
+    const r = boardRotation(value)
+    // VehicleView's mapping from ArduPilot body frame into three.js.
+    board.rotation.set(r.pitch, -r.yaw, -r.roll, 'YXZ')
+    renderer.render(scene, camera)
+    const x = (value % BOARD_COLUMNS) * frame
+    const y = Math.floor(value / BOARD_COLUMNS) * frame
+    ctx.drawImage(renderer.domElement, 0, 0, big, big, x, y, frame, frame)
+  }
+
+  const url = out.toDataURL('image/png')
+  renderer.dispose()
+  return { url, distance, columns: BOARD_COLUMNS, rows }
+}
+
 /** Called from the main process. One sheet per aircraft, as data URLs. */
-export async function render({ planeGltf, f35bBase64, frame, scale }) {
+export async function render({ planeGltf, f35bBase64, frame, boardFrame, scale }) {
   const bytes = Uint8Array.from(atob(f35bBase64), (c) => c.charCodeAt(0))
   return {
     frames: FRAMES.map((f) => f.id),
     plane: await sheet(planeGltf, frame, scale),
     f35b: await sheet(bytes.buffer, frame, scale),
+    board: await boardSheet(boardFrame, scale),
   }
 }

@@ -72,9 +72,10 @@ export default function DemoTransmitter() {
 
   return (
     <div className="demo-tx">
-      <p className="demo-tx__note">
-        Demo vehicle — drag these instead of a real transmitter. They stay where you put them.
-      </p>
+      {/* Why sticks appear at all, and nothing else: that they are sticky
+          rather than spring-loaded is in the comment at the top of the file,
+          and is obvious the first time one is dragged. */}
+      <p className="demo-tx__note">Demo vehicle</p>
       <div className="demo-tx__pads">
         {PADS.map((pad) => {
           const x = demoSticks[pad.xAxis]

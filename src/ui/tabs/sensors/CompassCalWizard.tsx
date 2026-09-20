@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { LaButton, LaHint, LaModal } from '../../components/La'
 import CalAttitudes from './CalAttitudes'
 import ParamField from '../../components/ParamField'
-import WriteFeedback from '../../components/WriteFeedback'
 import { magCalFinished, magCalList, useCalStore } from '../../../stores/cal-store'
 import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
@@ -316,7 +315,6 @@ export default function CompassCalWizard({ onClose }: { onClose: () => void }) {
       )}
 
       <LaHint error>{error}</LaHint>
-      <WriteFeedback />
     </LaModal>
   )
 }

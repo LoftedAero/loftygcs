@@ -21,6 +21,24 @@ import WriteParamsModal from './WriteParamsModal'
 // leaving an edit on screen with no way to send it.
 const PARAMLESS_TABS = new Set<TabId>(['overview', 'firmware', 'logs', 'sensors'])
 
+// Tabs that carry Write themselves. Two Write buttons on one screen are two
+// answers to the same question, so the bar stays out of their way entirely --
+// including while edits are staged, which is exactly when their own button is
+// the one to press.
+//
+// A tab qualifies one of two ways: a card carries Revert/Write on its title
+// row, or every control on the screen writes as it is used. Radio, Power,
+// Failsafe, OSD and Tuning do neither yet and still take the footer's copy;
+// this set is how the footer eventually empties.
+const OWN_WRITE_TABS = new Set<TabId>([
+  'parameters',
+  'ports',
+  'configuration',
+  'modes',
+  'outputs',
+  'sensors',
+])
+
 // The bottom action bar: per-tab actions on the left, version link on the
 // right. Write Params is the one orange action for the tabs that edit
 // parameters -- everything those tabs stage goes to the vehicle here.
@@ -30,9 +48,7 @@ function ParamActions({ tab }: { tab: TabId }) {
   const loadState = useParamStore((s) => s.loadState)
   const [confirming, setConfirming] = useState(false)
   if (loadState !== 'ready') return null
-  // The Parameters page has its own actions column; two Write buttons on one
-  // screen would be two answers to the same question.
-  if (tab === 'parameters') return null
+  if (OWN_WRITE_TABS.has(tab)) return null
   // ...but if edits are staged on another tab, keep the bar: quietly losing
   // sight of unsaved vehicle changes is the worse of the two outcomes.
   if (PARAMLESS_TABS.has(tab) && dirtyCount === 0) return null

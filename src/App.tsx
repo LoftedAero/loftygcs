@@ -7,7 +7,7 @@ import PreferencesModal from './ui/shell/PreferencesModal'
 import SerialChooserModal from './ui/shell/SerialChooserModal'
 import PreviewNotice from './ui/shell/PreviewNotice'
 import UnsavedChangesModal from './ui/shell/UnsavedChangesModal'
-import { tabFills, useUiStore, visibleTabs } from './stores/ui-store'
+import { holdsVehicleTabs, tabFills, useUiStore, visibleTabs } from './stores/ui-store'
 import { useGuideStore } from './stores/guide-store'
 import { useConnectionStore } from './stores/connection-store'
 import GuideRunner from './ui/guides/GuideRunner'
@@ -72,7 +72,7 @@ function SetupContent() {
 export default function App() {
   const mode = useUiStore((s) => s.mode)
   const activeTab = useUiStore((s) => s.activeTab)
-  const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
+  const connected = useConnectionStore((s) => holdsVehicleTabs(s.phase))
 
   // A tab that leaves the rail must not leave someone staring at it. Losing
   // the link while on, say, Radio drops you to the top of what is left --

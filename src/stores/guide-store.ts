@@ -71,13 +71,25 @@ export const useGuideStore = create<GuideState>((set) => ({
 const EMPTY_LABELS = { outputLabels: {}, channelLabels: {} }
 const labelCache = new Map<string, ReturnType<typeof mergedLabels>>()
 
+/**
+ * Whether product labels are shown anywhere in the app.
+ *
+ * Off while guided setups are out of scope. The selection is persisted in
+ * localStorage, so anyone who picked an aircraft before the entry point was
+ * removed still had "Lift fan ESC" and "Nozzle tilt" written down the Outputs
+ * table with no way left to turn them off -- product naming from a feature
+ * that is no longer reachable. One flag rather than four edited call sites,
+ * because the call sites are right: this is a property of the feature.
+ */
+const PROFILE_LABELS_ENABLED = false
+
 /** Merged product labels, or empty maps when no aircraft is selected. */
 export function useProfileLabels(): {
   outputLabels: Record<number, string>
   channelLabels: Record<number, string>
 } {
   const id = useGuideStore((s) => s.selectedProfileId)
-  if (!id) return EMPTY_LABELS
+  if (!id || !PROFILE_LABELS_ENABLED) return EMPTY_LABELS
   let cached = labelCache.get(id)
   if (!cached) {
     cached = mergedLabels(id)

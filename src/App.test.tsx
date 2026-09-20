@@ -49,6 +49,17 @@ describe('app shell', () => {
     expect(useUiStore.getState().activeTab).toBe(visibleTabs(false)[0]!.id)
   })
 
+  it('stays on a vehicle-only tab through a reboot', () => {
+    // The app reconnects by itself after a reboot it asked for, so the screen
+    // that asked for it is where the user should land again.
+    useConnectionStore.setState({ phase: 'rebooting' })
+    useUiStore.setState({ mode: 'setup', activeTab: 'sensors' })
+    render(<App />)
+    expect(useUiStore.getState().activeTab).toBe('sensors')
+    expect(screen.getByRole('button', { name: 'Sensors' })).toBeTruthy()
+    useConnectionStore.setState({ phase: 'idle' })
+  })
+
   it('draws the Overview readouts once there is a vehicle to read', () => {
     // Overview renders itself rather than describing itself -- it used to be
     // a card describing the app. Asserted with a vehicle now, because that

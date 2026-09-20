@@ -1,5 +1,10 @@
 import { create } from 'zustand'
 import { frameName, knownAirframe, type KnownAirframe } from '../protocol/airframe'
+import {
+  boardNameFromBanner,
+  parseRcoutBanner,
+  type RcoutBanner,
+} from '../protocol/rcout-banner'
 import type { FirmwareVersion } from '../protocol/types'
 
 // Throttled snapshot of vehicle state for ordinary React components (mode
@@ -52,6 +57,21 @@ export interface VehicleSnapshot {
    */
   airframe: KnownAirframe | null
   /**
+   * Which outputs the board drives, and with what -- from the same boot
+   * banner, and latched for the same reason.
+   *
+   * Null until a board says, which is most of the time: only the ChibiOS HAL
+   * builds this line, so SITL and the demo vehicle never send one.
+   */
+  rcout: RcoutBanner | null
+  /**
+   * `CHIBIOS_SHORT_BOARD_NAME`, from the boot banner's system-id line.
+   *
+   * What identifies the board's output timer groups: its `APJ_BOARD_ID` does
+   * not, since 44 of them are shared by boards with different pinouts.
+   */
+  boardName: string | null
+  /**
    * Mission progress, as reported rather than inferred.
    *
    * The vehicle is the authority on which item it is flying: a plan uploaded
@@ -79,6 +99,12 @@ export interface VehicleSnapshot {
    */
   firmware: FirmwareVersion | null
   capabilities: number
+  /**
+   * ArduPilot's `APJ_BOARD_ID` for this flight controller, or 0 when it has
+   * not said -- which SITL never does, since the id is a ChibiOS build
+   * constant. It is what the output timer groups are looked up by.
+   */
+  boardId: number
   /**
    * Where the camera mount says it is pointed, or null when there is none.
    *
@@ -119,6 +145,8 @@ const EMPTY: VehicleSnapshot = {
   rcChannels: [],
   rcRssi: -1,
   airframe: null,
+  rcout: null,
+  boardName: null,
   missionSeq: null,
   wpDistM: null,
   altErrorM: null,
@@ -127,6 +155,7 @@ const EMPTY: VehicleSnapshot = {
   sensorsHealth: 0,
   firmware: null,
   capabilities: 0,
+  boardId: 0,
   gimbal: null,
   statusTexts: [],
 }
@@ -149,6 +178,12 @@ export const useVehicleStore = create<VehicleStore>((set) => ({
       // in the boot banner, and the status feed is a capped ring that it
       // scrolls out of within a minute of a talkative vehicle.
       airframe: s.airframe ?? knownAirframe(frameName([st.text])),
+      // Replaced rather than kept, unlike the airframe: a board re-sends this
+      // after a reboot, and a reboot is exactly when the output modes change.
+      // `parseRcoutBanner` returns null for every other line, so a talkative
+      // vehicle cannot clear it.
+      rcout: parseRcoutBanner(st.text) ?? s.rcout,
+      boardName: boardNameFromBanner(st.text) ?? s.boardName,
     })),
   reset: () => set({ ...EMPTY, statusTexts: [] }),
 }))

@@ -4,6 +4,7 @@ import ParamField from './ParamField'
 import SetupBand from './SetupBand'
 import { useInDoc } from './SetupDoc'
 import { useParamStore } from '../../stores/param-store'
+import { useConnectionStore } from '../../stores/connection-store'
 
 // A card built from a list of parameters. Fields the connected vehicle does
 // not have are dropped, and a card left with nothing to show hides itself --
@@ -23,6 +24,10 @@ export interface ParamFieldSpec {
   writeNow?: boolean
   /** Also re-read the set afterwards -- see ParamField. */
   gatesOthers?: boolean
+  /** Greyed until whatever it depends on is switched on -- see ParamField. */
+  disabled?: boolean
+  /** A number box even where ArduPilot names some values -- see ParamField. */
+  numeric?: boolean
 }
 
 export default function ParamCard({
@@ -32,6 +37,8 @@ export default function ParamCard({
   fields,
   children,
   className,
+  actions,
+  showNames,
 }: {
   title: string
   subtitle?: string
@@ -39,6 +46,21 @@ export default function ParamCard({
   fields: ParamFieldSpec[]
   children?: ReactNode
   className?: string
+  /**
+   * What the card does, on its title row -- usually `CardParamActions`.
+   *
+   * Card layout only: the guided-document layout below puts a band's heading
+   * and its fields in one flow, with nowhere for a button to sit.
+   */
+  actions?: ReactNode
+  /**
+   * Print each parameter's ArduPilot name under its label.
+   *
+   * A card-level switch rather than a flag per field: within one card the
+   * answer is always the same, and a list where some rows carried a name and
+   * others did not would read as the name meaning something.
+   */
+  showNames?: boolean
 }) {
   const entries = useParamStore((s) => s.entries)
   const inDoc = useInDoc()
@@ -55,6 +77,9 @@ export default function ParamCard({
           {...(f.unit ? { unit: f.unit } : {})}
           {...(f.writeNow ? { writeNow: true } : {})}
           {...(f.gatesOthers ? { gatesOthers: true } : {})}
+          {...(showNames ? { showName: true } : {})}
+          {...(f.disabled ? { disabled: true } : {})}
+          {...(f.numeric ? { numeric: true } : {})}
         />
       ))}
       {children}
@@ -82,17 +107,43 @@ export default function ParamCard({
       {...(subtitle !== undefined ? { subtitle } : {})}
       {...(note !== undefined ? { note } : {})}
       {...(className !== undefined ? { className } : {})}
+      {...(actions !== undefined ? { actions } : {})}
     >
       {controls}
     </LaCard>
   )
 }
 
-/** Shared empty state for a tab that needs a connected vehicle. */
-export function NeedsVehicle({ title, body }: { title: string; body: string }) {
-  return (
-    <LaCard title={title} note="Connect a vehicle to see its settings.">
-      <p className="app-placeholder">{body}</p>
-    </LaCard>
+/**
+ * Shared empty state for a tab that needs a connected vehicle: the tab's name
+ * and one line saying why it is empty.
+ *
+ * Two states, because there are two reasons to be here and only one of them
+ * is the user's to act on. With nothing connected this is barely seen at all
+ * -- a vehicle-only tab leaves the rail on a disconnect, and this covers the
+ * one render before the redirect, which is the defence Mission Planner keeps
+ * its own "not connected" messages as.
+ *
+ * A **reboot** is the other, and it is seen for seconds rather than a frame:
+ * the tab deliberately stays put so the screen that asked for the restart is
+ * the screen you come back to. "Connect a vehicle" is wrong there -- nobody
+ * has to do anything, the link comes back by itself -- so the card says what
+ * is happening instead.
+ *
+ * Neither state describes the tab. Each one carried a sentence naming what the
+ * screen would have held, which is the card-that-describes-itself this app
+ * removed from eleven tabs already; the rail says where you are.
+ */
+export function NeedsVehicle({ title }: { title: string }) {
+  const rebooting = useConnectionStore((s) => s.phase === 'rebooting')
+  const connected = useConnectionStore(
+    (s) => s.phase === 'connected' || s.phase === 'linkLost',
   )
+  const loading = useParamStore((s) => s.loadState !== 'ready')
+  const note = rebooting
+    ? 'Rebooting the vehicle and reconnecting telemetry.'
+    : connected && loading
+      ? 'Reading the vehicle’s parameters.'
+      : 'Connect a vehicle to see its settings.'
+  return <LaCard title={title} note={note} />
 }

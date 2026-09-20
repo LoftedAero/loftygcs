@@ -67,8 +67,9 @@ export default function ParamMatrix({
   const style = { '--matrix-cols': keptCols.length } as CSSProperties
 
   const grid = (
-    <>
-      <div className="matrix-grid matrix-grid--head" style={style}>
+    // Framed like every other table on a Setup screen -- see `.app-table`.
+    <div className="app-table">
+      <div className="app-table__row matrix-grid app-table__head" style={style}>
         <span />
         {keptCols.map(({ col }) => (
           <span key={col.label}>
@@ -78,8 +79,8 @@ export default function ParamMatrix({
         ))}
       </div>
       {keptRows.map((r) => (
-        <div className="matrix-grid" key={r.label} style={style}>
-          <span className="matrix-grid__label">{r.label}</span>
+        <div className="app-table__row matrix-grid" key={r.label} style={style}>
+          <span className="app-table__label">{r.label}</span>
           {keptCols.map(({ col, i }) => {
             const param = r.params[i]
             return (
@@ -93,7 +94,7 @@ export default function ParamMatrix({
           })}
         </div>
       ))}
-    </>
+    </div>
   )
 
   // A matrix is already a grid, so it goes straight into the band rather

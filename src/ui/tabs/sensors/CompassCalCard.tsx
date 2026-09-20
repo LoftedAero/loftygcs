@@ -3,7 +3,6 @@ import { LaButton, LaCard, LaHint } from '../../components/La'
 import ParamField from '../../components/ParamField'
 import CompassPriority from './CompassPriority'
 import CompassCalWizard from './CompassCalWizard'
-import WriteFeedback from '../../components/WriteFeedback'
 import RebootPrompt from '../../components/RebootPrompt'
 import { useParamStore } from '../../../stores/param-store'
 
@@ -23,22 +22,32 @@ export default function CompassCalCard() {
   const useParams = ['COMPASS_USE', 'COMPASS_USE2', 'COMPASS_USE3'].filter((p) => entries.has(p))
   const anyUsed = useParams.length === 0 || useParams.some((p) => entries.get(p)?.value !== 0)
 
-  // What you set, then what you do, as on the accelerometer card above it.
-  // One card, not two: calibration and "which compass, in what order, and is
-  // it used" are one subject.
+  // Actions on the title row, settings in the body, as on the accelerometer
+  // card above it. One card, not two: calibration and "which compass, in what
+  // order, and is it used" are one subject.
   return (
-    <LaCard title="Compass" className="compass-card">
+    <LaCard
+      title="Compass"
+      className="compass-card"
+      actions={
+        <>
+          {/* On the title row with the actions: the reminder left after
+              Later, which as a block in the body grew the card. */}
+          <RebootPrompt />
+          <LaButton variant="secondary" disabled={!anyUsed} onClick={() => setCalibrating(true)}>
+            Calibrate compass
+          </LaButton>
+        </>
+      }
+    >
       <CompassPriority />
-      <ParamField param="COMPASS_ENABLE" label="Enable compasses" writeNow />
-      <ParamField param="COMPASS_AUTODEC" label="Auto declination" writeNow />
-      <ParamField param="COMPASS_LEARN" label="Learn offsets in flight" writeNow />
-      <RebootPrompt />
-      <div className="la-row">
-        <LaButton variant="secondary" disabled={!anyUsed} onClick={() => setCalibrating(true)}>
-          Calibrate compass
-        </LaButton>
-        <span className="la-grow" />
-        <WriteFeedback />
+      {/* Three settings that apply to every compass, side by side with their
+          labels above: one row reads as one group, where three rows under a
+          table read as more of the table. */}
+      <div className="sensor-fields">
+        <ParamField param="COMPASS_ENABLE" label="Enable compasses" writeNow stacked />
+        <ParamField param="COMPASS_AUTODEC" label="Auto declination" writeNow stacked />
+        <ParamField param="COMPASS_LEARN" label="Learn offsets in flight" writeNow stacked />
       </div>
       {/* ArduPilot refuses to calibrate a compass it is not using --
           `_start_calibration` returns false on `!use_for_yaw(i)`, and

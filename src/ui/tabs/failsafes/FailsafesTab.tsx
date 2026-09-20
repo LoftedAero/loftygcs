@@ -8,17 +8,16 @@ export default function FailsafesTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   if (!connected) {
     return (
-      <NeedsVehicle
-        title="Failsafes"
-        body="Radio and ground-station loss, EKF and crash detection, geofence, and arming checks."
-      />
+      <NeedsVehicle title="Failsafes" />
     )
   }
   return (
     <SetupDoc>
+      {/* Worth doing before a new airframe flies: switch the transmitter off
+          on the bench with the props removed and confirm the vehicle reacts.
+          A standing instruction on the card is one people learn to skip. */}
       <ParamCard
         title="Radio failsafe"
-        note="Test this before every new airframe flies: switch the transmitter off on the bench, props removed, and confirm the vehicle reacts."
         fields={[
           { param: 'FS_THR_ENABLE', label: 'Throttle failsafe' },
           { param: 'FS_THR_VALUE', label: 'Trigger PWM', unit: 'µs' },
@@ -27,9 +26,10 @@ export default function FailsafesTab() {
           { param: 'THR_FS_VALUE', label: 'Trigger PWM', unit: 'µs' },
         ]}
       />
+      {/* Only useful when the vehicle is genuinely flown from the GCS: on a
+          hobby link this fires on ordinary telemetry dropouts. */}
       <ParamCard
         title="Ground station failsafe"
-        note="Only useful when the vehicle is genuinely flown from the GCS; on a hobby link it fires on ordinary telemetry dropouts."
         fields={[
           { param: 'FS_GCS_ENABLE', label: 'GCS failsafe' },
           { param: 'FS_GCS_TIMEOUT', label: 'Timeout', unit: 's' },
@@ -64,9 +64,11 @@ export default function FailsafesTab() {
           { param: 'FENCE_MARGIN', label: 'Margin', unit: 'm' },
         ]}
       />
+      {/* These are what keep a misconfigured vehicle on the ground. The
+          warning against leaving them off belongs where somebody turns them
+          off, not standing on the card. */}
       <ParamCard
         title="Arming checks"
-        note="Arming checks are what keep a misconfigured vehicle on the ground. Disable them for bench work only, and put them back."
         fields={[
           { param: 'ARMING_CHECK', label: 'Checks enabled' },
           { param: 'ARMING_RUDDER', label: 'Rudder arming' },

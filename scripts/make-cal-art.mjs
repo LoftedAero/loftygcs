@@ -25,8 +25,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 /** Pixels per frame. Twice the 72px the tiles draw, for a 2x display. */
 const FRAME = 144
 
+/** Pixels per frame of the board sheet. Twice the 160px the card draws it at. */
+const BOARD_FRAME = 320
+
 /** Supersampling: each frame is rendered this much larger, then scaled down. */
 const SCALE = 3
+
 
 const OUT = 'src/ui/tabs/sensors'
 
@@ -59,6 +63,7 @@ async function render() {
       planeGltf: readFileSync(path.join(root, 'src/models/airplane.gltf'), 'utf8'),
       f35bBase64: readFileSync(path.join(root, 'src/models/f35b.glb')).toString('base64'),
       frame: FRAME,
+      boardFrame: BOARD_FRAME,
       scale: SCALE,
     }
     const result = await win.webContents.executeJavaScript(
@@ -81,6 +86,15 @@ async function render() {
       )
     }
     console.log(`frames: ${result.frames.join(', ')}`)
+
+    const board = result.board
+    const boardPng = Buffer.from(board.url.slice(board.url.indexOf(',') + 1), 'base64')
+    if (boardPng.length < 4000) throw new Error(`board sheet came back empty (${boardPng.length} bytes)`)
+    writeFileSync(path.join(root, OUT, 'board-orientations.png'), boardPng)
+    console.log(
+      `wrote ${OUT}/board-orientations.png  ${BOARD_FRAME * board.columns}x${BOARD_FRAME * board.rows}, ` +
+        `${Math.round(boardPng.length / 1024)} KB, ${board.columns} x ${board.rows} frames`,
+    )
   } finally {
     rmSync(tmp, { recursive: true, force: true })
   }

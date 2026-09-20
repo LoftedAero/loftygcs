@@ -343,7 +343,9 @@ class ConnectionService {
         for (const d of evt.batch) this.applyDelta(d)
         return
       case 'version': {
-        useVehicleStore.getState().apply({ firmware: evt.firmware, capabilities: evt.capabilities })
+        useVehicleStore
+          .getState()
+          .apply({ firmware: evt.firmware, capabilities: evt.capabilities, boardId: evt.boardId })
         // The answer we were holding the metadata fetch for.
         if (this.metadataTimer) {
           clearTimeout(this.metadataTimer)
@@ -648,7 +650,18 @@ class ConnectionService {
    * metadata and can tell from them whether a reboot is now the next step,
    * which a number cannot.
    */
-  async writeDirtyParams(): Promise<{ written: string[]; failed: string[] }> {
+  /**
+   * Send every staged edit, or only the ones a caller claims.
+   *
+   * The scope exists because a screen can hold more than one card that edits
+   * parameters, and a button labelled "Write (14)" on one of them must not
+   * quietly send the other's edits too. Callers without a scope -- the action
+   * bar, the parameters column -- still send everything, which is what those
+   * buttons have always meant.
+   */
+  async writeDirtyParams(
+    owns?: (param: string) => boolean,
+  ): Promise<{ written: string[]; failed: string[] }> {
     const worker = this.worker
     if (!worker) return { written: [], failed: [] }
     const store = useParamStore.getState()
@@ -658,6 +671,7 @@ class ConnectionService {
     try {
       for (const [name, e] of store.entries) {
         if (!e.dirty) continue
+        if (owns && !owns(name)) continue
         try {
           const echoed = await worker.setParam(name, e.value, e.mavType)
           useParamStore.getState().confirmWrite(name, echoed)

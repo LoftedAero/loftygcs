@@ -1,5 +1,6 @@
 import { mdiArrowDown, mdiArrowUp } from '@mdi/js'
 import ParamField from '../../components/ParamField'
+import WriteFeedback from '../../components/WriteFeedback'
 import { useParamStore } from '../../../stores/param-store'
 import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
 import { connectionService } from '../../../services/connection'
@@ -143,8 +144,18 @@ export default function CompassPriority() {
   }
 
   return (
-    <div className="compass-prio">
-      <div className="compass-prio__row compass-prio__row--head">
+    <section className="compass-prio" aria-labelledby="compass-prio-title">
+      <h3 className="compass-prio__title" id="compass-prio-title">
+        Compass priority
+        {/* The arrows write too, and have no control of their own to answer
+            inside, so the table's own title does. */}
+        <WriteFeedback prefixes={['COMPASS_PRIO']} inline />
+      </h3>
+      {/* Framed, with a header band and a rule between rows: it sat on the
+          card as loose lines of text and controls, and did not read as the
+          table it is. */}
+      <div className="app-table">
+      <div className="app-table__row compass-prio__row app-table__head">
         <span />
         <span>Compass</span>
         <span>Use</span>
@@ -152,7 +163,7 @@ export default function CompassPriority() {
         <span>Priority</span>
       </div>
       {rows.map((r, i) => (
-        <div className="compass-prio__row" key={r.prio}>
+        <div className="app-table__row compass-prio__row" key={r.prio}>
           <span className="compass-prio__n">{i + 1}</span>
           <span className="compass-prio__device">
             {r.id === 0 ? (
@@ -189,8 +200,12 @@ export default function CompassPriority() {
             ) : r.id === 0 ? (
               <span className="compass-prio__na">—</span>
             ) : (
+              // Not "AHRS_ORIENT": a parameter name on screen says nothing to
+              // the person reading the row, and that one was not even
+              // ArduPilot's spelling of it. What the cell has to say is why
+              // there is no control here.
               <span className="compass-prio__na" title="An internal compass turns with the board">
-                AHRS_ORIENT
+                Follows the board
               </span>
             )}
           </span>
@@ -223,7 +238,8 @@ export default function CompassPriority() {
           </span>
         </div>
       ))}
+      </div>
       <p className="la-hint">The order takes effect when the vehicle reboots.</p>
-    </div>
+    </section>
   )
 }

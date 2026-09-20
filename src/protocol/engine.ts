@@ -274,6 +274,9 @@ export class ProtocolEngine {
             capabilities: Number(msg.fields.capabilities ?? 0),
             vendorId: Number(msg.fields.vendorId ?? 0),
             productId: Number(msg.fields.productId ?? 0),
+            // `uint32_t(APJ_BOARD_ID) << 16` in GCS_Common's
+            // send_autopilot_version, so the id is the top half.
+            boardId: Number(msg.fields.boardVersion ?? 0) >>> 16,
           },
         })
         return

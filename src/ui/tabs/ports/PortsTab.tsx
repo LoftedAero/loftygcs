@@ -1,6 +1,7 @@
 import { LaCard } from '../../components/La'
 import ParamField from '../../components/ParamField'
 import { NeedsVehicle } from '../../components/ParamCard'
+import CardParamActions from '../../components/CardParamActions'
 import { useParamStore } from '../../../stores/param-store'
 
 // Serial port assignment. This tab earns its place ahead of Sensors: a GPS
@@ -15,10 +16,7 @@ export default function PortsTab() {
 
   if (!ready) {
     return (
-      <NeedsVehicle
-        title="Ports"
-        body="Protocol and baud rate for each serial port: telemetry radios, GPS, companion computers, and peripherals."
-      />
+      <NeedsVehicle title="Ports" />
     )
   }
 
@@ -29,36 +27,52 @@ export default function PortsTab() {
 
   if (ports.length === 0) {
     return (
-      <LaCard title="Serial ports" note="This vehicle reports no serial port parameters.">
-        <p className="app-placeholder">
-          Every SERIALn_* parameter remains reachable on the Parameters tab.
-        </p>
-      </LaCard>
+      <LaCard title="Serial ports" note="This vehicle reports no serial port parameters." />
     )
   }
 
   return (
+    // Which port is the USB console is said on the row itself, and the
+    // reboot a protocol change needs is raised by the write that needs it.
+    //
+    // The card spans the grid's tracks and then takes half the content area,
+    // which is a Sensors tile's width -- as one ordinary card it sat in a
+    // single 460px track with four columns squeezed into the narrowest shape
+    // they ever have to take. The rows are framed for the same reason: the
+    // compass priority table is one rail item away, and a table drawn two
+    // ways reads as two applications.
     <LaCard
       title="Serial ports"
-      note="SERIAL0 is the USB console. Changing a protocol needs a reboot before the peripheral is detected."
+      className="ports-card"
+      actions={
+        <CardParamActions
+          reason="Serial port changes take effect after a restart"
+          owns={(param) => /^SERIAL\d+_/.test(param)}
+        />
+      }
     >
-      <div className="ports-grid ports-grid--head">
-        <span>Port</span>
-        <span>Protocol</span>
-        <span>Baud</span>
-        <span>Options</span>
-      </div>
-      {ports.map((n) => (
-        <div className="ports-grid" key={n}>
-          <span className="ports-grid__label">
-            SERIAL{n}
-            {n === 0 && <span className="ports-grid__hint">USB</span>}
-          </span>
-          <ParamField param={`SERIAL${n}_PROTOCOL`} label="Protocol" bare />
-          <ParamField param={`SERIAL${n}_BAUD`} label="Baud" bare />
-          <ParamField param={`SERIAL${n}_OPTIONS`} label="Options" bare />
+      <div className="app-table">
+        <div className="app-table__row ports-grid app-table__head">
+          <span>Port</span>
+          <span>Protocol</span>
+          <span>Baud</span>
+          <span>Options</span>
         </div>
-      ))}
+        {ports.map((n) => (
+          <div className="app-table__row ports-grid" key={n}>
+            <span className="app-table__label">
+              SERIAL{n}
+              {n === 0 && <span className="ports-grid__hint">USB</span>}
+            </span>
+            {/* Staged like every other curated screen -- the card's own Write
+                is what sends them, and a port half-reconfigured mid-edit is
+                not a state worth putting on the vehicle. */}
+            <ParamField param={`SERIAL${n}_PROTOCOL`} label="Protocol" bare />
+            <ParamField param={`SERIAL${n}_BAUD`} label="Baud" bare />
+            <ParamField param={`SERIAL${n}_OPTIONS`} label="Options" bare />
+          </div>
+        ))}
+      </div>
     </LaCard>
   )
 }

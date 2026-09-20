@@ -26,18 +26,32 @@ export function LaCard({
   title,
   subtitle,
   note,
+  actions,
   children,
   className = '',
 }: {
   title?: string
   subtitle?: string
   note?: string
+  /**
+   * What the card does, on its title row. The system sheet has no header row,
+   * only a title carrying the orange rule, so the row is app-local
+   * (`.la-card__head` in app.css) and takes the rule across its full width.
+   */
+  actions?: ReactNode
   children?: ReactNode
   className?: string
 }) {
   return (
     <section className={`la-card ${className}`.trim()}>
-      {title && <h2 className="la-card__title">{title}</h2>}
+      {title && actions ? (
+        <div className="la-card__head">
+          <h2 className="la-card__title">{title}</h2>
+          <div className="la-card__actions">{actions}</div>
+        </div>
+      ) : (
+        title && <h2 className="la-card__title">{title}</h2>
+      )}
       {subtitle && <p className="la-card__subtitle">{subtitle}</p>}
       {children}
       {note && <p className="la-card__note">{note}</p>}

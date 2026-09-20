@@ -20,10 +20,7 @@ export default function RadioTab() {
 
   if (!connected) {
     return (
-      <NeedsVehicle
-        title="Radio"
-        body="Receiver calibration, stick mapping, and auxiliary switch functions."
-      />
+      <NeedsVehicle title="Radio" />
     )
   }
 
@@ -35,9 +32,11 @@ export default function RadioTab() {
   return (
     <>
       <RadioCalCard />
+      {/* Remapping at the transmitter is the better fix where the radio
+          allows it, and RCMAP changes are read at boot -- the write raises
+          the restart prompt itself. */}
       <ParamCard
         title="Stick mapping"
-        note="Edit these by hand only if the transmitter cannot be remapped instead; changes take effect after a reboot."
         fields={[
           { param: 'RCMAP_ROLL', label: 'Roll channel' },
           { param: 'RCMAP_PITCH', label: 'Pitch channel' },
@@ -46,23 +45,24 @@ export default function RadioTab() {
         ]}
       />
       {auxChannels.length > 0 && (
-        <LaCard
-          title="Auxiliary functions"
-          note="Each switch channel can trigger one function. The flight-mode channel is set on the Flight modes tab."
-        >
-          <div className="aux-grid aux-grid--head">
-            <span>Channel</span>
-            <span>Function</span>
-          </div>
-          {auxChannels.map((n) => (
-            <div className="aux-grid" key={n}>
-              <span className="aux-grid__label">
-                RC{n}
-                {channelLabels[n] && <span className="aux-grid__product">{channelLabels[n]}</span>}
-              </span>
-              <ParamField param={`RC${n}_OPTION`} label={`Channel ${n} function`} bare />
+        <LaCard title="Auxiliary functions">
+          <div className="app-table">
+            <div className="app-table__row aux-grid app-table__head">
+              <span>Channel</span>
+              <span>Function</span>
             </div>
-          ))}
+            {auxChannels.map((n) => (
+              <div className="app-table__row aux-grid" key={n}>
+                <span className="app-table__label">
+                  RC{n}
+                  {channelLabels[n] && (
+                    <span className="aux-grid__product">{channelLabels[n]}</span>
+                  )}
+                </span>
+                <ParamField param={`RC${n}_OPTION`} label={`Channel ${n} function`} bare />
+              </div>
+            ))}
+          </div>
         </LaCard>
       )}
       <ParamCard

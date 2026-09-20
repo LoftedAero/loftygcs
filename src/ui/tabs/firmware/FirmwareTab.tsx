@@ -726,7 +726,7 @@ function FirmwareCard() {
             <strong>{apj.label}</strong> — {apj.apj.image.length} bytes
             {apj.apj.version && `, ${apj.apj.version}`}
           </p>
-          <p>The current firmware and its configuration on this board will be erased.</p>
+          <p>The current firmware on this board will be erased.</p>
         </LaModal>
       )}
 

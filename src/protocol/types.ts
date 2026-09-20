@@ -118,6 +118,15 @@ export type ProtocolEvent =
       /** Board type, from the vendor/product ids the vehicle reports. */
       vendorId: number
       productId: number
+      /**
+       * ArduPilot's own board id -- `APJ_BOARD_ID`, the number its hwdef
+       * declares and the one `firmware.ardupilot.org`'s manifest keys builds
+       * by. It rides in AUTOPILOT_VERSION's `board_version` shifted up
+       * sixteen bits (`uint32_t(APJ_BOARD_ID) << 16`), which is why it is
+       * shifted back rather than read whole. Zero when the vehicle does not
+       * say, which SITL does not.
+       */
+      boardId: number
     }
 
 /** ArduPilot's own version, decoded from AUTOPILOT_VERSION. */

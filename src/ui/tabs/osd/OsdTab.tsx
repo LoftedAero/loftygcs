@@ -12,17 +12,16 @@ export default function OsdTab() {
   const entries = useParamStore((s) => s.entries)
   if (!connected) {
     return (
-      <NeedsVehicle title="OSD" body="On-screen display type, units, and warning thresholds." />
+      <NeedsVehicle title="OSD" />
     )
   }
   if (!entries.has('OSD_TYPE')) {
     return (
-      <LaCard title="OSD" note="This firmware build has no OSD support compiled in.">
-        <p className="app-placeholder">
-          Boards without an onboard OSD chip need a build that includes MSP DisplayPort or an
-          analog OSD before these settings appear.
-        </p>
-      </LaCard>
+      // A board without an onboard OSD chip needs a build carrying MSP
+      // DisplayPort or an analog OSD before any of these parameters exist,
+      // which is a firmware choice made elsewhere; the one line says the
+      // state this vehicle is in.
+      <LaCard title="OSD" note="This firmware build has no OSD support compiled in." />
     )
   }
   return <OsdWorkspace />

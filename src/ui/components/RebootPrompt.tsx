@@ -16,8 +16,14 @@ import { rebootAutopilot } from '../../services/flight'
 // looking at. **Later is a real answer**, though: somebody mid-bring-up has
 // half a dozen changes to make and one reboot to do at the end, and a dialog
 // with no way out teaches people to click the first button they see. So
-// Later steps the reminder down to a line on the card rather than clearing
-// it, and only a *new* reason opens the dialog again.
+// Later steps the reminder down rather than clearing it, and only a *new*
+// reason opens the dialog again.
+//
+// The stepped-down reminder is drawn to sit on a card's title row, beside
+// the card's own actions, rather than as a block in the card body: a block
+// appearing there made the card grow the moment somebody pressed Later. The
+// reason it is owed is kept as the hover text, because the row has room for
+// "Reboot required" and a button, not a sentence.
 export default function RebootPrompt() {
   const pending = useWriteFeedbackStore((s) => s.rebootPending)
   const deferred = useWriteFeedbackStore((s) => s.rebootDeferred)
@@ -37,12 +43,12 @@ export default function RebootPrompt() {
 
   if (deferred) {
     return (
-      <div className="reboot-prompt">
-        <p className="reboot-prompt__why">{pending}</p>
-        <LaButton variant="secondary" size="sm" disabled={!connected || armed} onClick={reboot}>
+      <span className="reboot-inline" title={pending}>
+        <span className="reboot-inline__why">Reboot required</span>
+        <LaButton variant="secondary" disabled={!connected || armed} onClick={reboot}>
           Reboot now
         </LaButton>
-      </div>
+      </span>
     )
   }
 
@@ -61,9 +67,6 @@ export default function RebootPrompt() {
         </>
       }
     >
-      <p className="app-placeholder">
-        The vehicle reads this at startup, so it is still running the old setting.
-      </p>
       {/* ArduPilot refuses to reboot while armed, and this is a screen
           somebody could be on with the motors live. */}
       {armed && <p className="app-placeholder">Disarm the vehicle first.</p>}

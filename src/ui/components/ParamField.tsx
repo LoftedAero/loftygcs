@@ -1,4 +1,7 @@
-import { LaSelect } from './La'
+import { useRef, useState } from 'react'
+import { LaButton, LaSelect } from './La'
+import BitmaskEditor, { describeBits } from './BitmaskEditor'
+import WriteFeedback from './WriteFeedback'
 import { useParamStore } from '../../stores/param-store'
 import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
 import { connectionService } from '../../services/connection'
@@ -30,6 +33,10 @@ export default function ParamField({
   bare,
   writeNow,
   gatesOthers,
+  stacked,
+  showName,
+  disabled,
+  numeric,
 }: {
   param: string
   label: string
@@ -49,10 +56,50 @@ export default function ParamField({
    * tens of seconds.
    */
   gatesOthers?: boolean
+  /** Label above the control rather than beside it, as `LaField`'s `stacked`. */
+  stacked?: boolean
+  /**
+   * Print the ArduPilot name under the label.
+   *
+   * A curated field is named for what it does, which is the point of curating
+   * it -- but the name is what the wiki, the forums and the Parameters tab all
+   * call the same setting, and without it a reader cannot carry an answer from
+   * one to the other. Off by default: a screen whose every row carries a
+   * SHOUTING_IDENTIFIER is the parameter table with extra steps, so it is the
+   * setup screens that opt in.
+   */
+  showName?: boolean
+  /**
+   * Editable, but not yet meaningful.
+   *
+   * For a field whose value only means something once another one is on --
+   * the airspeed sensor's type under its enable. Greyed rather than hidden,
+   * because a row that disappears takes the reader's place on the card with
+   * it, and what is being said is "this is here, and it is not in play yet".
+   */
+  disabled?: boolean
+  /**
+   * Edit it as a number even though ArduPilot names some of its values.
+   *
+   * `@Values` on a *continuous* parameter is a list of suggestions, not an
+   * enumeration: MOT_SPIN_MIN names 0.0, 0.15 and 0.25 over a range of 0 to
+   * 0.25 with an increment of 0.01. Rendered as a dropdown it can neither
+   * show what the vehicle is set to -- a bench-tuned 0.12 becomes a lone
+   * unnamed entry, and the stock 0.15 reads as the word "Default" -- nor let
+   * anyone type the value between two of them.
+   *
+   * Declared per field rather than inferred from "has both Values and Range",
+   * which 185 Copter parameters do: BATT_VOLT_PIN is one of them, and its
+   * values are hardware names that belong in a list.
+   */
+  numeric?: boolean
 }) {
   const entry = useParamStore((s) => s.entries.get(param))
   const meta = useParamStore((s) => s.metadata[param])
   const edit = useParamStore((s) => s.edit)
+  const [bitmaskOpen, setBitmaskOpen] = useState(false)
+  // The commit, reachable from a native listener that outlives this render.
+  const commitRef = useRef<(v: number) => void>(() => {})
 
   /**
    * Send it, then find out what the vehicle exposes now.
@@ -96,19 +143,73 @@ export default function ParamField({
       })
   }
 
+  commitRef.current = commit
+
   if (!entry) {
     if (bare) return <span className="la-muted">—</span>
+    // Deliberately out of play *and* not yet reported: the quadplane frame
+    // fields, which the firmware only creates once Q_ENABLE is on and the
+    // vehicle has restarted. Drawn as the row they will become, so the card is
+    // one height in every state rather than growing by two rows the moment a
+    // reboot lands -- which is the same rule that keeps a status from
+    // resizing a card.
+    if (disabled) {
+      return (
+        <div
+          className={['la-field', showName ? 'la-field--named' : '', 'la-field--off']
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <label className="la-field__label">{label}</label>
+          {showName && <span className="la-field__param">{param}</span>}
+          <LaSelect disabled value="">
+            <option value="">—</option>
+          </LaSelect>
+          {showName && <span className="la-field__unit">{unit ?? ''}</span>}
+        </div>
+      )
+    }
     return (
-      <div className="la-field">
+      <div className={stacked ? 'la-field la-field--stacked' : 'la-field'}>
         <label className="la-field__label">{label}</label>
         <span className="la-muted">not on this vehicle</span>
       </div>
     )
   }
 
-  const control = meta?.values ? (
+  // A bitmask has no named values, so without this the field fell through to
+  // a plain number box and asked for a mask to be typed -- which is what the
+  // Parameters table's own editor exists to avoid. The button says what is
+  // switched on rather than the number that says it.
+  const control = meta?.bitmask ? (
+    <>
+      <LaButton
+        variant="ghost"
+        className="param-bitmask"
+        disabled={disabled}
+        title={describeBits(entry.value, meta.bitmask, 99)}
+        onClick={() => setBitmaskOpen(true)}
+      >
+        {describeBits(entry.value, meta.bitmask, 2)}
+      </LaButton>
+      {bitmaskOpen && (
+        <BitmaskEditor
+          name={param}
+          displayName={meta.displayName}
+          value={entry.value}
+          bitmask={meta.bitmask}
+          onApply={(v) => {
+            commit(v)
+            setBitmaskOpen(false)
+          }}
+          onCancel={() => setBitmaskOpen(false)}
+        />
+      )}
+    </>
+  ) : meta?.values && !numeric ? (
     <LaSelect
       value={String(entry.value)}
+      disabled={disabled}
       onChange={(e) => commit(Number(e.target.value))}
       className={entry.dirty ? 'is-dirty' : ''}
       title={meta.description ?? param}
@@ -126,36 +227,82 @@ export default function ParamField({
     <input
       className={entry.dirty ? 'la-input la-input--num is-dirty' : 'la-input la-input--num'}
       type="number"
+      disabled={disabled}
       step={meta?.increment ?? 'any'}
       value={entry.value}
       title={meta?.description ?? param}
+      // The platform's own `change` event is the commit, and React's
+      // `onChange` is not it -- React maps that to `input`, which fires on
+      // every keystroke. `change` fires exactly where a number box means
+      // "done": on Enter, on leaving the field, and **immediately on the
+      // stepper**, which is the one this missed. Travel is set by nudging a
+      // trim and watching the surface, and Up-arrow only staged the value, so
+      // nothing moved until you clicked away. Measured in the app: ArrowUp
+      // fires input+change, typing "148" fires input alone, Enter fires
+      // change.
+      // A ref rather than a listener in an effect, because React may hand back
+      // a different node across a re-render and this re-attaches when it does
+      // (React 19 runs the cleanup a ref returns).
+      ref={(node) => {
+        if (!node || !writeNow) return undefined
+        const onNativeChange = () => commitRef.current(Number(node.value))
+        node.addEventListener('change', onNativeChange)
+        return () => node.removeEventListener('change', onNativeChange)
+      }}
       onChange={(e) => {
         const v = Number(e.target.value)
         // Always stage on the way past, even for a `writeNow` field: the
-        // control has to show what is being typed, and the commit below is
-        // what sends it.
+        // control has to show what is being typed, and the ref above is what
+        // sends it.
         if (Number.isFinite(v)) edit(param, v)
-      }}
-      onKeyDown={(e) => {
-        if (writeNow && e.key === 'Enter') commit(Number(e.currentTarget.value))
-      }}
-      onBlur={(e) => {
-        if (writeNow && Number(e.target.value) !== entry.origValue) {
-          commit(Number(e.target.value))
-        }
       }}
     />
   )
 
-  if (bare) return control
+  // A field that writes answers for itself, inside its own control: a card-wide
+  // "Saved" left the reader to work out which of several fields it meant, and
+  // anywhere outside the control's box would cost the layout a line.
+  const placed = writeNow ? (
+    <span className="param-control">
+      {control}
+      <WriteFeedback params={[param]} inline />
+    </span>
+  ) : (
+    control
+  )
+
+  if (bare) return placed
 
   const unitText = unit ?? meta?.units
   return (
-    <div className="la-field" title={meta?.description ?? param}>
+    <div
+      className={
+        [
+          stacked ? 'la-field la-field--stacked' : 'la-field',
+          showName ? 'la-field--named' : '',
+          disabled ? 'la-field--off' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      }
+      title={meta?.description ?? param}
+    >
+      {/* Four columns rather than two: what the setting does, the ArduPilot
+          name for it, the control, and the unit that qualifies the number in
+          it. The words lead because this is a curated screen -- somebody is
+          here to change a thing, not to look up an identifier -- and the name
+          follows in the same quiet sub-font a unit takes, as the thing to
+          carry to the wiki or the Parameters tab once they have found the row.
+          The unit sits *after* the box rather than up against the label,
+          because it qualifies what is typed in the box and not what the row is
+          called; it stays a `.la-field__unit`, which is where the design
+          system puts units. */}
       <label className="la-field__label">
-        {label} {unitText && <span className="la-field__unit">{unitText}</span>}
+        {label} {!showName && unitText && <span className="la-field__unit">{unitText}</span>}
       </label>
-      {control}
+      {showName && <span className="la-field__param">{param}</span>}
+      {placed}
+      {showName && <span className="la-field__unit">{unitText ?? ''}</span>}
     </div>
   )
 }

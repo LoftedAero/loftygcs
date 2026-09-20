@@ -49,6 +49,10 @@ const ALLOWED = [
   // Repeated items *inside* a panel, which are framed to separate them from
   // it rather than to be one.
   '.fence-item',
+  // One frame class in the picker on Configuration: a tile is framed to
+  // separate it from its neighbours and from the card holding them, and the
+  // chosen one is marked by its border colour rather than by a second frame.
+  '.frame-tile',
   '.fw-vehicle',
   '.plotted',
   '.preset__load',

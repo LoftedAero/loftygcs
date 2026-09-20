@@ -166,17 +166,66 @@ label is wrong.
 > *"Getting a little irritated at how frequently random text and
 > descriptions are being placed throughout the app."*
 
-### What you set, then what you do
+### A card's actions live on its title row
 
-Within a card, the settings come first and the action that uses them last.
-The accelerometer card reads orientation → Calibrate; the compass card reads
-priority, then its settings, then Calibrate. (The *actions column* on the
-full-height screens is the other way round — vehicle actions, then files,
-then settings — because a column is scanned from the top for something to
-press, where a card is read through.)
+A card that does something puts its buttons on the title row, right-aligned,
+and its body holds only settings. Every action on a screen is then found in
+the same place, and a set of dropdowns is not broken up by buttons of another
+width. Settings that belong together sit in one row, each label above its
+control. (The *actions column* on the full-height screens is a different shape
+for a different job — vehicle actions, then files, then settings — because a
+column is scanned from the top for something to press.)
 
-> *"Just place the rotation setting at the top for flow… Similarly, place
-> the calibration button for compass at the bottom."*
+This replaced "settings first, action last", which put Calibrate at the foot
+of each card: laid out that way the buttons were stacked among the fields and
+the two cards read as unevenly arranged.
+
+> *"I like actions in the header, but I like the horizontal layout of the
+> compass controls"*
+
+### A write answers inside the control that made it
+
+"Saved" belongs in the box that was just changed, not on the card. A card-wide
+answer leaves the reader to work out which of several fields it meant, and on a
+screen with two writing cards both of them said it.
+
+> *"Make the 'Saved' text appear close to (or even inline with) the input that
+> actually triggers it"*
+
+**Reserve the room, never paint over the value.** The word needs somewhere to
+go that is not on top of what it is confirming: while it shows, the control's
+text area shortens and a value too long for what is left is cut with a fade.
+Overlaying it hid the tail of the very setting being confirmed —
+`Yaw293Pitch68Roll180` ends a pixel short of where the word starts.
+
+> *"What do we do when the input box doesn't contain enough whitespace for
+> 'Saved'?"*
+
+The corollary is that the box itself never changes size. A control sized by its
+own content grows by the reserved width the moment the answer appears, which is
+how one dropdown in a table came to be 68px wider than its neighbour for two
+seconds at a time: give it the width of its column instead.
+
+### A reboot is not a disconnect
+
+The app asks for the restart and reconnects from it by itself, so the screen
+that asked is the screen to come back to. Dropping to the top of the offline
+tabs meant finding your place again after every calibration that ends in a
+reboot. The placeholder those tabs draw says what is happening rather than
+asking for a vehicle — nobody has anything to do.
+
+> *"When a reboot is triggered, can we make the app land back on the same page
+> after reconnecting?"*
+
+### Red is status, except for destructive actions
+
+The design system says green and red are status and never actions. The one
+standing exception is a control whose whole point is that it is destructive —
+Stop all on the motor test, the confirms on MAVFTP and the joystick. Written
+down because the rule and the code had disagreed for some time, and the code
+was right.
+
+> *"Keep red for destructive actions"*
 
 ---
 
@@ -659,6 +708,28 @@ comparison anyone makes is a comparison across three headings.
 
 Fifteen rail items need groups. See the vocabulary rule above for which
 headings.
+
+### A table is one treatment; only its columns are its own
+
+> "We have tables for various purposes in a few of our setup pages. I want to
+> make sure these tables and their fonts, labels, and general styles are
+> consistent."
+
+Seven of them — serial ports, the initial tune, the mode slots, the servo
+outputs, the auxiliary channels, a gain matrix, the compass priority list —
+had drifted into four treatments, none of them chosen. Three were framed and
+four were loose lines on a card; the framed ones ruled between rows from the
+top and the loose ones from the bottom, so the last row of each carried a
+rule under nothing; row padding came in three values; two set a font size and
+five inherited one a step larger; and the header band was tracked at 0.04em in
+five places and 0.09em in the sixth. Each one was reasonable when it was
+written and the set was not.
+
+`.app-table` in `app.css` is the whole of it — frame, header band, row rule,
+row metric, and the monospace identifier column — and a table declares only
+`grid-template-columns`, because the columns are what the table is *about*.
+The header takes `.la-card__subtitle`'s numbers rather than a sixth opinion:
+where the design system already has a small uppercase label, use its.
 
 ---
 

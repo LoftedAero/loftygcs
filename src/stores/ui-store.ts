@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useParamStore } from './param-store'
+import type { ConnectionPhase } from './connection-store'
 
 // Navigation is two levels. The top level is a *mode* -- what you are doing
 // with the vehicle right now -- and only Setup has a tab rail; the rest are
@@ -123,6 +124,17 @@ export const TABS = [
 ] as const
 
 export type TabId = (typeof TABS)[number]['id']
+
+/**
+ * Whether the vehicle-only tabs stay in the rail. A reboot counts: it is a
+ * step the app asked for and reconnects from on its own, so dropping someone
+ * to the top of the offline list meant finding their screen again every time
+ * a calibration told them to restart. If the vehicle never comes back, the
+ * phase goes to idle and the tabs leave then.
+ */
+export function holdsVehicleTabs(phase: ConnectionPhase): boolean {
+  return phase === 'connected' || phase === 'linkLost' || phase === 'rebooting'
+}
 
 /** The tabs to show, given whether a vehicle is on the link. */
 export function visibleTabs(connected: boolean): typeof TABS {

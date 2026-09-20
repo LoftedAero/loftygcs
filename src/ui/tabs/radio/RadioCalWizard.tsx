@@ -180,10 +180,8 @@ export default function RadioCalWizard({ open, onClose }: { open: boolean; onClo
         <div className="rc-wizard__main">
           {stage === 'intro' && (
             <>
-              <p className="rc-wizard__lead">
-                This finds which channel each stick is on and which way round it reads, then
-                records the endpoints — so nothing has to be worked out by hand afterwards.
-              </p>
+              {/* The checklist is the actionable part; what the wizard does
+                  is what pressing Start finds out. */}
               <ul className="rc-wizard__checklist">
                 <li>Remove the propellers, or disconnect motor power entirely.</li>
                 <li>Turn the transmitter on and check the receiver is bound.</li>
@@ -198,10 +196,7 @@ export default function RadioCalWizard({ open, onClose }: { open: boolean; onClo
               <h3 className="rc-wizard__step">Center the sticks</h3>
               <p className="rc-wizard__lead">
                 Let the roll, pitch and yaw sticks sit at center and hold the throttle all the way
-                down.{' '}
-                {stage === 'center'
-                  ? 'This is the resting position everything else is measured against.'
-                  : 'This last reading becomes the trims.'}
+                down.
               </p>
               <StickDiagram active={null} />
             </>
@@ -212,10 +207,9 @@ export default function RadioCalWizard({ open, onClose }: { open: boolean; onClo
               <h3 className="rc-wizard__step">
                 Move the {spec.label.toLowerCase()} stick {spec.maxDirection}
               </h3>
-              <p className="rc-wizard__lead">
-                Hold it there. Whichever channel moves is the one carrying {spec.label.toLowerCase()},
-                and the direction it moves decides whether it needs reversing.
-              </p>
+              {/* The monitor beside this highlights the channel that moved,
+                  and the review table shows the direction it decided. */}
+              <p className="rc-wizard__lead">Hold it there.</p>
               <StickDiagram active={fn ?? null} />
               <p className="rc-wizard__progress">
                 Stick {step + 1} of {STICK_FUNCTIONS.length}
@@ -227,8 +221,7 @@ export default function RadioCalWizard({ open, onClose }: { open: boolean; onClo
             <>
               <h3 className="rc-wizard__step">Sweep everything to its limits</h3>
               <p className="rc-wizard__lead">
-                Move every stick, switch and dial through its full range, several times. The bars
-                keep the widest reading each channel has shown.
+                Move every stick, switch and dial through its full range, several times.
               </p>
               <p className="rc-wizard__progress">
                 {swept.length} channel{swept.length === 1 ? '' : 's'} swept so far
@@ -269,13 +262,8 @@ export default function RadioCalWizard({ open, onClose }: { open: boolean; onClo
                   asked for. Run the calibration again.
                 </LaHint>
               )}
-              {!saved && conflicts.length === 0 && (
-                <LaHint>
-                  Saving writes endpoints and trims for {swept.length} channel
-                  {swept.length === 1 ? '' : 's'}, the four RCMAP assignments, and the reversals.
-                  RCMAP changes need a reboot before they take effect.
-                </LaHint>
-              )}
+              {/* What Save writes is the table above it, and the reboot the
+                  mapping needs is said once the write has happened. */}
               {saved && (
                 <LaHint error={saved.failed.length > 0}>
                   {saved.failed.length

@@ -10,10 +10,7 @@ export default function PowerTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   if (!connected) {
     return (
-      <NeedsVehicle
-        title="Power"
-        body="Battery monitor selection, voltage and current calibration, and low-battery actions."
-      />
+      <NeedsVehicle title="Power" />
     )
   }
   return (
@@ -33,7 +30,7 @@ export default function PowerTab() {
       />
       <ParamCard
         title="Low battery"
-        note="Thresholds are measured under load; set them from a real flight log, not a bench reading."
+        note="Set them from a real flight log, not a bench reading."
         fields={[
           { param: 'BATT_LOW_VOLT', label: 'Low voltage', unit: 'V' },
           { param: 'BATT_LOW_MAH', label: 'Low capacity', unit: 'mAh' },
@@ -61,15 +58,17 @@ function LiveCard() {
   const a = useVehicleStore((s) => s.batteryA)
   const pct = useVehicleStore((s) => s.batteryPct)
   return (
-    <LaCard
-      title="Live reading"
-      note="Compare against a multimeter and adjust the voltage multiplier until they agree."
-    >
+    // This card is the calibration tool -- the multiplier on the card below
+    // is turned until this readout matches a meter -- which the numbers show
+    // without a sentence saying so.
+    <LaCard title="Live reading">
       <LaField label="Voltage" unit="V">
         <LaReadout placeholder="—" value={v > 0 ? v.toFixed(2) : undefined} />
       </LaField>
       <LaField label="Current" unit="A">
-        <LaReadout placeholder="not measured" value={a >= 0 ? a.toFixed(1) : undefined} />
+        {/* A dash, like its neighbours: the three readouts are one set, and
+            empty is empty whichever reading is missing. */}
+        <LaReadout placeholder="—" value={a >= 0 ? a.toFixed(1) : undefined} />
       </LaField>
       <LaField label="Remaining" unit="%">
         <LaReadout placeholder="—" value={pct >= 0 ? String(pct) : undefined} />

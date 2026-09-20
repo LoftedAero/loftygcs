@@ -27,9 +27,17 @@ export default function GuideBrowserModal({ onClose }: { onClose: () => void }) 
       open
       title="Guided setups"
       actions={
-        <LaButton variant="ghost" onClick={onClose}>
-          Close
-        </LaButton>
+        <>
+          {/* Always drawn, disabled when there is nothing to clear: as a
+              paragraph that appeared only once an aircraft was chosen, it
+              grew the dialog at the moment of choosing. */}
+          <LaButton variant="ghost" disabled={!selected} onClick={() => selectProfile(null)}>
+            Clear aircraft
+          </LaButton>
+          <LaButton variant="ghost" onClick={onClose}>
+            Close
+          </LaButton>
+        </>
       }
     >
       {classGuides.length > 0 && (
@@ -75,14 +83,6 @@ export default function GuideBrowserModal({ onClose }: { onClose: () => void }) 
         ))}
       </section>
 
-      {selected && (
-        <p className="la-card__note">
-          Aircraft set to {selected.name} — its output and channel names show across the app.{' '}
-          <button className="la-link-btn" onClick={() => selectProfile(null)}>
-            Clear
-          </button>
-        </p>
-      )}
     </LaModal>
   )
 }

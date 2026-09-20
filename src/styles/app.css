@@ -34,6 +34,133 @@
      2x display draws the sheet pixel for pixel -- change one and regenerate
      the other with `npm run cal-art`. */
   --app-cal-art: 72px;
+  /* The board picture beside Orientation. Half the rendered frame (320px), so
+     a 2x display draws it pixel for pixel -- regenerate with `npm run cal-art`
+     if this changes. */
+  --app-orient-board: 160px;
+  /* The empty top of every board frame, measured across all 44: the least is
+     69px of 320, so 34px at card size. The picture is lifted by that much, so
+     the board starts level with the label beside it without any orientation
+     rising above it. Remeasure if the sheet is re-rendered. */
+  --app-orient-board-lift: 34px;
+  /* The Orientation dropdown on the Accelerometer card, alone in its row, so it
+     takes a width of its own rather than the whole card. */
+  --app-sensor-control-w: 220px;
+  /* The system sheet's control height (.la-btn, .la-select): a card title
+     takes it too, so a title row with buttons and one without carry their
+     orange rules on the same line. */
+  --app-card-head-h: 30px;
+  /* One width for the buttons on a card's title row, so a set of actions reads
+     as a set rather than as labels of different lengths. Sized to the longest,
+     "Calibrate accelerometer"; a longer label still grows past it. */
+  --app-card-action-w: 176px;
+  /* The chevron's room inside `.la-select` -- the frozen sheet's own
+     padding-right, restated because anything placed inside that box has to
+     clear it. */
+  --app-select-chevron-w: 26px;
+  /* Room for a field's own answer to a write, sized to the longer of the two
+     words: "Not saved" measures 63px at --la-size-sm, plus a gap. It is
+     *reserved* rather than overlaid because the room is not always there --
+     AHRS_ORIENTATION's longest option, "Yaw293Pitch68Roll180", runs to within
+     a pixel of where the word starts, so an overlay covered the value it was
+     confirming. */
+  /* The slot kept clear to the right of a control that writes as it is used,
+     for the tick or cross that answers. Sized to the glyph and its breathing
+     room -- it was 68px when the answer was the word "Saved", which no table
+     of PWM boxes could give up. */
+  --app-write-mark-w: 16px;
+  /* The fixed columns of a setup table -- the port or channel name down the
+     left, and the narrow value columns beside the one that flexes. Ports and
+     Flight modes are the same table shape and had the number typed three
+     times each; sized to "115200" in a baud dropdown, the widest of them. */
+  --app-table-col-w: 110px;
+  /* The one wide column in such a table -- a serial protocol name, the widest
+     being "MAVLink2 (no streaming)". Capped rather than left to take the
+     window's slack: spanning the card grid gave the protocol dropdown 950px
+     beside 110px neighbours, which is not one column of controls. */
+  --app-table-wide-col-w: 360px;
+  /* The Options column holds a bitmask button whose label is a list of what
+     is switched on, so it is wider than a baud rate. */
+  --app-ports-options-w: 150px;
+  /* The serial table's own width: four columns, three gaps and the card's
+     padding. About half a 1400px content area, which is what it needs and no
+     more. */
+  --app-ports-card-w: 800px;
+  /* The frame drawing, beside the two dropdowns that choose it. Matched to
+     the orientation board on Sensors so the two setup pictures are one size. */
+  --app-frame-diagram-w: 240px;
+  /* One frame tile in the class table. Small enough that a dozen fit across
+     half a card, big enough to count arms and read a motor number. */
+  --app-frame-tile-w: 132px;
+  /* The quadplane's lift frame, which gets one picture rather than the Copter
+     screen's table of them. Sized to the block of fields it sits beside --
+     three 30px rows and two 12px gaps -- and not a pixel more, so the fields
+     are what set the card's height and it is the same card with a frame drawn
+     as without one. At 132px it was the taller of the two and left a
+     quadplane's VTOL card 18px deeper than a fixed wing's, on a screen whose
+     left column is height-matched to the tune beside it. (`align-self:
+     stretch` is the tidier way to say this and does not work: a replaced
+     element with an intrinsic aspect ratio keeps its own size. Measured.) */
+  --app-vtol-art-w: 114px;
+  /* A curated field row: what it does, its ArduPilot name, its control. All
+     three are fixed so the row lands in the same place on every card, and the
+     slack falls to the *right* of the control -- which is where the quadplane
+     frame picture goes, and why it can appear and disappear without shoving
+     three cards' worth of fields sideways. Sized to the longest each has to
+     hold: "Enable airspeed sensor" and PTCH_LIM_MAX_DEG. */
+  --app-config-label-w: 200px;
+  --app-config-name-w: 180px;
+  /* The unit column, right of the control it qualifies. Sized to "degrees",
+     spelled out because the ° glyph is a few pixels of ink at this size and
+     the one place it appears is beside numbers a wrong reading of which is an
+     attitude limit. */
+  --app-config-unit-w: 64px;
+  /* The four tracks of a named field row, named once so the rows a screen
+     builds by hand -- the protocol row with its dialog button, the timer-group
+     bubbles -- line up with the rows `ParamField` builds itself. The two text
+     tracks give way under their ceiling; the control and its unit do not,
+     because a column of controls on one edge is the point of the format. */
+  --app-named-tracks:
+    minmax(0, var(--app-config-label-w))
+    minmax(0, var(--app-config-name-w))
+    minmax(0, var(--app-config-control-w))
+    var(--app-config-unit-w);
+  /* The Configuration screen's two columns, on both vehicles, and the one
+     place in this app a layout is capped rather than left to fill.
+     `.app-content`'s rule is the opposite -- cap the column *count*, never the
+     grid's width -- and it is right there for a reason that does not hold
+     here: those cards put extra track width to use, so stopping them growing
+     turns the slack into padding nobody asked for. Every control on this
+     screen is a fixed width on purpose, and the tune table's columns are a
+     parameter name and two short numbers, so a wider track is never read by
+     anything. Measured at 2560 before the cap: cards at 1148px against a 604px
+     row, and a 532px Parameter column holding names that draw at 135.
+     The stack is sized to the widest card that sits in it -- a field row plus
+     the VTOL picture beside it -- and the tune to its own table. Both are
+     fixed rather than one taking the remainder, because the point is that the
+     same card is the same size whichever aircraft is connected: with the
+     Copter screen left to fill, the tune was 1148px there and 728 here. */
+  --app-config-stack-w: 856px;
+  --app-config-tune-w: 720px;
+  /* The cap every Setup screen that sets its own layout shares, so Outputs
+     does not fill a 2560px window while Configuration stops at 1600 -- the
+     same card at two sizes depending on which rail item you pressed is the
+     thing this cap exists to stop. */
+  --app-setup-screen-w: 1600px;
+  /* Every control down the plane screen's column, from one number. Sized to
+     the widest thing any of them has to show -- Q_FRAME_TYPE's raw
+     MOTOR_FRAME_TYPE_NYT_PLUS, which the firmware metadata gives no friendly
+     name for -- so the set is one ragged-free edge rather than a number box
+     at 55px beside a dropdown at 190. */
+  --app-config-control-w: 200px;
+  /* The motor-test keypad: eight numbered buttons and the stop beside them,
+     one width so they read as a set. Sized to "Stop all", the longest. */
+  --app-motor-btn-w: 96px;
+  /* The frame drawn beside the motor-test controls. Sized to the column it
+     sits next to -- fields, keypad and the stop, about 210px -- so the card is
+     no taller than that column and the picture is as big as the card allows.
+     Was 114px stacked above them. */
+  --app-motor-art-w: 200px;
   /* Same idea in the SITL tray, sized to what its 320px panel leaves after
      the widest label ("RealFlight host") and the panel's own padding. */
   --app-simtray-control-w: 168px;
@@ -749,6 +876,22 @@
 .la-modal:has(.prefs__group) .la-modal__actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  margin-left: auto;
+}
+
+/* The three ways out of the leave prompt are one choice, so they are one
+   size. "Stay here" is much the shortest label, and at its content width --
+   76px against 122 and 131, measured -- it read as the lesser option, which
+   is the opposite of what this dialog means: staying is what someone who
+   meant to write the edits picks. Equal `1fr` tracks in a `max-content` grid
+   take the widest button's width, so nothing here goes stale when a label
+   changes. The row itself is the shared component's, so this is scoped with
+   `:has()` the way the preferences dialog above scopes its own. */
+.la-modal:has(.leave-prompt) .la-modal__actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  width: max-content;
   margin-left: auto;
 }
 
@@ -2329,12 +2472,220 @@ button.app-status__state--bad:hover {
   max-width: 860px;
 }
 
-/* The write answer riding in a card's action row: no reserved band above the
-   row, and no shift when it appears, because the row's height is the
-   button's. */
-.la-row > .write-feedback {
+/* Every button in the motor-test keypad is one width, including the stop. */
+.motor-test__buttons > .la-btn {
+  min-width: var(--app-motor-btn-w);
+}
+/* The test keys: always two rows, split evenly, each row centred.
+   Two rows because ArduPilot tests up to `AP_MOTORS_MAX_NUM_MOTORS` -- twelve
+   on an ordinary build -- and a keypad that grew a third row on a dodecahexa
+   would push the stop and everything under it down, on a card whose whole
+   point is that it does not move.
+   Split evenly rather than filled left to right: at six per row a quad left
+   four keys in the first row and the second empty, and an octa left a row of
+   six over a row of two. Halved, every frame from a pair to a dodecahexa is a
+   rectangle, because every one of them has an even number of test steps.
+   The keys are capped at a button's width and the row is centred inside what
+   it is given, so two keys are two buttons in the middle rather than two
+   enormous ones -- and the cap is a `max-width` on a full-width grid, so a
+   narrow card shrinks them instead of overflowing. */
+.motor-test__keypad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+.motor-test__row {
+  display: grid;
+  grid-template-columns: repeat(var(--keys, 6), minmax(0, 1fr));
+  gap: var(--la-space-2);
+  width: 100%;
+  max-width: calc(
+    var(--keys, 6) * var(--app-motor-btn-w) + (var(--keys, 6) - 1) * var(--la-space-2)
+  );
+  /* Holds its place when a row has nothing in it, which only an odd count of
+     one can produce -- the guarantee is what matters, not the case. */
+  min-height: var(--app-card-head-h);
+  margin-inline: auto;
+}
+.motor-test__row > .la-btn {
+  min-width: 0;
+  padding: 0;
+}
+
+/* A card's actions on its title row. The system sheet has no header row, only
+   a title carrying the orange rule, so the row takes the rule over from the
+   title and draws it across the full width under both. */
+.la-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* One line, always. A status appearing beside the buttons must never push
+     them onto a second line and make the card taller; the status gives way
+     instead (below). */
+  flex-wrap: nowrap;
+  gap: var(--la-space-3);
+  padding-bottom: var(--la-space-2);
+  border-bottom: 2px solid var(--la-orange);
+}
+.la-card__head > .la-card__title {
+  flex: none;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.la-card__actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--la-space-2);
+}
+/* Every button on a title row, the reboot reminder included, is one width and
+   never shrinks. */
+.la-card__actions > .la-btn,
+.la-card__actions .reboot-inline > .la-btn {
+  flex: none;
+  min-width: var(--app-card-action-w);
+}
+/* Status beside the buttons -- the answer to a write, a Set level result --
+   shortens with an ellipsis rather than wrapping; the full text is its hover
+   text. */
+.la-card__actions > .write-feedback,
+.card-status {
+  min-width: 0;
   margin-top: 0;
-  text-align: right;
+  min-height: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--la-size-sm);
+}
+.card-status--busy {
+  color: var(--la-ink-3);
+}
+/* Green and red: this is status, never an action. */
+.card-status--ok {
+  color: var(--la-ok);
+}
+.card-status--bad {
+  color: var(--la-bad);
+}
+/* On Sensors a card with actions sits beside one without, so both title rows
+   are made the same height and their orange rules end on the same line: a
+   control's height of content under the rule either way. A title in a header
+   row takes that height itself, and the row adds its padding and rule; a
+   plain title is border-box, so its minimum has to count them. */
+.la-card__head > .la-card__title {
+  display: flex;
+  align-items: center;
+  min-height: var(--app-card-head-h);
+}
+.sensors-screen .la-card > .la-card__title {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--app-card-head-h) + var(--la-space-2) + 2px);
+}
+
+/* A Sensors card body: settings, and on the accelerometer card the picture of
+   the setting right beside them. */
+.sensor-card {
+  display: flex;
+  flex-wrap: wrap;
+  /* Top, not centered: the field starts right under the title rule where the
+     compass fields do, instead of floating halfway down the picture. */
+  align-items: flex-start;
+  gap: var(--la-space-5);
+}
+/* Settings that belong together in one row, each label above its control.
+   Specific enough to outrank `.app-content .la-card .la-field`, which pins a
+   label column beside the control and would undo the stacked field. */
+.sensor-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--la-space-3);
+}
+.sensor-fields--one {
+  grid-template-columns: var(--app-sensor-control-w);
+}
+.app-content .la-card .sensor-fields .la-field {
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+}
+.sensor-fields .la-select,
+.sensor-fields .la-input {
+  width: 100%;
+  min-width: 0;
+}
+/* One width for every control in a named row, which is the rule a column of
+   controls follows everywhere in this app: sized once from a token, never to
+   each control's own content. Without it a screen was a 55px number box, a
+   125px dropdown and a 190px one down a single column, and the ragged right
+   edge read as three unrelated groups.
+   Attached to the row format rather than to the Configuration screen, because
+   the format is what Outputs adopted -- scoped to a screen it would have had
+   to be pasted a second time. */
+.la-field--named > .la-select,
+.la-field--named > .la-input,
+.la-field--named > .param-control > .la-select,
+.la-field--named > .param-control > .la-input {
+  width: 100%;
+  min-width: 0;
+}
+/* A field whose value cannot mean anything yet -- the airspeed sensor's type
+   with the sensor switched off. The control carries the system sheet's own
+   disabled treatment; this is the label following it, so the row reads as one
+   thing that is out of play rather than a live label over a dead box. */
+.la-field--off .la-field__label,
+.la-field--off .la-field__param {
+  color: var(--la-ink-3);
+}
+/* A curated field carrying its ArduPilot name (ParamField's `showName`): three
+   columns in the Parameters table's own order -- name, what it means, control.
+   The name is monospace and a step quieter than the words beside it, because
+   it is there to be recognised and carried elsewhere rather than read as the
+   label; the explanation takes the slack, so every control on the screen lands
+   on one line down the right. */
+.app-content .la-card .la-field--named {
+  /* Three fixed tracks, and the leftovers stay on the right. Letting the words
+     take the slack put the control against the card's right edge, which left
+     the VTOL picture nowhere to go but on top of it -- and made that card's
+     controls land at a different x from the two above it. Both text columns
+     may still give way under their ceiling rather than a breakpoint deciding
+     when, so a narrow card ellipsizes words instead of re-flowing the row. */
+  grid-template-columns: var(--app-named-tracks);
+  justify-content: start;
+  align-items: center;
+}
+.la-field--named > .la-field__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.la-field__param {
+  overflow: hidden;
+  /* The same size and ink `.la-field__unit` takes, which is this app's
+     existing sub-font: a unit and a parameter name are the same kind of thing
+     beside a label -- a qualifier, not a second name for the setting. Mono is
+     the one addition, because it is an identifier and is read character by
+     character when it is being matched against a wiki page. */
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* One pre-rendered sheet, a frame per rotation, indexed by background position
+   (see OrientationView). */
+.orient-board {
+  display: block;
+  flex: none;
+  width: var(--app-orient-board);
+  height: var(--app-orient-board);
+  margin-top: calc(-1 * var(--app-orient-board-lift));
+  background-repeat: no-repeat;
+  /* The lifted frame's empty top reaches toward the title row; it is only a
+     picture, so it must never take a click meant for anything under it. */
+  pointer-events: none;
 }
 
 /* Sensors lays itself out rather than flowing into the card grid. The two
@@ -2353,6 +2704,13 @@ button.app-status__state--bad:hover {
   display: flex;
   flex-direction: column;
   gap: var(--la-space-4);
+}
+/* The two columns are one grid row, so each is as tall as the taller one.
+   Hardware ID is a single card and stretches on its own; the stack is two, so
+   its last card takes whatever height is left, or the frames would end at
+   different lines whenever the sensor list is the longer side. */
+.sensors-screen__stack > .la-card:last-child {
+  flex: 1;
 }
 
 /* Leaflet paints its popups and tooltips from its own sheet -- white card,
@@ -3149,7 +3507,13 @@ button.app-status__state--bad:hover {
    sequencers' .is-lit rows: orange means "this is what Write will send". */
 .param-row--dirty,
 .is-dirty {
-  background: var(--la-orange-soft);
+  /* `background-color`, never the `background` shorthand: the shorthand also
+     resets image, repeat, position and size, and `.la-select` carries its
+     chevron as an inlined background image. In light mode the shorthand won
+     and the chevron disappeared from every staged dropdown; in dark mode the
+     more specific chevron rule put the image back while the reset repeat and
+     size stayed, tiling chevrons across the whole control. */
+  background-color: var(--la-orange-soft);
 }
 
 .param-row__name {
@@ -3222,7 +3586,13 @@ button.app-status__state--bad:hover {
    sequencers' .is-lit rows: orange means "this is what Write will send". */
 .param-row--dirty,
 .is-dirty {
-  background: var(--la-orange-soft);
+  /* `background-color`, never the `background` shorthand: the shorthand also
+     resets image, repeat, position and size, and `.la-select` carries its
+     chevron as an inlined background image. In light mode the shorthand won
+     and the chevron disappeared from every staged dropdown; in dark mode the
+     more specific chevron rule put the image back while the reset repeat and
+     size stayed, tiling chevrons across the whole control. */
+  background-color: var(--la-orange-soft);
 }
 
 .param-row__name {
@@ -3244,31 +3614,335 @@ button.app-status__state--bad:hover {
 
 /* --- Ports, aux functions, flight modes: label + control tables ------ */
 
-.ports-grid {
+/* A wide table is not a card-grid tile: it spans every track it is given, so
+   the columns get the width they were sized for instead of the 460px a single
+   track happens to be. */
+.ports-card {
+  grid-column: 1 / -1;
+  /* Half the content area: the width of one Sensors tile, measured against it,
+     so the two screens read as the same app. Spanning the tracks first is what
+     lets it take that width rather than a 460px track's. */
+  max-width: 50%;
+}
+
+/* Every drawable frame class, as a picker. The chosen one is marked in blue:
+   it is a working control showing its state, where this screen's orange means
+   a staged edit and belongs to the dropdown and to Write. */
+.frame-grid {
   display: grid;
-  grid-template-columns: 110px minmax(0, 1.4fr) 110px 110px;
+  /* Four to a row, so the eight classes are two complete rows rather than a
+     row of seven and a lonely eighth. `auto-fill` gave whatever happened to
+     fit, which changed with the window and left a ragged last line. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--la-space-3);
+  min-width: 0;
+}
+/* Still complete rows when the card is narrow -- two of four rather than
+   three and a remainder. */
+@media (max-width: 1100px) {
+  .frame-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.frame-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--la-space-1);
+  padding: var(--la-space-2);
+  background: var(--la-surface);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  color: var(--la-ink-2);
+  font: 400 var(--la-size-sm) / 1.2 var(--la-font);
+  cursor: pointer;
+  transition: border-color var(--la-ease), background var(--la-ease);
+}
+.frame-tile:hover {
+  border-color: var(--la-blue);
+}
+.frame-tile:focus-visible {
+  border-color: var(--la-blue);
+  box-shadow: var(--la-ring);
+  outline: none;
+}
+.frame-tile--on {
+  border-color: var(--la-blue);
+  background: var(--la-blue-soft);
+  color: var(--la-ink);
+  font-weight: 600;
+}
+.frame-tile__art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* The quadplane's one picture, under the fields that choose it. Centered
+   rather than left-aligned: it is the card's illustration, not another
+   control in the column of them. */
+.vtol-card__body {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-4);
+}
+.vtol-card__fields {
+  display: grid;
+  gap: var(--la-space-3);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.vtol-card__art {
+  display: block;
+  flex: none;
+  width: var(--app-vtol-art-w);
+  height: auto;
+}
+/* A class the chosen type does not apply to keeps its picture -- drawn in its
+   own canonical shape -- and says so by fading, so the grid never changes size
+   and never shows a blank square. */
+.frame-tile--off .frame-tile__art {
+  opacity: 0.3;
+}
+.frame-tile--off .frame-tile__name {
+  color: var(--la-ink-3);
+}
+.frame-tile__name {
+  text-align: center;
+}
+
+/* The frame, drawn from ArduPilot's motor table. Sized like the orientation
+   board on Sensors: big enough to count propellers on, small enough to sit
+   beside the two dropdowns that choose it. */
+.frame-diagram {
+  display: block;
+  flex: none;
+  width: var(--app-frame-diagram-w);
+  height: var(--app-frame-diagram-w);
+}
+.frame-diagram__arms line {
+  stroke: var(--la-line-strong);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+/* Forward is the hub's own shape, and the only orange on the drawing: it is
+   the one thing a reader has to find before any of the numbers mean
+   anything. A separate marker out at the rim competed with the motors and
+   disappeared behind one on a plus frame. */
+.frame-diagram__hub {
+  fill: var(--la-orange);
+}
+.frame-diagram__motor {
+  stroke: var(--la-line-strong);
+  stroke-width: 2;
+  fill: var(--la-surface);
+}
+/* Direction is the arrow, and a colour that works on either ground. A fill
+   tint could not do this job: --la-blue-soft is #17293a against a #1c1d21
+   surface in dark mode, which is no difference at all. The ring takes the
+   same colour as its arc so the pairing is legible even where two motors
+   overlap. */
+.frame-diagram__motor--cw {
+  stroke: var(--la-blue);
+}
+.frame-diagram__motor--ccw {
+  stroke: var(--la-ink);
+}
+.frame-diagram__spin path {
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.frame-diagram__spin--cw path {
+  stroke: var(--la-blue);
+}
+.frame-diagram__spin--cw polygon {
+  fill: var(--la-blue);
+}
+.frame-diagram__spin--ccw path {
+  stroke: var(--la-ink);
+}
+.frame-diagram__spin--ccw polygon {
+  fill: var(--la-ink);
+}
+/* The tricopter's tail pivot, drawn as a servo: a body with mounting flanges
+   and a mounting lug beneath it. Numbered 7 -- the channel it is wired to,
+   per `AP_MOTORS_CH_TRI_YAW CH_7`. */
+.frame-diagram__servo-body {
+  fill: var(--la-surface-2);
+  stroke: var(--la-ink-2);
+  stroke-width: 2;
+}
+/* One lug under the body, offset right, the way a servo actually mounts. */
+.frame-diagram__servo-lug {
+  fill: var(--la-surface-2);
+  stroke: var(--la-ink-2);
+  stroke-width: 1.5;
+}
+/* No font-size: the drawing sets it per motor, because a twelve-motor frame
+   is drawn smaller than a quad and its numbers have to follow. A size here
+   would be CSS overriding the presentation attribute and undoing that. */
+.frame-diagram__n {
+  fill: var(--la-ink);
+  font-family: var(--la-font);
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+/* The two Configuration cards sit side by side and end level, the same shape
+   Sensors uses for its own pair. `stretch` is what matches them: the taller
+   card sets the row, and the shorter one is drawn to that height with its
+   content still at the top -- which is the padding, rather than a number
+   anybody has to keep in step. */
+/* Configuration is two columns of a fixed size on both vehicles: what the
+   aircraft is on the left, the initial tune on the right, the same geometry
+   whether a Copter or a plane is connected.
+   It is the one layout in this app that is capped rather than left to fill,
+   and the reason is on `--app-config-stack-w`. The consistency is the second
+   half of it: the tune card is the same card on both pages, and letting the
+   Copter screen fill the window put it at 1148px there against 728 here --
+   the same table, the same three columns of a name and two short numbers, at
+   two different sizes depending on what was plugged in. Filling the window is
+   worth giving up to lose that. */
+.config-screen {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: var(--app-config-stack-w) var(--app-config-tune-w);
+  max-width: var(--app-setup-screen-w);
+  gap: var(--la-space-4);
+  align-items: stretch;
+  align-content: start;
+  min-width: 0;
+}
+/* One column before the two would squeeze -- see the note on the cap. */
+@media (max-width: 1400px) {
+  .config-screen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.config-screen > .la-card {
+  max-width: none;
+  min-width: 0;
+}
+/* The plane page's left column is a subject read downward -- how fast, how far
+   it may lean, what lifts it -- against the tune beside it. The geometry is
+   the shared one above; this class is what the field rules scope to, because
+   the three-column row belongs to this page and not to the Copter frame
+   card. */
+
+/* A flex column rather than a grid one, so the slack has somewhere to go: the
+   stack is stretched to the height of the tune card beside it, and a grid
+   would leave that spare below the last card, ending the column short of its
+   neighbour. */
+/* A column of cards inside one cell of a screen's grid. Two screens want it --
+   the plane Configuration page and Outputs -- so it is one class and each adds
+   only what is peculiar to it. */
+.app-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
+  min-width: 0;
+}
+/* A stacked column told to reach the full height of its grid row. Only the
+   last card takes the slack: sharing it between all of them would put a band of
+   white under every set of fields on the screen. */
+.app-stack--fill > .la-card:last-child {
+  flex: 1 1 auto;
+}
+.tune-table {
+  margin-top: var(--la-space-3);
+}
+/* Sits on the controls' line, not the labels' -- it is a third control in
+   that row rather than a third field, and takes the same width as the two
+   boxes it reads. */
+.tune-calc {
+  align-self: end;
+}
+.tune-calc .la-btn {
+  width: 100%;
+  min-width: 0;
+}
+.tune-grid {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+/* The current value is context; the proposed one is the news. */
+.tune-grid__now {
+  color: var(--la-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.tune-grid__next {
+  color: var(--la-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Every table on a Setup screen, from one definition.
+   There are seven of them -- serial ports, the initial tune, the mode slots,
+   the servo outputs, the auxiliary channels, a gain matrix and the compass
+   priority list -- and they had drifted into four treatments: three were
+   framed and four were loose lines on a card, the framed ones ruled between
+   rows from the top and the loose ones from the bottom (so the last row of
+   each carried a rule under nothing), row padding came in three values, two
+   set a font size and five inherited one a step larger, and the header band
+   was tracked at 0.04em in five places and 0.09em in the sixth.
+   None of that was decided; it accumulated one screen at a time. The columns
+   are the only thing a table here gets to have an opinion about, because the
+   columns are what the table is about.
+   The header takes `.la-card__subtitle`'s numbers -- the design system's own
+   small uppercase label -- rather than a sixth opinion invented here. */
+.app-table {
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  /* Clips the header band and the active-row tint to the rounded corners. */
+  overflow: hidden;
+}
+.app-table__row {
+  display: grid;
   gap: var(--la-space-3);
   align-items: center;
-  padding: var(--la-space-1) 0;
-  border-bottom: 1px solid var(--la-line);
+  padding: var(--la-space-1) var(--la-space-3);
+  font-size: var(--la-size-sm);
+  /* Ruled from the top, so the rule always falls *between* two rows: a
+     bottom rule draws one under the last row, against the frame. */
+  border-top: 1px solid var(--la-line);
+}
+.app-table__row:first-child {
+  border-top: 0;
+}
+.app-table__head {
+  background: var(--la-surface-2);
+  color: var(--la-ink-3);
+  font-size: var(--la-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* The left-hand column of most of them is an identifier -- SERIAL3, Mode 4,
+   a parameter name -- so it is monospace, and a flex row because several
+   carry a marker or a second line beside the name. */
+.app-table__label {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  min-width: 0;
+  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
+}
+
+.ports-grid {
+  display: grid;
+  /* Fractions, like the compass priority table beside it: the columns divide
+     the card rather than sitting at fixed widths with the row's rule running
+     on into empty space. Protocol takes the most because its names are the
+     longest thing in the table. */
+  grid-template-columns:
+    var(--app-table-col-w) minmax(0, 2fr)
+    minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .aux-grid {
-  display: grid;
   grid-template-columns: 130px minmax(0, 1fr);
-  gap: var(--la-space-3);
-  align-items: center;
-  padding: var(--la-space-1) 0;
-  border-bottom: 1px solid var(--la-line);
 }
 
 .modes-grid {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr) 110px;
-  gap: var(--la-space-3);
-  align-items: center;
-  padding: var(--la-space-1) 0;
-  border-bottom: 1px solid var(--la-line);
+  grid-template-columns: var(--app-table-col-w) minmax(0, 1fr) var(--app-table-col-w);
 }
 
 /* Parameters that vary on two axes: the axis down the left, the gain
@@ -3276,14 +3950,9 @@ button.app-status__state--bad:hover {
    has as many as it has, and equal fractions keep the header sitting over
    its own column whatever the card's width. */
 .matrix-grid {
-  display: grid;
   grid-template-columns: 72px repeat(var(--matrix-cols, 3), minmax(0, 1fr));
-  gap: var(--la-space-3);
-  align-items: center;
-  padding: var(--la-space-1) 0;
-  border-bottom: 1px solid var(--la-line);
 }
-.matrix-grid--head {
+.app-table__head.matrix-grid {
   /* Centered over the inputs, which are centered in their own cells --
      left-aligned headings drift away from a control that is not. */
   text-align: center;
@@ -3304,32 +3973,13 @@ button.app-status__state--bad:hover {
   max-width: 7em;
 }
 
-.ports-grid--head,
-.aux-grid--head,
-.outputs-grid--head,
-.modes-grid--head,
-.matrix-grid--head {
-  font-size: var(--la-size-xs);
-  font-weight: 600;
-  color: var(--la-ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.ports-grid__label,
-.aux-grid__label,
-.modes-grid__label,
-.matrix-grid__label {
-  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
-  display: flex;
-  align-items: center;
-  gap: var(--la-space-1);
-}
-
 .ports-grid__hint {
   font-family: var(--la-font);
   font-size: var(--la-size-xs);
   color: var(--la-ink-3);
+  /* Clear of the port name: at the label row's own gap the two nearly
+     touched, and "SERIAL0 USB" read as one string. */
+  margin-left: var(--la-space-2);
 }
 
 .aux-grid__product,
@@ -3939,25 +4589,181 @@ button.app-status__state--bad:hover {
 
 /* --- Motors & Outputs ------------------------------------------------ */
 
-.outputs-grid {
+/* The table is sized to itself and the column beside it takes the rest.
+   `max-content` rather than a width written down here: every column of that
+   table is already a fixed number, so its width is the sum of them and stating
+   it again is a second place to update. It had the slack instead -- 1132px of
+   card around 912px of table, with 220px of nothing down its right edge, while
+   the motor keypad and the limits were squeezed into 452.
+   `start` rather than stretch: the table is sixteen rows and nothing beside it
+   should be padded out to match. */
+/* Two columns of one height. The table is sized to itself -- every one of its
+   columns is already a fixed number, so its width is the sum of them -- and the
+   cards beside it take the rest.
+   `stretch` rather than `start`: the two columns hold different amounts on
+   different vehicles (a plane has no motor test and no motor limits), and
+   whichever is shorter is padded to the taller rather than leaving a step down
+   the middle of the screen. Which card absorbs it is decided by
+   `.app-stack--fill`, so the padding lands in one place instead of being
+   spread as a band under every card. */
+.outputs-screen {
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) 90px 90px 90px 80px;
-  gap: var(--la-space-2);
+  grid-template-columns: max-content minmax(0, 1fr);
+  max-width: var(--app-setup-screen-w);
+  gap: var(--la-space-4);
+  align-items: stretch;
+  min-width: 0;
+}
+/* One column below this, and the number comes from the two columns rather than
+   from taste: the table is `max-content`, so it does not give way, and below
+   about 1660px of window the remainder left for the motor test is narrower
+   than the keypad it has to hold. Measured: the content area is the window
+   less 248px of rail and padding, and 940 + 16 + 460 needs 1664 of it. */
+@media (max-width: 1660px) {
+  .outputs-screen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Controls on the left, the frame beside them. The drawing's size is set by
+   the height of the column next to it, not by a number of its own -- which is
+   why the keypad belongs in that column too. Above the fields it could only
+   ever be as tall as it was wide; beside the whole stack it is most of the
+   card. */
+.motor-test__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--la-space-4);
   align-items: center;
-  padding: var(--la-space-1) 0;
-  border-bottom: 1px solid var(--la-line);
+  min-width: 0;
 }
+.motor-test__art {
+  display: block;
+  width: var(--app-motor-art-w);
+  height: auto;
+}
+/* The board's timer groups, as bubbles.
 
-.outputs-grid--head {
+   The one thing on this card nobody can change -- it is how the board is wired
+   -- so it is drawn as an object rather than as a value: a filled pill with no
+   border, no hover and no focus, which is what separates it from the five
+   dropdowns above it. One row, always, however many groups a board has and
+   whether or not it is in the generated table; the card's height is matched to
+   the table beside it, so a block that grew for a known board would move
+   everything under it. */
+.outproto__groups-row {
+  align-items: center;
+  /* Held at the foot of the card. This is the card that absorbs the column's
+     slack on a plane -- there is no motor test and no motor limits beside it --
+     and with the bubbles left under the fields the spare height trailed off
+     the bottom as void. Pushed down, it frames the card instead: settings at
+     the top, the board's own fact at the base. No effect where the card is not
+     stretched, since there is no free space to take. */
+  margin-top: auto;
+}
+.outproto__bubbles {
+  display: flex;
+  min-width: 0;
+  height: var(--app-card-head-h);
+  align-items: center;
+  gap: var(--la-space-1);
+  overflow: hidden;
+}
+.outproto__bubble {
+  display: inline-flex;
+  flex: none;
+  align-items: baseline;
+  gap: 3px;
+  padding: 2px var(--la-space-2);
+  border-radius: 999px;
+  background: var(--la-blue-soft);
+  color: var(--la-ink);
+  white-space: nowrap;
+}
+.outproto__chans {
+  font: 700 var(--la-size-sm) / 1.2 var(--la-font-mono);
+}
+.outproto__timer {
   font-size: var(--la-size-xs);
-  font-weight: 600;
+  color: var(--la-ink-2);
+}
+/* A group with no DMA cannot do DShot whatever its timer allows, which is the
+   one thing about a group worth warning on. Amber: a state to know about, not
+   a fault. */
+.outproto__bubble--nodma {
+  background: var(--la-orange-soft);
+}
+.outproto__bubble--none {
+  background: var(--la-surface-2);
   color: var(--la-ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+}
+/* Two rows this card builds itself, on the same tracks as every row
+   `ParamField` builds -- plus one more for what each carries at the end: the
+   ESC dialog's button on the protocol row, and the bubbles on the group row,
+   which take the control and unit tracks together since they are one object
+   rather than a value and its unit. */
+.outproto__protocol {
+  display: grid;
+  grid-template-columns: var(--app-named-tracks);
+  align-items: center;
+  gap: var(--la-space-3);
+}
+/* The button's track is added only when there is a button. Declared always, an
+   empty fifth track still costs its gap, and the whole row's flexible columns
+   shrank 12px out of step with every other row on the card. */
+.outproto__protocol--btn {
+  grid-template-columns: var(--app-named-tracks) auto;
+}
+.outproto__groups-row {
+  display: grid;
+  grid-template-columns: var(--app-named-tracks);
+  gap: var(--la-space-3);
+}
+.outproto__groups-row > .outproto__bubbles {
+  grid-column: 3 / -1;
+}
+.outproto__protocol > .la-select,
+.outproto__protocol > .la-input,
+.outproto__protocol > .param-control {
+  width: 100%;
+  min-width: 0;
 }
 
-.outputs-grid__label {
-  font: 400 var(--la-size-sm) / 1.2 var(--la-font-mono);
+/* The pass-through dialog: nine ordinary fields in a column, at the width the
+   modal gives them. */
+.esc-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+
+/* The keypad's own label. `.la-card__subtitle` is the design system's second
+   heading inside a card and carries a top margin for sitting under the title;
+   here it sits between two groups. */
+.motor-test__what {
+  margin: 0;
+}
+/* A fieldset carries the disabled state to every control inside it, which is
+   what lets the card draw its whole body before it is armed. It brings a
+   border and padding of its own that have no place here. */
+.motor-test__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+/* The three PWM columns carry a 5.5em box plus the mark's reserved slot, so
+   they are sized to both rather than to the box alone. Function has a ceiling
+   rather than the row's slack: as `1fr` it took every spare pixel, and on a
+   full-width window that was a 1230px dropdown holding "Motor1". The leftovers
+   stay on the right, the way a curated field row's do. */
+.outputs-grid {
+  grid-template-columns: 80px minmax(0, 360px) 100px 100px 100px 80px;
+  justify-content: start;
 }
 
 /* --- Guided setups --------------------------------------------------- */
@@ -5136,8 +5942,16 @@ body.is-splitting .flight-map {
    list scrolls inside its own pane, and the preview is capped by viewport
    height rather than allowed to grow with the column. */
 .osd-workspace {
+  /* The panel list's track, and the two controls on this screen that are not
+     part of a field column. Declared here rather than in :root because they
+     describe this workspace only -- the same shape `--prio-moves-w` follows
+     on the compass table -- and the list's width is redefined at the
+     breakpoint below rather than written out a second time. */
+  --app-osd-list-w: 262px;
+  --app-osd-res-w: 118px;
+  --app-osd-coord-w: 84px;
   display: grid;
-  grid-template-columns: 262px minmax(0, 1fr) var(--app-col-w);
+  grid-template-columns: var(--app-osd-list-w) minmax(0, 1fr) var(--app-col-w);
   gap: var(--la-space-3);
   /* Grid items stretch by default, so the panel list and the preview end up
      the same height whichever is naturally taller. The settings column opts
@@ -5187,7 +6001,8 @@ body.is-splitting .flight-map {
    inside itself, because on a narrow window the page scrolls anyway. */
 @media (max-width: 1360px) {
   .osd-workspace {
-    grid-template-columns: 240px minmax(0, 1fr);
+    --app-osd-list-w: 240px;
+    grid-template-columns: var(--app-osd-list-w) minmax(0, 1fr);
   }
   .osd-workspace__side {
     grid-column: 1 / -1;
@@ -5223,15 +6038,14 @@ body.is-splitting .flight-map {
   align-items: center;
 }
 .osd-toolbar__res .la-select {
-  width: auto;
-  min-width: 118px;
+  width: var(--app-osd-res-w);
+  min-width: 0;
 }
 
 /* Sits on the bottom edge of the card. When the settings column is the
    tallest thing on the row, the slack lands between the preview and this
    row rather than hanging below it. */
-.osd-selection,
-.osd-selection--empty {
+.osd-selection {
   margin-top: auto;
   padding-top: var(--la-space-3);
   border-top: 1px solid var(--la-line);
@@ -5239,8 +6053,17 @@ body.is-splitting .flight-map {
 .osd-selection__name {
   font-size: var(--la-size-md);
 }
-.osd-selection__coord {
-  width: 84px;
+/* The two spinners and the Remove beside them are one set of three. */
+.osd-selection__coord,
+.osd-selection .la-btn {
+  width: var(--app-osd-coord-w);
+  min-width: var(--app-osd-coord-w);
+}
+/* Label above the box, not beside it: the card-wide `.la-field` rule pins a
+   label column next to the control, which inside 84px left "Column" and "Row"
+   clipped to "Co" and "R". */
+.app-content .la-card .osd-selection__coord {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .osd-palette__group + .osd-palette__group {
@@ -6381,33 +7204,40 @@ body.is-splitting .flight-map {
    rather than `auto` so the heading over the arrows is centered on them
    instead of on whatever width the buttons happened to take. */
 .compass-prio {
-  --prio-moves-w: 64px;
-}
-.compass-prio__row {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 116px 152px var(--prio-moves-w);
-  align-items: center;
+  --prio-moves-w: 72px;
+  display: flex;
+  flex-direction: column;
   gap: var(--la-space-2);
-  padding: var(--la-space-1) 0;
-  font-size: var(--la-size-sm);
+  margin-top: 0;
 }
-.compass-prio__row--head {
-  font-size: var(--la-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--la-ink-3);
-  border-bottom: 1px solid var(--la-line);
-  padding-bottom: var(--la-space-2);
+.compass-prio__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-2);
+  margin: 0;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  color: var(--la-ink);
+}
+/* Weighted rather than fixed: the part name had every spare pixel and the two
+   dropdowns were squeezed against the arrows. Now the name gets the most, the
+   orientation list (the longer options) the next, then the switch. */
+.compass-prio__row {
+  /* Use and Orientation share one track width: both hold a dropdown, and two
+     dropdowns of different widths in adjacent columns read as a mistake. */
+  grid-template-columns:
+    24px minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr)
+    var(--prio-moves-w);
 }
 /* A column heading sits over its own control, so the ones above a dropdown
    take the dropdown's own left padding -- `.la-select` insets its text, and
    a heading flush to the track's edge reads as belonging to the column
    before it. The heading over the arrows is centered, because they are. */
-.compass-prio__row--head > :nth-child(3),
-.compass-prio__row--head > :nth-child(4) {
+.app-table__head.compass-prio__row > :nth-child(3),
+.app-table__head.compass-prio__row > :nth-child(4) {
   padding-left: var(--la-space-2);
 }
-.compass-prio__row--head > :nth-child(5) {
+.app-table__head.compass-prio__row > :nth-child(5) {
   text-align: center;
 }
 .compass-prio__cell {
@@ -6420,6 +7250,15 @@ body.is-splitting .flight-map {
 .compass-prio__cell .la-select {
   width: 100%;
   min-width: 0;
+}
+/* The wrapper fills the cell rather than shrinking to its control, which is
+   what makes the dropdown the width of its column instead of the width of its
+   own longest option -- Use came out 91px beside Orientation's 177px in equal
+   272px cells. It also stops the box growing by the reserved status width the
+   moment "Saved" appears: at the track's width, the padding shortens the text
+   area, exactly as it does on the cards. */
+.compass-prio__cell .param-control {
+  display: grid;
 }
 /* What a cell says when there is no control to draw: an empty slot, or an
    internal compass, whose orientation ArduPilot takes from AHRS_ORIENT. */
@@ -6520,30 +7359,84 @@ body.is-splitting .flight-map {
 .write-feedback--bad {
   color: var(--la-bad);
 }
-
-/* The compass card's own settings: one width for every control, so the three
-   dropdowns under the table line up with each other rather than each sizing
-   to its longest option. */
-.compass-card .la-field {
-  grid-template-columns: minmax(0, 20ch) 152px;
+/* One word beside what wrote: no line reserved, so nothing moves. */
+.write-feedback--inline {
+  min-height: 0;
+  margin-top: 0;
+  font-weight: 400;
+  white-space: nowrap;
 }
-.compass-card .la-field .la-select {
-  width: 152px;
+
+/* A field that writes as you go, and the mark that answers for it.
+   Inline-grid so it hugs a lone control in a table cell and still stretches as
+   a grid item where the field's label sits above it.
+
+   One reserved slot to the right of the control, whatever the control is. It
+   used to be 68px of room for the word "Saved", and the word had to be painted
+   *inside* a dropdown -- clear of its chevron, with a gradient masking the
+   option text it cut -- because 68px beside one would have halved it. A 16px
+   glyph sits outside every control instead, so the fade, the chevron offset
+   and the per-control-type reservations are all gone with it.
+   The room is permanent whether or not a mark is showing, which is the part
+   that matters: a slot that appears on a write moves the control under the
+   hand that just used it. */
+.param-control {
+  position: relative;
+  display: inline-grid;
   min-width: 0;
+  padding-right: var(--app-write-mark-w);
+}
+/* The button stands in for a value, so it reads as one: left-aligned, and
+   trimmed rather than widening the column it sits in. */
+.param-bitmask {
+  justify-content: flex-start;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* In the serial table the wrapper fills its cell, so the button is the width
+   of the column rather than of whatever happens to be switched on. */
+.ports-grid .param-control {
+  display: grid;
+}
+.ports-grid .param-bitmask {
+  width: 100%;
+}
+.param-control > .write-feedback {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: flex;
+  align-items: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.write-feedback__mark {
+  display: block;
+  width: var(--la-space-4);
+  height: var(--la-space-4);
 }
 
-/* "Restart to apply." Raised by a reboot-required parameter or a finished
-   calibration; it appears only when there is something to apply. */
-.reboot-prompt {
-  margin-top: var(--la-space-3);
-  padding: var(--la-space-3);
-  background: var(--la-orange-soft);
-  border-radius: var(--la-radius-sm);
+/* "Restart to apply", once Later has been pressed. It sits on a card's title
+   row beside the actions, so it never makes the card grow; the reason it is
+   owed is the hover text. Amber, because it is a state that wants attention,
+   not an action -- the button beside it is the action. */
+.reboot-inline {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: var(--la-space-2);
 }
-.reboot-prompt__why {
-  margin: 0 0 var(--la-space-2);
+.reboot-inline__why {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--la-size-sm);
-  color: var(--la-ink);
+  font-weight: 700;
+  color: var(--la-warn);
 }
 
 /* One row per compass during a calibration: name, bar, percentage. They are

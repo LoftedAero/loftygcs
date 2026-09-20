@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { LaButton, LaHint, LaModal } from '../components/La'
+import { LaButton, LaModal } from '../components/La'
 import { useParamStore } from '../../stores/param-store'
 
 // What is about to be written, before it is written.
@@ -17,19 +17,32 @@ export interface WriteParamsModalProps {
   open: boolean
   onConfirm: () => void
   onCancel: () => void
+  /**
+   * Show only the edits this write will send.
+   *
+   * A card that owns its parameters sends only those, so listing the whole
+   * staged set here would promise work the button is not going to do -- which
+   * is exactly the misreading this dialog exists to prevent.
+   */
+  owns?: (param: string) => boolean
 }
 
-export default function WriteParamsModal({ open, onConfirm, onCancel }: WriteParamsModalProps) {
+export default function WriteParamsModal({
+  open,
+  onConfirm,
+  onCancel,
+  owns,
+}: WriteParamsModalProps) {
   const entries = useParamStore((s) => s.entries)
   const metadata = useParamStore((s) => s.metadata)
 
   const pending = useMemo(
     () =>
       [...entries.entries()]
-        .filter(([, e]) => e.dirty)
+        .filter(([name, e]) => e.dirty && (!owns || owns(name)))
         .map(([name, e]) => ({ name, from: e.origValue, to: e.value }))
         .sort((a, b) => a.name.localeCompare(b.name)),
-    [entries],
+    [entries, owns],
   )
 
   if (!open) return null
@@ -75,21 +88,6 @@ export default function WriteParamsModal({ open, onConfirm, onCancel }: WritePar
           </tbody>
         </table>
       </div>
-
-      {pending.some((p) => REBOOT_PREFIXES.some((x) => p.name.startsWith(x))) && (
-        <LaHint>
-          Some of these only take effect after a reboot — the vehicle will say so if it needs
-          one.
-        </LaHint>
-      )}
     </LaModal>
   )
 }
-
-/**
- * Parameter families ArduPilot generally needs a reboot to apply. Only used
- * to raise the possibility, never to claim it: the vehicle itself reports
- * what actually needs restarting, and guessing more precisely than this would
- * be inventing knowledge we do not have.
- */
-const REBOOT_PREFIXES = ['FRAME', 'SERIAL', 'CAN_', 'EK3_', 'EK2_', 'INS_', 'COMPASS_', 'BRD_']

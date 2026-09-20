@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { LaButton, LaCard, LaHint, LaLinkButton, LaSelect, LaSwitch } from '../../components/La'
+import { LaButton, LaCard, LaHint, LaReadout, LaSelect, LaSwitch } from '../../components/La'
 import OsdActions from './OsdActions'
 import ParamCard from '../../components/ParamCard'
 import { useParamStore } from '../../../stores/param-store'
@@ -83,6 +83,27 @@ export default function OsdWorkspace() {
   const osdOff = !osdType
   const noPanels = placements.length === 0
 
+  const bringBack = () => {
+    for (const id of offGrid) {
+      const p = placements.find((q) => q.item.id === id)
+      if (p) move(id, p.x, p.y)
+    }
+  }
+
+  // One line for whatever is wrong with the layout, worst first: a panel that
+  // will not be drawn at all outranks two that overlap, which outranks a grid
+  // the backend ignores. As three hints mounted under the preview they each
+  // grew the card as they came and went, and the preview is height-capped
+  // against chrome this file's CSS assumes is fixed.
+  const layoutStatus =
+    offGrid.size > 0
+      ? `${offGrid.size} panel${offGrid.size === 1 ? '' : 's'} outside ${grid.label}`
+      : overlaps.size > 0
+        ? `${overlaps.size} panel${overlaps.size === 1 ? '' : 's'} overlapping`
+        : hdWanted && osdType !== TYPE_MSP_DISPLAYPORT
+          ? 'HD grid needs the MSP DisplayPort OSD type'
+          : ''
+
   // Alphabetical inside each group. The catalog is written in a rough
   // reading order, which is fine for a spec and useless for finding one
   // panel among sixty-five.
@@ -103,7 +124,7 @@ export default function OsdWorkspace() {
           {noPanels && (
             <p className="app-placeholder">
               {osdOff
-                ? 'The vehicle reports no panel positions while its OSD is off. Turn it on beside this, write the change and reboot, and the layout appears here.'
+                ? 'No panels while the OSD is off.'
                 : `This firmware exposes no panel parameters for screen ${screen}.`}
             </p>
           )}
@@ -126,7 +147,26 @@ export default function OsdWorkspace() {
         </div>
       </LaCard>
 
-      <LaCard title="Screen layout" className="osd-workspace__screen">
+      <LaCard
+        title="Screen layout"
+        className="osd-workspace__screen"
+        actions={
+          <>
+            {layoutStatus && (
+              <span className="card-status card-status--bad" role="status" title={layoutStatus}>
+                {layoutStatus}
+              </span>
+            )}
+            {/* The fix for the worst of those states, as an ordinary action
+                rather than a link inside a red message. */}
+            {offGrid.size > 0 && (
+              <LaButton variant="secondary" disabled={osdOff} onClick={bringBack}>
+                Bring panels on screen
+              </LaButton>
+            )}
+          </>
+        }
+      >
         <div className="la-row la-row--between la-row--wrap osd-toolbar">
           <div className="la-radio-group" role="radiogroup" aria-label="OSD screen">
             {OSD_SCREENS.map((n) => {
@@ -148,7 +188,8 @@ export default function OsdWorkspace() {
                   <span className="la-radio__mark"></span>
                   <span className="la-radio__text">
                     Screen {n}
-                    {!on && <span className="la-field__unit"> off</span>}
+                    {/* A state, not a unit. */}
+                    {!on && <span className="la-muted"> off</span>}
                   </span>
                 </label>
               )
@@ -157,7 +198,7 @@ export default function OsdWorkspace() {
           <div className="la-row osd-toolbar__right">
             {entries.has(txtResParam) ? (
               <label className="la-row osd-toolbar__res">
-                <span className="la-field__unit">Grid</span>
+                <span className="la-field__label">Grid</span>
                 <LaSelect
                   value={String(txtRes ?? 0)}
                   disabled={osdOff}
@@ -172,7 +213,12 @@ export default function OsdWorkspace() {
                 </LaSelect>
               </label>
             ) : (
-              <span className="la-field__unit">{grid.label}</span>
+              // The same shape as the selectable case: a label and a value,
+              // rather than the grid's size in the slot units go in.
+              <span className="la-row osd-toolbar__res">
+                <span className="la-field__label">Grid</span>
+                <LaReadout placeholder="—" value={grid.label} />
+              </span>
             )}
             {entries.has(screenEnableParam) && (
               <LaSwitch
@@ -185,22 +231,10 @@ export default function OsdWorkspace() {
           </div>
         </div>
 
-        {/* Picking an HD grid does nothing on its own: ArduPilot only draws
-            the wider grids over MSP DisplayPort, and ignores TXT_RES on every
-            other backend. Rather than let the selection look broken, say so
-            and offer the one parameter change that makes it real. */}
-        {hdWanted && osdType !== TYPE_MSP_DISPLAYPORT && (
-          <LaHint>
-            The vehicle draws 30×16 until its OSD type is MSP DisplayPort — HD text resolution is
-            ignored on every other backend.{' '}
-            {entries.has('OSD_TYPE') && (
-              <LaLinkButton onClick={() => edit('OSD_TYPE', TYPE_MSP_DISPLAYPORT)}>
-                Set OSD type to MSP DisplayPort
-              </LaLinkButton>
-            )}
-          </LaHint>
-        )}
-
+        {/* Picking an HD grid does nothing on its own -- ArduPilot draws the
+            wider grids only over MSP DisplayPort -- which the title row says.
+            No second control offering to change OSD_TYPE: the Display card in
+            the column already carries that parameter. */}
         <OsdScreen
           grid={grid}
           placements={placements}
@@ -217,7 +251,6 @@ export default function OsdWorkspace() {
           selected={selected}
           grid={grid}
           osdType={osdType}
-          overlapping={selectedId !== null && overlaps.has(selectedId)}
           disabled={osdOff}
           onMove={move}
           onDisable={(id) => {
@@ -225,30 +258,6 @@ export default function OsdWorkspace() {
             setSelectedId(null)
           }}
         />
-
-        {offGrid.size > 0 && (
-          <LaHint error>
-            {offGrid.size} panel{offGrid.size === 1 ? ' sits' : 's sit'} outside {grid.label} and
-            will not be drawn.{' '}
-            <LaLinkButton
-              onClick={() => {
-                for (const id of offGrid) {
-                  const p = placements.find((q) => q.item.id === id)
-                  if (p) move(id, p.x, p.y)
-                }
-              }}
-            >
-              Bring {offGrid.size === 1 ? 'it' : 'them'} back on screen
-            </LaLinkButton>
-          </LaHint>
-        )}
-
-        {overlaps.size > 0 && (
-          <LaHint error>
-            {overlaps.size} panel{overlaps.size === 1 ? '' : 's'} overlap another. ArduPilot draws
-            them in parameter order, so the later one wins and the other is unreadable.
-          </LaHint>
-        )}
       </LaCard>
 
       <div className="osd-workspace__side">
@@ -271,12 +280,9 @@ export default function OsdWorkspace() {
             { param: 'OSD_OPTIONS', label: 'Options' },
           ]}
         >
-          {osdType === 0 && (
-            <LaHint>
-              The OSD is off, so nothing is drawn on the video feed. Screens can still be laid out,
-              and take effect once a type is set — which needs a reboot.
-            </LaHint>
-          )}
+          {/* Screens can still be laid out with it off, and take effect once
+              a type is set -- which the layout pane shows by staying live. */}
+          {osdType === 0 && <LaHint>The OSD is off, so nothing is drawn on the video feed.</LaHint>}
         </ParamCard>
 
         <ParamCard
@@ -309,11 +315,18 @@ export default function OsdWorkspace() {
   )
 }
 
+/**
+ * The selected panel's exact placement.
+ *
+ * One row, always drawn: with nothing selected this was a line of instructions
+ * instead, so the card -- and the preview above it -- changed height on every
+ * selection. The controls switch off rather than disappearing, which is the
+ * same rule the OSD-off state follows.
+ */
 function SelectionDetail({
   selected,
   grid,
   osdType,
-  overlapping,
   disabled,
   onMove,
   onDisable,
@@ -321,25 +334,23 @@ function SelectionDetail({
   selected: ReturnType<typeof readPlacements>[number] | null
   grid: { cols: number; rows: number }
   osdType: number | undefined
-  overlapping: boolean
   disabled: boolean
   onMove: (id: string, x: number, y: number) => void
   onDisable: (id: string) => void
 }) {
-  if (!selected) {
-    return (
-      <p className="la-hint osd-selection osd-selection--empty">
-        Select a panel to place it exactly. Drag to move; arrow keys nudge, with Shift for five
-        cells at a time.
-      </p>
-    )
-  }
-  const { item, x, y } = selected
-  const mspGap = item.mspOnly && osdType !== undefined && !MSP_TYPES.has(osdType)
+  const item = selected?.item ?? null
+  const x = selected?.x ?? 0
+  const y = selected?.y ?? 0
+  const off = disabled || !item
+  const mspGap = item?.mspOnly && osdType !== undefined && !MSP_TYPES.has(osdType)
   return (
     <div className="osd-selection">
       <div className="la-row la-row--between la-row--wrap">
-        <strong className="osd-selection__name">{item.label}</strong>
+        <strong className="osd-selection__name">
+          {item ? item.label : 'No panel selected'}
+          {/* In the row rather than under it, so saying so costs no height. */}
+          {mspGap && <span className="la-muted"> · drawn only on an MSP OSD</span>}
+        </strong>
         <div className="la-row">
           <label className="la-field la-field--stacked osd-selection__coord">
             <span className="la-field__label">Column</span>
@@ -349,8 +360,8 @@ function SelectionDetail({
               min={0}
               max={grid.cols - 1}
               value={x}
-              disabled={disabled}
-              onChange={(e) => onMove(item.id, Number(e.target.value), y)}
+              disabled={off}
+              onChange={(e) => item && onMove(item.id, Number(e.target.value), y)}
             />
           </label>
           <label className="la-field la-field--stacked osd-selection__coord">
@@ -361,27 +372,15 @@ function SelectionDetail({
               min={0}
               max={grid.rows - 1}
               value={y}
-              disabled={disabled}
-              onChange={(e) => onMove(item.id, x, Number(e.target.value))}
+              disabled={off}
+              onChange={(e) => item && onMove(item.id, x, Number(e.target.value))}
             />
           </label>
-          <LaButton
-            variant="ghost"
-            size="sm"
-            disabled={disabled}
-            onClick={() => onDisable(item.id)}
-          >
+          <LaButton variant="ghost" size="sm" disabled={off} onClick={() => item && onDisable(item.id)}>
             Remove
           </LaButton>
         </div>
       </div>
-      {mspGap && (
-        <LaHint>
-          ArduPilot draws this panel only on an MSP OSD. It stays configurable here, but the current
-          OSD type will ignore it.
-        </LaHint>
-      )}
-      {overlapping && <LaHint error>This panel overlaps another.</LaHint>}
     </div>
   )
 }

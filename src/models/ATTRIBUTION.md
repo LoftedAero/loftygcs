@@ -15,8 +15,8 @@ the struts, undercarriage and propeller re-toned so they stay legible against it
 
 The license requires that credit travels with the model, so the app shows it wherever the
 model is drawn — not only here. That is three places now: the Overview tab, the Logs
-tab's 3D replay when the log says a plane flew, and the compass-calibration attitude tiles
-on Sensors. Do not remove any of those lines without replacing the model, and add one
+tab's 3D replay when the log says a plane flew, and the calibration attitude tiles on
+Sensors. Do not remove any of those lines without replacing the model, and add one
 anywhere else the biplane appears — **including a picture of it**. The calibration tiles
 draw no model at runtime at all: they are `cal-attitudes-plane.png`, rendered from this
 file by `npm run cal-art` (scripts/make-cal-art.mjs). A rendering is still the work, so it

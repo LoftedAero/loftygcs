@@ -57,9 +57,7 @@ export default function ChannelMonitor({
               {channel}
               {fn && <span className="rc-monitor__fn">{STICK_SPECS[fn].label}</span>}
               {reversed && (
-                <span className="rc-monitor__rev" title="This channel reads backwards and will be reversed">
-                  reversed
-                </span>
+                <span className="rc-monitor__rev">reversed</span>
               )}
               {!fn && labels?.[channel] && (
                 <span className="rc-monitor__profile">{labels[channel]}</span>

@@ -35,10 +35,7 @@ export default function TuningTab() {
 
   if (!connected) {
     return (
-      <NeedsVehicle
-        title="Tuning"
-        body="The commonly adjusted rate and angle gains, navigation speeds, and autotune. The full set lives on the Parameters tab."
-      />
+      <NeedsVehicle title="Tuning" />
     )
   }
 
@@ -118,10 +115,14 @@ export default function TuningTab() {
           title="Angle gains"
           subtitle="Copter"
           columns={[{ label: 'Angle P' }, { label: 'Accel max', unit: 'cdeg/s/s' }]}
+          /* ATC_ACC_*_MAX, not ATC_ACCEL_*_MAX: Copter 4.7.1 reports the
+             short spelling and nothing matching the long one, so this column
+             was empty on current firmware. Found while building the initial
+             tune card, by searching the vehicle's own parameter list. */
           rows={[
-            { label: 'Roll', params: ['ATC_ANG_RLL_P', 'ATC_ACCEL_R_MAX'] },
-            { label: 'Pitch', params: ['ATC_ANG_PIT_P', 'ATC_ACCEL_P_MAX'] },
-            { label: 'Yaw', params: ['ATC_ANG_YAW_P', 'ATC_ACCEL_Y_MAX'] },
+            { label: 'Roll', params: ['ATC_ANG_RLL_P', 'ATC_ACC_R_MAX'] },
+            { label: 'Pitch', params: ['ATC_ANG_PIT_P', 'ATC_ACC_P_MAX'] },
+            { label: 'Yaw', params: ['ATC_ANG_YAW_P', 'ATC_ACC_Y_MAX'] },
           ]}
         />
         {/* Filtering sat on Sensors, next to the calibrations, because these
@@ -132,7 +133,7 @@ export default function TuningTab() {
             happens to carry. */}
         <ParamCard
           title="Filtering"
-          note="Lower filter frequencies are calmer but add delay. Change these only with a log to justify it."
+          note="Change these only with a log to justify it."
           fields={[
             { param: 'INS_GYRO_FILTER', label: 'Gyro filter', unit: 'Hz' },
             { param: 'INS_ACCEL_FILTER', label: 'Accel filter', unit: 'Hz' },
@@ -140,7 +141,7 @@ export default function TuningTab() {
         />
         <ParamCard
           title="Autotune"
-          note="Autotune flies the vehicle to find its own gains. Read the ArduPilot procedure before switching into it — it needs space and calm air."
+          note="Read the ArduPilot procedure before switching into it — it needs space and calm air."
           fields={[
             { param: 'AUTOTUNE_AXES', label: 'Axes to tune' },
             { param: 'AUTOTUNE_AGGR', label: 'Aggressiveness' },

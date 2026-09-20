@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { useUiStore, visibleTabs } from '../../stores/ui-store'
+import { holdsVehicleTabs, useUiStore, visibleTabs } from '../../stores/ui-store'
 import { useConnectionStore } from '../../stores/connection-store'
 
 // The Setup rail. Shown only in Setup mode -- Fly and Mission take the whole
@@ -21,7 +21,7 @@ import { useConnectionStore } from '../../stores/connection-store'
 export default function NavRail() {
   const activeTab = useUiStore((s) => s.activeTab)
   const setTab = useUiStore((s) => s.setTab)
-  const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
+  const connected = useConnectionStore((s) => holdsVehicleTabs(s.phase))
   const tabs = visibleTabs(connected)
   return (
     <nav className="app-nav" aria-label="Setup sections">

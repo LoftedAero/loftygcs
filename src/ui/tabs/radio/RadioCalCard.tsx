@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LaButton, LaCard, LaHint } from '../../components/La'
+import { LaButton, LaCard } from '../../components/La'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useParamStore } from '../../../stores/param-store'
 import { useProfileLabels } from '../../../stores/guide-store'
@@ -29,21 +29,30 @@ export default function RadioCalCard() {
 
   return (
     <>
+      {/* The wizard says to switch the transmitter on and take the props off
+          at the moment it matters, so the card does not stand there saying
+          it. Why the card is waiting goes on the title row beside the button
+          it disables, where it costs the card no height. */}
       <LaCard
         title="Radio"
-        note="Live receiver input. Calibrate with the transmitter on, the vehicle disarmed, and the propellers off."
+        actions={
+          <>
+            {channels.length > 0 && !paramsReady && (
+              <span className="card-status" role="status">
+                Waiting for parameters…
+              </span>
+            )}
+            <LaButton
+              variant="secondary"
+              disabled={channels.length === 0 || !paramsReady}
+              onClick={() => setWizardOpen(true)}
+            >
+              Calibrate radio
+            </LaButton>
+          </>
+        }
       >
         <ChannelMonitor channels={channels} mapping={mapping} labels={channelLabels} />
-        <div className="la-row">
-          <LaButton
-            variant="secondary"
-            disabled={channels.length === 0 || !paramsReady}
-            onClick={() => setWizardOpen(true)}
-          >
-            Calibrate radio
-          </LaButton>
-        </div>
-        {channels.length > 0 && !paramsReady && <LaHint>Waiting for parameters…</LaHint>}
       </LaCard>
       <RadioCalWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
     </>
