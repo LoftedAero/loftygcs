@@ -120,11 +120,8 @@
      bubbles -- line up with the rows `ParamField` builds itself. The two text
      tracks give way under their ceiling; the control and its unit do not,
      because a column of controls on one edge is the point of the format. */
-  --app-named-tracks:
-    minmax(0, var(--app-config-label-w))
-    minmax(0, var(--app-config-name-w))
-    minmax(0, var(--app-config-control-w))
-    var(--app-config-unit-w);
+  --app-named-tracks: minmax(0, var(--app-config-label-w)) minmax(0, var(--app-config-name-w))
+    minmax(0, var(--app-config-control-w)) var(--app-config-unit-w);
   /* The Configuration screen's two columns, on both vehicles, and the one
      place in this app a layout is capped rather than left to fill.
      `.app-content`'s rule is the opposite -- cap the column *count*, never the
@@ -406,6 +403,40 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.serial-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.serial-group__toggle {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  padding: var(--la-space-2) var(--la-space-3);
+  cursor: pointer;
+  text-align: left;
+}
+.serial-group__toggle:hover {
+  color: var(--la-blue);
+}
+.serial-group__caret {
+  width: 1em;
+  color: var(--la-ink-3);
+}
+.serial-group__count {
+  margin-left: auto;
+  color: var(--la-ink-3);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- The actions column ----------------------------------------------
@@ -3396,6 +3427,29 @@ button.app-status__state--bad:hover {
   padding: var(--la-space-3);
 }
 
+/* The change log, at the foot of the actions column. A fixed height rather
+   than growing with the session -- a long bench session can stage the same
+   handful of parameters dozens of times, and a column that grew with it
+   would push Write and Revert off the top of the screen, which are the
+   controls actually needed while reading this. */
+.param-change-log {
+  height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.param-change-log__line {
+  word-break: break-word;
+}
+/* Yellow is the ask; this app's frozen design sheet has no yellow token, so
+   --la-warn -- the same one the rest of the app already reaches for to mean
+   "needs attention" -- stands in. Committed lines take no color of their
+   own and fall back to .la-log's ordinary ink. */
+.param-change-log__line.is-pending {
+  color: var(--la-warn);
+}
+
 /* One row: name | control | unit | (bits) | range hint. Names are
    monospace so columns of values read as a table without being one. */
 /* Six columns, always the same six, so values line up down the page and the
@@ -3656,7 +3710,9 @@ button.app-status__state--bad:hover {
   color: var(--la-ink-2);
   font: 400 var(--la-size-sm) / 1.2 var(--la-font);
   cursor: pointer;
-  transition: border-color var(--la-ease), background var(--la-ease);
+  transition:
+    border-color var(--la-ease),
+    background var(--la-ease);
 }
 .frame-tile:hover {
   border-color: var(--la-blue);
@@ -4762,7 +4818,7 @@ button.app-status__state--bad:hover {
    full-width window that was a 1230px dropdown holding "Motor1". The leftovers
    stay on the right, the way a curated field row's do. */
 .outputs-grid {
-  grid-template-columns: 80px minmax(0, 360px) 100px 100px 100px 80px;
+  grid-template-columns: 80px minmax(0, 360px) 100px 100px 100px 80px 100px;
   justify-content: start;
 }
 
