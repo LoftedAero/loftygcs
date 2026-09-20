@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 import { LaButton, LaModal } from '../components/La'
 
+/**
+ * The onboard 8250/16550 UART ports Linux always enumerates -- ttyS0
+ * upward, usually a couple dozen of them, whether or not anything is wired
+ * to them. A real flight controller shows up as ttyACM* or ttyUSB* instead,
+ * so these are never the port anyone wants and exist only to bury it.
+ */
+const isBuiltIn = (p: SerialPortChoice) => /^ttyS\d+$/i.test(p.portName || p.portId)
+
 // Electron's Web Serial chooser. In a browser the browser draws its own
 // picker; in Electron the select-serial-port handler defers to us so the
 // chooser matches the house style. Radio-shaped because it is an exclusive
@@ -8,6 +16,11 @@ import { LaButton, LaModal } from '../components/La'
 export default function SerialChooserModal() {
   const [ports, setPorts] = useState<SerialPortChoice[] | null>(null)
   const [selected, setSelected] = useState('')
+  // Whether the Built-In group is open, as an explicit override once
+  // somebody has clicked it; before that it follows the selection, so a
+  // port that lands inside the group by default is never hidden from
+  // whoever is about to press Connect.
+  const [builtInOverride, setBuiltInOverride] = useState<boolean | null>(null)
 
   // The list is live: main re-sends it whenever a port appears or goes away
   // while the request is open, which is what makes plugging a board in with
@@ -29,7 +42,41 @@ export default function SerialChooserModal() {
 
   if (!ports) return null
 
-  const done = () => setPorts(null)
+  const done = () => {
+    setPorts(null)
+    setBuiltInOverride(null)
+  }
+  const connect = (portId: string) => {
+    window.loftgcs?.serialPicker.choose(portId)
+    done()
+  }
+
+  const others = ports.filter((p) => !isBuiltIn(p))
+  const builtIn = ports.filter(isBuiltIn)
+  const builtInOpen = builtInOverride ?? builtIn.some((p) => p.portId === selected)
+
+  const row = (p: SerialPortChoice) => (
+    <label
+      className={`la-radio serial-port${selected === p.portId ? ' is-selected' : ''}`}
+      key={p.portId}
+      // A double click is "connect to this one" -- the port under the
+      // pointer, not whatever `selected` happens to hold when the second
+      // click's timer fires.
+      onDoubleClick={() => connect(p.portId)}
+    >
+      <input
+        type="radio"
+        name="serial-port"
+        checked={selected === p.portId}
+        onChange={() => setSelected(p.portId)}
+      />
+      <span className="la-radio__mark"></span>
+      <span className="serial-port__text">
+        <span className="serial-port__name">{p.portName || p.portId}</span>
+        {describePort(p) && <span className="serial-port__desc">{describePort(p)}</span>}
+      </span>
+    </label>
+  )
 
   return (
     <LaModal
@@ -49,10 +96,7 @@ export default function SerialChooserModal() {
           <LaButton
             variant="primary"
             disabled={ports.length === 0}
-            onClick={() => {
-              window.loftgcs?.serialPicker.choose(selected)
-              done()
-            }}
+            onClick={() => connect(selected)}
           >
             Connect
           </LaButton>
@@ -67,26 +111,26 @@ export default function SerialChooserModal() {
         // grid, and a chooser is a list. The vendor and product ids are
         // gone with it -- two boards of the same model share them, so the
         // one line that was supposed to tell them apart never could; the
-        // port name above it always does.
+        // port name above it always does. Anything not following the
+        // ttyS* convention sorts to the top and stays a plain row; the
+        // built-in ports collapse into their own disclosure below it.
         <div className="serial-list">
-          {ports.map((p) => (
-            <label
-              className={`la-radio serial-port${selected === p.portId ? ' is-selected' : ''}`}
-              key={p.portId}
-            >
-              <input
-                type="radio"
-                name="serial-port"
-                checked={selected === p.portId}
-                onChange={() => setSelected(p.portId)}
-              />
-              <span className="la-radio__mark"></span>
-              <span className="serial-port__text">
-                <span className="serial-port__name">{p.portName || p.portId}</span>
-                {describePort(p) && <span className="serial-port__desc">{describePort(p)}</span>}
-              </span>
-            </label>
-          ))}
+          {others.map(row)}
+          {builtIn.length > 0 && (
+            <div className="serial-group">
+              <button
+                type="button"
+                className="serial-group__toggle"
+                aria-expanded={builtInOpen}
+                onClick={() => setBuiltInOverride(!builtInOpen)}
+              >
+                <span className="serial-group__caret">{builtInOpen ? '▾' : '▸'}</span>
+                Built-In
+                <span className="serial-group__count">{builtIn.length}</span>
+              </button>
+              {builtInOpen && builtIn.map(row)}
+            </div>
+          )}
         </div>
       )}
     </LaModal>
