@@ -5,6 +5,9 @@
 import { attitudeFromMountStatus, attitudeFromQuaternion } from './gimbal'
 import type { DecodedMessage, TelemetryDelta } from './types'
 
+/** SERVO_OUTPUT_RAW carries a fixed servo1Raw..servo16Raw, not a count field. */
+const SERVO_OUTPUT_COUNT = 16
+
 /** One message can carry several facts -- SYS_STATUS is both power and sensors. */
 export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
   const f = msg.fields
@@ -117,6 +120,13 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
       const raw = f.rssi as number | undefined
       const rssi = raw === undefined || raw === 255 ? -1 : raw
       return [{ k: 'rc', channels, rssi }]
+    }
+    case 'SERVO_OUTPUT_RAW': {
+      const valuesUs: number[] = []
+      for (let i = 1; i <= SERVO_OUTPUT_COUNT; i++) {
+        valuesUs.push((f[`servo${i}Raw`] as number | undefined) ?? 0)
+      }
+      return [{ k: 'servoOutputs', valuesUs }]
     }
     default:
       return []

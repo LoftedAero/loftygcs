@@ -110,6 +110,7 @@ function OutputsCard() {
           <span>Trim</span>
           <span>Max</span>
           <span>Reversed</span>
+          <span>Current</span>
         </div>
         {outputs.map((n) => (
           <OutputRow key={n} n={n} />
@@ -140,7 +141,29 @@ function OutputRow({ n }: { n: number }) {
       <ParamField param={`SERVO${n}_TRIM`} label="Trim" bare writeNow />
       <ParamField param={`SERVO${n}_MAX`} label="Max" bare writeNow />
       <ReverseSwitch param={`SERVO${n}_REVERSED`} />
+      <CurrentOutputField n={n} />
     </div>
+  )
+}
+
+/**
+ * What the output is doing right now, from SERVO_OUTPUT_RAW -- read-only,
+ * unlike every other field in this row. There is nothing to write: this is
+ * the vehicle reporting, not a setting, so it never stages and has no
+ * dirty state.
+ */
+function CurrentOutputField({ n }: { n: number }) {
+  const valueUs = useVehicleStore((s) => s.servoOutputsUs[n - 1])
+  return (
+    <input
+      className="la-input la-input--num"
+      type="text"
+      readOnly
+      tabIndex={-1}
+      aria-label={`SERVO${n} current output`}
+      title={valueUs ? `${valueUs} µs` : 'No reading from this output'}
+      value={valueUs ? `${valueUs} µs` : '—'}
+    />
   )
 }
 
