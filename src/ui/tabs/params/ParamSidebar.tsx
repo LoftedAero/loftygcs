@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LaButton, LaHint, LaModal } from '../../components/La'
 import { useParamStore } from '../../../stores/param-store'
+import { useParamLogStore } from '../../../stores/param-log-store'
 import VehicleParamActions from '../../components/VehicleParamActions'
 import ParamCompareModal from './ParamCompareModal'
 import {
@@ -32,6 +33,57 @@ export default function ParamSidebar() {
         <ImportButton />
         <ExportButton />
       </section>
+
+      <section className="app-col__group">
+        <h3 className="app-col__head">Change log</h3>
+        <ParamChangeLog />
+      </section>
+    </div>
+  )
+}
+
+/**
+ * What has changed this session, as it happens -- not what the vehicle
+ * holds now (the table above already says that) but what was *done* to get
+ * it there. One line per staged edit, live: yellow and "pending" while it is
+ * only staged, the plain body color and "committed" once Write's ack lands.
+ * Retyping the same field updates its one line rather than adding another,
+ * and reverting an edit withdraws its line entirely -- there is nothing left
+ * to report. Sourced from `param-log-store`, which hooks `edit` and
+ * `confirmWrite` in param-store directly, so a change staged from any
+ * screen -- Configuration, Outputs, a calibration wizard -- appears here the
+ * same as one staged in this table.
+ */
+function ParamChangeLog() {
+  const lines = useParamLogStore((s) => s.lines)
+  const logRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = logRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [lines])
+
+  if (lines.length === 0) {
+    return <p className="la-hint">Parameter changes made this session will appear here.</p>
+  }
+
+  return (
+    <div
+      className="la-log param-change-log"
+      ref={logRef}
+      role="log"
+      aria-label="Parameter change log"
+    >
+      {lines.map((l) => (
+        <div
+          key={l.id}
+          className={
+            l.status === 'pending' ? 'param-change-log__line is-pending' : 'param-change-log__line'
+          }
+        >
+          {l.param} update from {l.from} to {l.to}: {l.status}
+        </div>
+      ))}
     </div>
   )
 }
