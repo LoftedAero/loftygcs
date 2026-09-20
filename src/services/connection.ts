@@ -486,6 +486,9 @@ class ConnectionService {
         p.rcChannels = d.channels
         p.rcRssi = d.rssi
         break
+      case 'servoOutputs':
+        p.servoOutputsUs = d.valuesUs
+        break
       case 'missionProgress':
         // Each message fills its own half; a null leaves the last value
         // standing rather than blanking a readout that is still true.
