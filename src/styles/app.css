@@ -3396,6 +3396,29 @@ button.app-status__state--bad:hover {
   padding: var(--la-space-3);
 }
 
+/* The change log, at the foot of the actions column. A fixed height rather
+   than growing with the session -- a long bench session can stage the same
+   handful of parameters dozens of times, and a column that grew with it
+   would push Write and Revert off the top of the screen, which are the
+   controls actually needed while reading this. */
+.param-change-log {
+  height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.param-change-log__line {
+  word-break: break-word;
+}
+/* Yellow is the ask; this app's frozen design sheet has no yellow token, so
+   --la-warn -- the same one the rest of the app already reaches for to mean
+   "needs attention" -- stands in. Committed lines take no color of their
+   own and fall back to .la-log's ordinary ink. */
+.param-change-log__line.is-pending {
+  color: var(--la-warn);
+}
+
 /* One row: name | control | unit | (bits) | range hint. Names are
    monospace so columns of values read as a table without being one. */
 /* Six columns, always the same six, so values line up down the page and the
