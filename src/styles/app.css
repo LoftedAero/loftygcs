@@ -407,6 +407,40 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.serial-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.serial-group__toggle {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  padding: var(--la-space-2) var(--la-space-3);
+  cursor: pointer;
+  text-align: left;
+}
+.serial-group__toggle:hover {
+  color: var(--la-blue);
+}
+.serial-group__caret {
+  width: 1em;
+  color: var(--la-ink-3);
+}
+.serial-group__count {
+  margin-left: auto;
+  color: var(--la-ink-3);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
 
 /* --- The actions column ----------------------------------------------
    Every screen that edits something has one: a fixed-width column on the
