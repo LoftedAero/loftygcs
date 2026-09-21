@@ -4762,7 +4762,7 @@ button.app-status__state--bad:hover {
    full-width window that was a 1230px dropdown holding "Motor1". The leftovers
    stay on the right, the way a curated field row's do. */
 .outputs-grid {
-  grid-template-columns: 80px minmax(0, 360px) 100px 100px 100px 80px;
+  grid-template-columns: 80px minmax(0, 360px) 100px 100px 100px 80px 100px;
   justify-content: start;
 }
 
