@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ParamRecord } from '../protocol/types'
 import type { ParamMeta } from '../services/param-metadata'
+import { useParamLogStore } from './param-log-store'
 
 // The full parameter table. Edits stage locally as "dirty" until the
 // action-bar Write sends them -- the same save-explicitly idiom as the other
@@ -175,12 +176,19 @@ export const useParamStore = create<ParamState>((set, get) => ({
     if (!e) return
     entries.set(name, { ...e, value, dirty: value !== e.origValue })
     set({ entries, dirtyCount: recount(entries) })
+    // The Parameters screen's change log, narrating from the same value
+    // this entry is staged against -- so retyping the same field keeps
+    // reporting against where the vehicle actually stands.
+    useParamLogStore.getState().recordEdit(name, e.origValue, value)
   },
 
   revertAll: () => {
     const entries = new Map(get().entries)
     for (const [name, e] of entries) {
-      if (e.dirty) entries.set(name, { ...e, value: e.origValue, dirty: false })
+      if (e.dirty) {
+        entries.set(name, { ...e, value: e.origValue, dirty: false })
+        useParamLogStore.getState().cancel(name)
+      }
     }
     set({ entries, dirtyCount: 0 })
   },
@@ -192,12 +200,13 @@ export const useParamStore = create<ParamState>((set, get) => ({
     const v = tidy(value)
     entries.set(name, { ...e, value: v, origValue: v, dirty: false })
     set({ entries, dirtyCount: recount(entries) })
+    useParamLogStore.getState().recordCommit(name, v)
   },
 
   setWriteBusy: (writeBusy) => set({ writeBusy }),
   setMetadata: (metadata, source = null) => set({ metadata, metadataSource: source }),
   setLastWrite: (lastWrite) => set({ lastWrite }),
-  reset: () =>
+  reset: () => {
     set({
       entries: new Map(),
       order: [],
@@ -209,5 +218,9 @@ export const useParamStore = create<ParamState>((set, get) => ({
       dirtyCount: 0,
       writeBusy: false,
       lastWrite: null,
-    }),
+    })
+    // A new connection is a new session for the change log too -- the same
+    // moment vehicle-store forgets the last aircraft's status feed.
+    useParamLogStore.getState().reset()
+  },
 }))
