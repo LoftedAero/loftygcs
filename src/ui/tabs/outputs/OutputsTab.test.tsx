@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import OutputsTab from './OutputsTab'
 import { useParamStore } from '../../../stores/param-store'
 import { useConnectionStore } from '../../../stores/connection-store'
+import { useVehicleStore } from '../../../stores/vehicle-store'
 
 // Which cards the Outputs screen offers, per vehicle. The one that matters is
 // the motor test: ArduPlane's lives entirely inside `#if HAL_QUADPLANE_ENABLED`
@@ -28,6 +29,7 @@ afterEach(() => {
   cleanup()
   useParamStore.setState({ entries: new Map(), loadState: 'idle' } as never)
   useConnectionStore.setState({ phase: 'idle' } as never)
+  useVehicleStore.setState({ servoOutputsUs: [] } as never)
 })
 
 const OUTPUTS = { SERVO1_FUNCTION: 33, SERVO1_MIN: 1100, SERVO1_TRIM: 1500, SERVO1_MAX: 1900 }
@@ -82,5 +84,36 @@ describe('while the parameters are still arriving', () => {
     expect(screen.queryByText('Servo outputs')).toBeNull()
     expect(screen.getByText('Outputs')).toBeTruthy()
     expect(screen.queryByText(/Reading the vehicle/)).not.toBeNull()
+  })
+})
+
+describe('the Position column', () => {
+  const position = (n: number) => screen.getByRole('meter', { name: `SERVO${n} output` })
+
+  it('draws what the output is driving, on the same 900-2100 scale as the Radio tab', () => {
+    seed(OUTPUTS)
+    useVehicleStore.setState({ servoOutputsUs: [1500] } as never)
+    render(<OutputsTab />)
+    expect(position(1).textContent).toBe('1500')
+    const fill = position(1).querySelector<HTMLElement>('.servo-position__fill')
+    expect(fill?.style.width).toBe('50%')
+  })
+
+  it('draws nothing on an output ArduPilot reports as 0, and says so with a dash', () => {
+    seed(OUTPUTS)
+    useVehicleStore.setState({ servoOutputsUs: [0] } as never)
+    render(<OutputsTab />)
+    expect(position(1).textContent).toBe('—')
+    expect(position(1).querySelector('.servo-position__fill')).toBeNull()
+  })
+
+  it('is a reading, not a field', () => {
+    // The row's other numbers are inputs; this one must not look like one,
+    // and must not be one either.
+    seed(OUTPUTS)
+    useVehicleStore.setState({ servoOutputsUs: [1500] } as never)
+    render(<OutputsTab />)
+    expect(position(1).querySelector('input')).toBeNull()
+    expect(position(1).tagName).not.toBe('INPUT')
   })
 })

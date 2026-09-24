@@ -1,12 +1,10 @@
 import { STICK_FUNCTIONS, STICK_SPECS, type Mapping, type StickFunction, type Travel } from './radio-cal'
+import { pwmPct as pct } from '../../pwm-scale'
 
 // Live receiver input, one bar per channel. Two things make this more useful
 // than a row of numbers: the bar shows where a channel sits inside its own
 // travel, and once the wizard has identified a stick, the channel carrying it
 // says so -- which is the answer Mission Planner leaves you to work out.
-
-const SCALE_MIN = 900
-const SCALE_MAX = 2100
 
 export interface ChannelMonitorProps {
   channels: readonly number[]
@@ -37,9 +35,6 @@ export default function ChannelMonitor({
       if (m) fnByChannel.set(m.channel, fn)
     }
   }
-
-  const pct = (v: number) =>
-    Math.max(0, Math.min(100, ((v - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100))
 
   return (
     <div className="rc-monitor">

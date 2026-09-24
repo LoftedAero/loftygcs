@@ -54,6 +54,17 @@
      as a set rather than as labels of different lengths. Sized to the longest,
      "Calibrate accelerometer"; a longer label still grows past it. */
   --app-card-action-w: 176px;
+  /* The Outputs table's Position bar. Height is the sheet's `.la-input`, so the
+     bar sits on the same lines as the PWM boxes beside it and the row keeps its
+     height; width is Mission Planner's bar, near enough, which is long enough
+     for a 100 us move to be seen. */
+  --app-servo-position-w: 120px;
+  --app-servo-position-h: 30px;
+  /* The Function dropdown's ceiling, from its longest option rather than the
+     row's slack: "CameraShutterSpeed" is 136px of text, 172px once the select's
+     padding and chevron are round it, plus the write mark's slot -- about 190px.
+     It was 360px, which is what paid for the Position column. */
+  --app-servo-function-w: 220px;
   /* The chevron's room inside `.la-select` -- the frozen sheet's own
      padding-right, restated because anything placed inside that box has to
      clear it. */
@@ -4619,7 +4630,7 @@ button.app-status__state--bad:hover {
    from taste: the table is `max-content`, so it does not give way, and below
    about 1660px of window the remainder left for the motor test is narrower
    than the keypad it has to hold. Measured: the content area is the window
-   less 248px of rail and padding, and 940 + 16 + 460 needs 1664 of it. */
+   less 248px of rail and padding, and 932 + 16 + 460 needs 1656 of it. */
 @media (max-width: 1660px) {
   .outputs-screen {
     grid-template-columns: minmax(0, 1fr);
@@ -4762,8 +4773,44 @@ button.app-status__state--bad:hover {
    full-width window that was a 1230px dropdown holding "Motor1". The leftovers
    stay on the right, the way a curated field row's do. */
 .outputs-grid {
-  grid-template-columns: 80px minmax(0, 360px) 100px 100px 100px 80px 100px;
+  grid-template-columns:
+    80px minmax(0, var(--app-servo-function-w)) 100px 100px 100px
+    var(--app-servo-position-w) 80px;
   justify-content: start;
+}
+
+/* A reading, so it is drawn as one: the disabled field's ground rather than a
+   live field's, and no border that turns blue on hover. The fill is a tint of
+   the working blue, not a token of its own, because --la-blue-soft is all but
+   the surface in dark mode (#17293a on #1c1d21) -- a tint of the real blue
+   reads on either ground. The number sits on top, as Mission Planner's does,
+   so the bar costs the row no width beyond itself. There is deliberately no
+   solid edge on the fill: at 1500, where a servo spends most of its time, the
+   edge falls on the middle of the centered number and strikes it through. */
+.servo-position {
+  position: relative;
+  box-sizing: border-box;
+  width: var(--app-servo-position-w);
+  height: var(--app-servo-position-h);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface-2);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.servo-position__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--la-blue) 35%, transparent);
+}
+/* The type of the PWM boxes beside it, so the row reads as four numbers. */
+.servo-position__value {
+  position: relative;
+  font-size: var(--la-size-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-ink);
 }
 
 /* --- Guided setups --------------------------------------------------- */

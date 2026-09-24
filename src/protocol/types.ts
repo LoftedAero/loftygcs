@@ -172,14 +172,14 @@ export type TelemetryDelta =
   | { k: 'gps'; fixType: number; satellites: number; hdop: number }
   | { k: 'rc'; channels: number[]; rssi: number }
   /**
-   * What each output is actually driving, from SERVO_OUTPUT_RAW.
+   * What sixteen outputs are actually driving, from one SERVO_OUTPUT_RAW.
    *
-   * Index 0 is SERVO1. ArduPilot sends 0 for an output the board has no
-   * channel for, which is indistinguishable from "not driving anything" --
-   * there is no separate sentinel the way `battery_remaining` has -1 -- so a
-   * 0 here is treated the same as never having heard from that output.
+   * `port` 0 is SERVO1-16 and 1 is SERVO17-32; `valuesUs[0]` is the first of
+   * that port's sixteen. ArduPilot sends 0 for an output with nothing on it
+   * (it rewrites the HAL's 65535 to 0 before sending), and there is no
+   * separate sentinel the way `battery_remaining` has -1.
    */
-  | { k: 'servoOutputs'; valuesUs: number[] }
+  | { k: 'servoOutputs'; port: number; valuesUs: number[] }
   | { k: 'sensors'; present: number; enabled: number; health: number }
   /**
    * Where the vehicle is in its mission, as the vehicle sees it.

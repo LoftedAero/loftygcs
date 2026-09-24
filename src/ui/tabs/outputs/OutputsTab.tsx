@@ -13,6 +13,7 @@ import { useParamStore } from '../../../stores/param-store'
 import { useProfileLabels } from '../../../stores/guide-store'
 import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
 import { connectionService } from '../../../services/connection'
+import { PWM_SCALE_MAX, PWM_SCALE_MIN, pwmPct } from '../../pwm-scale'
 import { MAV_RESULT } from '../../../protocol/commands'
 
 const MAV_CMD_DO_MOTOR_TEST = 209
@@ -109,8 +110,8 @@ function OutputsCard() {
           <span>Min</span>
           <span>Trim</span>
           <span>Max</span>
+          <span>Position</span>
           <span>Reversed</span>
-          <span>Current</span>
         </div>
         {outputs.map((n) => (
           <OutputRow key={n} n={n} />
@@ -140,30 +141,46 @@ function OutputRow({ n }: { n: number }) {
       <ParamField param={`SERVO${n}_MIN`} label="Min" bare writeNow />
       <ParamField param={`SERVO${n}_TRIM`} label="Trim" bare writeNow />
       <ParamField param={`SERVO${n}_MAX`} label="Max" bare writeNow />
+      {/* Beside the three numbers it is read against: set a Max, watch the
+          bar reach it. */}
+      <OutputPosition n={n} />
       <ReverseSwitch param={`SERVO${n}_REVERSED`} />
-      <CurrentOutputField n={n} />
     </div>
   )
 }
 
 /**
- * What the output is doing right now, from SERVO_OUTPUT_RAW -- read-only,
- * unlike every other field in this row. There is nothing to write: this is
- * the vehicle reporting, not a setting, so it never stages and has no
- * dirty state.
+ * What the output is driving right now, from SERVO_OUTPUT_RAW: a bar with the
+ * pulse width on it, Mission Planner's Position column.
+ *
+ * Drawn, not an input. It sits in a row of boxes that take a value, and a box
+ * the same shape that takes none is a control that does nothing when clicked.
+ * The bar is on the Radio tab's scale, so a stick and the servo it moves read
+ * at the same place.
+ *
+ * 0 is ArduPilot's "nothing on this output" and draws as a dash, not as a
+ * pulse of zero. It is also what a motor output reads while the safety switch
+ * is holding the outputs off, so four dashes on a copter's motors is not a
+ * lost reading.
  */
-function CurrentOutputField({ n }: { n: number }) {
-  const valueUs = useVehicleStore((s) => s.servoOutputsUs[n - 1])
+function OutputPosition({ n }: { n: number }) {
+  const valueUs = useVehicleStore((s) => s.servoOutputsUs[n - 1]) ?? 0
   return (
-    <input
-      className="la-input la-input--num"
-      type="text"
-      readOnly
-      tabIndex={-1}
-      aria-label={`SERVO${n} current output`}
-      title={valueUs ? `${valueUs} µs` : 'No reading from this output'}
-      value={valueUs ? `${valueUs} µs` : '—'}
-    />
+    <div
+      className="servo-position"
+      role="meter"
+      aria-label={`SERVO${n} output`}
+      aria-valuemin={PWM_SCALE_MIN}
+      aria-valuemax={PWM_SCALE_MAX}
+      aria-valuenow={Math.max(PWM_SCALE_MIN, Math.min(PWM_SCALE_MAX, valueUs))}
+      aria-valuetext={valueUs ? `${valueUs} microseconds` : 'no output'}
+      title={valueUs ? `${valueUs} µs` : 'Nothing on this output'}
+    >
+      {valueUs > 0 && (
+        <span className="servo-position__fill" style={{ width: `${pwmPct(valueUs)}%` }} />
+      )}
+      <span className="servo-position__value">{valueUs || '—'}</span>
+    </div>
   )
 }
 

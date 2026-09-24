@@ -50,8 +50,8 @@ export interface VehicleSnapshot {
   rcRssi: number
   /**
    * What each output is actually driving, from SERVO_OUTPUT_RAW -- index 0 is
-   * SERVO1. Empty until the message has arrived once; a 0 at an index the
-   * vehicle has reported means that output, not that the array is short.
+   * SERVO1. Empty until the message has arrived once, then 32 long whichever
+   * of its two ports has been heard; 0 is an output with nothing on it.
    */
   servoOutputsUs: number[]
   /** Raw SYS_STATUS masks; decoded for display by protocol/sensors.ts. */
