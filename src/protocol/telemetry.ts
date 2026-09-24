@@ -5,6 +5,15 @@
 import { attitudeFromMountStatus, attitudeFromQuaternion } from './gimbal'
 import type { DecodedMessage, TelemetryDelta } from './types'
 
+/** SERVO_OUTPUT_RAW carries a fixed servo1Raw..servo16Raw, not a count field. */
+const SERVO_OUTPUT_COUNT = 16
+/**
+ * Outputs a board can report: two messages of sixteen. ArduPilot builds with
+ * 32 on any board with more than 1 MB of flash, and sends the upper half as a
+ * second SERVO_OUTPUT_RAW with `port` 1.
+ */
+const SERVO_OUTPUT_PORTS = 2
+
 /** One message can carry several facts -- SYS_STATUS is both power and sensors. */
 export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
   const f = msg.fields
@@ -118,7 +127,46 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
       const rssi = raw === undefined || raw === 255 ? -1 : raw
       return [{ k: 'rc', channels, rssi }]
     }
+    case 'SERVO_OUTPUT_RAW': {
+      // `port` says which sixteen these are, and it is not optional reading:
+      // `GCS_MAVLINK::send_servo_output_raw` sends port 1 for outputs 17-32
+      // whenever any of them is not a GPIO -- which by default is all of
+      // them -- so a 32-channel board sends both, back to back, every cycle.
+      // Taken as outputs 1-16, the second one overwrites the real values with
+      // the upper half's, which on most aircraft is sixteen zeros. SITL builds
+      // with 16 channels and never sends it, so nothing live catches this.
+      const port = (f.port as number | undefined) ?? 0
+      if (port >= SERVO_OUTPUT_PORTS) return []
+      const valuesUs: number[] = []
+      for (let i = 1; i <= SERVO_OUTPUT_COUNT; i++) {
+        valuesUs.push((f[`servo${i}Raw`] as number | undefined) ?? 0)
+      }
+      return [{ k: 'servoOutputs', port, valuesUs }]
+    }
     default:
       return []
   }
+}
+
+/**
+ * Place one SERVO_OUTPUT_RAW's sixteen values at its port's offset, keeping the
+ * other port's.
+ *
+ * Index 0 is SERVO1. The result is always 32 long, so an index is an output
+ * number whichever port has been heard from.
+ */
+export function mergeServoOutputs(
+  prev: readonly number[],
+  port: number,
+  valuesUs: readonly number[],
+): number[] {
+  const next = Array.from(
+    { length: SERVO_OUTPUT_COUNT * SERVO_OUTPUT_PORTS },
+    (_, i) => prev[i] ?? 0,
+  )
+  const base = port * SERVO_OUTPUT_COUNT
+  valuesUs.forEach((v, i) => {
+    next[base + i] = v
+  })
+  return next
 }

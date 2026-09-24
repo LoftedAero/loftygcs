@@ -9,6 +9,7 @@ import type { TransportOptions } from '../transport/Transport'
 import { WorkerClient } from '../worker/worker-client'
 import type { FirmwareVersion, MissionItem, ProtocolEvent, TelemetryDelta } from '../protocol/types'
 import { modeName, vehicleTypeName } from '../protocol/modes'
+import { mergeServoOutputs } from '../protocol/telemetry'
 import { setConnectionState, useConnectionStore } from '../stores/connection-store'
 import { describeLinkError, describeSilentLink } from './link-error'
 import { WebSerialTransport, grantedSerialPorts } from '../transport/web-serial'
@@ -485,6 +486,15 @@ class ConnectionService {
       case 'rc':
         p.rcChannels = d.channels
         p.rcRssi = d.rssi
+        break
+      case 'servoOutputs':
+        // Merged rather than assigned: the two ports arrive as separate
+        // messages, usually in the same batch, and each must keep the other's.
+        p.servoOutputsUs = mergeServoOutputs(
+          p.servoOutputsUs ?? useVehicleStore.getState().servoOutputsUs,
+          d.port,
+          d.valuesUs,
+        )
         break
       case 'missionProgress':
         // Each message fills its own half; a null leaves the last value

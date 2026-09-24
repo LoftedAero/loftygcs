@@ -48,6 +48,12 @@ export interface VehicleSnapshot {
   rcChannels: number[]
   /** RC receiver RSSI, 0-254. 255 (or -1 here) means the link does not report it. */
   rcRssi: number
+  /**
+   * What each output is actually driving, from SERVO_OUTPUT_RAW -- index 0 is
+   * SERVO1. Empty until the message has arrived once, then 32 long whichever
+   * of its two ports has been heard; 0 is an output with nothing on it.
+   */
+  servoOutputsUs: number[]
   /** Raw SYS_STATUS masks; decoded for display by protocol/sensors.ts. */
   /**
    * The airframe the vehicle announced, when it is one we can draw.
@@ -144,6 +150,7 @@ const EMPTY: VehicleSnapshot = {
   gpsHdop: 0,
   rcChannels: [],
   rcRssi: -1,
+  servoOutputsUs: [],
   airframe: null,
   rcout: null,
   boardName: null,
