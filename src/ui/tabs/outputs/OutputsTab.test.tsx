@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import OutputsTab from './OutputsTab'
 import { useParamStore } from '../../../stores/param-store'
 import { useConnectionStore } from '../../../stores/connection-store'
@@ -9,6 +9,15 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 // the motor test: ArduPlane's lives entirely inside `#if HAL_QUADPLANE_ENABLED`
 // and its entry point answers MAV_RESULT_FAILED when Q_ENABLE is 0, so on a
 // fixed wing every button on it is a refusal.
+
+const setParamNow = vi.fn<(name: string, value: number) => Promise<number>>()
+vi.mock('../../../services/connection', () => ({
+  connectionService: {
+    setParamNow: (name: string, value: number) => setParamNow(name, value),
+    runCommand: () => Promise.resolve(0),
+    refreshParams: () => Promise.resolve(),
+  },
+}))
 
 vi.mock('../../../stores/guide-store', () => ({
   useProfileLabels: () => ({ outputLabels: {}, channelLabels: {} }),
@@ -115,5 +124,48 @@ describe('the Position column', () => {
     render(<OutputsTab />)
     expect(position(1).querySelector('input')).toBeNull()
     expect(position(1).tagName).not.toBe('INPUT')
+  })
+})
+
+describe('Set trim', () => {
+  const setTrim = (n: number) =>
+    screen.getByRole('button', { name: `Set SERVO${n}_TRIM to the current position` }) as HTMLButtonElement
+
+  it('writes the live position into that output’s trim', async () => {
+    setParamNow.mockReset().mockImplementation(async (_n, v) => v)
+    seed(OUTPUTS)
+    useVehicleStore.setState({ servoOutputsUs: [1560] } as never)
+    render(<OutputsTab />)
+    expect(setTrim(1).disabled).toBe(false)
+    fireEvent.click(setTrim(1))
+    expect(setParamNow).toHaveBeenCalledWith('SERVO1_TRIM', 1560)
+    // Staged on the way past, so the Trim box shows it before the ack.
+    expect(useParamStore.getState().entries.get('SERVO1_TRIM')?.value).toBe(1560)
+    await waitFor(() => expect(setParamNow).toHaveBeenCalledTimes(1))
+  })
+
+  it('has nothing to take from an output reporting nothing, and says so', () => {
+    seed(OUTPUTS)
+    useVehicleStore.setState({ servoOutputsUs: [0] } as never)
+    render(<OutputsTab />)
+    expect(setTrim(1).disabled).toBe(true)
+    expect(setTrim(1).title).toBe('Nothing on this output')
+  })
+
+  it('will not make a trim outside the output’s travel, and says so', () => {
+    // A disarmed motor at MOT_PWM_MIN, below this servo's own Min.
+    seed(OUTPUTS)
+    useVehicleStore.setState({ servoOutputsUs: [1000] } as never)
+    render(<OutputsTab />)
+    expect(setTrim(1).disabled).toBe(true)
+    expect(setTrim(1).title).toMatch(/1000 is outside/)
+  })
+
+  it('is spent once the trim is already there, and says so', () => {
+    seed(OUTPUTS)
+    useVehicleStore.setState({ servoOutputsUs: [1500] } as never)
+    render(<OutputsTab />)
+    expect(setTrim(1).disabled).toBe(true)
+    expect(setTrim(1).title).toBe('SERVO1_TRIM is already 1500')
   })
 })

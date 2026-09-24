@@ -56,15 +56,22 @@
   --app-card-action-w: 176px;
   /* The Outputs table's Position bar. Height is the sheet's `.la-input`, so the
      bar sits on the same lines as the PWM boxes beside it and the row keeps its
-     height; width is Mission Planner's bar, near enough, which is long enough
-     for a 100 us move to be seen. */
-  --app-servo-position-w: 120px;
+     height. Width was 120px, Mission Planner's bar near enough; it gave 24px to
+     the Set trim button beside it, and at 12.5 us a pixel a 100 us move is
+     still eight pixels of bar. */
+  --app-servo-position-w: 96px;
   --app-servo-position-h: 30px;
+  /* The Set trim button beside each bar, one width so the column is one. */
+  --app-servo-set-w: 64px;
+  /* The frozen sheet's `.la-switch__track`, restated because a heading is
+     centered over it. */
+  --app-switch-w: 40px;
   /* The Function dropdown's ceiling, from its longest option rather than the
      row's slack: "CameraShutterSpeed" is 136px of text, 172px once the select's
      padding and chevron are round it, plus the write mark's slot -- about 190px.
-     It was 360px, which is what paid for the Position column. */
-  --app-servo-function-w: 220px;
+     It was 360px, which is what paid for the Position column, then 220px, and
+     the Set trim button took most of what was left. */
+  --app-servo-function-w: 196px;
   /* The chevron's room inside `.la-select` -- the frozen sheet's own
      padding-right, restated because anything placed inside that box has to
      clear it. */
@@ -4677,8 +4684,8 @@ button.app-status__state--bad:hover {
    from taste: the table is `max-content`, so it does not give way, and below
    about 1660px of window the remainder left for the motor test is narrower
    than the keypad it has to hold. Measured: the content area is the window
-   less 248px of rail and padding, and 932 + 16 + 460 needs 1656 of it. */
-@media (max-width: 1660px) {
+   less 248px of rail and padding, and 940 + 16 + 460 needs 1664 of it. */
+@media (max-width: 1663px) {
   .outputs-screen {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -4818,11 +4825,12 @@ button.app-status__state--bad:hover {
    they are sized to both rather than to the box alone. Function has a ceiling
    rather than the row's slack: as `1fr` it took every spare pixel, and on a
    full-width window that was a 1230px dropdown holding "Motor1". The leftovers
-   stay on the right, the way a curated field row's do. */
+   stay on the right, the way a curated field row's do. Reversed is 68px
+   because its switch and mark are 64, and so is its heading. */
 .outputs-grid {
   grid-template-columns:
     80px minmax(0, var(--app-servo-function-w)) 100px 100px 100px
-    var(--app-servo-position-w) 80px;
+    calc(var(--app-servo-position-w) + var(--la-space-1) + var(--app-servo-set-w)) 68px;
   justify-content: start;
 }
 
@@ -4851,6 +4859,70 @@ button.app-status__state--bad:hover {
   position: absolute;
   inset: 0 auto 0 0;
   background: color-mix(in srgb, var(--la-blue) 35%, transparent);
+}
+/* Each heading centered over its column's control, not over the column: the
+   track carries the write mark's slot after a PWM box or a dropdown, and the
+   Set trim button after the bar, so centering on the track put every heading
+   right of the thing it names -- 20px over a box, 59px over Function. Measured
+   before this: every heading sat at the track's left edge, 19-59px left of its
+   control's center, and the Reversed switch 12px left of its heading's.
+
+   The flex centering is on purpose: a heading wider than its control (REVERSED
+   over a 40px switch) overflows both sides evenly, where `text-align: center`
+   would push it all out to the right. Output keeps its heading at the left,
+   over identifiers that are themselves left-aligned text. */
+.app-table__head.outputs-grid > * {
+  display: flex;
+  justify-content: center;
+  justify-self: start;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+.app-table__head.outputs-grid > :nth-child(1) {
+  justify-content: flex-start;
+}
+.app-table__head.outputs-grid > :nth-child(2) {
+  width: 100%;
+  padding-right: var(--app-write-mark-w);
+}
+/* The PWM boxes are the sheet's 5.5em at the box's own type size, which is not
+   the heading's, so the width is written out in the box's terms. */
+.app-table__head.outputs-grid > :nth-child(3),
+.app-table__head.outputs-grid > :nth-child(4),
+.app-table__head.outputs-grid > :nth-child(5) {
+  width: calc(5.5 * var(--la-size-md));
+}
+.app-table__head.outputs-grid > :nth-child(6) {
+  width: var(--app-servo-position-w);
+}
+/* The switch and its mark centered in the column, and the heading over the
+   switch alone: the same box as the cell's, less the mark's slot. */
+.app-table__head.outputs-grid > :nth-child(7),
+.outputs-grid__reverse {
+  justify-self: center;
+}
+.app-table__head.outputs-grid > :nth-child(7) {
+  width: calc(var(--app-switch-w) + var(--app-write-mark-w));
+  padding-right: var(--app-write-mark-w);
+}
+
+/* The bar and the button that takes its value, as one cell under Position. */
+.servo-position-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+}
+.servo-position__set {
+  width: var(--app-servo-set-w);
+  flex: none;
+}
+/* The sheet gives every disabled button the not-allowed cursor. These are
+   disabled most of the time -- with the sticks at rest the trim already
+   matches -- so the pointer met a no-entry sign on almost every pass down the
+   table, which reads as something refused rather than nothing to do. The
+   greyed button already says it; the hover text says why. */
+.servo-position__set:disabled {
+  cursor: default;
 }
 /* The type of the PWM boxes beside it, so the row reads as four numbers. */
 .servo-position__value {

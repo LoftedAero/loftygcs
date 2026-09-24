@@ -143,7 +143,10 @@ function OutputRow({ n }: { n: number }) {
       <ParamField param={`SERVO${n}_MAX`} label="Max" bare writeNow />
       {/* Beside the three numbers it is read against: set a Max, watch the
           bar reach it. */}
-      <OutputPosition n={n} />
+      <span className="servo-position-cell">
+        <OutputPosition n={n} />
+        <SetTrimButton n={n} />
+      </span>
       <ReverseSwitch param={`SERVO${n}_REVERSED`} />
     </div>
   )
@@ -185,6 +188,74 @@ function OutputPosition({ n }: { n: number }) {
 }
 
 /**
+ * Make where the output is now its trim.
+ *
+ * The way a surface is trimmed on the bench: hold the stick until the surface
+ * sits where it should, press this, let go. The trim becomes the held position,
+ * so the surface returns there when the stick centers -- and until it does, the
+ * stick's offset rides on top of the new trim, which is the surface moving
+ * further while the stick is still held, not a fault.
+ *
+ * Written at once, like everything else in the row, and answered by the Trim
+ * field's own mark rather than one of its own: the value that changed is in
+ * that box, so that is where the tick belongs. It stages on the way past, as
+ * `ReverseSwitch` does, so a write that does not land leaves the value for the
+ * footer's Write instead of losing it.
+ *
+ * Disabled with nothing to take -- no reading, or one outside this output's
+ * Min and Max, which a trim may not be -- and when the trim is already there,
+ * which is its state with the sticks at rest. The hover text says which.
+ */
+function SetTrimButton({ n }: { n: number }) {
+  const param = `SERVO${n}_TRIM`
+  const valueUs = useVehicleStore((s) => s.servoOutputsUs[n - 1]) ?? 0
+  const trim = useParamStore((s) => s.entries.get(param)?.value)
+  const min = useParamStore((s) => s.entries.get(`SERVO${n}_MIN`)?.value)
+  const max = useParamStore((s) => s.entries.get(`SERVO${n}_MAX`)?.value)
+  const edit = useParamStore((s) => s.edit)
+
+  const inTravel =
+    valueUs > 0 && (min === undefined || valueUs >= min) && (max === undefined || valueUs <= max)
+  const usable = trim !== undefined && inTravel && valueUs !== trim
+  const why =
+    trim === undefined
+      ? `This vehicle has no ${param}`
+      : valueUs === 0
+        ? 'Nothing on this output'
+        : !inTravel
+          ? `${valueUs} is outside this output’s Min and Max`
+          : `${param} is already ${valueUs}`
+
+  const set = () => {
+    edit(param, valueUs)
+    void connectionService
+      .setParamNow(param, valueUs)
+      .then(() => useWriteFeedbackStore.getState().report({ ok: true, param }))
+      .catch((err: unknown) => {
+        useWriteFeedbackStore.getState().report({
+          ok: false,
+          param,
+          ...(err instanceof Error && err.message ? { error: err.message } : {}),
+        })
+      })
+  }
+
+  return (
+    <LaButton
+      variant="ghost"
+      size="sm"
+      className="servo-position__set"
+      disabled={!usable}
+      aria-label={`Set ${param} to the current position`}
+      title={usable ? `Set ${param} to ${valueUs}` : why}
+      onClick={set}
+    >
+      Set trim
+    </LaButton>
+  )
+}
+
+/**
  * Reversed, written as it is flipped.
  *
  * A switch is its own commit gesture -- there is no half-flipped state and
@@ -196,7 +267,7 @@ function OutputPosition({ n }: { n: number }) {
 function ReverseSwitch({ param }: { param: string }) {
   const entry = useParamStore((s) => s.entries.get(param))
   const edit = useParamStore((s) => s.edit)
-  if (!entry) return <span className="la-muted">—</span>
+  if (!entry) return <span className="la-muted outputs-grid__reverse">—</span>
   const commit = (on: boolean) => {
     const v = on ? 1 : 0
     edit(param, v)
@@ -212,7 +283,7 @@ function ReverseSwitch({ param }: { param: string }) {
       })
   }
   return (
-    <span className="param-control">
+    <span className="param-control outputs-grid__reverse">
       <label className="la-switch">
         <input
           type="checkbox"
