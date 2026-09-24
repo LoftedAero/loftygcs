@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import SerialChooserModal from './SerialChooserModal'
 
 // ttyS0-ttyS31 are the onboard UART ports every Linux box enumerates
@@ -52,14 +52,14 @@ describe('grouping', () => {
     send([board, ...builtIns])
     expect(screen.getByText('ttyACM0')).toBeTruthy()
     expect(screen.queryByText('ttyS0')).toBeNull()
-    const toggle = screen.getByRole('button', { name: /Built-In/ })
+    const toggle = screen.getByRole('button', { name: /Built-in/ })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(screen.getByText('3')).toBeTruthy()
+    expect(within(toggle).getByText('3')).toBeTruthy()
   })
 
   it('expands and collapses the group on click', () => {
     send([board, ...builtIns])
-    const toggle = screen.getByRole('button', { name: /Built-In/ })
+    const toggle = screen.getByRole('button', { name: /Built-in/ })
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('ttyS0')).toBeTruthy()
@@ -70,7 +70,7 @@ describe('grouping', () => {
 
   it('sorts every non-ttyS port ahead of the Built-In group', () => {
     send([...builtIns, board])
-    const names = screen.getAllByText(/^ttyA|^Built-In/).map((el) => el.textContent)
+    const names = screen.getAllByText(/^ttyA|^Built-in/).map((el) => el.textContent)
     expect(names[0]).toBe('ttyACM0')
   })
 
@@ -79,14 +79,14 @@ describe('grouping', () => {
     // list[0] is picked as the default selection, and it is a ttyS* port
     // here, so hiding it behind a collapsed disclosure would hide the
     // selection Connect is about to act on.
-    const toggle = screen.getByRole('button', { name: /Built-In/ })
+    const toggle = screen.getByRole('button', { name: /Built-in/ })
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('ttyS0')).toBeTruthy()
   })
 
   it('does not offer a Built-In group when there are no ttyS* ports', () => {
     send([board])
-    expect(screen.queryByRole('button', { name: /Built-In/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Built-in/ })).toBeNull()
   })
 })
 
@@ -99,7 +99,7 @@ describe('double click', () => {
 
   it('works on a Built-In row once the group is open', () => {
     send([board, ...builtIns])
-    fireEvent.click(screen.getByRole('button', { name: /Built-In/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Built-in/ }))
     fireEvent.doubleClick(screen.getByText('ttyS1'))
     expect(chosen).toBe('s1')
   })
@@ -108,6 +108,55 @@ describe('double click', () => {
     send([board])
     fireEvent.doubleClick(screen.getByText('ttyACM0'))
     expect(screen.queryByText('Select serial port')).toBeNull()
+  })
+})
+
+describe('the default selection', () => {
+  const connect = () => fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+
+  it('is the board, not ttyS0, when the OS lists the built-in ports first', () => {
+    // The order a Linux desktop really reports: ttyS0 upward, then the USB
+    // device. Defaulting to the OS's first row put the dot on a phantom.
+    send([...builtIns, board])
+    expect(screen.getByRole('button', { name: /Built-in/ }).getAttribute('aria-expanded')).toBe(
+      'false',
+    )
+    connect()
+    expect(chosen).toBe('a')
+  })
+
+  it('moves to a board plugged in after the chooser opened', () => {
+    send(builtIns)
+    send([...builtIns, board])
+    expect(screen.getByRole('button', { name: /Built-in/ }).getAttribute('aria-expanded')).toBe(
+      'false',
+    )
+    connect()
+    expect(chosen).toBe('a')
+  })
+
+  it('stays on a port somebody picked when the list changes', () => {
+    send([board, ...builtIns])
+    fireEvent.click(screen.getByRole('button', { name: /Built-in/ }))
+    fireEvent.click(screen.getByText('ttyS1'))
+    const other: SerialPortChoice = { portId: 'b', portName: 'ttyUSB0' }
+    send([other, board, ...builtIns])
+    connect()
+    expect(chosen).toBe('s1')
+  })
+})
+
+describe('a selection hidden by collapsing the group', () => {
+  it('cannot be connected to until it is shown again', () => {
+    send([board, ...builtIns])
+    const toggle = screen.getByRole('button', { name: /Built-in/ })
+    fireEvent.click(toggle)
+    fireEvent.click(screen.getByText('ttyS1'))
+    fireEvent.click(toggle)
+    const connect = screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement
+    expect(connect.disabled).toBe(true)
+    fireEvent.click(toggle)
+    expect(connect.disabled).toBe(false)
   })
 })
 
