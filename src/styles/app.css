@@ -69,6 +69,9 @@
      padding-right, restated because anything placed inside that box has to
      clear it. */
   --app-select-chevron-w: 26px;
+  /* The serial chooser's list, which scrolls inside the dialog: about twelve
+     rows, and never so tall on a short window that the buttons leave it. */
+  --app-serial-list-max-h: min(55vh, 440px);
   /* Room for a field's own answer to a write, sized to the longer of the two
      words: "Not saved" measures 63px at --la-size-sm, plus a gap. It is
      *reserved* rather than overlaid because the room is not always there --
@@ -375,10 +378,20 @@
    right for "Yes / No" and wrong for five ports carrying a name and a
    description each -- they landed three-then-two in a ragged grid whose
    columns did not line up. A chooser is a list, so this is one. */
+/* The list scrolls, not the dialog. A Linux desktop reports thirty-two ttyS
+   ports, and with the Built-in group open the dialog grew to the height of the
+   window and scrolled as a whole -- Cancel and Connect went off the bottom,
+   which is the one place in a chooser nothing may go. The padding, taken back
+   by the margin, keeps a focused row's ring inside the scroll box, which would
+   otherwise clip it at the top and bottom. */
 .serial-list {
   display: flex;
   flex-direction: column;
   gap: var(--la-space-1);
+  max-height: var(--app-serial-list-max-h);
+  overflow-y: auto;
+  padding: var(--la-space-1);
+  margin: calc(-1 * var(--la-space-1));
 }
 .serial-port {
   display: flex;
@@ -417,6 +430,40 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.serial-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.serial-group__toggle {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--la-ink-2);
+  font: inherit;
+  font-size: var(--la-size-sm);
+  font-weight: 600;
+  padding: var(--la-space-2) var(--la-space-3);
+  cursor: pointer;
+  text-align: left;
+}
+.serial-group__toggle:hover {
+  color: var(--la-blue);
+}
+.serial-group__caret {
+  width: 1em;
+  color: var(--la-ink-3);
+}
+.serial-group__count {
+  margin-left: auto;
+  color: var(--la-ink-3);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- The actions column ----------------------------------------------
