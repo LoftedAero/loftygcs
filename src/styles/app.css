@@ -174,14 +174,17 @@
      name for -- so the set is one ragged-free edge rather than a number box
      at 55px beside a dropdown at 190. */
   --app-config-control-w: 200px;
-  /* The motor-test keypad: eight numbered buttons and the stop beside them,
-     one width so they read as a set. Sized to "Stop all", the longest. */
+  /* The motor-test keys, one width so they read as a set. */
   --app-motor-btn-w: 96px;
   /* The frame drawn beside the motor-test controls. Sized to the column it
-     sits next to -- fields, keypad and the stop, about 210px -- so the card is
-     no taller than that column and the picture is as big as the card allows.
-     Was 114px stacked above them. */
-  --app-motor-art-w: 200px;
+     sits next to, so the card is no taller than that column and the picture is
+     as big as the card allows: fields, label and two rows of keys, measured at
+     138px once the fields went side by side and the stop moved to the title
+     row. At its old 200px the drawing set the card's height and the controls
+     floated in the middle of it. Two rows of keys is every frame there is --
+     ArduPilot's ceiling is twelve motors, six to a row -- so the column is
+     one height on every vehicle. */
+  --app-motor-art-w: 138px;
   /* Same idea in the SITL tray, sized to what its 320px panel leaves after
      the widest label ("RealFlight host") and the panel's own padding. */
   --app-simtray-control-w: 168px;
@@ -2537,23 +2540,19 @@ button.app-status__state--bad:hover {
   max-width: 860px;
 }
 
-/* Every button in the motor-test keypad is one width, including the stop. */
-.motor-test__buttons > .la-btn {
-  min-width: var(--app-motor-btn-w);
-}
-/* The test keys: always two rows, split evenly, each row centred.
+/* The test keys: always two rows, split evenly, each row from the left edge.
    Two rows because ArduPilot tests up to `AP_MOTORS_MAX_NUM_MOTORS` -- twelve
    on an ordinary build -- and a keypad that grew a third row on a dodecahexa
-   would push the stop and everything under it down, on a card whose whole
-   point is that it does not move.
+   would push everything under it down, on a card whose whole point is that it
+   does not move.
    Split evenly rather than filled left to right: at six per row a quad left
    four keys in the first row and the second empty, and an octa left a row of
    six over a row of two. Halved, every frame from a pair to a dodecahexa is a
    rectangle, because every one of them has an even number of test steps.
-   The keys are capped at a button's width and the row is centred inside what
-   it is given, so two keys are two buttons in the middle rather than two
-   enormous ones -- and the cap is a `max-width` on a full-width grid, so a
-   narrow card shrinks them instead of overflowing. */
+   The keys are capped at a button's width, so two keys are two buttons rather
+   than two enormous ones -- and the cap is a `max-width` on a full-width grid,
+   so a narrow card shrinks them instead of overflowing. From the left rather
+   than centred, the edge the fields above them keep. */
 .motor-test__keypad {
   display: flex;
   flex-direction: column;
@@ -2570,7 +2569,6 @@ button.app-status__state--bad:hover {
   /* Holds its place when a row has nothing in it, which only an odd count of
      one can produce -- the guarantee is what matters, not the case. */
   min-height: var(--app-card-head-h);
-  margin-inline: auto;
 }
 .motor-test__row > .la-btn {
   min-width: 0;
@@ -2695,6 +2693,14 @@ button.app-status__state--bad:hover {
 .la-field--named > .param-control > .la-input {
   width: 100%;
   min-width: 0;
+}
+/* And one edge for every value in that column. The sheet centers an input's
+   text, which is right for a table of PWM boxes and wrong here: beside
+   dropdowns whose text starts at the left, a centered "50" floated mid-box and
+   read as a different kind of control, though its type is identical. */
+.la-field--named .la-input,
+.outproto__protocol .la-input {
+  text-align: left;
 }
 /* A field whose value cannot mean anything yet -- the airspeed sensor's type
    with the sensor switched off. The control carries the system sheet's own
@@ -4695,16 +4701,21 @@ button.app-status__state--bad:hover {
    why the keypad belongs in that column too. Above the fields it could only
    ever be as tall as it was wide; beside the whole stack it is most of the
    card. */
+/* The controls never narrower than their own content, and the drawing the one
+   that gives way: at the narrowest width this card sits beside the table the
+   two fields need 285px and the column beside a full-size drawing has 272.
+   The drawing is square, so shrinking it cannot make the card taller. */
 .motor-test__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, var(--app-motor-art-w));
   gap: var(--la-space-4);
   align-items: center;
   min-width: 0;
 }
 .motor-test__art {
   display: block;
-  width: var(--app-motor-art-w);
+  width: 100%;
+  max-width: var(--app-motor-art-w);
   height: auto;
 }
 /* The board's timer groups, as bubbles.
@@ -4748,10 +4759,6 @@ button.app-status__state--bad:hover {
 .outproto__chans {
   font: 700 var(--la-size-sm) / 1.2 var(--la-font-mono);
 }
-.outproto__timer {
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-2);
-}
 /* A group with no DMA cannot do DShot whatever its timer allows, which is the
    one thing about a group worth warning on. Amber: a state to know about, not
    a fault. */
@@ -4773,22 +4780,17 @@ button.app-status__state--bad:hover {
   align-items: center;
   gap: var(--la-space-3);
 }
-/* The button's track is added only when there is a button. Declared always, an
-   empty fifth track still costs its gap, and the whole row's flexible columns
-   shrank 12px out of step with every other row on the card. */
-.outproto__protocol--btn {
-  grid-template-columns: var(--app-named-tracks) auto;
-}
 .outproto__groups-row {
   display: grid;
   grid-template-columns: var(--app-named-tracks);
   gap: var(--la-space-3);
 }
 .outproto__groups-row > .outproto__bubbles {
-  grid-column: 3 / -1;
+  grid-column: 2 / -1;
 }
 .outproto__protocol > .la-select,
 .outproto__protocol > .la-input,
+.outproto__protocol > .la-btn,
 .outproto__protocol > .param-control {
   width: 100%;
   min-width: 0;
@@ -4811,6 +4813,42 @@ button.app-status__state--bad:hover {
 /* A fieldset carries the disabled state to every control inside it, which is
    what lets the card draw its whole body before it is armed. It brings a
    border and padding of its own that have no place here. */
+/* Throttle and duration on one row, packed from the left, each box beside its
+   own label. The sheet's field is `1fr auto`, which put each box at the far
+   side of half the card with the width of a field between it and its label. */
+.motor-test__levels {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-4);
+}
+/* A label that wraps makes the row taller at exactly the width it is short of
+   room, which is the height this layout exists to save. */
+.motor-test__levels .la-field__label {
+  white-space: nowrap;
+}
+/* Specific enough to beat the card-wide 20ch label column, which is right for
+   fields stacked down a card and is the gap itself when two sit side by side. */
+.app-content .la-card .motor-test__levels > .la-field {
+  grid-template-columns: auto auto;
+}
+/* The sheet's 5.5em number box is sized for four-digit PWM values; these hold
+   at most "100" and "0.5". At 5.5em the pair needed 295px beside a 272px column
+   at the narrowest two-column width, and overran it. */
+.motor-test__levels .la-input--num {
+  width: 4.5em;
+}
+/* Stop all and Disable are one width, as every title-row pair is, and give way
+   together when the card is narrow rather than overlapping the title: at the
+   narrowest width this card sits beside the table (460px) two 176px buttons
+   and "Motor test" need more room than there is. A test's status shrinks
+   first, so a result appearing never resizes the buttons. */
+.motor-test .la-card__actions > .la-btn {
+  flex: 0 1 var(--app-card-action-w);
+  min-width: 0;
+}
+.motor-test .la-card__actions > .card-status {
+  flex-shrink: 1000;
+}
 .motor-test__controls {
   display: flex;
   flex-direction: column;
@@ -7560,6 +7598,14 @@ body.is-splitting .flight-map {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* In a value's type rather than a button's: it kept the sheet's 12px
+     semibold grey label and 12px inset, so beside a dropdown reading "None"
+     its "none" was smaller, heavier, paler and further in. The select's own
+     size, weight, ink and inset. */
+  padding: 0 var(--la-space-2);
+  font-size: var(--la-size-md);
+  font-weight: 400;
+  color: var(--la-ink);
 }
 /* In the serial table the wrapper fills its cell, so the button is the width
    of the column rather than of whatever happens to be switched on. */

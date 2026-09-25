@@ -146,7 +146,17 @@ export default function ParamField({
   commitRef.current = commit
 
   if (!entry) {
-    if (bare) return <span className="la-muted">—</span>
+    if (bare) {
+      // A table row's control, greyed rather than dashed when the row is one a
+      // card always draws: the same empty dropdown a named field shows below.
+      return disabled ? (
+        <LaSelect disabled value="">
+          <option value="">—</option>
+        </LaSelect>
+      ) : (
+        <span className="la-muted">—</span>
+      )
+    }
     // Deliberately out of play *and* not yet reported: the quadplane frame
     // fields, which the firmware only creates once Q_ENABLE is on and the
     // vehicle has restarted. Drawn as the row they will become, so the card is

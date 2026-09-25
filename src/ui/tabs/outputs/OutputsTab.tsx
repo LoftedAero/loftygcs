@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { LaButton, LaCard, LaField, LaModal } from '../../components/La'
 import ParamCard, { NeedsVehicle } from '../../components/ParamCard'
 import ParamField from '../../components/ParamField'
@@ -15,6 +15,7 @@ import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
 import { connectionService } from '../../../services/connection'
 import { PWM_SCALE_MAX, PWM_SCALE_MIN, pwmPct } from '../../pwm-scale'
 import { MAV_RESULT } from '../../../protocol/commands'
+import { vehicleClass } from '../../../protocol/modes'
 
 const MAV_CMD_DO_MOTOR_TEST = 209
 const MAX_OUTPUTS = 16
@@ -49,9 +50,7 @@ export default function OutputsTab() {
   // answer, not three. The download's progress is on the app bar, which is
   // where it belongs: it is not about the screen you happen to be on.
   if (!connected || !ready) {
-    return (
-      <NeedsVehicle title="Outputs" />
-    )
+    return <NeedsVehicle title="Outputs" />
   }
   return (
     // The table is the page; the two cards beside it are what you do *to* what
@@ -67,27 +66,27 @@ export default function OutputsTab() {
         <OutputOptionsCard />
         <MixingCard />
         <FlapsCard />
-      {/* Written as they are set, like the table above: these are the other
+        {/* Written as they are set, like the table above: these are the other
           half of the same bench loop -- spin up a motor, watch where it
           starts, nudge the minimum -- and a page that auto-saves one card and
           stages the other would be two behaviours on one screen. MOT_PWM_TYPE
           is read at boot, and the field raises the restart prompt itself from
           ArduPilot's own metadata. */}
-      <ParamCard
-        title="Motor limits"
-        showNames
-        fields={[
-          // Numbers, not the three names ArduPilot suggests: these are found on
-          // the bench by spinning a motor and watching where it starts, and the
-          // value that comes out of that is rarely one of the three.
-          { param: 'MOT_SPIN_ARM', label: 'Spin when armed', writeNow: true, numeric: true },
-          { param: 'MOT_SPIN_MIN', label: 'Spin minimum', writeNow: true, numeric: true },
-          { param: 'MOT_SPIN_MAX', label: 'Spin maximum', writeNow: true, numeric: true },
-          { param: 'MOT_PWM_MIN', label: 'PWM minimum', unit: 'µs', writeNow: true },
-          { param: 'MOT_PWM_MAX', label: 'PWM maximum', unit: 'µs', writeNow: true },
-          { param: 'MOT_THST_EXPO', label: 'Thrust expo', writeNow: true },
-        ]}
-      />
+        <ParamCard
+          title="Motor limits"
+          showNames
+          fields={[
+            // Numbers, not the three names ArduPilot suggests: these are found on
+            // the bench by spinning a motor and watching where it starts, and the
+            // value that comes out of that is rarely one of the three.
+            { param: 'MOT_SPIN_ARM', label: 'Spin when armed', writeNow: true, numeric: true },
+            { param: 'MOT_SPIN_MIN', label: 'Spin minimum', writeNow: true, numeric: true },
+            { param: 'MOT_SPIN_MAX', label: 'Spin maximum', writeNow: true, numeric: true },
+            { param: 'MOT_PWM_MIN', label: 'PWM minimum', unit: 'µs', writeNow: true },
+            { param: 'MOT_PWM_MAX', label: 'PWM maximum', unit: 'µs', writeNow: true },
+            { param: 'MOT_THST_EXPO', label: 'Thrust expo', writeNow: true },
+          ]}
+        />
       </div>
     </div>
   )
@@ -358,20 +357,17 @@ function FlapsCard() {
       fields={[
         // Units come from ArduPilot's metadata (%, m/s, %/s) rather than being
         // written here.
-        { param: 'FLAP_1_PERCNT', label: 'Flap 1', writeNow: true },
-        { param: 'FLAP_1_SPEED', label: 'Flap 1 speed', writeNow: true },
-        { param: 'FLAP_2_PERCNT', label: 'Flap 2', writeNow: true },
-        { param: 'FLAP_2_SPEED', label: 'Flap 2 speed', writeNow: true },
+        { param: 'FLAP_1_PERCNT', label: 'Flaps 1 percent', writeNow: true },
+        { param: 'FLAP_1_SPEED', label: 'Flaps 1 speed', writeNow: true },
+        { param: 'FLAP_2_PERCNT', label: 'Flaps 2 percent', writeNow: true },
+        { param: 'FLAP_2_SPEED', label: 'Flaps 2 speed', writeNow: true },
+        { param: 'TKOFF_FLAP_PCNT', label: 'Takeoff flaps', writeNow: true },
+        { param: 'LAND_FLAP_PERCNT', label: 'Landing flaps', writeNow: true },
         { param: 'FLAP_SLEWRATE', label: 'Slew rate', writeNow: true },
-        { param: 'TKOFF_FLAP_PCNT', label: 'Takeoff flap', writeNow: true },
-        { param: 'LAND_FLAP_PERCNT', label: 'Landing flap', writeNow: true },
       ]}
     />
   )
 }
-
-/** The output protocols that are DShot, from AP_Motors' shared pwm_type enum. */
-const DSHOT_VALUES = new Set([4, 5, 6, 7])
 
 /**
  * What the outputs speak, and what the board will let them.
@@ -388,40 +384,60 @@ const DSHOT_VALUES = new Set([4, 5, 6, 7])
  *     which is why that mask is on the card rather than buried in the dialog:
  *     on a plane nothing fills it in, where on a Copter `SERVO_BLH_AUTO` adds
  *     the motors for you.
+ *
+ * On a plane the two are always drawn, greyed where the firmware has neither.
+ * They come from AP_BLHeli, which every ChibiOS flight controller builds
+ * (`HAL_SUPPORT_RCOUT_SERIAL` defaults on in `board/chibios.h`) and SITL did
+ * not until master's abc8df0d (2026-08-19) -- so the 4.7 simulators report
+ * neither. Without it a fixed wing has no way to choose DShot at all, and a card
+ * that simply lost those rows showed DShot settings with nothing anywhere to
+ * select DShot. Drawn greyed, the card says what it cannot do and stays one
+ * height, as the VTOL frame rows do.
+ *
+ * Everything that only refines a protocol -- DShot's rate and ESC type, the
+ * pass-through settings -- is in the ESC settings dialog, on every vehicle, and
+ * nothing on the card is repeated in it.
  */
 function OutputOptionsCard() {
   const boardName = useVehicleStore((s) => s.boardName)
   const boardId = useVehicleStore((s) => s.boardId)
   const entries = useParamStore((s) => s.entries)
   const [escOpen, setEscOpen] = useState(false)
-  // The pass-through settings exist only where the firmware compiled them in,
-  // which is every ChibiOS board and no SITL. Asking the vehicle rather than
-  // the board type, because that is what actually decides it.
-  const hasEsc = ESC_PARAMS.some((p) => entries.has(p))
+  // Fixed wing and quadplane alike: both report a plane MAV_TYPE, and both
+  // choose a forward motor's protocol with SERVO_BLH_OTYPE.
+  const plane = useVehicleStore((s) => vehicleClass(s.vehicleType) === 'plane')
 
   // Whichever protocol selectors this vehicle has, in the order they matter.
   // `SERVO_BLH_OTYPE` is the forward motor only where there are lift motors to
-  // tell it apart from; on a plain fixed wing it is *the* motor.
+  // tell it apart from; on a plain fixed wing it is *the* motor. On a Copter it
+  // is not a motor setting at all -- MOT_PWM_TYPE drives every motor, and the
+  // override is for outputs outside that group -- so it stays in the dialog;
+  // listed here it drew a second "Motor output" row on any board with AP_BLHeli.
   const hasVtol = entries.has('Q_M_PWM_TYPE')
   const protocols = [
     { param: 'MOT_PWM_TYPE', label: 'Motor output' },
     { param: 'Q_M_PWM_TYPE', label: 'VTOL motor output' },
     { param: 'SERVO_BLH_OTYPE', label: hasVtol ? 'Forward motor output' : 'Motor output' },
-  ].filter((f) => entries.has(f.param))
+  ].filter((f) => (f.param === 'SERVO_BLH_OTYPE' ? plane : entries.has(f.param)))
+  const maskOnCard = plane || entries.has('SERVO_BLH_MASK')
 
-  // DShot has settings of its own and nothing else does, so they are drawn only
-  // when something is actually set to it -- two extra rows on a card that
-  // otherwise has three, for a protocol most aircraft do not use.
-  //
-  // ...unless there is no selector to consult. `SERVO_DSHOT_*` live in
-  // SRV_Channels and exist on every vehicle, but the thing that *chooses*
-  // DShot does not: a fixed wing picks it with SERVO_BLH_OTYPE, which is
-  // absent wherever AP_BLHeli was not compiled in -- SITL among them. Hiding
-  // the settings then removes the only way to reach a parameter the firmware
-  // is still using, so with nothing to gate on they are shown.
-  const dshot =
-    protocols.length === 0 ||
-    protocols.some((f) => DSHOT_VALUES.has(entries.get(f.param)?.value ?? -1))
+  // The dialog holds what refines a protocol and is not already on the card.
+  // It is offered only where something can actually choose one: with no
+  // selector the firmware has, DShot's rate and ESC type set nothing.
+  const onCard = new Set([
+    ...protocols.map((f) => f.param),
+    ...(maskOnCard ? ['SERVO_BLH_MASK'] : []),
+  ])
+  // SERVO_BLH_AUTO adds "all multicopter motors" to the pass-through, and takes
+  // them from the vehicle's AP_Motors group -- which ArduPlane only creates once
+  // Q_ENABLE is on. On a fixed wing it has no motors to add, so it is left out
+  // there, as the DShot rows are where nothing can select DShot. An unreported
+  // Q_ENABLE keeps it: unknown is not absent.
+  const fixedWing = plane && entries.get('Q_ENABLE')?.value === 0
+  const escParams = ESC_SETTINGS.filter(
+    (p) => entries.has(p) && !onCard.has(p) && !(fixedWing && p === 'SERVO_BLH_AUTO'),
+  )
+  const escAvailable = escParams.length > 0 && protocols.some((f) => entries.has(f.param))
 
   return (
     <LaCard
@@ -435,72 +451,65 @@ function OutputOptionsCard() {
         // restart, and switching one mid-thought would have the vehicle briefly
         // driving its ESCs a way nobody meant. `CardParamActions` carries the
         // restart prompt itself, so this card no longer mounts its own.
+        //
+        // It owns what is on the card and nothing in the dialog, which has a
+        // Write of its own: edits made there and then closed over were counted
+        // here, by a button on a card that did not show them.
         <CardParamActions
           reason="Output changes take effect after a restart"
-          owns={(param) => OUTPUT_OPTION_PARAMS.has(param)}
+          owns={(param) => onCard.has(param)}
         />
       }
     >
       <ParamField param="SERVO_RATE" label="Servo rate" unit="Hz" showName />
-      {protocols.map((f, i) => (
-        // The ESC dialog opens from the last protocol row rather than from the
-        // title: what is in it qualifies *these* selectors, and a button in the
-        // corner of the card read as belonging to the card as a whole.
-        <div
-          className={
-            i === protocols.length - 1 && hasEsc
-              ? 'outproto__protocol outproto__protocol--btn'
-              : 'outproto__protocol'
-          }
-          key={f.param}
-        >
-          <label className="la-field__label">{f.label}</label>
-          <span className="la-field__param">{f.param}</span>
-          <ParamField param={f.param} label={f.label} bare />
-          <span />
-          {i === protocols.length - 1 && hasEsc && (
-            <LaButton variant="secondary" onClick={() => setEscOpen(true)}>
-              ESC settings…
-            </LaButton>
-          )}
-        </div>
-      ))}
-      {hasEsc && (
-        <ParamField param="SERVO_BLH_MASK" label="Protocol outputs" showName />
+      {protocols.map((f) => {
+        const present = entries.has(f.param)
+        return (
+          <div
+            className={present ? 'outproto__protocol' : 'outproto__protocol la-field--off'}
+            key={f.param}
+          >
+            <label className="la-field__label">{f.label}</label>
+            <span className="la-field__param">{f.param}</span>
+            <ParamField
+              param={f.param}
+              label={f.label}
+              bare
+              {...(present ? {} : { disabled: true })}
+            />
+            <span />
+          </div>
+        )
+      })}
+      {maskOnCard && (
+        <ParamField
+          param="SERVO_BLH_MASK"
+          label="Protocol outputs"
+          showName
+          {...(entries.has('SERVO_BLH_MASK') ? {} : { disabled: true })}
+        />
       )}
-      {dshot && <ParamField param="SERVO_DSHOT_RATE" label="DShot rate" showName />}
-      {dshot && <ParamField param="SERVO_DSHOT_ESC" label="DShot ESC type" showName />}
+      {/* A row of its own, under the selectors it qualifies, with the button in
+          the control column. Beside the last selector it needed a fifth grid
+          track, which squeezed that one row: its name and dropdown sat 40px
+          left of every other row's and the dropdown came out narrower. */}
+      {escAvailable && (
+        <div className="outproto__protocol">
+          <label className="la-field__label">ESC settings</label>
+          <span />
+          <LaButton variant="secondary" onClick={() => setEscOpen(true)}>
+            Configure
+          </LaButton>
+          <span />
+        </div>
+      )}
       <TimerGroupBubbles name={boardName} id={boardId} />
-      {escOpen && <EscSettingsModal onClose={() => setEscOpen(false)} />}
+      {escOpen && <EscSettingsModal params={escParams} onClose={() => setEscOpen(false)} />}
     </LaCard>
   )
 }
 
-/**
- * Everything this card's Write is responsible for, the dialog's included.
- *
- * The dialog is opened from the card and belongs to it, so its nine parameters
- * stage into the same count rather than writing behind a modal -- one card, one
- * Write. Leaving the page with them unsent is caught by the usual prompt.
- */
-const OUTPUT_OPTION_PARAMS: ReadonlySet<string> = new Set([
-  'SERVO_RATE',
-  'MOT_PWM_TYPE',
-  'Q_M_PWM_TYPE',
-  'SERVO_DSHOT_RATE',
-  'SERVO_DSHOT_ESC',
-  'SERVO_BLH_AUTO',
-  'SERVO_BLH_MASK',
-  'SERVO_BLH_BDMASK',
-  'SERVO_BLH_RVMASK',
-  'SERVO_BLH_3DMASK',
-  'SERVO_BLH_POLES',
-  'SERVO_BLH_TRATE',
-  'SERVO_BLH_OTYPE',
-  'SERVO_BLH_PORT',
-])
-
-/** Everything the ESC pass-through dialog owns, and nothing else. */
+/** The pass-through library's parameters. */
 const ESC_PARAMS = [
   'SERVO_BLH_AUTO',
   'SERVO_BLH_MASK',
@@ -514,33 +523,56 @@ const ESC_PARAMS = [
 ]
 
 /**
- * BLHeli and AM32 pass-through, behind a button.
- *
- * Nine parameters that matter on the day somebody is configuring ESCs and never
- * again, on a card whose other five are read every time the screen is opened.
- * They also only exist on hardware, so on SITL the button is not there at all
- * rather than opening an empty dialog.
- *
- * What these settings do is *enable* ArduPilot's pass-through: they put the
- * ESCs' own 4-way interface on a MAVLink serial channel for BLHeliSuite or the
- * AM32 configurator to reach. Being that configurator is a different feature.
+ * Everything the ESC settings dialog can hold, in the order it shows them:
+ * DShot's two refinements first, then the pass-through library's. The card
+ * passes in the ones this vehicle has and does not already show.
  */
-function EscSettingsModal({ onClose }: { onClose: () => void }) {
+const ESC_SETTINGS = ['SERVO_DSHOT_RATE', 'SERVO_DSHOT_ESC', ...ESC_PARAMS]
+
+/**
+ * What refines the output protocol, behind a button.
+ *
+ * Settings that matter on the day somebody is configuring ESCs and rarely
+ * again, on a card whose other rows are read every time the screen is opened.
+ * DShot's rate and ESC type are here with the pass-through settings on every
+ * vehicle: they qualify a protocol chosen on the card rather than choosing one.
+ *
+ * What the pass-through settings do is *enable* ArduPilot's pass-through: they
+ * put the ESCs' own 4-way interface on a MAVLink serial channel for BLHeliSuite
+ * or the AM32 configurator to reach. Being that configurator is a different
+ * feature.
+ */
+function EscSettingsModal({ params, onClose }: { params: string[]; onClose: () => void }) {
+  const owns = (param: string) => params.includes(param)
+  const pending = useParamStore((s) => {
+    let n = 0
+    for (const param of params) if (s.entries.get(param)?.dirty) n++
+    return n
+  })
+  const writeBusy = useParamStore((s) => s.writeBusy)
   return (
     <LaModal
       open
-      title="ESC pass-through"
+      title="ESC settings"
       actions={
-        <LaButton variant="primary" onClick={onClose}>
-          Close
-        </LaButton>
+        // Its own Revert and Write, the card's controls in the card's shape.
+        // These edits used to stage into the card's Write, which meant closing
+        // the dialog and finding them counted by a button on a card that did
+        // not show them. Close is absent while anything here is unwritten, as
+        // Revert and Write are absent while nothing is: closing over staged
+        // values would leave edits that no visible Write covers.
+        <>
+          <CardParamActions reason="ESC changes take effect after a restart" owns={owns} />
+          {pending === 0 && !writeBusy && (
+            <LaButton variant="primary" onClick={onClose}>
+              Close
+            </LaButton>
+          )}
+        </>
       }
     >
-      {/* Staged, like the card that opens this. So the button says Close
-          rather than Done: nothing here is sent until the card's own Write is
-          pressed, and its count includes whatever was changed in here. */}
       <div className="esc-settings">
-        {ESC_PARAMS.map((param) => (
+        {params.map((param) => (
           <ParamField key={param} param={param} label={ESC_LABELS[param] ?? param} showName />
         ))}
       </div>
@@ -549,7 +581,9 @@ function EscSettingsModal({ onClose }: { onClose: () => void }) {
 }
 
 const ESC_LABELS: Record<string, string> = {
-  SERVO_BLH_AUTO: 'Auto-enable on motors',
+  SERVO_DSHOT_RATE: 'DShot rate',
+  SERVO_DSHOT_ESC: 'DShot ESC type',
+  SERVO_BLH_AUTO: 'Auto-enable',
   SERVO_BLH_MASK: 'Pass-through outputs',
   SERVO_BLH_BDMASK: 'Bi-directional DShot',
   SERVO_BLH_RVMASK: 'Reversed outputs',
@@ -557,7 +591,7 @@ const ESC_LABELS: Record<string, string> = {
   SERVO_BLH_POLES: 'Motor poles',
   SERVO_BLH_TRATE: 'Telemetry rate',
   SERVO_BLH_OTYPE: 'Output type override',
-  SERVO_BLH_PORT: 'Control port',
+  SERVO_BLH_PORT: 'Pass-thru port',
 }
 
 /**
@@ -578,8 +612,9 @@ function TimerGroupBubbles({ name, id }: { name: string | null; id: number }) {
   const board = timerGroups(name, id)
   const full = board
     ? board.groups
-        .map(([low, high, timer, nodma]) =>
-          `${timer} ${low === high ? low : `${low}-${high}`}${nodma ? ' (no DMA)' : ''}`,
+        .map(
+          ([low, high, timer, nodma]) =>
+            `${timer} ${low === high ? low : `${low}-${high}`}${nodma ? ' (no DMA)' : ''}`,
         )
         .join(', ')
     : undefined
@@ -587,10 +622,15 @@ function TimerGroupBubbles({ name, id }: { name: string | null; id: number }) {
   return (
     <div className="outproto__groups-row">
       <label className="la-field__label">Timer groups</label>
-      {/* The name track, empty: this row is the board's own fact and has no
-          parameter behind it, and leaving the track out would shift the
-          bubbles left of every control above them. */}
-      <span />
+      {/* From the name column rather than the control column: this row has no
+          parameter behind it, and a board's groups did not fit the control
+          column. Measured: a Cube Orange's five groups need 226px as ranges
+          alone and 368px with their timers, against 185-246px of control
+          column at the widths this card sits beside the table; from the name
+          column there is 305-428px, which holds every board in the table but
+          the one with ten groups at the narrowest. The timers are in the hover
+          text -- the grouping is what decides a protocol, and which timer
+          drives it does not. */}
       <div className="outproto__bubbles" title={full}>
         {board ? (
           board.groups.map(([low, high, timer, nodma]) => (
@@ -599,7 +639,6 @@ function TimerGroupBubbles({ name, id }: { name: string | null; id: number }) {
               key={`${timer}-${low}`}
             >
               <span className="outproto__chans">{low === high ? low : `${low}-${high}`}</span>
-              <span className="outproto__timer">{timer}</span>
             </span>
           ))
         ) : (
@@ -609,6 +648,9 @@ function TimerGroupBubbles({ name, id }: { name: string | null; id: number }) {
     </div>
   )
 }
+
+/** How long a motor-test result stays on the title row, as Set level's does. */
+const MOTOR_STATUS_MS = 4000
 
 function MotorTestCard() {
   // The interlock is deliberate friction: nothing in this card spins until
@@ -635,10 +677,18 @@ function MotorTestCard() {
   const [confirming, setConfirming] = useState(false)
   const [throttle, setThrottle] = useState(10)
   const [duration, setDuration] = useState(2)
-  const [status, setStatus] = useState('')
+  // A result says what happened and then gets out of the way, as Set level's
+  // does; a spin stays up for as long as the motor turns. The in-progress line
+  // holds until there is a result to replace it.
+  const [status, setStatus] = useState<{ text: string; holdMs: number } | null>(null)
+  useEffect(() => {
+    if (!status || !Number.isFinite(status.holdMs)) return
+    const t = setTimeout(() => setStatus(null), status.holdMs)
+    return () => clearTimeout(t)
+  }, [status])
 
   const test = async (motor: number) => {
-    setStatus(`Motor ${letter(motor)}…`)
+    setStatus({ text: `Motor ${letter(motor)}…`, holdMs: Infinity })
     try {
       // param1 motor (1-based), param2 type 0=percent, param3 value,
       // param4 timeout s.
@@ -649,11 +699,20 @@ function MotorTestCard() {
       )
       setStatus(
         result === 0
-          ? `Motor ${letter(motor)}: spinning ${throttle}% for ${duration}s`
-          : `Motor ${letter(motor)}: ${MAV_RESULT[result] ?? `result ${result}`}`,
+          ? {
+              text: `Motor ${letter(motor)}: spinning ${throttle}% for ${duration}s`,
+              holdMs: Math.max(MOTOR_STATUS_MS, duration * 1000),
+            }
+          : {
+              text: `Motor ${letter(motor)}: ${MAV_RESULT[result] ?? `result ${result}`}`,
+              holdMs: MOTOR_STATUS_MS,
+            },
       )
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'The vehicle did not answer.')
+      setStatus({
+        text: err instanceof Error ? err.message : 'The vehicle did not answer.',
+        holdMs: MOTOR_STATUS_MS,
+      })
     }
   }
 
@@ -661,15 +720,12 @@ function MotorTestCard() {
 
   // Nothing to draw for a fixed wing, or for a frame class this app has no
   // picture of -- the card still tests motors either way.
-  const motors =
-    frameClass === undefined ? null : frameLayout(frameClass, frameType ?? 0)
+  const motors = frameClass === undefined ? null : frameLayout(frameClass, frameType ?? 0)
 
   // One button per step of this frame's sequence, or Mission Planner's eight
   // when the frame is not one we can draw. A tricopter's step 3 is its tail
   // servo, which is a real step and gets a button like the rest.
-  const slots = motors
-    ? motors.map((m) => m.test).sort((a, b) => a - b)
-    : [1, 2, 3, 4, 5, 6, 7, 8]
+  const slots = motors ? motors.map((m) => m.test).sort((a, b) => a - b) : [1, 2, 3, 4, 5, 6, 7, 8]
 
   // Two rows, always, split as evenly as the count allows. Every multirotor
   // ArduPilot can draw has an even number of test steps -- a tricopter's four
@@ -685,13 +741,25 @@ function MotorTestCard() {
     return m.servo ? `Tail servo on channel ${m.n}` : `Motor ${m.n}`
   }
 
-  const stopAll = async () => {
+  /** DO_MOTOR_TEST at 0% for 0 s: ends whatever test is running, starts none. */
+  const sendStop = () => {
     for (let m = 1; m <= 8; m++) {
       void connectionService
         .runCommand(MAV_CMD_DO_MOTOR_TEST, [m, 0, 0, 0, 0, 0, 0], 2000)
         .catch(() => {})
     }
-    setStatus('Stop sent to all motors.')
+  }
+  const stopAll = () => {
+    sendStop()
+    setStatus({ text: 'Stop sent to all motors.', holdMs: MOTOR_STATUS_MS })
+  }
+  // Disabling stops first. Stop all is not there once the card is off, and a
+  // test started just before could otherwise run on for its full duration with
+  // nothing on screen able to end it.
+  const disable = () => {
+    sendStop()
+    setStatus(null)
+    setInterlocked(false)
   }
 
   return (
@@ -699,22 +767,32 @@ function MotorTestCard() {
     // friction is the confirm dialog, which is where it is actually read.
     // The result goes beside it rather than under the buttons, where an
     // empty hint collapsed and the card jumped on the first test.
+    // No "Props off" subtitle: the confirm behind Enable asks it, which is where
+    // it is read, and the line cost the card a row of height.
     <LaCard
       className="motor-test"
       title="Motor test"
-      subtitle="Props off"
       actions={
         <>
           {status && (
-            <span className="card-status" role="status" title={status}>
-              {status}
+            <span className="card-status" role="status" title={status.text}>
+              {status.text}
             </span>
+          )}
+          {/* On the title row, where it costs the card no height, and only
+              while the card is armed -- Disable sends the same stop on its
+              way out. Red, and an action: destructive controls are this app's
+              one standing exception to status-only color. */}
+          {interlocked && (
+            <LaButton variant="danger" onClick={stopAll}>
+              Stop all
+            </LaButton>
           )}
           {/* One switch for the whole card. It stays on the title row in both
               states so the row never empties, and the friction is the confirm
               dialog behind it rather than the button's absence. */}
           {interlocked ? (
-            <LaButton variant="ghost" onClick={() => setInterlocked(false)}>
+            <LaButton variant="ghost" onClick={disable}>
               Disable
             </LaButton>
           ) : (
@@ -735,31 +813,37 @@ function MotorTestCard() {
             height on the first Enable -- and it sits in a column with another
             card under it, which then jumped too. */}
         <fieldset className="motor-test__controls" disabled={!interlocked}>
-          <LaField label="Throttle" unit="%" htmlFor="mt-throttle">
-            <input
-              id="mt-throttle"
-              className="la-input la-input--num"
-              type="number"
-              min={0}
-              max={100}
-              value={throttle}
-              onChange={(e) => setThrottle(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
-            />
-          </LaField>
-          <LaField label="Duration" unit="s" htmlFor="mt-duration">
-            <input
-              id="mt-duration"
-              className="la-input la-input--num"
-              type="number"
-              min={0.5}
-              max={10}
-              step={0.5}
-              value={duration}
-              onChange={(e) =>
-                setDuration(Math.min(10, Math.max(0.5, Number(e.target.value) || 2)))
-              }
-            />
-          </LaField>
+          {/* Side by side rather than stacked: one row instead of two, on a
+              card whose height is the column's. */}
+          <div className="motor-test__levels">
+            <LaField label="Throttle" unit="%" htmlFor="mt-throttle">
+              <input
+                id="mt-throttle"
+                className="la-input la-input--num"
+                type="number"
+                min={0}
+                max={100}
+                value={throttle}
+                onChange={(e) =>
+                  setThrottle(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
+                }
+              />
+            </LaField>
+            <LaField label="Duration" unit="s" htmlFor="mt-duration">
+              <input
+                id="mt-duration"
+                className="la-input la-input--num"
+                type="number"
+                min={0.5}
+                max={10}
+                step={0.5}
+                value={duration}
+                onChange={(e) =>
+                  setDuration(Math.min(10, Math.max(0.5, Number(e.target.value) || 2)))
+                }
+              />
+            </LaField>
+          </div>
           {/* One width for the set, so nine buttons read as a keypad rather
               than as labels of nine different lengths. */}
           {/* Lettered, like Mission Planner's, because these are positions in
@@ -769,18 +853,16 @@ function MotorTestCard() {
               accessible name spells both out.
               Six to a row and two rows always: ArduPilot's ceiling is twelve
               motors, and a keypad that grew a row on a dodecahexa would move
-              the Stop under it and the whole card with it. */}
-          {/* The keys spin real motors, which the card's title does not say and
-              its props-off subtitle only hints at. */}
-          <p className="la-card__subtitle motor-test__what">Spin a motor</p>
+              the whole card with it. */}
+          {/* The keys spin real motors, which the card's title does not say. */}
+          <p className="la-card__subtitle motor-test__what">Spin motors</p>
           <div className="motor-test__keypad">
             {keyRows.map((row, i) => (
               <div
                 className="motor-test__row"
                 key={i}
                 // The row's own key count, so it can cap its width at that many
-                // keys and centre what is left -- a grid cannot ask "how many
-                // children have I got".
+                // keys -- a grid cannot ask "how many children have I got".
                 style={{ '--keys': row.length || 1 } as CSSProperties}
               >
                 {row.map((m) => (
@@ -797,17 +879,8 @@ function MotorTestCard() {
               </div>
             ))}
           </div>
-          <div className="la-row motor-test__buttons">
-            {/* Red, and an action: destructive controls are this app's one
-                standing exception to status-only color. */}
-            <LaButton variant="danger" onClick={() => void stopAll()}>
-              Stop all
-            </LaButton>
-          </div>
         </fieldset>
-        {motors && (
-          <FrameDiagram motors={motors} className="motor-test__art" labels="test" />
-        )}
+        {motors && <FrameDiagram motors={motors} className="motor-test__art" labels="test" />}
       </div>
       {confirming && (
         <LaModal
