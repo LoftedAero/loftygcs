@@ -235,8 +235,7 @@ function ImportButton() {
                controls they are rather than as a description of them. */
             <>
               Staged {result?.applied ?? 0} change{result?.applied === 1 ? '' : 's'} from{' '}
-              {result?.file} - review and choose <strong>Write params</strong> or{' '}
-              <strong>Revert changes</strong>
+              {result?.file} - review and choose <strong>Write</strong> or <strong>Revert</strong>
             </>
           )}
         </p>

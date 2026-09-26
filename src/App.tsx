@@ -7,6 +7,7 @@ import PreferencesModal from './ui/shell/PreferencesModal'
 import SerialChooserModal from './ui/shell/SerialChooserModal'
 import PreviewNotice from './ui/shell/PreviewNotice'
 import UnsavedChangesModal from './ui/shell/UnsavedChangesModal'
+import RebootPrompt from './ui/components/RebootPrompt'
 import { holdsVehicleTabs, tabFills, useUiStore, visibleTabs } from './stores/ui-store'
 import { useGuideStore } from './stores/guide-store'
 import { useConnectionStore } from './stores/connection-store'
@@ -22,6 +23,7 @@ import OutputsTab from './ui/tabs/outputs/OutputsTab'
 import PowerTab from './ui/tabs/power/PowerTab'
 import FailsafesTab from './ui/tabs/failsafes/FailsafesTab'
 import TuningTab from './ui/tabs/tuning/TuningTab'
+import FiltersTab from './ui/tabs/filters/FiltersTab'
 import OsdTab from './ui/tabs/osd/OsdTab'
 import ParamsTab from './ui/tabs/params/ParamsTab'
 import LogsTab from './ui/tabs/logs/LogsTab'
@@ -54,6 +56,8 @@ function SetupContent() {
       return <PowerTab />
     case 'failsafes':
       return <FailsafesTab />
+    case 'filters':
+      return <FiltersTab />
     case 'tuning':
       return <TuningTab />
     case 'osd':
@@ -113,6 +117,9 @@ export default function App() {
       <PreferencesModal />
       <SerialChooserModal />
       <UnsavedChangesModal />
+      {/* The one restart dialog, for whichever screen owed it -- see
+          RebootPrompt. Cards show only the reminder left after Later. */}
+      <RebootPrompt />
       {/* Last, so it sits over everything on first run. */}
       <PreviewNotice />
     </div>

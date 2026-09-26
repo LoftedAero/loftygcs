@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { LaButton, LaSelect } from './La'
-import BitmaskEditor, { describeBits } from './BitmaskEditor'
+import BitmaskEditor, { countBits, describeBits } from './BitmaskEditor'
+import { shortOption } from './option-names'
 import WriteFeedback from './WriteFeedback'
 import { useParamStore } from '../../stores/param-store'
 import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
@@ -8,8 +9,8 @@ import { connectionService } from '../../services/connection'
 
 // One control bound to a parameter by name -- the building block of every
 // curated view. Edits stage in the param store exactly like the Parameters
-// tab, so the action bar's Write Params covers all of them and nothing
-// reaches the vehicle on keystroke.
+// tab, so the Write on the card or column that owns them sends them together
+// and nothing reaches the vehicle on keystroke.
 //
 // `bare` drops the label wrapper for table layouts (Ports, Outputs), where
 // the column heading is the label.
@@ -37,6 +38,10 @@ export default function ParamField({
   showName,
   disabled,
   numeric,
+  withValues,
+  optionLabels,
+  bitmaskCount,
+  shortOptions,
 }: {
   param: string
   label: string
@@ -93,6 +98,38 @@ export default function ParamField({
    * values are hardware names that belong in a list.
    */
   numeric?: boolean
+  /**
+   * Put each named value's number beside its name: "Crisp (0.1)".
+   *
+   * For a dropdown whose names are presets on a physical scale rather than an
+   * enumeration -- ATC_INPUT_TC's Very Soft to Very Crisp are time constants
+   * in seconds, and the word alone hides the number a tuning guide or a log
+   * quotes. Per field, like `numeric`, for the same reason: in an enumeration
+   * such as a frame class the number is an index and would only be noise.
+   */
+  withValues?: boolean
+  /**
+   * Short names for a dropdown's values, where ArduPilot's are sentences.
+   *
+   * OSD_SW_METHOD's options are "switch to next screen if channel value was
+   * changed" and two like it: in any control narrower than the page they are
+   * the same first dozen characters cut off. The full sentence for the chosen
+   * value stays in the hover text. A value not listed keeps its own name.
+   */
+  optionLabels?: Record<number, string>
+  /**
+   * A bitmask as how many options are set -- "2 selected", "none" -- rather than
+   * their names. For a control too narrow to show a name whole: OSD_OPTIONS
+   * in the OSD column read "UseDecimalPac". The names are the hover text,
+   * and the editor is a click away.
+   */
+  bitmaskCount?: boolean
+  /**
+   * ArduPilot's sentence-length value names, shortened (`option-names.ts`):
+   * "Yes(minimum PWM when disarmed)" as "Yes, min PWM". The full name of the
+   * chosen value is the hover text.
+   */
+  shortOptions?: boolean
 }) {
   const entry = useParamStore((s) => s.entries.get(param))
   const meta = useParamStore((s) => s.metadata[param])
@@ -145,6 +182,11 @@ export default function ParamField({
 
   commitRef.current = commit
 
+  // One name is a sentinel, not a list to choose from: 4.7's BATT_VOLT_PIN
+  // names only -1, "Disabled", so as a dropdown it offered that and the bare
+  // 13 it was set to, and no way to pick any other pin.
+  const listed = Object.keys(meta?.values ?? {}).length > 1
+
   if (!entry) {
     if (bare) {
       // A table row's control, greyed rather than dashed when the row is one a
@@ -172,10 +214,18 @@ export default function ParamField({
         >
           <label className="la-field__label">{label}</label>
           {showName && <span className="la-field__param">{param}</span>}
-          <LaSelect disabled value="">
-            <option value="">—</option>
-          </LaSelect>
-          {showName && <span className="la-field__unit">{unit ?? ''}</span>}
+          {/* The control it will become, which the metadata already knows
+              for a parameter the vehicle has not created yet: a capacity
+              drawn as a dropdown turned into a number box the moment the
+              second battery was switched on. */}
+          {listed || meta?.bitmask ? (
+            <LaSelect disabled value="">
+              <option value="">—</option>
+            </LaSelect>
+          ) : (
+            <input className="la-input la-input--num" type="number" disabled placeholder="—" />
+          )}
+          {showName && <span className="la-field__unit">{unit ?? meta?.units ?? ''}</span>}
         </div>
       )
     }
@@ -200,7 +250,15 @@ export default function ParamField({
         title={describeBits(entry.value, meta.bitmask, 99)}
         onClick={() => setBitmaskOpen(true)}
       >
-        {describeBits(entry.value, meta.bitmask, 2)}
+        {/* Its own element, so the ellipsis applies: text sitting directly
+            in the button's flex box is clipped with no ellipsis at all, and
+            "UseDecimalPack" cut to "UseDecimalPac" read as a typo rather
+            than as more to see. */}
+        <span className="param-bitmask__text">
+          {bitmaskCount
+            ? countBits(entry.value, meta.bitmask)
+            : describeBits(entry.value, meta.bitmask, 2)}
+        </span>
       </LaButton>
       {bitmaskOpen && (
         <BitmaskEditor
@@ -216,17 +274,22 @@ export default function ParamField({
         />
       )}
     </>
-  ) : meta?.values && !numeric ? (
+  ) : meta?.values && listed && !numeric ? (
     <LaSelect
       value={String(entry.value)}
       disabled={disabled}
       onChange={(e) => commit(Number(e.target.value))}
       className={entry.dirty ? 'is-dirty' : ''}
-      title={meta.description ?? param}
+      title={
+        optionLabels || shortOptions
+          ? (meta.values[entry.value] ?? meta.description ?? param)
+          : (meta.description ?? param)
+      }
     >
       {Object.entries(meta.values).map(([v, l]) => (
         <option key={v} value={v}>
-          {l}
+          {optionLabels?.[Number(v)] ??
+            (shortOptions ? shortOption(l) : withValues ? `${l} (${v})` : l)}
         </option>
       ))}
       {meta.values[entry.value] === undefined && (
@@ -286,15 +349,13 @@ export default function ParamField({
   const unitText = unit ?? meta?.units
   return (
     <div
-      className={
-        [
-          stacked ? 'la-field la-field--stacked' : 'la-field',
-          showName ? 'la-field--named' : '',
-          disabled ? 'la-field--off' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')
-      }
+      className={[
+        stacked ? 'la-field la-field--stacked' : 'la-field',
+        showName ? 'la-field--named' : '',
+        disabled ? 'la-field--off' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       title={meta?.description ?? param}
     >
       {/* Four columns rather than two: what the setting does, the ArduPilot

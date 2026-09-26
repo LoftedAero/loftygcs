@@ -143,7 +143,8 @@ If you have twenty minutes and no hardware, this is the useful path:
 3. **Mission** — press *Read vehicle*, drag a waypoint, add one with the
    palette above the map, change a row's command in the table.
 4. **Setup ▸ Parameters** — search, edit, and notice what happens when you
-   do. (Nothing is written until you press *Write Params*.)
+   do. (Nothing is written until you press *Write params* in the column
+   beside the table.)
 
 With a flight controller, the parts most worth exercising are **Setup ▸
 Radio** and **Setup ▸ Sensors** — the calibration flows are the ones designed

@@ -24,7 +24,18 @@ import { rebootAutopilot } from '../../services/flight'
 // appearing there made the card grow the moment somebody pressed Later. The
 // reason it is owed is kept as the hover text, because the row has room for
 // "Reboot required" and a button, not a sentence.
-export default function RebootPrompt() {
+/**
+ * A restart the vehicle owes, in one of two shapes.
+ *
+ * The dialog is mounted **once**, in the app shell: every card's actions used
+ * to carry a whole prompt, so a screen with three cards stacked three dialogs
+ * on top of each other, and a screen with none -- OSD, whose column uses
+ * `VehicleParamActions` -- showed nothing at all when OSD_TYPE asked for a
+ * restart, until a card-style Write mounted somewhere later and the prompt
+ * surfaced over it. `inline` is what a card's title row keeps: after Later,
+ * "Reboot required" and the button, where the edit was made.
+ */
+export default function RebootPrompt({ inline = false }: { inline?: boolean }) {
   const pending = useWriteFeedbackStore((s) => s.rebootPending)
   const deferred = useWriteFeedbackStore((s) => s.rebootDeferred)
   const defer = useWriteFeedbackStore((s) => s.deferReboot)
@@ -40,6 +51,8 @@ export default function RebootPrompt() {
     // a rejection is not news -- the link status says the rest.
     void rebootAutopilot().catch(() => {})
   }
+
+  if (inline !== deferred) return null
 
   if (deferred) {
     return (

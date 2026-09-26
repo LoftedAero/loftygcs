@@ -47,6 +47,13 @@ export default function AppBar() {
   const setPreferencesOpen = useUiStore((s) => s.setPreferencesOpen)
 
   const busy = phase === 'opening' || phase === 'handshaking'
+  // A reboot wait is a link in progress, not an absent one: the service is
+  // already reopening the same port, and a second Connect would race it for
+  // the device -- on serial, putting a chooser up over a reconnect that was
+  // about to succeed. The wait ends itself (REBOOT_RETURN_MS in the service),
+  // dropping to an error that re-enables Connect, and Disconnect stays live
+  // throughout as the way to give up sooner.
+  const linked = busy || phase === 'connected' || phase === 'linkLost' || phase === 'rebooting'
 
   const connect = () => {
     if (selectedKind === 'serial') {
@@ -105,7 +112,7 @@ export default function AppBar() {
       <div className="app-bar__band app-bar__band--right">
         <LaSelect
           value={selectedKind}
-          disabled={busy || phase === 'connected' || phase === 'linkLost'}
+          disabled={linked}
           onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
           title="Connection type"
         >
@@ -120,11 +127,7 @@ export default function AppBar() {
           <option value="ws">WebSocket</option>
           <option value="virtual">Demo</option>
         </LaSelect>
-        <LaButton
-          variant="primary"
-          disabled={busy || phase === 'connected' || phase === 'linkLost'}
-          onClick={connect}
-        >
+        <LaButton variant="primary" disabled={linked} onClick={connect}>
           Connect
         </LaButton>
         <LaButton

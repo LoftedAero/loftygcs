@@ -65,10 +65,10 @@ describe('parameters opened from a file', () => {
     // that there is nothing to write it to.
     expect(useParamStore.getState().dirtyCount).toBe(1)
     render(<VehicleParamActions />)
-    expect(btn(/Write params/).disabled).toBe(true)
+    expect(btn(/^Write/).disabled).toBe(true)
     expect(btn(/Reload from vehicle/).disabled).toBe(true)
     // Reverting an edit to a file is still an edit to a file.
-    expect(btn(/Revert changes/).disabled).toBe(false)
+    expect(btn(/^Revert$/).disabled).toBe(false)
     expect(screen.getByText(/came from a file/)).toBeTruthy()
   })
 
@@ -80,7 +80,7 @@ describe('parameters opened from a file', () => {
     useParamStore.getState().edit('ATC_RAT_PIT_P', 0.2)
     useConnectionStore.setState({ phase: 'connected' })
     render(<VehicleParamActions />)
-    expect(btn(/Write params/).disabled).toBe(true)
+    expect(btn(/^Write/).disabled).toBe(true)
   })
 
   it('offers both once the set came from the vehicle', () => {
@@ -89,7 +89,7 @@ describe('parameters opened from a file', () => {
     useConnectionStore.setState({ phase: 'connected' })
     render(<VehicleParamActions />)
     expect(useParamStore.getState().source).toBe('vehicle')
-    expect(btn(/Write params/).disabled).toBe(false)
+    expect(btn(/^Write/).disabled).toBe(false)
     expect(btn(/Reload from vehicle/).disabled).toBe(false)
   })
 })

@@ -1,10 +1,6 @@
 import { create } from 'zustand'
 import { frameName, knownAirframe, type KnownAirframe } from '../protocol/airframe'
-import {
-  boardNameFromBanner,
-  parseRcoutBanner,
-  type RcoutBanner,
-} from '../protocol/rcout-banner'
+import { boardNameFromBanner, parseRcoutBanner, type RcoutBanner } from '../protocol/rcout-banner'
 import type { FirmwareVersion } from '../protocol/types'
 
 // Throttled snapshot of vehicle state for ordinary React components (mode
@@ -15,6 +11,13 @@ export interface StatusText {
   severity: number
   text: string
   at: number
+}
+
+/** One monitor's reading: volts or null, amps and percent with -1 for unmeasured. */
+export interface BatteryReading {
+  voltageV: number | null
+  currentA: number
+  remainingPct: number
 }
 
 export interface VehicleSnapshot {
@@ -42,6 +45,12 @@ export interface VehicleSnapshot {
   batteryV: number
   batteryA: number
   batteryPct: number
+  /**
+   * Each monitor's own reading from BATTERY_STATUS, keyed by instance (0 is
+   * BATT_, 1 is BATT2_). Empty until one arrives; the three fields above are
+   * SYS_STATUS's primary and stay what the bar and HUD read.
+   */
+  batteries: Record<number, BatteryReading>
   gpsFix: number
   gpsSats: number
   gpsHdop: number
@@ -145,6 +154,7 @@ const EMPTY: VehicleSnapshot = {
   batteryV: 0,
   batteryA: 0,
   batteryPct: -1,
+  batteries: {},
   gpsFix: 0,
   gpsSats: 0,
   gpsHdop: 0,

@@ -1,7 +1,17 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ConfigurationTab from './ConfigurationTab'
 import { useParamStore } from '../../../stores/param-store'
+import { useConnectionStore } from '../../../stores/connection-store'
+
+const setParamNow = vi.fn<(name: string, value: number) => Promise<number>>(async (_n, v) => v)
+const refreshParams = vi.fn<(opts: { quiet?: boolean }) => Promise<void>>(async () => {})
+vi.mock('../../../services/connection', () => ({
+  connectionService: {
+    setParamNow: (name: string, value: number) => setParamNow(name, value),
+    refreshParams: (opts: { quiet?: boolean }) => refreshParams(opts),
+  },
+}))
 
 // Configuration draws itself from what the aircraft reports, because the two
 // vehicles have almost nothing in common here: a multirotor has FRAME_CLASS,
@@ -68,13 +78,13 @@ describe('Configuration, per vehicle', () => {
     })
     render(<ConfigurationTab />)
     expect(screen.getByText('Airspeed')).toBeTruthy()
-    expect(screen.getByText('Flight envelope')).toBeTruthy()
     expect(screen.getByText('Cruise airspeed')).toBeTruthy()
-    expect(screen.getByText('Roll limit')).toBeTruthy()
+    // The attitude limits moved to Tuning's Attitude card.
+    expect(screen.queryByText('Flight envelope')).toBeNull()
+    expect(screen.queryByText('ROLL_LIMIT_DEG')).toBeNull()
     // The names go on the labels, because this is where somebody carries an
     // answer between the wiki, the forums and the Parameters tab.
     expect(screen.getByText('AIRSPEED_CRUISE')).toBeTruthy()
-    expect(screen.getByText('ROLL_LIMIT_DEG')).toBeTruthy()
     // The throttle that holds the cruise speed reads with the speeds, not with
     // the attitude limits.
     expect(screen.getByText('TRIM_THROTTLE')).toBeTruthy()
@@ -99,6 +109,22 @@ describe('Configuration, per vehicle', () => {
     // The multirotor family is offered by the calculation and dropped here,
     // because this aircraft does not report it.
     expect(screen.queryByText('MOT_THST_EXPO')).toBeNull()
+  })
+
+  it('writes Q_ENABLE when chosen and re-reads, which is where the VTOL set comes from', async () => {
+    // Measured on ArduPlane 4.7.1: Q_ENABLE=1 exposes ~200 Q_ parameters with
+    // no restart -- but only to a GCS that reads the list again.
+    useConnectionStore.setState({ phase: 'connected' } as never)
+    seed({ Q_ENABLE: 0, AIRSPEED_CRUISE: 22 })
+    useParamStore.setState({
+      metadata: { Q_ENABLE: { values: { 0: 'Disabled', 1: 'Enabled' } } },
+    } as never)
+    render(<ConfigurationTab />)
+    const select = screen.getByText('Q_ENABLE').closest('.la-field')!.querySelector('select')!
+    fireEvent.change(select, { target: { value: '1' } })
+    expect(setParamNow).toHaveBeenCalledWith('Q_ENABLE', 1)
+    await waitFor(() => expect(refreshParams).toHaveBeenCalledWith({ quiet: true }))
+    useConnectionStore.setState({ phase: 'idle' } as never)
   })
 
   // A card's Revert and Write are absent until it has something to send, not

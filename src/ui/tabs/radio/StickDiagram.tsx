@@ -1,4 +1,4 @@
-import type { StickFunction } from './radio-cal'
+import type { Direction, StickFunction } from './radio-cal'
 import { STICK_SPECS } from './radio-cal'
 
 // The transmitter, drawn so the instruction is unmistakable. QGC's radio page
@@ -6,78 +6,117 @@ import { STICK_SPECS } from './radio-cal'
 // than describing it in a sentence you have to translate.
 //
 // Drawn for a mode-2 transmitter (throttle and yaw on the left), which is
-// what the great majority of ArduPilot users fly. The gates and the arrow are
-// the whole point, so nothing else is decorated.
+// what the great majority of ArduPilot users fly. It is drawn to look like one
+// -- a square gate in a round gimbal bezel, a dial at each top corner, a
+// screen between -- because a picture that reads as a transmitter at a glance
+// is one nobody has to decode before following it. Chosen from five concepts;
+// the angled switches and antenna of an earlier one read as odd at this size.
+// The gates, knobs and arrow keep the only color.
 
-const GATE_R = 26
+/** Half the side of a square gimbal gate. */
+const GATE = 28
+/** The round bezel a gimbal sits in, around its gate. */
+const BEZEL_R = GATE + 8
 const KNOB_R = 9
 /** How far the knob sits from center when a step calls for full deflection. */
-const THROW = GATE_R - KNOB_R - 2
+const THROW = GATE - KNOB_R - 3
+const CY = 88
+const CX = { left: 72, right: 168 } as const
+const DIALS = [30, 210]
 
 export interface StickDiagramProps {
-  /** The function being identified, or null to draw both sticks centered. */
+  /** The function being asked for, or null when none is. */
   active: StickFunction | null
-  /** Live stick positions, -1..1, when the mapping is known. */
-  live?: { left: { x: number; y: number }; right: { x: number; y: number } } | undefined
+  /** Which way it is asked for; the max direction unless it says otherwise. */
+  direction?: Direction
+  /**
+   * Where the throttle rests while it is not the stick being asked for. Down
+   * by default, since a throttle has no spring and "centered" is not where it
+   * sits; up through the yaw steps of the calibration, which keeps them
+   * clear of the rudder-arm gesture (see IDENTIFY_STEPS).
+   */
+  throttle?: 'up' | 'down'
 }
 
-export default function StickDiagram({ active, live }: StickDiagramProps) {
+export default function StickDiagram({
+  active,
+  direction = 'max',
+  throttle = 'down',
+}: StickDiagramProps) {
   const spec = active ? STICK_SPECS[active] : null
+  // +1 toward the max direction's side of the drawing, -1 toward the min's.
+  const toward = direction === 'max' ? 1 : -1
 
   const offsetFor = (side: 'left' | 'right') => {
+    // Mode 2: the left stick's vertical is the throttle.
+    const off = { x: 0, y: side === 'left' ? (throttle === 'up' ? -THROW : THROW) : 0 }
     if (spec && spec.stick === side) {
       // Screen y grows downward, so an "up" instruction is a negative offset.
-      const d = THROW * spec.sense
-      return spec.axis === 'x' ? { x: d, y: 0 } : { x: 0, y: -d }
+      const d = THROW * spec.sense * toward
+      if (spec.axis === 'x') off.x = d
+      else off.y = -d
     }
-    if (live) {
-      const p = live[side]
-      return { x: p.x * THROW, y: -p.y * THROW }
-    }
-    return { x: 0, y: 0 }
+    return off
   }
 
   return (
     <svg
       className="stick-diagram"
-      viewBox="0 0 220 118"
+      viewBox="0 0 240 152"
       role="img"
       aria-label={
         spec
-          ? `Move the ${spec.label.toLowerCase()} stick ${spec.maxDirection}`
-          : 'Transmitter sticks centered'
+          ? `Move the ${spec.label.toLowerCase()} stick ${direction === 'max' ? spec.maxDirection : spec.minDirection}`
+          : 'Transmitter with the sticks centered and the throttle down'
       }
     >
-      {/* Body */}
-      <rect x="6" y="20" width="208" height="92" rx="14" className="stick-diagram__body" />
-      {/* Antenna, purely so the shape reads as a transmitter at a glance */}
-      <line x1="34" y1="20" x2="20" y2="4" className="stick-diagram__antenna" />
+      <rect x="8" y="20" width="224" height="124" rx="22" className="stick-diagram__case" />
+      {/* A dial at each top corner, its pointer at twelve o'clock. */}
+      {DIALS.map((x) => (
+        <g key={x} className="stick-diagram__dial">
+          <circle cx={x} cy="36" r="7" />
+          <line x1={x} y1="30" x2={x} y2="34" />
+        </g>
+      ))}
+      <rect x="102" y="34" width="36" height="22" rx="3" className="stick-diagram__screen" />
 
       {(['left', 'right'] as const).map((side) => {
-        const cx = side === 'left' ? 68 : 152
-        const cy = 66
+        const cx = CX[side]
         const off = offsetFor(side)
         const isActive = spec?.stick === side
         return (
           <g key={side}>
-            <circle
-              cx={cx}
-              cy={cy}
-              r={GATE_R}
+            <circle cx={cx} cy={CY} r={BEZEL_R} className="stick-diagram__bezel" />
+            <rect
+              x={cx - GATE}
+              y={CY - GATE}
+              width={GATE * 2}
+              height={GATE * 2}
+              rx="9"
               className={`stick-diagram__gate${isActive ? ' is-active' : ''}`}
             />
             {/* Cross-hairs give the eye a center to judge deflection against */}
-            <line x1={cx - 7} y1={cy} x2={cx + 7} y2={cy} className="stick-diagram__cross" />
-            <line x1={cx} y1={cy - 7} x2={cx} y2={cy + 7} className="stick-diagram__cross" />
+            <line x1={cx - 7} y1={CY} x2={cx + 7} y2={CY} className="stick-diagram__cross" />
+            <line x1={cx} y1={CY - 7} x2={cx} y2={CY + 7} className="stick-diagram__cross" />
+            {/* Along the row or column the knob is on: yaw with the throttle
+                held up is pushed along the top of the gate, not its middle. */}
             {isActive && spec && (
-              <Arrow cx={cx} cy={cy} axis={spec.axis} sense={spec.sense} />
+              <Arrow
+                cx={spec.axis === 'y' ? cx + off.x : cx}
+                cy={spec.axis === 'x' ? CY + off.y : CY}
+                axis={spec.axis}
+                sense={(spec.sense * toward) as 1 | -1}
+              />
             )}
-            <circle
-              cx={cx + off.x}
-              cy={cy + off.y}
-              r={KNOB_R}
+            <g
               className={`stick-diagram__knob${isActive ? ' is-active' : ''}`}
-            />
+              style={{ transform: `translate(${off.x}px, ${off.y}px)` }}
+            >
+              <circle cx={cx} cy={CY} r={KNOB_R} />
+              {/* The stick end's rim, so the knob reads as a stick seen from
+                  above rather than a dot. */}
+              <circle cx={cx} cy={CY} r={KNOB_R - 4} className="stick-diagram__knob-top" />
+            </g>
           </g>
         )
       })}
@@ -96,13 +135,10 @@ function Arrow({
   axis: 'x' | 'y'
   sense: 1 | -1
 }) {
-  const reach = GATE_R + 15
-  const tip =
-    axis === 'x' ? { x: cx + reach * sense, y: cy } : { x: cx, y: cy - reach * sense }
+  const reach = GATE + 15
+  const tip = axis === 'x' ? { x: cx + reach * sense, y: cy } : { x: cx, y: cy - reach * sense }
   const from =
-    axis === 'x'
-      ? { x: cx + (GATE_R + 3) * sense, y: cy }
-      : { x: cx, y: cy - (GATE_R + 3) * sense }
+    axis === 'x' ? { x: cx + (GATE + 3) * sense, y: cy } : { x: cx, y: cy - (GATE + 3) * sense }
   // Head drawn as a triangle pointing along the same axis.
   const w = 5
   const head =

@@ -60,7 +60,7 @@ export default memo(function ParamRow({ name }: { name: string }) {
       <span className="param-row__unit">{meta?.units ?? ''}</span>
 
       {/* Undo this one edit, beside the value it undoes.
-          The column's Revert changes throws away every staged edit at once,
+          The column's Revert throws away every staged edit at once,
           which is the wrong instrument for "that one was a typo" in a table
           of eight hundred rows -- there was no way to put a single value
           back except remembering it and typing it again. The cell is always
@@ -169,4 +169,3 @@ export default memo(function ParamRow({ name }: { name: string }) {
     </div>
   )
 })
-

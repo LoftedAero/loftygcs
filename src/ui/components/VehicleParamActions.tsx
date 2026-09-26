@@ -1,29 +1,38 @@
-import { useState } from 'react'
 import { LaButton, LaHint } from './La'
 import { useParamStore } from '../../stores/param-store'
 import { useConnectionStore } from '../../stores/connection-store'
 import { connectionService } from '../../services/connection'
-import WriteParamsModal from '../shell/WriteParamsModal'
+import { useParamWrite } from './CardParamActions'
 import RebootButton from './RebootButton'
 
-// Write, revert, reload — the three things every page that edits parameters
-// needs, in one place so the pages cannot drift apart.
+// Write, revert, reload -- what a screen with an actions column needs to
+// send its parameters, in one place so the columns cannot drift apart.
 //
-// These used to live only in the global footer. They moved onto the pages
-// once leaving a page with unwritten edits started asking first: the edits
-// belong to the page, so the buttons that send them do too. The footer still
-// carries them for the Setup tabs that have no column of their own.
+// **The same Write as a card's, kept in view.** It shares the card's
+// behavior (`useParamWrite`): "Write (N)" carries the count, where the column
+// had a "staged" pill beside a "Write params" button; the same confirmation;
+// the same restart dialog when what was written is read at boot, where the
+// column had a note under its reboot button; and a scope, so OSD's Write
+// sends the OSD's parameters and not an edit staged on another screen. What
+// differs is deliberate: the pair is always present rather than appearing
+// with the first edit, because the column is the page's one place to write
+// from and nothing under it may move.
 
 export interface VehicleParamActionsProps {
   /** Heading for the group; pages name it for what they edit. */
   title?: string
+  /** Which parameters this column writes; everything staged when left out. */
+  owns?: (param: string) => boolean
+  /** The restart dialog's question when what was written is read at boot. */
+  reason?: string
 }
 
-export default function VehicleParamActions({ title = 'Vehicle' }: VehicleParamActionsProps) {
-  const dirtyCount = useParamStore((s) => s.dirtyCount)
-  const writeBusy = useParamStore((s) => s.writeBusy)
+export default function VehicleParamActions({
+  title = 'Vehicle',
+  owns,
+  reason = 'Parameter changes take effect after a restart',
+}: VehicleParamActionsProps) {
   const lastWrite = useParamStore((s) => s.lastWrite)
-  const metadata = useParamStore((s) => s.metadata)
   const connected = useConnectionStore((s) => s.phase === 'connected')
   // A set read from a file is a document, not an aircraft. Write and Reload
   // are the two buttons that need something on the other end -- exactly the
@@ -32,44 +41,32 @@ export default function VehicleParamActions({ title = 'Vehicle' }: VehicleParamA
   // file.
   const fromFile = useParamStore((s) => s.source === 'file')
   const canReachVehicle = connected && !fromFile
-  const [confirming, setConfirming] = useState(false)
-
-  const needsReboot = (lastWrite?.written ?? []).some((n) => metadata[n]?.rebootRequired)
-
-  const write = () => {
-    setConfirming(false)
-    void connectionService.writeDirtyParams().then((result) => {
-      useParamStore.getState().setLastWrite(result)
-    })
-  }
+  const w = useParamWrite({ reason, owns })
 
   return (
     <section className="app-col__group">
-      <WriteParamsModal open={confirming} onConfirm={write} onCancel={() => setConfirming(false)} />
-      <div className="app-col__headrow">
-        <h3 className="app-col__head">{title}</h3>
-        {dirtyCount > 0 && <span className="mission-badge is-dirty">{dirtyCount} staged</span>}
-      </div>
+      {w.modal}
+      <h3 className="app-col__head">{title}</h3>
       <LaButton
         variant="primary"
         size="block"
-        disabled={dirtyCount === 0 || writeBusy || !canReachVehicle}
-        onClick={() => setConfirming(true)}
+        disabled={w.dirtyCount === 0 || w.writeBusy || !canReachVehicle}
+        onClick={w.confirm}
       >
-        {writeBusy ? 'Writing…' : 'Write params'}
-      </LaButton>
-      <LaButton
-        variant="secondary"
-        size="block"
-        disabled={writeBusy || dirtyCount === 0}
-        onClick={() => useParamStore.getState().revertAll()}
-      >
-        Revert changes
+        {w.label}
       </LaButton>
       <LaButton
         variant="ghost"
         size="block"
-        disabled={writeBusy || !canReachVehicle}
+        disabled={w.writeBusy || w.dirtyCount === 0}
+        onClick={w.revert}
+      >
+        Revert
+      </LaButton>
+      <LaButton
+        variant="ghost"
+        size="block"
+        disabled={w.writeBusy || !canReachVehicle}
         onClick={() => void connectionService.refreshParams()}
       >
         Reload from vehicle
@@ -81,17 +78,15 @@ export default function VehicleParamActions({ title = 'Vehicle' }: VehicleParamA
             : 'Connect a vehicle to write or reload.'}
         </LaHint>
       )}
-      {lastWrite && (
-        <LaHint error={lastWrite.failed.length > 0}>
-          {lastWrite.failed.length > 0
-            ? `Wrote ${lastWrite.written.length}; failed: ${lastWrite.failed.join(', ')}`
-            : `Wrote ${lastWrite.written.length} parameter${lastWrite.written.length === 1 ? '' : 's'}.`}
+      {/* Failures only. A write that went through shows as its count going
+          back to plain "Write", as a card's does; one that did not leaves its
+          parameters staged, and this names them. */}
+      {lastWrite && lastWrite.failed.length > 0 && (
+        <LaHint error>
+          Wrote {lastWrite.written.length}; failed: {lastWrite.failed.join(', ')}
         </LaHint>
       )}
-      {/* The metadata already knows which parameters the firmware only reads
-          at boot, so the page can say when a reboot is the next step rather
-          than leaving it to be remembered. */}
-      <RebootButton note={needsReboot ? 'Some of what you wrote takes effect on reboot.' : ''} />
+      <RebootButton />
     </section>
   )
 }

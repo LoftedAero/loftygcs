@@ -169,6 +169,20 @@ export type TelemetryDelta =
       climbMs: number
     }
   | { k: 'battery'; voltageV: number; currentA: number; remainingPct: number }
+  /**
+   * One battery monitor's own reading, from BATTERY_STATUS. `id` is the
+   * monitor's instance: 0 is BATT_, 1 is BATT2_. SYS_STATUS carries only the
+   * primary, so this is the only place a second pack is heard from. Voltage
+   * is null when the message says none was measured; current and remaining
+   * keep the wire's -1 for the same.
+   */
+  | {
+      k: 'batteryStatus'
+      id: number
+      voltageV: number | null
+      currentA: number
+      remainingPct: number
+    }
   | { k: 'gps'; fixType: number; satellites: number; hdop: number }
   | { k: 'rc'; channels: number[]; rssi: number }
   /**

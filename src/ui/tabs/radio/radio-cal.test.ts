@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  IDENTIFY_STEPS,
   MIN_DEFLECTION_US,
+  STICK_FUNCTIONS,
   STICK_SPECS,
   buildWrites,
   claimedChannels,
@@ -8,6 +10,7 @@ import {
   detectDeflection,
   exercisedChannels,
   mappingFromDeflection,
+  reachedMin,
   updateTravel,
   type CalibrationResult,
   type Travel,
@@ -246,5 +249,55 @@ describe('buildWrites', () => {
       'RC1_REVERSED',
       'RCMAP_ROLL',
     ])
+  })
+})
+
+describe('the identify steps', () => {
+  it('takes every stick both ways', () => {
+    for (const fn of STICK_FUNCTIONS) {
+      expect(IDENTIFY_STEPS.filter((s) => s.fn === fn).map((s) => s.direction)).toEqual([
+        'max',
+        'min',
+      ])
+    }
+  })
+
+  it('never asks for yaw with the throttle down, which is the rudder-arm gesture', () => {
+    const up = IDENTIFY_STEPS.findIndex((s) => s.fn === 'throttle' && s.direction === 'max')
+    const down = IDENTIFY_STEPS.findIndex((s) => s.fn === 'throttle' && s.direction === 'min')
+    IDENTIFY_STEPS.forEach((s, i) => {
+      if (s.fn === 'yaw') expect(i > up && i < down).toBe(true)
+    })
+  })
+})
+
+describe('reachedMin', () => {
+  const centered = [1500, 1500, 1000, 1500]
+
+  it('wants a centered stick past center the other way', () => {
+    const yaw = { channel: 4, reversed: false }
+    expect(reachedMin(STICK_SPECS.yaw, yaw, centered, [], [1500, 1500, 1000, 1400])).toBe(false)
+    expect(reachedMin(STICK_SPECS.yaw, yaw, centered, [], [1500, 1500, 1000, 1100])).toBe(true)
+  })
+
+  it('reads a reversed channel the other way round', () => {
+    // Pitch back gave the lower pulse, so forward is the higher one.
+    const pitch = { channel: 2, reversed: true }
+    expect(reachedMin(STICK_SPECS.pitch, pitch, centered, [], [1500, 1100, 1000, 1500])).toBe(false)
+    expect(reachedMin(STICK_SPECS.pitch, pitch, centered, [], [1500, 1900, 1000, 1500])).toBe(true)
+  })
+
+  it('wants the throttle most of the way back down from the top it reached', () => {
+    const throttle = { channel: 3, reversed: false }
+    const travel = [undefined, undefined, { min: 1000, max: 2000 }] as never
+    expect(reachedMin(STICK_SPECS.throttle, throttle, centered, travel, [0, 0, 1500, 0])).toBe(
+      false,
+    )
+    expect(reachedMin(STICK_SPECS.throttle, throttle, centered, travel, [0, 0, 1100, 0])).toBe(true)
+  })
+
+  it('ignores every channel but the one the max step found', () => {
+    const roll = { channel: 1, reversed: false }
+    expect(reachedMin(STICK_SPECS.roll, roll, centered, [], [1500, 1500, 1000, 1000])).toBe(false)
   })
 })

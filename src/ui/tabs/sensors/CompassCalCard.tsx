@@ -33,7 +33,7 @@ export default function CompassCalCard() {
         <>
           {/* On the title row with the actions: the reminder left after
               Later, which as a block in the body grew the card. */}
-          <RebootPrompt />
+          <RebootPrompt inline />
           <LaButton variant="secondary" disabled={!anyUsed} onClick={() => setCalibrating(true)}>
             Calibrate compass
           </LaButton>

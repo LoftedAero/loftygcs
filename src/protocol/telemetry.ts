@@ -107,6 +107,19 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           health: f.onboardControlSensorsHealth as number,
         },
       ]
+    case 'BATTERY_STATUS':
+      return [
+        {
+          k: 'batteryStatus',
+          id: f.id as number,
+          voltageV: packVoltage(
+            (f.voltages as number[] | undefined) ?? [],
+            (f.voltagesExt as number[] | undefined) ?? [],
+          ),
+          currentA: (f.currentBattery as number) < 0 ? -1 : (f.currentBattery as number) / 100,
+          remainingPct: f.batteryRemaining as number,
+        },
+      ]
     case 'GPS_RAW_INT':
       return [
         {
@@ -146,6 +159,24 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
     default:
       return []
   }
+}
+
+/**
+ * A pack's total from BATTERY_STATUS's cell slots, in volts, or null.
+ *
+ * The slots are cells only when the monitor measures cells. ArduPilot's
+ * `send_battery_status` otherwise writes the pack total into the first slot
+ * and, past the 65,534 mV a slot can hold, carries the rest into the next --
+ * so the total is the sum of every used slot either way. Unused is 65535 in
+ * `voltages` and 0 (or 65535) in the extension.
+ */
+export function packVoltage(voltages: readonly number[], ext: readonly number[]): number | null {
+  const UNUSED = 0xffff
+  const used = [
+    ...voltages.filter((mv) => mv !== UNUSED),
+    ...ext.filter((mv) => mv !== 0 && mv !== UNUSED),
+  ]
+  return used.length ? used.reduce((a, b) => a + b, 0) / 1000 : null
 }
 
 /**

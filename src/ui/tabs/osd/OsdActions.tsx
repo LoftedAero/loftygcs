@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { LaButton, LaHint, LaModal } from '../../components/La'
 import VehicleParamActions from '../../components/VehicleParamActions'
+import ParamField from '../../components/ParamField'
+import type { ParamFieldSpec } from '../../components/ParamCard'
 import { useParamStore } from '../../../stores/param-store'
 import { parseParamFile, sameValue } from '../../../protocol/param-file'
 
@@ -23,11 +25,23 @@ export function isOsdParam(name: string): boolean {
   return /^OSD\d?_/.test(name)
 }
 
-export default function OsdActions() {
+/**
+ * The OSD's one column: what you do first -- vehicle actions, the layout file
+ * -- and what you set after, as groups of the same tile (`children`), the
+ * order every screen's column keeps.
+ */
+export default function OsdActions({ children }: { children?: ReactNode }) {
   return (
-    <div className="app-col-shell osd-actions">
-      <div className="app-col">
-        <VehicleParamActions title="OSD" />
+    <div className="app-col-shell">
+      <div className="app-col app-col--fields">
+        {/* Scoped to the OSD's own parameters, as a card's Write is to its
+            card's: an edit staged on another screen is not this page's to
+            send. */}
+        <VehicleParamActions
+          title="OSD"
+          owns={isOsdParam}
+          reason="OSD changes take effect after a restart"
+        />
         <section className="app-col__group">
           <h3 className="app-col__head">Layout file</h3>
           {/* That these touch only the OSD parameters is what the buttons
@@ -36,8 +50,51 @@ export default function OsdActions() {
           <SaveLayout />
           <LoadLayout />
         </section>
+        {children}
       </div>
     </div>
+  )
+}
+
+/**
+ * A settings group in the column: ParamCard's field list, as a section of the
+ * column rather than a card of its own. The same presence rule -- a parameter
+ * the vehicle does not report is not drawn, and a group with none is not
+ * either. `children` are rows of the group's own after the fields, such as a
+ * button opening a dialog; they are drawn only with the group.
+ */
+export function OsdSettings({
+  title,
+  fields,
+  children,
+}: {
+  title: string
+  fields: ParamFieldSpec[]
+  children?: ReactNode
+}) {
+  const entries = useParamStore((s) => s.entries)
+  const present = fields.filter((f) => entries.has(f.param))
+  if (present.length === 0 && !children) return null
+  return (
+    <section className="app-col__group">
+      <h3 className="app-col__head">{title}</h3>
+      {present.map((f) => (
+        <ParamField
+          key={f.param}
+          param={f.param}
+          label={f.label}
+          {...(f.unit ? { unit: f.unit } : {})}
+          {...(f.writeNow ? { writeNow: true } : {})}
+          {...(f.gatesOthers ? { gatesOthers: true } : {})}
+          {...(f.optionLabels ? { optionLabels: f.optionLabels } : {})}
+          // Too narrow here for a bitmask's names or ArduPilot's longer value
+          // names: "2 selected", short names, the full text on hover.
+          bitmaskCount
+          shortOptions
+        />
+      ))}
+      {children}
+    </section>
   )
 }
 
@@ -141,7 +198,7 @@ function LoadLayout() {
       >
         <p className="app-placeholder">
           Staged {result?.staged ?? 0} OSD change{result?.staged === 1 ? '' : 's'} from{' '}
-          {result?.file}. Nothing is written until you press Write params.
+          {result?.file}. Nothing is written until you press Write.
         </p>
         {(result?.ignoredNonOsd ?? 0) > 0 && (
           <p className="app-placeholder">

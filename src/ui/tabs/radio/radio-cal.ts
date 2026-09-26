@@ -35,6 +35,13 @@ export interface StickSpec {
   label: string
   /** The direction that must read as the channel's maximum. */
   maxDirection: string
+  /** The opposite one, asked for second to check the first. */
+  minDirection: string
+  /**
+   * Springs back to center. The throttle does not: it rests wherever it was
+   * left, which is at the bottom when the wizard takes its centered sample.
+   */
+  centered: boolean
   /** Which stick it lives on for a mode-2 transmitter, for the diagram. */
   stick: 'left' | 'right'
   axis: 'x' | 'y'
@@ -54,6 +61,8 @@ export const STICK_SPECS: Record<StickFunction, StickSpec> = {
     fn: 'throttle',
     label: 'Throttle',
     maxDirection: 'all the way up',
+    minDirection: 'all the way down',
+    centered: false,
     stick: 'left',
     axis: 'y',
     sense: 1,
@@ -63,6 +72,8 @@ export const STICK_SPECS: Record<StickFunction, StickSpec> = {
     fn: 'yaw',
     label: 'Yaw',
     maxDirection: 'all the way right',
+    minDirection: 'all the way left',
+    centered: true,
     stick: 'left',
     axis: 'x',
     sense: 1,
@@ -72,6 +83,8 @@ export const STICK_SPECS: Record<StickFunction, StickSpec> = {
     fn: 'roll',
     label: 'Roll',
     maxDirection: 'all the way right',
+    minDirection: 'all the way left',
+    centered: true,
     stick: 'right',
     axis: 'x',
     sense: 1,
@@ -82,12 +95,81 @@ export const STICK_SPECS: Record<StickFunction, StickSpec> = {
     label: 'Pitch',
     // Back, not forward: see the sign derivation above.
     maxDirection: 'all the way back, toward you',
+    minDirection: 'all the way forward, away from you',
+    centered: true,
     stick: 'right',
     axis: 'y',
     // Down the screen: toward the pilot, the opposite of throttle's push away.
     sense: -1,
     rcmapParam: 'RCMAP_PITCH',
   },
+}
+
+export type Direction = 'max' | 'min'
+
+export interface IdentifyStep {
+  fn: StickFunction
+  direction: Direction
+}
+
+/**
+ * Every stick both ways, QGroundControl's walk: the max direction identifies
+ * the channel and its reversal, the min direction confirms it -- the same
+ * channel has to go the other way -- and between them they capture the
+ * stick's endpoints, so the sweep afterwards is only for switches and dials.
+ *
+ * **The order keeps the throttle up for yaw.** Throttle down with yaw right is
+ * ArduPilot's rudder-arm gesture -- measured against SITL: both Copter and
+ * Plane armed from it in a few seconds, calibration or no calibration, since
+ * the wizard tells the vehicle nothing. So the throttle goes up first and
+ * stays up through both yaw steps, then comes down before roll and pitch,
+ * which are no part of the gesture. Only for the mapping the vehicle holds,
+ * though: the firmware reads the gesture through its current RCMAP_* and
+ * endpoints, so on a radio miswired badly enough some other pair of sticks
+ * is the one that arms. The props-off checklist is what covers that.
+ */
+export const IDENTIFY_STEPS: readonly IdentifyStep[] = [
+  { fn: 'throttle', direction: 'max' },
+  { fn: 'yaw', direction: 'max' },
+  { fn: 'yaw', direction: 'min' },
+  { fn: 'throttle', direction: 'min' },
+  { fn: 'roll', direction: 'max' },
+  { fn: 'roll', direction: 'min' },
+  { fn: 'pitch', direction: 'max' },
+  { fn: 'pitch', direction: 'min' },
+]
+
+/** How far back from its top the throttle must come to count as down again. */
+export const RETURN_FRACTION = 0.8
+
+/**
+ * Whether the stick a max step identified has now gone the other way.
+ *
+ * A centered stick must cross its center by the same margin a max step needs,
+ * the opposite way. The throttle has no center -- it began at the bottom -- so
+ * it must come most of the way back down from the top it reached. Only the
+ * expected channel is read: moving some other stick leaves this false, which
+ * is how a max step that caught the wrong stick shows itself.
+ */
+export function reachedMin(
+  spec: StickSpec,
+  m: Mapping,
+  reference: readonly number[],
+  travel: readonly Travel[],
+  now: readonly number[],
+): boolean {
+  const i = m.channel - 1
+  const ref = reference[i]
+  const v = now[i]
+  if (!ref || !v) return false
+  // The pulse-width direction the max went, so a reversed channel reads alike.
+  const up = m.reversed ? -1 : 1
+  if (spec.centered) return (v - ref) * up <= -MIN_DEFLECTION_US
+  const t = travel[i]
+  if (!t) return false
+  const top = up > 0 ? t.max : t.min
+  const span = (top - ref) * up
+  return span >= MIN_DEFLECTION_US && (top - v) * up >= RETURN_FRACTION * span
 }
 
 /** A stick has to move at least this far from center to count as deflected. */
@@ -177,14 +259,12 @@ export function updateTravel(travel: Travel[], sample: readonly number[]): Trave
 export interface CalibrationResult {
   mapping: Partial<Record<StickFunction, Mapping>>
   travel: Travel[]
-  /** Centred sample taken at the end, for the trims. */
+  /** The centered sample taken at the start, which is also the trims. */
   centers: number[]
 }
 
 /** Channels already assigned to a stick, so later steps can skip them. */
-export function claimedChannels(
-  mapping: Partial<Record<StickFunction, Mapping>>,
-): Set<number> {
+export function claimedChannels(mapping: Partial<Record<StickFunction, Mapping>>): Set<number> {
   const out = new Set<number>()
   for (const fn of STICK_FUNCTIONS) {
     const m = mapping[fn]
@@ -258,4 +338,4 @@ export function buildWrites(result: CalibrationResult): ParamWrite[] {
   return writes
 }
 
-export type StageId = 'intro' | 'center' | 'identify' | 'sweep' | 'trims' | 'review'
+export type StageId = 'intro' | 'center' | 'identify' | 'sweep' | 'review'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeServoOutputs, messageToDeltas } from './telemetry'
+import { mergeServoOutputs, messageToDeltas, packVoltage } from './telemetry'
 import type { DecodedMessage } from './types'
 
 function servoRaw(port: number, values: number[]): DecodedMessage {
@@ -54,5 +54,47 @@ describe('mergeServoOutputs', () => {
     const prev = [1500]
     mergeServoOutputs(prev, 0, [1600])
     expect(prev).toEqual([1500])
+  })
+})
+
+describe('BATTERY_STATUS', () => {
+  const U = 0xffff
+  const status = (fields: DecodedMessage['fields']): DecodedMessage => ({
+    msgid: 147,
+    msgName: 'BATTERY_STATUS',
+    sysid: 1,
+    compid: 1,
+    seq: 0,
+    fields,
+  })
+
+  it('reads a second monitor by its instance, with the wire’s -1s kept', () => {
+    const voltages = [12600, U, U, U, U, U, U, U, U, U]
+    expect(
+      messageToDeltas(
+        status({
+          id: 1,
+          voltages,
+          voltagesExt: [0, 0, 0, 0],
+          currentBattery: -1,
+          batteryRemaining: -1,
+        }),
+      ),
+    ).toEqual([{ k: 'batteryStatus', id: 1, voltageV: 12.6, currentA: -1, remainingPct: -1 }])
+  })
+
+  it('adds up a total ArduPilot carried past what one slot holds', () => {
+    // 100.4 V: a full first slot and the rest in the next, as
+    // `send_battery_status` writes a big pack with no cell readings.
+    expect(packVoltage([65534, 34866, U, U, U, U, U, U, U, U], [0, 0, 0, 0])).toBe(100.4)
+  })
+
+  it('sums measured cells, the extension included', () => {
+    const cells = Array(10).fill(4200)
+    expect(packVoltage(cells, [4200, 4200, 0, 0])).toBeCloseTo(50.4)
+  })
+
+  it('says nothing was measured rather than zero volts', () => {
+    expect(packVoltage(Array(10).fill(U), [0, 0, 0, 0])).toBeNull()
   })
 })

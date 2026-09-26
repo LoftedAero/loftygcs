@@ -1,4 +1,4 @@
-import { LaCard, LaHint } from '../../components/La'
+import { LaCard } from '../../components/La'
 import { NeedsVehicle } from '../../components/ParamCard'
 import ParamField from '../../components/ParamField'
 import CardParamActions from '../../components/CardParamActions'
@@ -29,21 +29,17 @@ export default function FlightModesTab() {
   const entries = useParamStore((s) => s.entries)
   const ready = useParamStore((s) => s.loadState === 'ready')
   const channels = useVehicleStore((s) => s.rcChannels)
-  const currentMode = useVehicleStore((s) => s.modeName)
 
   // Parameters too, not just a link: with them still arriving every FLTMODE is
   // missing, and the empty-set branch below would announce that this vehicle
   // has no mode switch -- which is a statement about the aircraft, made while
   // the download that would disprove it is still running.
   if (!connected || !ready) {
-    return (
-      <NeedsVehicle title="Flight modes" />
-    )
+    return <NeedsVehicle title="Flight modes" />
   }
 
-  // Simple and super simple are Copter's; a plane reports neither, and a row
-  // reading "not on this vehicle" is what `ParamCard` existed to prevent --
-  // this card builds its own rows, so it carries the rule itself.
+  // A row reading "not on this vehicle" is what `ParamCard` existed to
+  // prevent; this card builds its own rows, so it carries the rule itself.
   const has = (param: string) => entries.has(param)
   const modeCh = entries.get('FLTMODE_CH')?.value ?? 5
   const pwm = channels[modeCh - 1] ?? 0
@@ -113,26 +109,17 @@ export default function FlightModesTab() {
           </div>
         ))}
       </div>
-      {/* The live row and the reading under it are the check; saying "flick
-          the switch and watch" is describing what the screen already shows. */}
-      <LaHint>
-        {activeSlot > 0
-          ? `Channel ${modeCh} reads ${pwm} µs — slot ${activeSlot} selected, vehicle reports ${currentMode || '—'}.`
-          : `No reading on channel ${modeCh}. Turn the transmitter on.`}
-      </LaHint>
-      {/* Which of the six fly relative to a heading rather than the nose. */}
-      {has('SIMPLE') && <ParamField param="SIMPLE" label="Simple mode slots" />}
-      {has('SUPER_SIMPLE') && <ParamField param="SUPER_SIMPLE" label="Super simple slots" />}
+      {/* The marked row is the whole check: flick the switch and it moves. A
+          line under the table spelled out the channel, its PWM, the slot and
+          the vehicle's mode -- the same fact the marker draws, plus the mode,
+          which the app bar already carries. With no reading, no row is
+          marked. Simple and super simple went with it: they are the
+          Parameters table's to carry, not this card's. */}
     </LaCard>
   )
 }
 
 /** The named parameters this card owns; the six slots are matched by shape. */
-const MODE_PARAMS: ReadonlySet<string> = new Set([
-  'FLTMODE_CH',
-  'INITIAL_MODE',
-  'SIMPLE',
-  'SUPER_SIMPLE',
-])
+const MODE_PARAMS: ReadonlySet<string> = new Set(['FLTMODE_CH', 'INITIAL_MODE'])
 
 const PWM_RANGES = ['≤ 1230', '1231–1360', '1361–1490', '1491–1620', '1621–1749', '≥ 1750']

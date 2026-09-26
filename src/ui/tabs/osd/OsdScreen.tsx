@@ -27,6 +27,12 @@ export interface OsdScreenProps {
    * with no backend there is nothing to lay out yet.
    */
   disabled?: boolean | undefined
+  /**
+   * What an empty screen says. Left out, it points at the panel list; `null`
+   * says nothing, for when the list has nothing to turn on either -- the OSD
+   * off, or this screen off -- and the Panels card already says why.
+   */
+  emptyText?: string | null
   /** Highlight the rows an NTSC frame cuts off. Analog grids only. */
   showNtscGuide: boolean
   onSelect: (id: string) => void
@@ -57,6 +63,7 @@ export default function OsdScreen({
   offGrid,
   showNtscGuide,
   disabled,
+  emptyText = 'Nothing is on this screen. Turn panels on from the list to place them.',
   onSelect,
   onMove,
 }: OsdScreenProps) {
@@ -129,10 +136,8 @@ export default function OsdScreen({
         {/* An OSD screen with nothing on it is a legitimate state (three of
             the four ship that way), so say so rather than showing what looks
             like a failed render. */}
-        {!placements.some((p) => p.enabled) && (
-          <p className="osd-screen__empty">
-            Nothing is on this screen. Turn panels on from the list to place them.
-          </p>
+        {emptyText !== null && !placements.some((p) => p.enabled) && (
+          <p className="osd-screen__empty">{emptyText}</p>
         )}
 
         {placements

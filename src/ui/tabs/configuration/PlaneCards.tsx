@@ -12,15 +12,20 @@ import { FRAME_CLASS_NAMES, frameTiles } from '../../../protocol/frame-layout'
 // A Copter's frame *is* the aircraft, so that screen is a picture of it and a
 // size. No parameter describes a plane's airframe at all -- measured on
 // ArduPlane 4.7.1-beta, which reports no FRAME_CLASS, no FRAME_TYPE and no
-// MOT_* -- so what is configurable here is the flight envelope: how fast it
-// is meant to go, how far it may lean, and whether it has VTOL motors bolted
-// on. Those are the numbers whose defaults describe ArduPilot's own bench
-// model rather than anybody's aeroplane.
+// MOT_* -- so what is configurable here is what the airframe is: how fast it
+// is meant to go, and whether it has VTOL motors bolted on. Those are the
+// numbers whose defaults describe ArduPilot's own bench model rather than
+// anybody's aeroplane.
+//
+// How far it may lean was here too, as a Flight envelope card, and moved to
+// Tuning's Attitude card: a Copter's lean limit lives only on Tuning, Mission
+// Planner keeps the plane's "Nav angles" on its tuning page, and they are
+// limits the controller flies to rather than facts about the airframe.
 //
 // **Every name here was read off a running vehicle**, because 4.4 renamed
 // this whole set off its centi-unit spellings and the guides still give the
-// old ones: `TRIM_ARSPD_CM`, `ARSPD_FBW_MIN/MAX`, `LIM_ROLL_CD` and
-// `LIM_PITCH_MAX/MIN` all come back empty on 4.7. The legacy names are
+// old ones: `TRIM_ARSPD_CM` and `ARSPD_FBW_MIN/MAX` come back empty on 4.7.
+// The legacy names are
 // deliberately *not* carried alongside the new ones the way `initial-tune.ts`
 // carries `ATC_ACCEL_*`: those differ only in spelling, where these differ in
 // **unit** -- centidegrees against degrees, cm/s against m/s -- and a field
@@ -31,15 +36,17 @@ import { FRAME_CLASS_NAMES, frameTiles } from '../../../protocol/frame-layout'
  * Whether this aircraft has VTOL motors, and what they are arranged as.
  *
  * `Q_ENABLE` is the only `Q_` parameter a fixed wing reports: with it at 0 the
- * vehicle carries no `Q_FRAME_*`, no `Q_M_*` and no `Q_A_*` at all (measured),
- * and they appear only after it is written **and the vehicle restarts**. So
- * this card is two fields that become four, and the restart prompt it raises
- * is what gets the user there -- `Q_ENABLE` is marked RebootRequired, so the
- * write asks the metadata and fires it without this screen keeping a list.
+ * vehicle carries no `Q_FRAME_*`, no `Q_M_*` and no `Q_A_*` at all. Written to
+ * 1, it reports all of them at once, with no restart -- measured on ArduPlane
+ * 4.7.1, 1,419 parameters to 1,619, and "QuadPlane initialised" arrives
+ * as it happens. So it is `OSD_TYPE`'s kind of field: written when chosen,
+ * then a quiet re-read, which is where the frame rows here and the whole VTOL
+ * half of Tuning and Filters come from.
  *
- * Staged rather than `writeNow`, unlike `OSD_TYPE`, which is the other
- * parameter here that gates others: a quiet refresh cannot reveal these,
- * because the firmware only builds the VTOL tree at boot.
+ * This comment used to say the tree was built only at boot, so the field was
+ * staged and relied on the restart prompt. Written that way the vehicle had
+ * a quadplane and the app did not know it until somebody reloaded the
+ * parameters by hand.
  */
 function VtolCard() {
   const qEnable = useParamStore((s) => s.entries.get('Q_ENABLE')?.value)
@@ -111,7 +118,7 @@ function VtolCard() {
             moment a reboot came back -- on a screen whose left column is
             height-matched to the tune card beside it. */}
         <div className="vtol-card__fields">
-          <ParamField param="Q_ENABLE" label="Enable VTOL" showName />
+          <ParamField param="Q_ENABLE" label="Enable VTOL" showName writeNow gatesOthers />
           <ParamField
             param="Q_FRAME_CLASS"
             label="Frame class"
@@ -194,54 +201,19 @@ const AIRSPEED_PARAMS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * How far the autopilot may throw the aircraft about.
- *
- * The direct analogue of the `ATC_ACC_*_MAX` limits the Copter tune sets, and
- * wrong in the same direction: 65 degrees of roll and 25 of pitch describe a
- * small sport airframe, and a large or slow one is being asked for an attitude
- * it cannot hold.
- */
-function EnvelopeCard() {
-  return (
-    <ParamCard
-      title="Flight envelope"
-      showNames
-      actions={
-        <CardParamActions
-          reason="Envelope changes take effect after a restart"
-          owns={(param) => ENVELOPE_PARAMS.has(param)}
-        />
-      }
-      fields={[
-        { param: 'ROLL_LIMIT_DEG', label: 'Roll limit', unit: 'degrees' },
-        { param: 'PTCH_LIM_MAX_DEG', label: 'Pitch up limit', unit: 'degrees' },
-        { param: 'PTCH_LIM_MIN_DEG', label: 'Pitch down limit', unit: 'degrees' },
-      ]}
-    />
-  )
-}
-
-const ENVELOPE_PARAMS: ReadonlySet<string> = new Set([
-  'ROLL_LIMIT_DEG',
-  'PTCH_LIM_MAX_DEG',
-  'PTCH_LIM_MIN_DEG',
-])
-
-/**
  * The plane half of the Configuration screen: one column, read downward.
  *
- * A column rather than three cards loose in the page grid, because these are
- * one subject in three parts -- how fast this aircraft flies, how far it may
- * lean doing it, and what if anything lifts it vertically -- and the grid
- * would otherwise spread them across the window in whatever order fits, with
- * the VTOL tune landing wherever there was room. Stacked, the tune stands in
- * the next column and appears only when there are motors to tune.
+ * A column rather than cards loose in the page grid, because these are one
+ * subject in two parts -- how fast this aircraft flies, and what if anything
+ * lifts it vertically -- and the grid would otherwise spread them across the
+ * window in whatever order fits, with the VTOL tune landing wherever there
+ * was room. Stacked, the tune stands in the next column and appears only when
+ * there are motors to tune.
  */
 export default function PlaneCards() {
   return (
     <div className="app-stack app-stack--fill">
       <AirspeedCard />
-      <EnvelopeCard />
       <VtolCard />
     </div>
   )

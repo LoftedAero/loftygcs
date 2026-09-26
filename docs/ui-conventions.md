@@ -249,6 +249,11 @@ ragged right-hand edge.
 Derive the two from **one** token rather than measuring one and copying the
 number into the other, or a reworded label silently breaks the alignment.
 
+The same holds for a screen's actions column once it carries settings:
+`.app-col--fields` gives every control there `--app-col-control-w`, and
+labels are shortened to fit beside it rather than wrapping (OSD's "PWM min",
+"Battery V" under a Warnings heading).
+
 ### Nothing in a bar absorbs the window's slack
 
 A status element sized `flex: 1 1 auto` grows to whatever is spare, which on
@@ -387,6 +392,30 @@ same places, so switching between them moves nothing.
 
 > *"make sure the placement and format of the elements on the mission,
 > fence, and rally tabs are consistent"*
+
+### A card keeps its name and place whatever the airframe
+
+A card that does one job is the same card on every vehicle: the same title,
+in the same position. Only a card with no counterpart -- the VTOL motors'
+gains on a quadplane -- appears or goes. Balancing a layout by merging or
+renaming cards for one airframe makes the same settings live somewhere else
+depending on what is connected. Fit the difference inside the card instead:
+a quadplane's VTOL rate filters are rows of the one Rate filters card.
+
+> *"I don't like the idea of renaming and rearranging tiles that have
+> essentially the same function between configurations"*
+
+### The same card twice is one height
+
+Two cards that are the same thing for different instances -- the first and
+second harmonic notch, a quadplane's fixed-wing and VTOL rate filters -- sit
+side by side in a row, so the grid gives them one height. In stacked columns
+the second takes whatever slack its column has, and two identical cards
+drawn at different sizes read as a fault. Columns are still right for cards
+that are not twins; balance them against measured heights rather than by eye.
+
+> *"I don't like that the first and second harmonic notch tiles are
+> different heights."*
 
 ### Anything that grows goes last
 
@@ -638,6 +667,19 @@ the same change is a louder copy of a control that is already there.
 > *"We don't need the emphasis panel with the OSD buttons because we already
 > have the display menu that prompts for OSD type."*
 
+### A value that cannot fit its box is shortened, not clipped
+
+Where a control is too narrow for ArduPilot's own text, show the compact
+form rather than let it be cut: a bitmask as "2 selected" (or "none"), and a
+sentence-length dropdown value by a short name that keeps the part telling it
+from its neighbours ("Yes(minimum PWM when disarmed)" as "Yes, min PWM"). The
+full text stays the hover text. Short names live in one table keyed by
+ArduPilot's text (`option-names.ts`), because the same number means different
+things on different vehicles; a card opts in with `compact`.
+
+> *"For options or drop-down fields, adopt the "n selected" or shortened
+> string approach for clarity"*
+
 ### A label must not be ambiguous
 
 If a word could mean two things in context, it is the wrong word, even when
@@ -696,8 +738,17 @@ nothing.
 ### Split a screen when it holds two sittings, not when it is long
 
 The test is whether anyone would change something in both halves in one
-session. Tuning splits into Attitude and Navigation because nobody tunes
-gains and mission speeds at the same bench.
+session. Filters is its own screen, ahead of Tuning, because the notches are
+set once per airframe from a batch-sampler log before any gain is touched,
+and gains are revisited. Tuning's attitude and navigation halves share one
+screen as its two columns instead: they are the same sitting, and as
+sub-tabs they were the one Setup screen that was not cards. Length is not
+the test -- three columns was the alternative, and at the shared 1600px cap
+it would have ellipsized every named row.
+
+> *"There are quite a lot of things on the tuning page now. Should we
+> consider three columns? Or a separate page for filters?"* · *"Ok, do the
+> separate filters page."*
 
 ### Draw a two-axis set as a matrix
 

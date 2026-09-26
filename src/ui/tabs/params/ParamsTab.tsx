@@ -141,8 +141,6 @@ export default function ParamsTab() {
           <p className="params-note">
             {names.length} of {order.length} parameters
             {source === 'file' ? ` from ${fileName ?? 'a file'} — not a vehicle.` : '.'}
-            {source === 'vehicle' &&
-              ' Changes stage here and are written from the column beside them.'}
             {/* Which documentation is on screen. Parameters are added and
                 re-scaled between releases, so a hint from the wrong version
                 is worse than no hint -- worth one line to say. */}

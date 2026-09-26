@@ -198,8 +198,8 @@ function OutputPosition({ n }: { n: number }) {
  * Written at once, like everything else in the row, and answered by the Trim
  * field's own mark rather than one of its own: the value that changed is in
  * that box, so that is where the tick belongs. It stages on the way past, as
- * `ReverseSwitch` does, so a write that does not land leaves the value for the
- * footer's Write instead of losing it.
+ * `ReverseSwitch` does, so a write that does not land leaves the value staged
+ * instead of losing it -- and leaving the page then offers to write it.
  *
  * Disabled with nothing to take -- no reading, or one outside this output's
  * Min and Max, which a trim may not be -- and when the trim is already there,
@@ -261,7 +261,8 @@ function SetTrimButton({ n }: { n: number }) {
  * nothing to type through -- so it sends on change, like a dropdown. It
  * carries the same mark as the fields beside it, and falls back to staging on
  * a failure exactly as `ParamField` does: the value the user chose is still
- * what they want, and the footer's Write is then the honest state of it.
+ * what they want, and staged -- which leaving the page offers to write -- is
+ * then the honest state of it.
  */
 function ReverseSwitch({ param }: { param: string }) {
   const entry = useParamStore((s) => s.entries.get(param))
@@ -571,7 +572,7 @@ function EscSettingsModal({ params, onClose }: { params: string[]; onClose: () =
         </>
       }
     >
-      <div className="esc-settings">
+      <div className="esc-settings dialog-fields">
         {params.map((param) => (
           <ParamField key={param} param={param} label={ESC_LABELS[param] ?? param} showName />
         ))}

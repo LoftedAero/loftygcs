@@ -26,8 +26,40 @@ export function describeBits(
   // A bit the metadata does not name is still set, and saying "none" for a
   // non-zero value would be a lie about the vehicle's configuration.
   if (on.length === 0) return `${v}`
-  if (on.length <= max) return on.join(', ')
-  return `${on.slice(0, max).join(', ')}, +${on.length - max} more`
+  const all = on.join(', ')
+  if (on.length <= max) return all
+  // Shortening only earns its place when it is shorter: "Roll, Pitch, Yaw"
+  // beats "Roll, Pitch, +1 more", which costs more room and says less.
+  const short = `${on.slice(0, max).join(', ')}, +${on.length - max} more`
+  return all.length <= short.length ? all : short
+}
+
+/**
+ * The longest single name a compact bitmask shows instead of a count. The
+ * narrowest place one is drawn is the OSD column, where "UseDecimalPack" (14)
+ * was clipped to "UseDecimalPac"; twelve fits there.
+ */
+const ONE_NAME_MAX = 12
+
+/**
+ * "2 selected", or "none" -- a bitmask's summary where its names will not fit.
+ *
+ * One short name is shown as itself: RC_PROTOCOLS at 1 is "All", and "1
+ * selected" said less in more room.
+ */
+export function countBits(value: number, bitmask?: NonNullable<ParamMeta['bitmask']>): string {
+  let v = Math.trunc(value) >>> 0
+  let n = 0
+  let only = -1
+  for (let bit = 0; v; bit++, v >>>= 1) {
+    if (v & 1) {
+      n++
+      only = bit
+    }
+  }
+  const name = n === 1 ? bitmask?.[only] : undefined
+  if (name !== undefined && name.length <= ONE_NAME_MAX) return name
+  return n === 0 ? 'none' : `${n} selected`
 }
 
 export default function BitmaskEditor({

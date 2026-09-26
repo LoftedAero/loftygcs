@@ -222,9 +222,14 @@ describe('Output options: what chooses the protocol, and what only refines it', 
     useVehicleStore.setState({ vehicleType: 1 } as never)
     render(<OutputsTab />)
     expect(names(card())).toEqual(expect.arrayContaining(['SERVO_BLH_OTYPE', 'SERVO_BLH_MASK']))
-    const selects = [...card().querySelectorAll('select')] as HTMLSelectElement[]
-    expect(selects.length).toBeGreaterThanOrEqual(2)
-    expect(selects.every((el) => el.disabled)).toBe(true)
+    // A dropdown or a number box, whichever the row will become.
+    const off = [...card().querySelectorAll('.la-field--off')]
+    expect(off.map((f) => f.querySelector('.la-field__param')?.textContent)).toEqual(
+      expect.arrayContaining(['SERVO_BLH_OTYPE', 'SERVO_BLH_MASK']),
+    )
+    expect(
+      off.every((f) => (f.querySelector('select, input') as HTMLInputElement | null)?.disabled),
+    ).toBe(true)
     expect(names(card())).not.toContain('SERVO_DSHOT_RATE')
     expect(escButton()).toBeNull()
   })

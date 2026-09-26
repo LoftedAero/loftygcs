@@ -226,8 +226,20 @@ answer the choosers:
 
 ### Radio
 
+The same four cards on every vehicle, in two columns: Channels (sixteen bars
+whatever the receiver reports) and Stick mapping; then Auxiliary functions
+(channels 5-16 as named rows) and Receiver options. Built from `docs/ux-rules.md`
+before review.
+
 - [ ] Disconnected
-- [ ] Connected
+- [ ] Connected -- measured at 1920×1100 and 2556×1393 on Copter, Plane and a
+      quadplane: no scroll, nothing clipped, both columns end on one line
+- [ ] Channels is one height with the transmitter off, an 8-channel receiver
+      and a 16-channel one
+- [ ] Calibration: every stick both ways, the throttle held up through both
+      yaw steps (never yaw with the throttle down); switches and dials optional;
+      Save closes the dialog and leaves "Calibration saved" on the card, with
+      the restart prompt only when the stick mapping changed
 - [ ] Calibration wizard, with a real transmitter if one is to hand
 
 ### Flight Modes
@@ -243,15 +255,35 @@ answer the choosers:
 
 ### Power
 
+A Battery 1 / Battery 2 switch over the same three cards on every vehicle:
+Live reading and Battery monitor, then Battery failsafe. Each battery gets the
+whole BATT_ group. Named rows, units from the metadata, values in their
+compact form. First screen built by running `docs/ux-rules.md` before review
+rather than after.
+
 - [ ] Disconnected
-- [ ] Connected
+- [ ] Connected -- measured at 1920×1100 and 2556×1393 on Copter, Plane and a
+      quadplane: no scroll, nothing clipped, both columns end on one line, and
+      the two batteries' views identical in shape
+- [ ] A monitor with no pins (DroneCAN, SMBus): the analog rows grey out and
+      the card keeps its height
+- [ ] Battery 2 switched on: writes at once, its rows come live with no change
+      in any card's height, and the restart prompt appears; after the restart
+      its live reading comes from its own BATTERY_STATUS
 
 ### Failsafe
 
-Now drawn as a document rather than tiled cards.
+The same cards on every vehicle, in two columns: Arming, Radio failsafe,
+Ground station failsafe, Return to launch; then Fence, EKF and crash, and --
+on a quadplane -- VTOL assist. Each lists the names its vehicle reports;
+values in their compact form.
 
 - [ ] Disconnected
-- [ ] Connected
+- [ ] On a Copter -- 4.7's RTL_ALT_M, RTL_ALT_FINAL_M, RTL_CLIMB_MIN_M in
+      meters; ARMING_SKIPCHK
+- [ ] On a Plane -- FS_GCS_ENABL, the short and long radio failsafe,
+      CRASH_DETECT
+- [ ] On a quadplane -- the VTOL return rows and the VTOL assist card
 
 ### OSD
 
@@ -261,17 +293,52 @@ legitimate configuration and the screen must say so.
 - [ ] Disconnected
 - [ ] Connected
 - [ ] The screen editor: dragging a panel, and Write
+- [ ] One settings column: actions, layout file, then Display, Screen
+      switching (channel and method), the screen being edited, Warnings --
+      every control one width; the layout toolbar holds only the screen
+      picker and the grid
+- [ ] Fills the window at any size above 1360px: all three columns end on one
+      line, the preview grows with the window at the grid's own shape, and
+      only the panel list and the settings column scroll
+
+### Filters
+
+The same four cards on every vehicle, in pairs of rows: the IMU card (low-pass
+filters and batch sampler) beside the rate filters, then the two harmonic
+notches side by side at one height. A quadplane's VTOL rate filters are rows of
+the one Rate filters card.
+
+- [ ] Disconnected
+- [ ] Connected — each notch shows its enable, with the rows after it greyed
+      until it is on and the vehicle has restarted
+- [ ] A notch enabled and the vehicle restarted: its rows come live, and the
+      card does not change height
+- [ ] The rate filters under the vehicle's own names: ATC_RAT_ on a Copter,
+      RLL_RATE_ on a plane, both sets on a quadplane
 
 ### Tuning
 
-Now split into subtabs, with the gains drawn as a matrix.
+One screen of cards in two columns that reads without scrolling in an 1100px
+window. A quadplane switches between its two sets -- Fixed wing is the Plane
+page and VTOL is the Copter page, card for card. Filters, the rate filters
+included, are on their own screen, above.
 
 - [ ] Disconnected
 - [ ] Connected
-- [ ] Attitude
-- [ ] Navigation
-- [ ] On a Plane as well as a Copter — the two draw different matrices and
-      only one of them is ever on screen
+- [ ] On a Copter — Autotune, Rate gains and Attitude on the left; the
+      horizontal and vertical position controllers and Navigation on the
+      right, named as ArduPilot's metadata names them. 4.7's renamed set
+      (WP_SPD, PSC_D_ACC_P, …) with units from the metadata; lean angle max
+      and input time constant under the angle gains, the time constant's
+      presets labelled with their seconds
+- [ ] On a Plane — rate gains, attitude with its limits, L1, TECS,
+      autotune; no multirotor cards, no yaw damper or throttle
+- [ ] On a quadplane — the Fixed wing / VTOL switch; each view laid out
+      exactly as the standalone page, VTOL on the Q_ parameters
+- [ ] On quadplane hardware — Quicktune in the VTOL Autotune card (official
+      builds carry QWIK_ and not Q_AUTOTUNE_); enabling it brings its rows
+      live without a restart
+- [ ] Enabling VTOL on Configuration brings the switch in without a reload
 
 ### Parameter List
 

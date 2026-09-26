@@ -167,6 +167,26 @@ describe('the connection menu adapts to what the environment can do', () => {
     expect(options()).toEqual(['USB serial', 'TCP', 'UDP', 'WebSocket', 'Demo'])
   })
 
+  it('holds Connect while a reboot is being waited out, and leaves Disconnect to give up', () => {
+    // The service is already reopening the port; a second Connect would race
+    // it for the device. The wait ends itself, to an error that frees Connect.
+    const connect = () => screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement
+    const disconnect = () => screen.getByRole('button', { name: 'Disconnect' }) as HTMLButtonElement
+    useConnectionStore.setState({ phase: 'rebooting' })
+    const { rerender } = render(<AppBar />)
+    expect(connect().disabled).toBe(true)
+    expect((screen.getByTitle('Connection type') as HTMLSelectElement).disabled).toBe(true)
+    expect(disconnect().disabled).toBe(false)
+
+    useConnectionStore.setState({
+      phase: 'error',
+      error: 'The vehicle did not come back after the reboot. Reconnect to retry.',
+    })
+    rerender(<AppBar />)
+    expect(connect().disabled).toBe(false)
+    useConnectionStore.setState({ phase: 'idle', error: null })
+  })
+
   it('shows the SITL tray, dark, until something is running', () => {
     render(<AppBar />)
     // The dot is the reason the tray earns bar space: a SITL left running

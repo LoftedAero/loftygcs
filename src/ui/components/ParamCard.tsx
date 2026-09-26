@@ -28,6 +28,18 @@ export interface ParamFieldSpec {
   disabled?: boolean
   /** A number box even where ArduPilot names some values -- see ParamField. */
   numeric?: boolean
+  /** Each named value's number beside its name -- see ParamField. */
+  withValues?: boolean
+  /** Short names for a dropdown's values -- see ParamField. */
+  optionLabels?: Record<number, string>
+  /**
+   * Drawn, greyed, even while the vehicle does not report it, instead of
+   * dropped. For a parameter the firmware creates only once something else is
+   * switched on and the vehicle restarts -- the harmonic notch's settings
+   * after INS_HNTCH_ENABLE -- so the card is one height before and after, as
+   * the VTOL frame rows are on Configuration.
+   */
+  reserve?: boolean
 }
 
 export default function ParamCard({
@@ -39,6 +51,8 @@ export default function ParamCard({
   className,
   actions,
   showNames,
+  compact,
+  drawn,
 }: {
   title: string
   subtitle?: string
@@ -61,11 +75,29 @@ export default function ParamCard({
    * others did not would read as the name meaning something.
    */
   showNames?: boolean
+  /**
+   * Values in their compact form, for a card too narrow for ArduPilot's own:
+   * a bitmask as "2 selected", a sentence-length dropdown value by its short
+   * name (`option-names.ts`), the full text on hover. Card-level for the same
+   * reason `showNames` is.
+   */
+  compact?: boolean
+  /**
+   * Draw the card even when every row is reserved. For a feature the firmware
+   * has but is switched off -- a second battery whose BATT2_MONITOR is 0
+   * reports nothing else, so its failsafe card would vanish from beside the
+   * monitor card that switches it on. The caller decides from a parameter
+   * that says the feature exists; a firmware without it still gets no card.
+   */
+  drawn?: boolean
 }) {
   const entries = useParamStore((s) => s.entries)
   const inDoc = useInDoc()
-  const present = fields.filter((f) => entries.has(f.param))
-  if (present.length === 0 && !children) return null
+  const present = fields.filter((f) => entries.has(f.param) || f.reserve)
+  // Reserved rows hold a card's shape; they are not a reason to draw it. A
+  // firmware with none of the real ones gets no card, not a card of greyed rows
+  // -- unless the caller knows the feature is there and merely switched off.
+  if (!fields.some((f) => entries.has(f.param)) && !children && !drawn) return null
 
   const controls = (
     <>
@@ -78,8 +110,11 @@ export default function ParamCard({
           {...(f.writeNow ? { writeNow: true } : {})}
           {...(f.gatesOthers ? { gatesOthers: true } : {})}
           {...(showNames ? { showName: true } : {})}
-          {...(f.disabled ? { disabled: true } : {})}
+          {...(f.disabled || (f.reserve && !entries.has(f.param)) ? { disabled: true } : {})}
           {...(f.numeric ? { numeric: true } : {})}
+          {...(f.withValues ? { withValues: true } : {})}
+          {...(f.optionLabels ? { optionLabels: f.optionLabels } : {})}
+          {...(compact ? { bitmaskCount: true, shortOptions: true } : {})}
         />
       ))}
       {children}
@@ -136,9 +171,7 @@ export default function ParamCard({
  */
 export function NeedsVehicle({ title }: { title: string }) {
   const rebooting = useConnectionStore((s) => s.phase === 'rebooting')
-  const connected = useConnectionStore(
-    (s) => s.phase === 'connected' || s.phase === 'linkLost',
-  )
+  const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const loading = useParamStore((s) => s.loadState !== 'ready')
   const note = rebooting
     ? 'Rebooting the vehicle and reconnecting telemetry.'

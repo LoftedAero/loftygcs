@@ -109,7 +109,12 @@ export const TABS = [
   { id: 'outputs', label: 'Outputs', group: 'Config/Tuning' },
   { id: 'power', label: 'Power', group: 'Config/Tuning' },
   { id: 'failsafes', label: 'Failsafe', group: 'Config/Tuning' },
-  { id: 'osd', label: 'OSD', group: 'Config/Tuning' },
+  // Full height: the preview is sized from the room its card has, so the
+  // workspace is handed the window rather than laid on the card grid.
+  { id: 'osd', label: 'OSD', group: 'Config/Tuning', fills: true },
+  // Before Tuning because that is the order the work is done in: the notches
+  // are set from a log first, and the gains tuned through them after.
+  { id: 'filters', label: 'Filters', group: 'Config/Tuning' },
   { id: 'tuning', label: 'Tuning', group: 'Config/Tuning' },
   // The label changed, the id did not: `parameters` is what a saved tab and
   // every deep link already say, and renaming it would strand both.

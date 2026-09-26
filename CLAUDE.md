@@ -131,6 +131,10 @@ design decisions are recorded there and in code comments.
   it when a review produces a preference that will apply again, and leave anything that applies
   to one screen only in a comment there. `docs/screen-review.md` is the per-screen gate those
   conventions are checked against before a preview build.
+  **`docs/ux-rules.md` is the portable half**: the reviewer's preferences stated without this
+  app's mechanisms, with a first-pass checklist, meant to be shared across the Lofted Aero apps
+  the way the stylesheet is. Run its checklist on a new screen before showing it; a rule that
+  is about *this* app's components belongs in ui-conventions instead.
 - **A transport's failure is turned into a sentence before anyone sees it**
   (`services/link-error.ts`). `Transport.open` is documented as rejecting with "a user-readable
   Error" and the IP transports never honored it: they reject with whatever Node threw, and
@@ -350,8 +354,12 @@ design decisions are recorded there and in code comments.
   `sitl.integration.test.ts`; a refused clear leaves the screen alone, or the app would report a
   vehicle with nothing on it while it still holds the old plan.
 - **Staged parameter edits belong to the page that made them.** Leaving a page with unwritten
-  edits prompts (`ui-store`'s `pendingNav`), so a screen's column can own its own Write. The
-  global action bar still carries Write for Setup tabs that have no column.
+  edits prompts (`ui-store`'s `pendingNav`), so a screen's column can own its own Write.
+  **The footer has no Write.** Every Setup screen writes from the card that owns the edit
+  (`CardParamActions`), from its column, or as it is used; the footer's copy went once the
+  last three screens (Radio, Power, Failsafe) had cards of their own. The leave-page prompt's
+  "Write and continue" is what still catches a write-as-you-go field whose write failed and
+  fell back to staged.
 - **Curated tabs** are declarations, not code: `ParamCard` takes a field list, drops params
   the vehicle lacks, and hides itself when empty — so one definition serves Copter, Plane,
   and Rover. `ParamField`'s `bare` prop drops the label for table layouts.

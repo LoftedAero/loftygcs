@@ -1,102 +1,22 @@
 import { useEffect, useState } from 'react'
-import { LaButton, LaLinkButton } from '../components/La'
+import { LaLinkButton } from '../components/La'
 import { BRAND } from '../../brand'
-import { useUiStore, type TabId } from '../../stores/ui-store'
-import { useParamStore } from '../../stores/param-store'
-import { connectionService } from '../../services/connection'
-import WriteParamsModal from './WriteParamsModal'
 
-// Flight commands used to live here as well. They moved onto the Fly screen
-// itself, next to the HUD they act on: the justification for keeping them in
-// the footer was that it never scrolls away, and nothing on that screen
-// scrolls, so the split only made the pilot look in two places.
-
-// Setup sections with no parameters to edit: showing them a Write button
-// would be offering an action the page cannot produce work for.
-// Tabs with no Write of their own to offer. `sensors` is here because it
-// writes as you go: a Write button there would be a second answer to a
-// question the screen has already answered. The rule below still applies to
-// it, and that is the point -- if one of those immediate writes fails, the
-// value falls back to staged and the bar comes back to carry it, rather than
-// leaving an edit on screen with no way to send it.
-const PARAMLESS_TABS = new Set<TabId>(['overview', 'firmware', 'logs', 'sensors'])
-
-// Tabs that carry Write themselves. Two Write buttons on one screen are two
-// answers to the same question, so the bar stays out of their way entirely --
-// including while edits are staged, which is exactly when their own button is
-// the one to press.
+// The footer used to carry Write Params, Revert and Refresh for every Setup
+// tab: parameter edits staged anywhere and were sent from here. Every tab now
+// either writes as it is used or carries Revert and Write on the title row of
+// the card that owns the edit (`CardParamActions`), so the footer's copy was
+// a second answer to a question each screen already answers -- and on a
+// screen with its own Write, two buttons that looked alike and sent different
+// sets. An edit left staged when a write-as-you-go field fails is still
+// covered: leaving the page with anything unwritten asks, and offers "Write
+// and continue" (`UnsavedChangesModal`).
 //
-// A tab qualifies one of two ways: a card carries Revert/Write on its title
-// row, or every control on the screen writes as it is used. Radio, Power,
-// Failsafe, OSD and Tuning do neither yet and still take the footer's copy;
-// this set is how the footer eventually empties.
-const OWN_WRITE_TABS = new Set<TabId>([
-  'parameters',
-  'ports',
-  'configuration',
-  'modes',
-  'outputs',
-  'sensors',
-])
-
-// The bottom action bar: per-tab actions on the left, version link on the
-// right. Write Params is the one orange action for the tabs that edit
-// parameters -- everything those tabs stage goes to the vehicle here.
-function ParamActions({ tab }: { tab: TabId }) {
-  const dirtyCount = useParamStore((s) => s.dirtyCount)
-  const writeBusy = useParamStore((s) => s.writeBusy)
-  const loadState = useParamStore((s) => s.loadState)
-  const [confirming, setConfirming] = useState(false)
-  if (loadState !== 'ready') return null
-  if (OWN_WRITE_TABS.has(tab)) return null
-  // ...but if edits are staged on another tab, keep the bar: quietly losing
-  // sight of unsaved vehicle changes is the worse of the two outcomes.
-  if (PARAMLESS_TABS.has(tab) && dirtyCount === 0) return null
-
-  const write = () => {
-    setConfirming(false)
-    void connectionService.writeDirtyParams().then((result) => {
-      useParamStore.getState().setLastWrite(result)
-    })
-  }
-
-  return (
-    <>
-      {/* The confirmation lives here rather than on the Parameters tab
-          because edits stage from anywhere -- a curated Setup card, the
-          compare tool, the table -- and this button is what sends all of
-          them. One list, wherever they came from. */}
-      <WriteParamsModal open={confirming} onConfirm={write} onCancel={() => setConfirming(false)} />
-      <LaButton
-        variant="primary"
-        size="lg"
-        disabled={dirtyCount === 0 || writeBusy}
-        onClick={() => setConfirming(true)}
-      >
-        {writeBusy ? 'Writing…' : `Write Params${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
-      </LaButton>
-      <LaButton
-        variant="ghost"
-        disabled={writeBusy || dirtyCount === 0}
-        onClick={() => useParamStore.getState().revertAll()}
-      >
-        Revert
-      </LaButton>
-      <LaButton
-        variant="ghost"
-        disabled={writeBusy}
-        onClick={() => void connectionService.refreshParams()}
-      >
-        Refresh
-      </LaButton>
-    </>
-  )
-}
+// Flight commands lived here once too, and moved onto the Fly screen beside
+// the HUD they act on.
 
 export default function ActionBar() {
   const [version, setVersion] = useState(__APP_VERSION__)
-  const mode = useUiStore((s) => s.mode)
-  const activeTab = useUiStore((s) => s.activeTab)
 
   useEffect(() => {
     // The packaged Electron app's version is authoritative (it can differ
@@ -106,9 +26,6 @@ export default function ActionBar() {
 
   return (
     <footer className="la-actionbar">
-      {/* Staged parameter edits are global, so Write lives in one place for
-          every Setup tab rather than appearing and vanishing per screen. */}
-      {mode === 'setup' && <ParamActions tab={activeTab} />}
       <span className="la-actionbar__spacer"></span>
       {/* Permanent, quiet, and next to the version it qualifies: someone who
           dismissed the first-run notice a week ago should still be able to

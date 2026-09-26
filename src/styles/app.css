@@ -21,6 +21,16 @@
      OSD all grew one independently and all picked a different number; this is
      the one they share. Change it here and every screen moves together. */
   --app-col-w: 280px;
+  /* One width for every control in a column of settings (`.app-col--fields`),
+     so its dropdowns and number boxes share a right-hand edge instead of each
+     sizing to its own longest option. What is left of the column's width goes
+     to the labels. */
+  --app-col-control-w: 128px;
+  /* A settings dialog's control and unit tracks (`.dialog-fields`): the
+     control wide enough for the longest ESC option names, the unit wide
+     enough for the write tick's lead plus "µs". */
+  --app-dialog-control-w: 168px;
+  --app-dialog-unit-w: 48px;
   /* The gap between a screen's main pane and its actions column. It was four
      different values across five screens -- 8px on Mission and Logs, 12px on
      Parameters, 16px on MAVFTP and the Inspector -- for one relationship. */
@@ -54,6 +64,9 @@
      as a set rather than as labels of different lengths. Sized to the longest,
      "Calibrate accelerometer"; a longer label still grows past it. */
   --app-card-action-w: 176px;
+  /* The channel monitor's label column, sized to its widest possible label,
+     "Throttle REV" -- measured at 79px at the monitor's 12px. */
+  --app-rc-label-w: 80px;
   /* The Outputs table's Position bar. Height is the sheet's `.la-input`, so the
      bar sits on the same lines as the PWM boxes beside it and the row keeps its
      height. Width was 120px, Mission Planner's bar near enough; it gave 24px to
@@ -138,14 +151,21 @@
   --app-config-unit-w: 64px;
   /* The four tracks of a named field row, named once so the rows a screen
      builds by hand -- the protocol row with its dialog button, the timer-group
-     bubbles -- line up with the rows `ParamField` builds itself. The two text
-     tracks give way under their ceiling; the control and its unit do not,
-     because a column of controls on one edge is the point of the format. */
-  --app-named-tracks:
-    minmax(0, var(--app-config-label-w))
-    minmax(0, var(--app-config-name-w))
-    minmax(0, var(--app-config-control-w))
-    var(--app-config-unit-w);
+     bubbles -- line up with the rows `ParamField` builds itself.
+
+     Squeezed, the three give way together, but not equally: a grid shares
+     room out in equal increments from each track's floor, so the floors are
+     what set the order. The label starts at nothing because it wraps to a
+     second line; the name starts a little ahead, since a parameter name cannot
+     wrap and clips instead; the control furthest ahead, because a clipped value
+     is a wrong one. Measured on 453px cards at 1664px, where the tracks come
+     out 98 / 106 / 114 -- exactly PTCH_LIM_MAX_DEG, and exactly "Roll,
+     Pitch, Yaw" -- and were an even 106, which clipped the second. */
+  --app-named-name-lead: 8px;
+  --app-named-control-lead: 16px;
+  --app-named-tracks: minmax(0, var(--app-config-label-w))
+    minmax(var(--app-named-name-lead), var(--app-config-name-w))
+    minmax(var(--app-named-control-lead), var(--app-config-control-w)) var(--app-config-unit-w);
   /* The Configuration screen's two columns, on both vehicles, and the one
      place in this app a layout is capped rather than left to fill.
      `.app-content`'s rule is the opposite -- cap the column *count*, never the
@@ -363,13 +383,38 @@
   background: var(--la-blue-soft);
 }
 
-/* The OSD column is a stack of cards rather than one bordered panel, so its
-   actions block is its own shell among them -- which also keeps its buttons
-   the same width as every other screen's, since all of them then inset by
-   the same border plus padding. The frame comes from `.app-col-shell`; this
-   class is only what is left over. */
-.osd-actions {
-  gap: var(--la-space-4);
+/* A column whose groups are lists of settings: label left, control right, and
+   every control the one width -- the rule a dialog's dropdowns keep. Opt-in
+   rather than on every `.app-col`, because Plan's columns lay some fields out
+   their own way (the survey's paired inputs). */
+.app-col--fields .la-field:not(.la-field--stacked) {
+  grid-template-columns: minmax(0, 1fr) var(--app-col-control-w);
+}
+/* Every control leaves room for the write tick, not only the ones that show
+   it: a field that writes when chosen carries the tick after its box, and
+   without the same room on its neighbours it was the one control in the
+   column that stopped 16px short of the others' edge. */
+.app-col--fields .la-field > .la-select,
+.app-col--fields .la-field > .la-input,
+.app-col--fields .la-field > .la-btn,
+.app-col--fields .la-field > .param-bitmask {
+  width: calc(100% - var(--app-write-mark-w));
+  /* The system sheet floors a select at 9em, which left every dropdown 5px
+     wider than the number boxes under it. */
+  min-width: 0;
+}
+.app-col--fields .la-field > .param-control {
+  width: 100%;
+}
+.app-col--fields .la-field > .param-control > :first-child {
+  width: 100%;
+  min-width: 0;
+}
+/* One edge for every value, as in a named row: the sheet centers an input's
+   text, which beside dropdowns reading from the left put "10" mid-box and
+   made the column look like two kinds of control. */
+.app-col--fields .la-input {
+  text-align: left;
 }
 
 .app-col__note {
@@ -2552,7 +2597,7 @@ button.app-status__state--bad:hover {
    The keys are capped at a button's width, so two keys are two buttons rather
    than two enormous ones -- and the cap is a `max-width` on a full-width grid,
    so a narrow card shrinks them instead of overflowing. From the left rather
-   than centred, the edge the fields above them keep. */
+   than centered, the edge the fields above them keep. */
 .motor-test__keypad {
   display: flex;
   flex-direction: column;
@@ -2633,17 +2678,20 @@ button.app-status__state--bad:hover {
 .card-status--bad {
   color: var(--la-bad);
 }
-/* On Sensors a card with actions sits beside one without, so both title rows
-   are made the same height and their orange rules end on the same line: a
-   control's height of content under the rule either way. A title in a header
-   row takes that height itself, and the row adds its padding and rule; a
-   plain title is border-box, so its minimum has to count them. */
+/* A card with actions beside one without -- Sensors, and Power's live reading
+   beside its monitor card -- gets the same title-row height, so their orange
+   rules end on the same line: a control's height of content under the rule
+   either way. A title in a header row takes that height itself, and the row
+   adds its padding and rule; a plain title is border-box, so its minimum has
+   to count them. Scoped to Sensors at first, and the next screen to need it
+   was 4px out. */
 .la-card__head > .la-card__title {
   display: flex;
   align-items: center;
   min-height: var(--app-card-head-h);
 }
-.sensors-screen .la-card > .la-card__title {
+.sensors-screen .la-card > .la-card__title,
+.config-screen .la-card > .la-card__title {
   display: flex;
   align-items: center;
   min-height: calc(var(--app-card-head-h) + var(--la-space-2) + 2px);
@@ -2689,10 +2737,30 @@ button.app-status__state--bad:hover {
    to be pasted a second time. */
 .la-field--named > .la-select,
 .la-field--named > .la-input,
+.la-field--named > .la-readout,
+.la-field--named > .param-bitmask,
 .la-field--named > .param-control > .la-select,
-.la-field--named > .param-control > .la-input {
+.la-field--named > .param-control > .la-input,
+.la-field--named > .param-control > .param-bitmask {
   width: 100%;
   min-width: 0;
+}
+/* ...whether it writes as it is used or is staged. A field that writes at once
+   keeps a slot for its tick, and inside the control's track that made it 16px
+   narrower than a staged field in the next row: a notch's Enable above its
+   settings on Filters, every Motor limits, Mixing and Flaps box beside Output
+   options' on Outputs. In a named row the slot is the lead of the unit column
+   instead, kept on every row so the units line up whether or not a row writes
+   at once. The grid's gap is the sheet's `.la-field` gap, --la-space-3. */
+.la-field--named > .param-control {
+  padding-right: 0;
+}
+.la-field--named > .param-control > .write-feedback {
+  right: auto;
+  left: calc(100% + var(--la-space-3));
+}
+.la-field--named > .la-field__unit {
+  padding-left: calc(var(--app-write-mark-w) + var(--la-space-1));
 }
 /* And one edge for every value in that column. The sheet centers an input's
    text, which is right for a table of PWM boxes and wrong here: beside
@@ -2701,6 +2769,11 @@ button.app-status__state--bad:hover {
 .la-field--named .la-input,
 .outproto__protocol .la-input {
   text-align: left;
+}
+/* A readout is the sheet's inline-flex, centered by its box rather than its
+   text, so the same edge takes a different property. */
+.la-field--named > .la-readout {
+  justify-content: flex-start;
 }
 /* A field whose value cannot mean anything yet -- the airspeed sensor's type
    with the sensor switched off. The control carries the system sheet's own
@@ -3727,7 +3800,9 @@ button.app-status__state--bad:hover {
   color: var(--la-ink-2);
   font: 400 var(--la-size-sm) / 1.2 var(--la-font);
   cursor: pointer;
-  transition: border-color var(--la-ease), background var(--la-ease);
+  transition:
+    border-color var(--la-ease),
+    background var(--la-ease);
 }
 .frame-tile:hover {
   border-color: var(--la-blue);
@@ -3876,12 +3951,32 @@ button.app-status__state--bad:hover {
 .config-screen {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: var(--app-config-stack-w) var(--app-config-tune-w);
+  /* Shrinkable, because the two widths and the rail need about 1850px and the
+     one-column breakpoint is 1400: in between, fixed tracks ran 168px past
+     the pane at 1664 and the whole screen scrolled sideways. */
+  grid-template-columns: minmax(0, var(--app-config-stack-w)) minmax(0, var(--app-config-tune-w));
   max-width: var(--app-setup-screen-w);
   gap: var(--la-space-4);
   align-items: stretch;
   align-content: start;
   min-width: 0;
+}
+/* The same two columns at equal widths, for a screen whose sides mirror each
+   other -- Filters, a notch under each. Half of the shared pair's total each, so
+   the screen is exactly as wide as Configuration and Tuning. Declared before
+   the query below, which then takes it to one column like the rest. */
+.config-screen--even {
+  grid-template-columns: repeat(
+    2,
+    minmax(0, calc((var(--app-config-stack-w) + var(--app-config-tune-w)) / 2))
+  );
+}
+/* Three equal columns under the same cap, for a screen whose cards do not fit
+   two columns in an 1100px window on every vehicle -- Failsafe. The named
+   rows narrow to fit (their tracks give way under their ceilings). Declared
+   before the breakpoint below, which folds it to one column like the rest. */
+.config-screen--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 /* One column before the two would squeeze -- see the note on the cap. */
 @media (max-width: 1400px) {
@@ -4008,12 +4103,13 @@ button.app-status__state--bad:hover {
     minmax(0, 1fr) minmax(0, 1fr);
 }
 
-.aux-grid {
-  grid-template-columns: 130px minmax(0, 1fr);
-}
-
 .modes-grid {
+  position: relative;
   grid-template-columns: var(--app-table-col-w) minmax(0, 1fr) var(--app-table-col-w);
+  /* Room for the live-slot dot in the padding, on every row -- the heading's
+     too, so the table moves as one -- rather than in the label, where it
+     pushed only the live row's "Mode 4" to the right. */
+  padding-left: var(--la-space-5);
 }
 
 /* Parameters that vary on two axes: the axis down the left, the gain
@@ -4022,6 +4118,9 @@ button.app-status__state--bad:hover {
    its own column whatever the card's width. */
 .matrix-grid {
   grid-template-columns: 72px repeat(var(--matrix-cols, 3), minmax(0, 1fr));
+  /* Tighter than a table's, and the inputs' padding below: a five-gain matrix
+     in a narrow card otherwise clipped "0.0036" to "0.003". */
+  column-gap: var(--la-space-2);
 }
 .app-table__head.matrix-grid {
   /* Centered over the inputs, which are centered in their own cells --
@@ -4032,6 +4131,7 @@ button.app-status__state--bad:hover {
   display: flex;
   justify-content: center;
 }
+
 .matrix-grid__unit {
   font-weight: 400;
   text-transform: none;
@@ -4042,6 +4142,15 @@ button.app-status__state--bad:hover {
 .matrix-grid .la-input--num {
   width: 100%;
   max-width: 7em;
+  padding-inline: var(--la-space-1);
+}
+/* Chromium keeps room for a number input's spin arrows even while they are
+   hidden, which in a five-gain matrix was the width of a digit. Nobody steps
+   a gain of 0.0036 by ones. */
+.matrix-grid .la-input--num::-webkit-inner-spin-button,
+.matrix-grid .la-input--num::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .ports-grid__hint {
@@ -4053,7 +4162,6 @@ button.app-status__state--bad:hover {
   margin-left: var(--la-space-2);
 }
 
-.aux-grid__product,
 .outputs-grid__product {
   display: block;
   font: 400 var(--la-size-xs) / 1.2 var(--la-font);
@@ -4074,11 +4182,14 @@ button.app-status__state--bad:hover {
 }
 
 .modes-grid__marker {
+  position: absolute;
+  top: 50%;
+  left: var(--la-space-2);
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--la-blue);
-  flex: none;
+  transform: translateY(-50%);
 }
 
 /* --- Setup tab ------------------------------------------------------- */
@@ -4109,7 +4220,7 @@ button.app-status__state--bad:hover {
 }
 .rc-monitor__row {
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr) 52px;
+  grid-template-columns: var(--app-rc-label-w) 2ch minmax(0, 1fr) 52px;
   align-items: center;
   gap: var(--la-space-3);
   padding: 2px var(--la-space-1);
@@ -4121,10 +4232,17 @@ button.app-status__state--bad:hover {
 .rc-monitor__row.is-watched {
   background: var(--la-blue-soft);
 }
-.rc-monitor__name {
+.rc-monitor__label {
   display: flex;
   align-items: baseline;
+  justify-content: flex-end;
   gap: var(--la-space-2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.rc-monitor__num {
+  text-align: right;
   color: var(--la-ink-3);
   font-variant-numeric: tabular-nums;
 }
@@ -4135,6 +4253,8 @@ button.app-status__state--bad:hover {
 .rc-monitor__rev {
   color: var(--la-orange-deep);
   font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 .rc-monitor__profile {
   color: var(--la-ink-3);
@@ -4179,6 +4299,14 @@ button.app-status__state--bad:hover {
 .la-modal__card:has(.rc-wizard) {
   width: min(920px, 100%);
 }
+/* Cancel and the step's action are one pair, so one size -- the compass
+   dialog's rule. A fixed width rather than the widest-of-two, because the
+   action is relabeled at every step ("Start", "Sticks are centered",
+   "Waiting for the stick…") and a pair sized to its words resized under the
+   pointer from one step to the next. */
+.la-modal:has(.rc-wizard) .la-modal__actions .la-btn {
+  min-width: var(--app-card-action-w);
+}
 
 .rc-wizard {
   display: grid;
@@ -4188,6 +4316,9 @@ button.app-status__state--bad:hover {
 }
 .rc-wizard__main {
   min-width: 0;
+}
+.rc-wizard--results {
+  grid-template-columns: minmax(0, 1fr);
 }
 .rc-wizard__side {
   min-width: 0;
@@ -4216,6 +4347,10 @@ button.app-status__state--bad:hover {
   color: var(--la-ink-3);
   font-size: var(--la-size-sm);
 }
+/* The lead line carrying a stray-stick warning in place of its instruction. */
+.rc-wizard__lead.is-bad {
+  color: var(--la-bad);
+}
 
 .stick-diagram {
   display: block;
@@ -4223,14 +4358,29 @@ button.app-status__state--bad:hover {
   max-width: 420px;
   height: auto;
 }
-.stick-diagram__body {
+.stick-diagram__case {
   fill: var(--la-surface-2);
   stroke: var(--la-line-strong);
+  stroke-width: 1.5;
 }
-.stick-diagram__antenna {
+/* The gimbal's round bezel sits a step darker than the case, so the square
+   gate reads as set into it. */
+.stick-diagram__bezel {
+  fill: var(--la-line);
   stroke: var(--la-line-strong);
-  stroke-width: 2.5;
+}
+.stick-diagram__dial circle {
+  fill: var(--la-surface);
+  stroke: var(--la-line-strong);
+}
+.stick-diagram__dial line {
+  stroke: var(--la-ink-3);
+  stroke-width: 1.5;
   stroke-linecap: round;
+}
+.stick-diagram__screen {
+  fill: var(--la-line);
+  stroke: var(--la-line-strong);
 }
 .stick-diagram__gate {
   fill: var(--la-surface);
@@ -4242,14 +4392,19 @@ button.app-status__state--bad:hover {
 .stick-diagram__cross {
   stroke: var(--la-line);
 }
+/* Moved as a group by transform, knob and rim together; a CSS transform on
+   an SVG element is in the drawing's own units. */
 .stick-diagram__knob {
   fill: var(--la-ink-3);
-  transition:
-    cx var(--la-ease),
-    cy var(--la-ease);
+  transition: transform var(--la-ease);
 }
 .stick-diagram__knob.is-active {
   fill: var(--la-blue);
+}
+.stick-diagram__knob-top {
+  fill: none;
+  stroke: var(--la-surface-2);
+  stroke-width: 1.5;
 }
 .stick-diagram__arrow line {
   stroke: var(--la-blue);
@@ -4288,6 +4443,19 @@ button.app-status__state--bad:hover {
   white-space: nowrap;
 }
 /* A clash is a fault, so it is named in the row as well as colored. */
+/* Each parameter's name, in the named rows' sub-font, with its value beside
+   it. A cell holds one pair, or one per line in the rare conflicted row. */
+.rc-review__pair {
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-2);
+}
+.rc-review__pair .la-field__param {
+  flex: none;
+  overflow: visible;
+}
+.rc-review__pair.is-bad,
+.rc-review__pair.is-bad .la-field__param,
 .rc-review tr.is-bad td {
   color: var(--la-bad);
   font-weight: 600;
@@ -4796,12 +4964,42 @@ button.app-status__state--bad:hover {
   min-width: 0;
 }
 
-/* The pass-through dialog: nine ordinary fields in a column, at the width the
-   modal gives them. */
-.esc-settings {
+/* A dialog's list of settings -- Outputs' ESC settings, an OSD screen's
+   settings. The named-row format is four tracks and ~680px, laid out only
+   inside a card, so in a dialog each row fell apart: label and name on one
+   line, the box full-width under them, the unit stranded at the end. Here the
+   name sits under its label, and every control is one width down the right
+   with its unit after it. */
+.dialog-fields {
   display: flex;
   flex-direction: column;
-  gap: var(--la-space-2);
+  gap: var(--la-space-3);
+}
+.dialog-fields .la-field--named {
+  grid-template-columns: minmax(0, 1fr) var(--app-dialog-control-w) var(--app-dialog-unit-w);
+  grid-template-areas:
+    'label control unit'
+    'param control unit';
+  column-gap: var(--la-space-3);
+  row-gap: 0;
+  align-items: center;
+}
+.dialog-fields .la-field--named > .la-field__label {
+  grid-area: label;
+  align-self: end;
+}
+.dialog-fields .la-field--named > .la-field__param {
+  grid-area: param;
+  align-self: start;
+}
+.dialog-fields .la-field--named > .la-select,
+.dialog-fields .la-field--named > .la-input,
+.dialog-fields .la-field--named > .param-bitmask,
+.dialog-fields .la-field--named > .param-control {
+  grid-area: control;
+}
+.dialog-fields .la-field--named > .la-field__unit {
+  grid-area: unit;
 }
 
 /* The keypad's own label. `.la-card__subtitle` is the design system's second
@@ -5993,7 +6191,7 @@ body.is-splitting .flight-map {
      alone would leave the character cells the wrong shape. Falls back to the
      column width when that is the tighter of the two. */
   aspect-ratio: var(--osd-aspect);
-  width: min(100%, calc(var(--osd-max-h, 58vh) * var(--osd-aspect)));
+  width: 100%;
   /* Centred in the card by auto margins rather than by centring the card's
      items, which would shrink the toolbar and the selection row with it. */
   margin-inline: auto;
@@ -6141,90 +6339,95 @@ body.is-splitting .flight-map {
   border-color: var(--la-blue);
 }
 
-/* Panel toggles left, preview center, global settings right. The point of
-   the arrangement is that the whole tab fits without scrolling: the panel
-   list scrolls inside its own pane, and the preview is capped by viewport
-   height rather than allowed to grow with the column. */
+/* Panel toggles left, preview center, and the settings column right -- the
+   same single framed column (`.app-col-shell`) every other screen that edits
+   something has, and at every window size: it used to fold under the other
+   two below 1360px, where it was three loose cards. Narrower windows take the
+   room from the panel list and the preview instead.
+
+   The workspace fills the content pane (the tab `fills`), its row takes all
+   of it, and the preview is fitted into whatever box its card has left: the
+   widest frame of the grid's aspect that fits, by container units, so the
+   character cells keep their shape at any size. It used to be capped by a
+   formula in window pixels, which fitted the window it was tuned on and left
+   a band of empty page under the columns on a taller one. The panel list and
+   the column scroll inside themselves; the page never does. */
 .osd-workspace {
   /* The panel list's track, and the two controls on this screen that are not
      part of a field column. Declared here rather than in :root because they
      describe this workspace only -- the same shape `--prio-moves-w` follows
-     on the compass table -- and the list's width is redefined at the
-     breakpoint below rather than written out a second time. */
+     on the compass table. */
   --app-osd-list-w: 262px;
   --app-osd-res-w: 118px;
   --app-osd-coord-w: 84px;
   display: grid;
   grid-template-columns: var(--app-osd-list-w) minmax(0, 1fr) var(--app-col-w);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--la-space-3);
-  /* Grid items stretch by default, so the panel list and the preview end up
-     the same height whichever is naturally taller. The settings column opts
-     out: three short cards stretched to a tall row would just be three cards
-     with a gap under them. */
   align-items: stretch;
-  /* How tall the preview may get -- one knob, since the panel list is sized
-     to match it. Two terms because the chrome around the preview (app bar,
-     action bar, card title, screen picker, selection row) is a fixed ~400px
-     that does not shrink with the window: a plain vh fraction fits a tall
-     window and overflows a short one by exactly that difference. */
-  --osd-max-h: min(66vh, calc(100vh - 415px));
 }
-.osd-workspace > .la-card,
-.osd-workspace__side > .la-card {
+.app-content--flush > .osd-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.osd-workspace > .la-card {
   max-width: none;
+  min-height: 0;
 }
-.osd-workspace__side {
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  /* Tighter than the workspace gap: on a short window this column, not the
-     preview, is what decides whether the tab scrolls, and the card borders
-     already separate the three well enough. */
-  gap: var(--la-space-1);
-  min-width: 0;
+.osd-workspace > .app-col-shell {
+  grid-row: 1 / -1;
+  grid-column: -2;
 }
 
 /* The list is the one thing here that cannot fit: sixty-five panels will
-   always be taller than a screen, so it gets its own scroll rather than
-   pushing the preview down the page. */
+   always be taller than a screen, so it scrolls inside its card rather than
+   pushing the preview down. */
 .osd-palette-scroll {
-  /* The basis, not a max-height, is what bounds the card: in a column flex
-     container it sets the hypothetical height the grid sizes the row from,
-     while flex-grow still lets the list fill the extra when the preview
-     card turns out to be the taller of the two. A max-height would bound it
-     but leave dead space under the list. */
-  flex: 1 1 var(--osd-max-h);
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   /* Room for the scrollbar so it never lands on top of a switch. */
   padding-right: var(--la-space-2);
 }
+.osd-screen-fit {
+  flex: 1 1 0;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+}
+.osd-screen-fit > .osd-screen {
+  width: min(100cqw, calc(100cqh * var(--osd-aspect)));
+}
 
-/* Two tiers down. First the settings column folds under the other two and
-   spreads out sideways; then everything stacks and the list stops scrolling
-   inside itself, because on a narrow window the page scrolls anyway. */
+/* A narrow window moves the panel list under the preview, so the preview has
+   the width beside the column to itself. The layout card keeps the full
+   height of the pane -- stacked into a shared height instead, the smallest
+   window the desktop app allows (980x640) left the preview two pixels tall --
+   and the list follows below it, reached by scrolling, its toggles spread
+   across the wider card. The column stays pinned beside both. */
 @media (max-width: 1360px) {
   .osd-workspace {
-    --app-osd-list-w: 240px;
-    grid-template-columns: var(--app-osd-list-w) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) var(--app-col-w);
+    grid-template-rows: 100% auto;
+    overflow-y: auto;
   }
-  .osd-workspace__side {
-    grid-column: 1 / -1;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-start;
+  .osd-workspace__screen {
+    grid-area: 1 / 1;
   }
-  .osd-workspace__side > .la-card {
-    flex: 1 1 300px;
+  .osd-workspace__panels {
+    grid-area: 2 / 1;
   }
-}
-@media (max-width: 980px) {
-  .osd-workspace {
-    grid-template-columns: minmax(0, 1fr);
+  .osd-workspace > .app-col-shell {
+    grid-area: 1 / 2;
+    position: sticky;
+    top: 0;
   }
-  .osd-palette-scroll {
-    /* Stacked, the page scrolls anyway, so the list shows in full. */
+  /* In full: the page scrolls here, and `.osd-palette` already spreads each
+     group's toggles across the width it is given. */
+  .osd-workspace .osd-palette-scroll {
     flex: none;
+    overflow: visible;
     padding-right: 0;
   }
 }
@@ -6257,17 +6460,17 @@ body.is-splitting .flight-map {
 .osd-selection__name {
   font-size: var(--la-size-md);
 }
-/* The two spinners and the Remove beside them are one set of three. */
-.osd-selection__coord,
+/* Each box with its label beside it, so the row is one control tall. The two
+   boxes and the Remove after them are one set of three, one width. */
+.osd-selection__coord {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.osd-selection__coord .la-input,
 .osd-selection .la-btn {
   width: var(--app-osd-coord-w);
   min-width: var(--app-osd-coord-w);
-}
-/* Label above the box, not beside it: the card-wide `.la-field` rule pins a
-   label column next to the control, which inside 84px left "Column" and "Row"
-   clipped to "Co" and "R". */
-.app-content .la-card .osd-selection__coord {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .osd-palette__group + .osd-palette__group {
@@ -7606,6 +7809,12 @@ body.is-splitting .flight-map {
   font-size: var(--la-size-md);
   font-weight: 400;
   color: var(--la-ink);
+}
+.param-bitmask__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* In the serial table the wrapper fills its cell, so the button is the width
    of the column rather than of whatever happens to be switched on. */

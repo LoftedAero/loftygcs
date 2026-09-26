@@ -13,6 +13,7 @@ import { mergeServoOutputs } from '../protocol/telemetry'
 import { setConnectionState, useConnectionStore } from '../stores/connection-store'
 import { describeLinkError, describeSilentLink } from './link-error'
 import { WebSerialTransport, grantedSerialPorts } from '../transport/web-serial'
+import { rebootCandidates, siblingsOf } from './reboot-port'
 import { useVehicleStore, type VehicleSnapshot } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { useCalStore } from '../stores/cal-store'
@@ -68,6 +69,14 @@ class ConnectionService {
    * only a port already in hand can be opened without a chooser.
    */
   private openedPort: SerialPort | null = null
+  /**
+   * Where the port picked by hand sits among the ports sharing its USB ids --
+   * a Cube's MAVLink and SLCAN ports are one pair of ids -- which is how the
+   * same one is found again after a reboot. See `reboot-port.ts`.
+   */
+  private serialRank = 0
+  /** Reopened ports that opened but sent no heartbeat, during this reboot. */
+  private rebootSkip = 0
   /** When to stop waiting for a reboot we commanded; 0 when not waiting. */
   private rebootUntil = 0
   private rebootTimer: ReturnType<typeof setTimeout> | null = null
@@ -108,6 +117,14 @@ class ConnectionService {
     )
     worker.start()
     this.openedPort = transport instanceof WebSerialTransport ? transport.openedPort : null
+    // Only for a port somebody chose. During a reboot wait the port is one this
+    // code chose from the rank, and measuring it again would only repeat it.
+    const chosen = this.openedPort
+    if (chosen && !this.rebooting) {
+      void grantedSerialPorts().then((ports) => {
+        this.serialRank = Math.max(0, siblingsOf(ports, chosen).indexOf(chosen))
+      })
+    }
     // While a reboot is outstanding the bar keeps saying so: the link coming
     // up is a step in that rather than a separate event, and flicking
     // through "Waiting for heartbeat" on every retry would read as a link
@@ -123,6 +140,9 @@ class ConnectionService {
         opts.kind === 'serial' && transport instanceof WebSerialTransport
           ? transport.openedPort?.getInfo()
           : undefined
+      // During a reboot wait, a port that opened and said nothing is the wrong
+      // sibling -- a Cube's SLCAN port, say -- so the next try starts past it.
+      if (this.rebooting) this.rebootSkip++
       this.linkFailed(describeSilentLink(usb))
     }, HANDSHAKE_TIMEOUT_MS)
     this.snapshotTimer = setInterval(() => this.flushSnapshot(), SNAPSHOT_INTERVAL_MS)
@@ -150,6 +170,7 @@ class ConnectionService {
     const { phase } = useConnectionStore.getState()
     if (phase === 'idle' || phase === 'error') return
     this.rebootUntil = Date.now() + REBOOT_RETURN_MS
+    this.rebootSkip = 0
     setConnectionState({ phase: 'rebooting', error: null })
   }
 
@@ -188,12 +209,17 @@ class ConnectionService {
     if (useConnectionStore.getState().phase !== 'rebooting') return
     const opts = this.openedWith
     if (opts) {
-      try {
-        await this.openLink(await this.withGrantedPort(opts))
-        return
-      } catch {
-        // Normal for the first several seconds: the device re-enumerates
-        // when the firmware's USB stack is up, and not before.
+      // Each candidate in turn within one try: a stale object from before the
+      // reboot cannot open, and stepping over it here beats waiting a second
+      // to learn the same thing again.
+      for (const candidate of await this.rebootOptions(opts)) {
+        try {
+          await this.openLink(candidate)
+          return
+        } catch {
+          // Normal for the first several seconds: the device re-enumerates
+          // when the firmware's USB stack is up, and not before.
+        }
       }
     }
     if (!this.rebooting) {
@@ -204,32 +230,21 @@ class ConnectionService {
   }
 
   /**
-   * The serial options with a port attached, so no chooser is needed.
+   * The links to try after a reboot, best first, each with a port attached so
+   * no chooser is needed.
    *
-   * Usually the very port the link was open on -- Chromium keeps that object
-   * across a re-enumeration for a device that reports a serial number, which
-   * a flight controller does. But not always: a device without one is
-   * dropped and comes back as a *new* port object, while the old one stays
-   * in `getPorts()` and can never be opened again. So the choice is made by
-   * USB ids and takes the **newest** match, which is the same object in the
-   * first case and the replacement in the second. Checking that the held
-   * port is still listed proves nothing, because the list keeps ports whose
-   * devices are unplugged.
+   * Serial ports are matched by USB ids and chosen by rank among them rather
+   * than by "the newest match", which on a Cube Orange was its SLCAN port: see
+   * `reboot-port.ts`. A port with no USB ids to match on (Bluetooth, a virtual
+   * COM port) has only the object in hand.
    */
-  private async withGrantedPort(opts: TransportOptions): Promise<TransportOptions> {
-    if (opts.kind !== 'serial') return opts
+  private async rebootOptions(opts: TransportOptions): Promise<TransportOptions[]> {
+    if (opts.kind !== 'serial') return [opts]
     const held = this.openedPort
-    if (!held) return opts
-    const want = held.getInfo()
-    // Nothing to match on (a Bluetooth or virtual COM port): the object in
-    // hand is the only candidate there is.
-    if (want.usbVendorId === undefined) return { ...opts, port: held }
-    const ports = await grantedSerialPorts()
-    const same = ports.filter((p) => {
-      const info = p.getInfo()
-      return info.usbVendorId === want.usbVendorId && info.usbProductId === want.usbProductId
-    })
-    return { ...opts, port: same.at(-1) ?? held }
+    if (!held) return [opts]
+    const siblings = siblingsOf(await grantedSerialPorts(), held)
+    const ports = rebootCandidates(siblings, this.serialRank, this.rebootSkip)
+    return (ports.length > 0 ? ports : [held]).map((port) => ({ ...opts, port }))
   }
 
   async disconnect(error?: string) {
@@ -477,6 +492,14 @@ class ConnectionService {
         p.batteryV = d.voltageV
         p.batteryA = d.currentA
         p.batteryPct = d.remainingPct
+        break
+      case 'batteryStatus':
+        // Merged, like the servo ports: each monitor arrives in its own
+        // message, and a batch holding one must keep the others'.
+        p.batteries = {
+          ...(p.batteries ?? useVehicleStore.getState().batteries),
+          [d.id]: { voltageV: d.voltageV, currentA: d.currentA, remainingPct: d.remainingPct },
+        }
         break
       case 'gps':
         p.gpsFix = d.fixType
