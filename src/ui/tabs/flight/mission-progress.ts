@@ -30,7 +30,9 @@ export function missionProgress(
   wpDistM: number | null,
   groundspeedMs: number,
 ): MissionProgress {
-  if (seq === null) return { position: null, commandName: null, etaS: null }
+  // Item 0 is home, never a waypoint being flown -- and it is what ArduPilot
+  // reports as current with no mission at all, which drew "WP 0 0 m".
+  if (seq === null || seq < 1) return { position: null, commandName: null, etaS: null }
 
   // The vehicle's plan and this GCS's plan can differ -- a plan uploaded
   // elsewhere, or none loaded here at all. The sequence number is still

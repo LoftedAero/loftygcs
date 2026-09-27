@@ -3,6 +3,7 @@ import {
   DISTANCE_CHOICES,
   SPEED_CHOICES,
   distanceLabel,
+  fixed,
   formatDistance,
   formatSpeed,
   formatVerticalSpeed,
@@ -125,5 +126,17 @@ describe('the choices a preferences control offers', () => {
     for (const c of SPEED_CHOICES) expect(speedLabel(c.id)).toBeTruthy()
     expect(DISTANCE_CHOICES.map((c) => c.id)).toEqual(['m', 'ft'])
     expect(SPEED_CHOICES).toHaveLength(4)
+  })
+})
+
+describe('no negative zero', () => {
+  it('drops the sign a value a hair under zero rounds to', () => {
+    // A vehicle on the ground reads a few centimeters below its home.
+    expect(formatDistance(-0.04, 'm')).toBe('0.0')
+    expect(formatDistance(-0.3, 'm', 0)).toBe('0')
+    expect(formatSpeed(-0.01, 'ms')).toBe('0.0')
+    expect(fixed(-0.4, 0)).toBe('0')
+    // A real negative keeps it.
+    expect(formatDistance(-2, 'm')).toBe('-2.0')
   })
 })

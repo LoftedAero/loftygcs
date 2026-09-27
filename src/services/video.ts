@@ -4,17 +4,38 @@
 // WebCodecs rather than a <video> element because there is no container here
 // to give one -- just access units off the wire. VideoDecoder takes exactly
 // that, and uses the same hardware decoder the element would.
+//
+// **A stream that drops comes back by itself.** A camera booting, a radio
+// link blinking, a companion computer restarting its streamer: each used to
+// leave the HUD on a dead frame until someone noticed and pressed Connect
+// again. Now any failure that is not about the request itself (video-error.ts)
+// retries, with a short backoff, until the user presses Disconnect -- and a
+// stream that goes silent while playing counts as a failure, because a
+// camera that stops sending without closing its socket is the commonest
+// drop of all and the only one no event reports.
+//
+// **An error is kept.** Every failure from the desktop side is followed by
+// its "Stopped", and treating that as a clean stop wiped the error the same
+// instant it arrived -- every failure was silent. The first report of a
+// session is the one acted on and shown; what follows it is ignored.
 
-export type VideoState = 'idle' | 'connecting' | 'playing' | 'error'
+import { describeVideoError, isRetryable } from './video-error'
+
+export type VideoState = 'idle' | 'connecting' | 'playing' | 'retrying' | 'error'
 
 export interface VideoStatus {
   state: VideoState
-  /** What to show the user: a step, or why it stopped. */
+  /** What to show the user: a step, what is playing, or why it stopped. */
   text: string
 }
 
 type FrameSink = (frame: VideoFrame) => void
 type StatusSink = (status: VideoStatus) => void
+
+/** Waits between attempts: quick at first, then no more often than this. */
+const RETRY_MS = [1000, 2000, 4000, 5000]
+/** How long a playing stream may send no frame before it counts as dropped. */
+const SILENT_MS = 3000
 
 class VideoService {
   private decoder: VideoDecoder | null = null
@@ -24,6 +45,20 @@ class VideoService {
   private status: VideoStatus = { state: 'idle', text: '' }
   /** Frames before the first keyframe decode into nothing useful. */
   private sawKeyframe = false
+  /** The stream wanted, or null once the user has stopped it. */
+  private url: string | null = null
+  /**
+   * Counts attempts, so a late event from an attempt already given up on
+   * cannot act on the one that replaced it.
+   */
+  private session = 0
+  /** The session whose failure has been handled; its "Stopped" is ignored. */
+  private failedSession = -1
+  private attempt = 0
+  private retryTimer: ReturnType<typeof setTimeout> | null = null
+  private watchdog: ReturnType<typeof setInterval> | null = null
+  private lastFrameAt = 0
+  private size = ''
 
   get current(): VideoStatus {
     return this.status
@@ -49,42 +84,95 @@ class VideoService {
     return typeof window !== 'undefined' && 'VideoDecoder' in window && !!window.loftgcs?.video
   }
 
+  /** Start showing a stream, and keep it showing until `close`. */
   async open(url: string): Promise<void> {
     await this.close()
     const bridge = window.loftgcs?.video
     if (!bridge) {
-      this.setStatus('error', 'Video needs the desktop app: the browser cannot open a network stream.')
+      this.setStatus(
+        'error',
+        'Video needs the desktop app: the browser cannot open a network stream.',
+      )
       return
     }
     if (!('VideoDecoder' in window)) {
       this.setStatus('error', 'This build has no WebCodecs decoder.')
       return
     }
+    this.url = url
+    this.attempt = 0
     this.setStatus('connecting', 'Opening…')
+    await this.start()
+  }
+
+  private async start(): Promise<void> {
+    const bridge = window.loftgcs?.video
+    const url = this.url
+    if (!bridge || url === null) return
+    const session = ++this.session
+    this.teardown()
 
     this.unsubscribe.push(
       bridge.onStatus((s) => {
-        if (s.error) this.setStatus('error', s.text)
-        else if (s.closed) this.setStatus('idle', '')
-        else if (this.status.state !== 'playing') this.setStatus('connecting', s.text)
+        if (session !== this.session) return
+        if (s.error) this.failed(session, s.text)
+        else if (s.closed) this.failed(session, null)
+        // Progress from the desktop side, until the first frame says more.
+        else if (this.status.state === 'connecting') this.setStatus('connecting', s.text)
       }),
-      bridge.onReady((info) => this.configure(info.codec)),
-      bridge.onUnit((u) => this.decode(u)),
+      bridge.onReady((info) => {
+        if (session === this.session) this.configure(info.codec, session)
+      }),
+      bridge.onUnit((u) => {
+        if (session === this.session) this.decode(u, session)
+      }),
     )
 
     const result = await bridge.open(url)
-    if (!result.ok) {
-      this.setStatus('error', result.error)
-      await this.close()
-    }
+    if (!result.ok) this.failed(session, result.error)
   }
 
-  private configure(codec: string) {
+  /**
+   * An attempt ended without being asked to: say why, and either try again
+   * or, for a failure repeating could not fix, stop.
+   *
+   * `raw` is null for a close with no error before it -- the far end simply
+   * went away.
+   */
+  private failed(session: number, raw: string | null) {
+    if (session !== this.session || session === this.failedSession || this.url === null) return
+    this.failedSession = session
+    const url = this.url
+    this.teardown()
+    void window.loftgcs?.video?.close().catch(() => undefined)
+    const sentence = raw === null ? 'The stream stopped.' : describeVideoError(raw, url)
+    if (raw !== null && !isRetryable(raw)) {
+      this.url = null
+      this.setStatus('error', sentence)
+      return
+    }
+    const wait = RETRY_MS[Math.min(this.attempt, RETRY_MS.length - 1)]!
+    this.attempt++
+    this.setStatus('retrying', `${sentence} Reconnecting…`)
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null
+      void this.start()
+    }, wait)
+  }
+
+  private configure(codec: string, session: number) {
     this.dropDecoder()
     this.sawKeyframe = false
     const decoder = new VideoDecoder({
       output: (frame) => {
-        if (this.status.state !== 'playing') this.setStatus('playing', '')
+        this.lastFrameAt = Date.now()
+        const size = `${frame.displayWidth}×${frame.displayHeight}`
+        if (this.status.state !== 'playing' || size !== this.size) {
+          this.size = size
+          this.attempt = 0
+          this.setStatus('playing', `Playing · ${size}`)
+          this.watch(session)
+        }
         if (this.frameSinks.size === 0) {
           // Nothing is drawing; a frame that is not closed leaks its buffer
           // and the decoder stalls once its pool is exhausted.
@@ -94,7 +182,7 @@ class VideoService {
         for (const sink of this.frameSinks) sink(frame)
         frame.close()
       },
-      error: (err) => this.setStatus('error', err.message),
+      error: (err) => this.failed(session, err.message),
     })
     // No description: the bitstream is Annex-B, which is what the
     // depayloader produces and what VideoDecoder assumes when none is given.
@@ -102,7 +190,17 @@ class VideoService {
     this.decoder = decoder
   }
 
-  private decode(u: { data: Uint8Array; keyframe: boolean; timestamp: number }) {
+  /** While playing, a stream that stops sending frames has dropped. */
+  private watch(session: number) {
+    if (this.watchdog) return
+    this.watchdog = setInterval(() => {
+      if (Date.now() - this.lastFrameAt > SILENT_MS) {
+        this.failed(session, `No video for ${SILENT_MS / 1000} s`)
+      }
+    }, 500)
+  }
+
+  private decode(u: { data: Uint8Array; keyframe: boolean; timestamp: number }, session: number) {
     const decoder = this.decoder
     if (!decoder || decoder.state !== 'configured') return
     if (!this.sawKeyframe) {
@@ -119,7 +217,7 @@ class VideoService {
         }),
       )
     } catch (err) {
-      this.setStatus('error', err instanceof Error ? err.message : 'Decode failed')
+      this.failed(session, err instanceof Error ? err.message : 'Decode failed')
     }
   }
 
@@ -134,10 +232,23 @@ class VideoService {
     }
   }
 
-  async close(): Promise<void> {
+  /** Everything an attempt holds, without saying anything about why. */
+  private teardown() {
     for (const off of this.unsubscribe) off()
     this.unsubscribe = []
+    if (this.watchdog) clearInterval(this.watchdog)
+    this.watchdog = null
     this.dropDecoder()
+    this.size = ''
+  }
+
+  /** Stop, and stop trying: the one way a stream ends without a reason shown. */
+  async close(): Promise<void> {
+    this.url = null
+    this.session++
+    if (this.retryTimer) clearTimeout(this.retryTimer)
+    this.retryTimer = null
+    this.teardown()
     await window.loftgcs?.video?.close().catch(() => undefined)
     this.setStatus('idle', '')
   }

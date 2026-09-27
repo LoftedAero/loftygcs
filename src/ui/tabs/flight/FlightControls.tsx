@@ -15,6 +15,8 @@ import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useParamStore } from '../../../stores/param-store'
 import { MAV_RESULT } from '../../../protocol/commands'
+import { useHudNoteStore } from '../../../stores/hud-note-store'
+import { HUD_MESSAGE_SEVERITY } from './hud-draw'
 import { modeNumberByName, modeTable, vehicleClass } from '../../../protocol/modes'
 import {
   arm,
@@ -72,7 +74,7 @@ const DO_ACTIONS: DoAction[] = [
 
 const TAKEOFF_ALT_M = 20
 
-/** How recent a STATUSTEXT has to be to count as the reason for a refusal. */
+/** How recent a vehicle warning has to be to count as a refusal's reason. */
 const REASON_WINDOW_MS = 4000
 
 export default function FlightControls() {
@@ -96,7 +98,8 @@ export default function FlightControls() {
   const qEnable = useParamStore((s) => s.entries.get('Q_ENABLE')?.value)
   const takeoffVia = takeoffStyle(vehicleType, qEnable)
 
-  const [status, setStatus] = useState('')
+  const say = useHudNoteStore((s) => s.say)
+  const clearNote = useHudNoteStore((s) => s.clear)
   const [speed, setSpeed] = useState('')
   const [alt, setAlt] = useState('')
   const [wp, setWp] = useState('')
@@ -121,33 +124,37 @@ export default function FlightControls() {
   }
 
   /**
-   * A refusal is only useful with the vehicle's own words attached.
+   * Whether the vehicle has explained a refusal itself.
    *
    * MAV_RESULT says FAILED and nothing else; the reason -- "Arm: Need
    * Position Estimate", "Mode change to Guided failed: requires position" --
-   * arrives moments later as a STATUSTEXT, in a feed the pilot is not
-   * looking at while pressing a button. So pull the newest one back here.
+   * arrives just after the ack as a warning, which the HUD shows. Only a
+   * refusal it did not explain needs the app to say anything.
    */
-  const reason = () => {
-    const texts = useVehicleStore.getState().statusTexts
-    const recent = texts[texts.length - 1]
-    if (!recent) return ''
-    return Date.now() - recent.at < REASON_WINDOW_MS ? ` — ${recent.text}` : ''
-  }
+  const explained = () =>
+    useVehicleStore
+      .getState()
+      .statusTexts.some(
+        (t) => t.severity <= HUD_MESSAGE_SEVERITY && Date.now() - t.at < REASON_WINDOW_MS,
+      )
 
+  // Results go to the HUD, where the vehicle's own warnings are (Mission
+  // Planner's arrangement), not to a line under these buttons. Success says
+  // nothing: the mode, the armed state, the altitude are the confirmation.
+  // It does clear what an earlier refusal left there.
   const report = (what: string) => async (result: number) => {
-    if (result === 0) return setStatus(`${what}: accepted`)
+    if (result === 0) return clearNote()
     // The vehicle usually explains itself just after the ack, not with it.
     await new Promise((r) => setTimeout(r, 400))
-    setStatus(`${what}: ${MAV_RESULT[result] ?? result}${reason()}`)
+    if (!explained()) say(`${what}: ${MAV_RESULT[result] ?? result}`)
   }
   const fail = (what: string) => (err: unknown) =>
-    setStatus(`${what}: ${err instanceof Error ? err.message : 'no answer'}`)
+    say(`${what}: ${err instanceof Error ? err.message : 'no answer'}`)
 
   const jump = (name: string) => {
     const num = modeNumberByName(vehicleType, name)
     if (num === undefined) {
-      setStatus(`${name} is not a mode on this vehicle`)
+      say(`${name} is not a mode on this vehicle`)
       return
     }
     void setModeConfirmed(num)
@@ -159,10 +166,7 @@ export default function FlightControls() {
         // leaving a vehicle that is armed, in Auto, and going nowhere until
         // it auto-disarms.
         if (r === 0 && name === 'Auto' && isCopter && relAltM < 1) {
-          setStatus(
-            'Auto: accepted, but Copter will not begin a takeoff on the ground — ' +
-              'take off first, or set AUTO_OPTIONS to allow it.',
-          )
+          say('Copter will not start an Auto takeoff from the ground')
         }
       })
       .catch(fail(name))
@@ -175,10 +179,11 @@ export default function FlightControls() {
     }
     void arm()
       .then((result) => {
-        if (result === 0) setStatus('Arm: accepted')
+        if (result === 0) clearNote()
         else {
-          // Refused: offer force-arm behind an explicit danger confirm.
-          setStatus(`Arm: ${MAV_RESULT[result] ?? result}`)
+          // Refused: the vehicle's reason is on the HUD; offer force-arm
+          // behind an explicit danger confirm.
+          if (!explained()) say(`Arm: ${MAV_RESULT[result] ?? result}`)
           setConfirmForce(true)
         }
       })
@@ -195,7 +200,13 @@ export default function FlightControls() {
       {/* Tier one: what mode it is in and whether it is armed. Full size and
           first, because everything else is an adjustment to these two. */}
       <div className="flight-controls__primary">
-        {/* Chosen, then sent -- not sent on change.
+        {/* Two groups that wrap as wholes: in a narrow column the jumps go
+            under the mode and Arm, rather than a row breaking between any
+            two buttons. The gap between them is what makes them groups; the
+            rule that used to divide them sat alone at the start of the
+            second line once they wrapped. */}
+        <div className="flight-controls__group">
+          {/* Chosen, then sent -- not sent on change.
             A <select> takes the mouse wheel, so a scroll that happens to
             pass over this one used to command a mode change on a flying
             aircraft, with nothing pressed and nothing confirmed. Staging
@@ -203,77 +214,74 @@ export default function FlightControls() {
             below and as a parameter edit: pick, then commit. The staged
             state wears `.is-dirty`, which is the app's existing "this is
             what the button will send" highlight. */}
-        <LaSelect
-          className={`flight-controls__mode${modeStaged ? ' is-dirty' : ''}`}
-          value={String(shownMode)}
-          disabled={!connected}
-          aria-label="Flight mode"
-          onChange={(e) => setPendingMode(Number(e.target.value))}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && modeStaged) applyMode()
-          }}
-        >
-          {Object.entries(modes).map(([num, name]) => (
-            <option key={num} value={num}>
-              {name}
-            </option>
-          ))}
-          {modes[shownMode] === undefined && (
-            <option value={String(shownMode)}>{modeNameNow}</option>
-          )}
-        </LaSelect>
-        <LaButton
-          variant="secondary"
-          disabled={!connected || !modeStaged}
-          title="Send the selected flight mode"
-          onClick={applyMode}
-        >
-          Set
-        </LaButton>
-        <LaButton
-          variant={armed ? 'danger' : 'primary'}
-          size="lg"
-          disabled={!connected}
-          onClick={onArmClick}
-        >
-          {armed ? 'Disarm' : 'Arm'}
-        </LaButton>
+          <LaSelect
+            className={`flight-controls__mode${modeStaged ? ' is-dirty' : ''}`}
+            value={String(shownMode)}
+            disabled={!connected}
+            aria-label="Flight mode"
+            onChange={(e) => setPendingMode(Number(e.target.value))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && modeStaged) applyMode()
+            }}
+          >
+            {Object.entries(modes).map(([num, name]) => (
+              <option key={num} value={num}>
+                {name}
+              </option>
+            ))}
+            {modes[shownMode] === undefined && (
+              <option value={String(shownMode)}>{modeNameNow}</option>
+            )}
+          </LaSelect>
+          <LaButton
+            variant="secondary"
+            disabled={!connected || !modeStaged}
+            title="Send the selected flight mode"
+            onClick={applyMode}
+          >
+            Set
+          </LaButton>
+          <LaButton
+            variant={armed ? 'danger' : 'primary'}
+            disabled={!connected}
+            onClick={onArmClick}
+          >
+            {armed ? 'Disarm' : 'Arm'}
+          </LaButton>
+        </div>
 
-        <span className="flight-controls__sep" />
-
-        {/* Tier two: one-touch jumps that are really mode changes, so they
+        <div className="flight-controls__group">
+          {/* Tier two: one-touch jumps that are really mode changes, so they
             sit beside the mode picker but a step down in size. */}
-        {/* Just "Takeoff". The altitude was in the label, but what the
+          {/* Just "Takeoff". The altitude was in the label, but what the
             command actually does differs by airframe, and one honest word
             beats a number that is only true for some of them -- measured
             against SITL, armed and in Guided: a quadplane answers
             NAV_TAKEOFF with ACCEPTED and a fixed wing with FAILED. The
             altitude is on the tooltip. */}
-        <LaButton
-          variant="secondary"
-          title={
-            takeoffVia === 'guided'
-              ? `Climb to ${formatDistance(TAKEOFF_ALT_M, units.distance, 0)} ${distanceLabel(units.distance)}`
-              : 'Switch to Takeoff mode and climb to the vehicle’s TKOFF_ALT'
-          }
-          disabled={!connected || !armed || takeoffVia === 'unsupported'}
-          onClick={() => {
-            // Only a copter goes via Guided, and only that route is slow
-            // enough to need saying: its EKF refuses the switch for a few
-            // seconds after boot, and without a word the button looks like
-            // it did nothing for twenty. A plane is one mode change.
-            if (takeoffVia === 'guided') setStatus('Takeoff: switching to Guided…')
-            void takeoff(TAKEOFF_ALT_M).then(report('Takeoff')).catch(fail('Takeoff'))
-          }}
-        >
-          Takeoff
-        </LaButton>
-        <LaButton variant="secondary" disabled={!connected} onClick={() => jump('Auto')}>
-          Auto
-        </LaButton>
-        <LaButton variant="secondary" disabled={!connected} onClick={() => jump('RTL')}>
-          RTL
-        </LaButton>
+          <LaButton
+            variant="secondary"
+            title={
+              takeoffVia === 'guided'
+                ? `Climb to ${formatDistance(TAKEOFF_ALT_M, units.distance, 0)} ${distanceLabel(units.distance)}`
+                : 'Switch to Takeoff mode and climb to the vehicle’s TKOFF_ALT'
+            }
+            disabled={!connected || !armed || takeoffVia === 'unsupported'}
+            onClick={() => {
+              // A copter's EKF refuses Guided for a few seconds after boot; the
+              // vehicle says so ("requires position"), and that is on the HUD.
+              void takeoff(TAKEOFF_ALT_M).then(report('Takeoff')).catch(fail('Takeoff'))
+            }}
+          >
+            Takeoff
+          </LaButton>
+          <LaButton variant="secondary" disabled={!connected} onClick={() => jump('Auto')}>
+            Auto
+          </LaButton>
+          <LaButton variant="secondary" disabled={!connected} onClick={() => jump('RTL')}>
+            RTL
+          </LaButton>
+        </div>
 
         {/* Read, not pressed -- so it takes the top row's right-hand end,
             which was the one piece of always-visible space on this screen
@@ -328,7 +336,7 @@ export default function FlightControls() {
           disabled={!connected}
           onSet={() => {
             setGuidedAltitude(fromDistance(Number(alt), units.distance))
-            setStatus('Altitude: sent')
+            clearNote()
           }}
         />
         <Field
@@ -342,11 +350,15 @@ export default function FlightControls() {
             void setCurrentMissionItem(Number(wp)).then(report('Set item')).catch(fail('Set item'))
           }
         />
-        {/* One group, so a wrap takes both or neither -- and it keeps the
-            right-hand end on the line it lands on, rather than a spacer
-            holding the end of the line above. */}
+        {/* Labelled like the fields beside it, and one group, so a wrap takes
+            both or neither and the line it lands on reads as a fourth field
+            rather than a stray at the right-hand edge. */}
         <div className="flight-controls__run">
+          <label className="la-field__label" htmlFor="fc-action">
+            Action
+          </label>
           <LaSelect
+            id="fc-action"
             className="flight-controls__action"
             value={action}
             disabled={!connected}
@@ -361,7 +373,6 @@ export default function FlightControls() {
           </LaSelect>
           <LaButton
             variant="secondary"
-            size="sm"
             disabled={!connected}
             onClick={() => {
               const a = DO_ACTIONS.find((x) => x.id === action)
@@ -372,8 +383,6 @@ export default function FlightControls() {
           </LaButton>
         </div>
       </div>
-
-      {status && <p className="la-hint flight-controls__status">{status}</p>}
 
       <LaModal
         open={pending !== null}
@@ -466,7 +475,7 @@ function Field({
           if (e.key === 'Enter' && value !== '') onSet()
         }}
       />
-      <LaButton variant="secondary" size="sm" disabled={disabled || value === ''} onClick={onSet}>
+      <LaButton variant="secondary" disabled={disabled || value === ''} onClick={onSet}>
         Set
       </LaButton>
     </div>

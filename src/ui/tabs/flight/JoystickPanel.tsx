@@ -1,20 +1,32 @@
-import { useEffect, useState } from 'react'
-import { LaButton, LaField, LaHint, LaInput, LaModal, LaSelect } from '../../components/La'
+import { useState } from 'react'
+import { LaButton, LaHint, LaModal, LaSelect } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useJoystickStore } from '../../../stores/joystick-store'
-import { enable, startReading, stop, stopReading } from '../../../services/joystick'
-import { CHANNEL_NAMES, PWM_MAX, PWM_MIN, type JoystickConfig } from '../../../protocol/joystick'
+import { enable, stop } from '../../../services/joystick'
+import { PWM_MAX, PWM_MID, PWM_MIN, channelName } from '../../../protocol/joystick'
+import StickDiagram from '../radio/StickDiagram'
+import type { StickFunction } from '../radio/radio-cal'
+import JoystickSetup from './JoystickSetup'
 
 // Flying with a gamepad.
 //
-// The panel is deliberately plain about what it is. Taking control is one
-// switch, it is off every time the app starts, and the bar for each channel
-// shows what is being sent -- because the failure this feature has is a
-// stick that is not where the pilot thinks it is.
+// The pane shows what is being sent and nothing else: the sticks drawn on the
+// same transmitter the Radio screen uses, because "where is the throttle" is
+// answered at a glance by a picture and not by a number, and a bar for every
+// mapped channel beside it. What drives each channel is changed in one place
+// only, the Configure dialog -- the pane briefly carried its own copy of the
+// mapping and two places to do one thing was worse than one more click.
 //
-// Reading the pad and sending it are separate: opening this panel starts
-// reading, so the bars move and the mapping can be set up with nothing
-// leaving the machine. Only the switch sends.
+// Taking control is one button, it is off every time the app starts, and the
+// failure this feature has is a control that is not where the pilot thinks it
+// is -- which is what the picture is for.
+//
+// The pane does not own the gamepad: it is read for the whole session
+// (services/joystick.ts), so closing this pane or leaving the Fly screen does
+// not drop control. The app bar says so from every screen, with a Release.
+
+/** Mode 2 and ArduPilot's default RCMAP: the channel each stick drives. */
+const STICK_CHANNELS: Record<StickFunction, number> = { roll: 1, pitch: 2, throttle: 3, yaw: 4 }
 
 export default function JoystickPanel() {
   const connected = useConnectionStore((s) => s.phase === 'connected')
@@ -22,19 +34,12 @@ export default function JoystickPanel() {
   const pads = useJoystickStore((s) => s.pads)
   const deviceId = useJoystickStore((s) => s.deviceId)
   const chooseDevice = useJoystickStore((s) => s.chooseDevice)
-  const axes = useJoystickStore((s) => s.axes)
   const channels = useJoystickStore((s) => s.channels)
   const active = useJoystickStore((s) => s.active)
   const message = useJoystickStore((s) => s.message)
   const config = useJoystickStore((s) => s.config)
-  const setConfig = useJoystickStore((s) => s.setConfig)
   const [setup, setSetup] = useState(false)
   const [confirming, setConfirming] = useState(false)
-
-  useEffect(() => {
-    startReading()
-    return stopReading
-  }, [])
 
   const take = () => {
     const refused = enable()
@@ -42,69 +47,104 @@ export default function JoystickPanel() {
     setConfirming(false)
   }
 
+  // Every channel something drives, in channel order: the sticks and
+  // whatever sliders and switches were added in Configure.
+  const mapped = [
+    ...new Set([
+      ...config.axes.filter((a) => a.axis >= 0).map((a) => a.channel),
+      // A flight mode button drives no channel.
+      ...config.buttons.filter((b) => b.button >= 0 && b.mode !== 'mode').map((b) => b.channel),
+    ]),
+  ].sort((a, b) => a - b)
+
+  // A stick is drawn where its channel is, and only when the channel is being
+  // driven; an undriven one stays centered and unlit.
+  const positions: Partial<Record<StickFunction, number>> = {}
+  if (pad) {
+    for (const [fn, ch] of Object.entries(STICK_CHANNELS) as [StickFunction, number][]) {
+      const v = positionOf(channels[ch - 1])
+      if (mapped.includes(ch) && v !== null) positions[fn] = (v - PWM_MID) / (PWM_MAX - PWM_MID)
+    }
+  }
+
   return (
     <div className="joystick-panel">
       <div className="joystick-panel__row">
+        {/* No "Sending" word: Release control and the app bar's pill already
+            say the gamepad has control. */}
         {/* Not "Joystick": the tab above already says that, and the row
-            underneath it is about which device. */}
+            is about which device. */}
         <span className="joystick-panel__label">Device</span>
 
-        {/* One device needs no choosing; several do, and choosing for
-            someone is choosing which sticks they are holding. The list is
-            by the id the browser reports, because indices shuffle between
-            sessions. */}
-        {pads.length > 1 ? (
-          <LaSelect
-            aria-label="Which device to fly with"
-            className="joystick-panel__pick"
-            value={deviceId ?? ''}
-            disabled={active}
-            onChange={(e) => chooseDevice(e.target.value === '' ? null : e.target.value)}
-          >
-            <option value="">Choose a device</option>
-            {pads.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.id}
-              </option>
-            ))}
-          </LaSelect>
-        ) : (
-          <span className="joystick-panel__pad">
-            {pad ? pad.id : 'no gamepad — press a button on it'}
-          </span>
-        )}
+        {/* Always a list, even of one or none, so the row keeps its shape as
+            devices appear. Several need choosing -- choosing for someone is
+            choosing which sticks they are holding -- and the list is by the
+            id the browser reports, because indices shuffle between sessions.
+
+            Empty is the usual state at launch, not a fault: Chromium hides
+            every gamepad from a page until a button is pressed on one of
+            them after it starts (measured -- an Xbox pad and a 3Dconnexion
+            joystick attached, getGamepads() all nulls until then), and it
+            reports four at most. The one line says what to do. */}
+        <LaSelect
+          aria-label="Which device to fly with"
+          className="joystick-panel__pick"
+          title={pad?.id}
+          value={pads.length === 0 ? '' : (deviceId ?? (pads.length === 1 ? pads[0]!.id : ''))}
+          disabled={active || pads.length === 0}
+          onChange={(e) => chooseDevice(e.target.value === '' ? null : e.target.value)}
+        >
+          {pads.length === 0 ? (
+            <option value="">Press a button on a controller</option>
+          ) : (
+            pads.length > 1 && <option value="">Choose a device</option>
+          )}
+          {/* A remembered device that is not attached stays named, so the
+              list does not quietly show some other one as chosen. */}
+          {deviceId && !pads.some((p) => p.id === deviceId) && pads.length > 0 && (
+            <option value={deviceId}>{padName(deviceId)}</option>
+          )}
+          {pads.map((p) => (
+            <option key={p.id} value={p.id}>
+              {padName(p.id)}
+            </option>
+          ))}
+        </LaSelect>
 
         <LaButton
           variant={active ? 'danger' : 'primary'}
-          size="sm"
           disabled={!connected || !pad}
           onClick={() => (active ? stop() : setConfirming(true))}
         >
           {active ? 'Release control' : 'Take control'}
         </LaButton>
-        <LaButton variant="ghost" size="sm" disabled={active} onClick={() => setSetup(true)}>
-          Set up
+        {/* "Configure", as the other buttons that open a dialog of settings
+            are named (OSD screen settings, ESC settings). */}
+        <LaButton variant="secondary" disabled={active} onClick={() => setSetup(true)}>
+          Configure
         </LaButton>
       </div>
 
-      <div className="joystick-panel__row">
-        {config.axes.map((map) => (
-          <ChannelBar
-            key={map.channel}
-            name={CHANNEL_NAMES[map.channel] ?? `Ch ${map.channel}`}
-            pwm={channels[map.channel - 1]}
-          />
-        ))}
-        {active && <span className="joystick-panel__live">sending</span>}
+      <div className="joystick-panel__body">
+        <div className="joystick-panel__sticks">
+          <StickDiagram active={null} positions={positions} />
+        </div>
+
+        <div className="joystick-panel__main">
+          <div className="joystick-panel__bars">
+            {mapped.map((ch) => (
+              <ChannelBar key={ch} name={channelName(ch)} pwm={channels[ch - 1]} />
+            ))}
+          </div>
+
+          {/* The list says "Choose a device" by itself; this is the case it
+              cannot show. */}
+          {deviceId && !pad && pads.length > 0 && (
+            <LaHint>That device is no longer attached.</LaHint>
+          )}
+          {message && <LaHint error>{message}</LaHint>}
+        </div>
       </div>
-
-      {pads.length > 1 && !pad && (
-        <LaHint>
-          {deviceId ? 'That device is no longer attached.' : 'Choose which device to fly with.'}
-        </LaHint>
-      )}
-
-      {message && <LaHint error={active === false}>{message}</LaHint>}
 
       <LaModal
         open={confirming}
@@ -121,129 +161,49 @@ export default function JoystickPanel() {
           </div>
         }
       >
-        <p>
-          The vehicle will read this gamepad as its receiver. Control is handed back if the window
-          loses focus, the gamepad is unplugged, or the link drops — but a transmitter is still the
-          thing to reach for if anything goes wrong.
-        </p>
+        {/* One sentence of what happens and one of what to keep to hand. The
+            conditions that hand control back -- pad unplugged, link dropped --
+            are what the code does, not a thing to read before pressing. */}
+        <p>The vehicle will fly on this gamepad's controls. Keep a transmitter to hand.</p>
       </LaModal>
 
-      <SetupModal
-        open={setup}
-        onClose={() => setSetup(false)}
-        axes={axes}
-        config={config}
-        setConfig={setConfig}
-      />
+      <JoystickSetup open={setup} onClose={() => setSetup(false)} />
     </div>
   )
 }
 
+/** A channel value that is a position; 0 and the ignore/release values are not. */
+function positionOf(pwm: number | undefined): number | null {
+  return pwm === undefined || pwm === 0 || pwm >= 65534 ? null : pwm
+}
+
 /**
- * Mapping the sticks.
- *
- * A dialog rather than a page: it is opened once for a new gamepad and then
- * never again, and it must not be reachable while control is taken.
+ * A device's name without the browser's decoration. Chromium appends
+ * "(STANDARD GAMEPAD Vendor: 045e Product: 02fd)" and Firefox prefixes
+ * "045e-02fd-"; neither says anything a person picking a device needs. The
+ * full id is still the key everything is stored under.
  */
-function SetupModal({
-  open,
-  onClose,
-  axes: live,
-  config,
-  setConfig,
-}: {
-  open: boolean
-  onClose: () => void
-  axes: number[]
-  config: JoystickConfig
-  setConfig: (patch: Partial<JoystickConfig>) => void
-}) {
-  return (
-    <LaModal
-      open={open}
-      title="Gamepad setup"
-      actions={
-        <LaButton variant="secondary" onClick={onClose}>
-          Done
-        </LaButton>
-      }
-    >
-      <p className="la-hint">Move a stick to see which axis it is. Nothing is sent from here.</p>
-      <table className="joystick-setup">
-        <thead>
-          <tr>
-            <th>Channel</th>
-            <th>Axis</th>
-            <th>Reverse</th>
-            <th className="num">Live</th>
-          </tr>
-        </thead>
-        <tbody>
-          {config.axes.map((map, i) => (
-            <tr key={map.channel}>
-              <td>{CHANNEL_NAMES[map.channel] ?? `Ch ${map.channel}`}</td>
-              <td>
-                <LaSelect
-                  aria-label={`Axis for channel ${map.channel}`}
-                  value={String(map.axis)}
-                  onChange={(e) => {
-                    const next = [...config.axes]
-                    next[i] = { ...map, axis: Number(e.target.value) }
-                    setConfig({ axes: next })
-                  }}
-                >
-                  <option value="-1">None</option>
-                  {live.map((_, index) => (
-                    <option key={index} value={index}>
-                      Axis {index}
-                    </option>
-                  ))}
-                </LaSelect>
-              </td>
-              <td>
-                <input
-                  type="checkbox"
-                  aria-label={`Reverse channel ${map.channel}`}
-                  checked={map.reverse}
-                  onChange={(e) => {
-                    const next = [...config.axes]
-                    next[i] = { ...map, reverse: e.target.checked }
-                    setConfig({ axes: next })
-                  }}
-                />
-              </td>
-              <td className="num">{live[map.axis]?.toFixed(2) ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <LaField label="Deadzone" htmlFor="js-deadzone" unit="%">
-        <LaInput
-          id="js-deadzone"
-          type="number"
-          min={0}
-          max={40}
-          value={Math.round(config.deadzone * 100)}
-          onChange={(e) =>
-            setConfig({ deadzone: Math.min(0.4, Math.max(0, Number(e.target.value) / 100)) })
-          }
-        />
-      </LaField>
-      <LaHint>Centered axes only; the throttle keeps its full travel.</LaHint>
-    </LaModal>
-  )
+export function padName(id: string): string {
+  const name = id
+    .replace(/\s*\([^)]*(?:Vendor:|STANDARD GAMEPAD)[^)]*\)\s*$/i, '')
+    .replace(/^[0-9a-f]{4}-[0-9a-f]{4}-/i, '')
+    .trim()
+  return name || id
 }
 
 /** One channel as a bar, because a number does not show a stuck stick. */
 function ChannelBar({ name, pwm }: { name: string; pwm: number | undefined }) {
-  const value = pwm === undefined || pwm === 65535 ? null : pwm
+  const value = positionOf(pwm)
   const pct = value === null ? 0 : ((value - PWM_MIN) / (PWM_MAX - PWM_MIN)) * 100
   return (
     <span className="joystick-bar" title={`${name}: ${value ?? 'not sent'}`}>
       <span className="joystick-bar__name">{name}</span>
       <span className="joystick-bar__track">
         {value !== null && (
-          <span className="joystick-bar__fill" style={{ width: `${pct.toFixed(1)}%` }} />
+          <span
+            className="joystick-bar__fill"
+            style={{ width: `${Math.min(100, Math.max(0, pct)).toFixed(1)}%` }}
+          />
         )}
         <span className="joystick-bar__mid" />
       </span>

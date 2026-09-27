@@ -134,4 +134,13 @@ describe('the phantom port a reboot leaves behind', () => {
     const b = { portId: 'b', displayName: 'Y-BL' }
     expect(pickBootloaderPort([a, b], new Set(), new Set(['a', 'b']))).toBeNull()
   })
+
+  it('never answers with a running board’s interface just because it is new', () => {
+    // Traced on the bench, the second press of Detect board: the Cube had
+    // left its bootloader, and the one port that appeared mid-request was the
+    // firmware's SLCAN interface. The list-difference fallback took it.
+    const slcan = { portId: 'com38', displayName: 'CubeOrange', driverName: 'Cube Orange SLCAN' }
+    const before = new Set([...others.map((p) => p.portId), 'com36', 'com37'])
+    expect(pickBootloaderPort([...others, phantom, slcan], before, new Set(['com38']))).toBeNull()
+  })
 })

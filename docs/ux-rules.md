@@ -64,7 +64,10 @@ Layout
 Controls
 - [ ] Each card's actions are on its title row. One primary action per
       region.
-- [ ] Rarely used settings are behind a dialog, not rows on the page.
+- [ ] Rarely used settings are behind a dialog, not rows on the page, and
+      the button that opens it says *Configure*.
+- [ ] Each thing can be done in one place. A screen shows what a dialog
+      edits; it does not carry a second copy of the editing.
 - [ ] Anything the app can work out, it works out — and asks only on failure.
 - [ ] A wizard that succeeds closes itself and leaves a brief word behind.
 - [ ] A control that enables another is right next to it.
@@ -134,6 +137,14 @@ answers, not a restatement of the question: *Takeoff / Waypoint / Cancel*.
 
 > *"'Read vehicle' to 'Read from vehicle'… 'Open file...' to 'Open from
 > file'"*
+
+The exception is a list kept inside the app — saved profiles — where *Load*
+and *Save as* already mean "from the list" and "into it". There, moving an
+item in or out as a file is *Import* and *Export*: "Open from file" and "Save
+to file" beside Load and Save read as two more ways of doing the same thing.
+
+> *"please rename 'open from file' and 'save to file' to 'import' and
+> 'export' to reduce confusion"*
 > *"Remove the explainer in the takeoff prompt pop-up — just the buttons are
 > fine."*
 
@@ -243,6 +254,13 @@ never add a row.
 > *"Make the 'Level set' (and other related text) appear in the header to the
 > left of the set level button, and have it go away after a few seconds."*
 > *"The 'Stop sent to all motors' should disappear after a short time."*
+
+The slot is a line tall while it is empty. An empty slot can collapse to
+nothing, and then the confirmation adds its line after all — pushing
+everything below it — even though no row was added.
+
+> *"The buttons all shifted a bit when the 'saved' text appeared when I saved
+> my profile"*
 
 ### Anything that grows goes last
 
@@ -483,6 +501,24 @@ a dialog with its own Write — not as permanent rows.
 > *"Settings like DShot Rate and DShot ESC type should be behind a pop-out ESC
 > settings menu."*
 > *"give the ESC settings pop-up its own parameter write controls"*
+
+The button that opens one is *Configure*, on every screen: the same act gets
+the same word.
+
+> *"We should probably change the 'Set up' button to 'Configure' to match
+> elsewhere in the app"*
+
+### One place for each thing
+
+When a dialog edits something, the screen that opens it shows the result and
+does not edit it too. Two routes to one change means two sets of controls to
+learn, and the question of which one is current.
+
+> *"I now don't like that there are things we can do in multiple places. Maybe
+> the previous approach was fine, but we can fill out the space… a bit
+> better."* — after the gamepad mapping was copied into the pane as well as
+> its dialog; resolved as a live picture of the sticks beside the channel
+> bars, with the mapping edited only in the dialog.
 
 ### Work it out; ask only when you can't
 

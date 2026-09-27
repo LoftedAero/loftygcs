@@ -52,7 +52,6 @@ export default function PlotPanel({
 }: PlotPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const legendRef = useRef<HTMLDivElement>(null)
-  const axisRef = useRef<HTMLParagraphElement>(null)
   const fieldsRef = useRef(fields)
   fieldsRef.current = fields
   // Which series the Y numbers are for. Every series is scaled to its own
@@ -137,13 +136,6 @@ export default function PlotPanel({
         ctx.lineTo(x, py + ph)
         ctx.stroke()
         ctx.fillText(sec === 0 ? 'now' : `-${sec}s`, x, py + ph + 4)
-      }
-
-      // Written here rather than through React: it changes every frame while
-      // history is still building up.
-      const axis = axisRef.current
-      if (axis) {
-        axis.textContent = `last ${Math.round(span / 1000)}s · each series scaled to its own range`
       }
 
       const legend: { name: string; color: string; value: number; lo: number; hi: number }[] = []
@@ -265,11 +257,6 @@ export default function PlotPanel({
               </span>
             )
           })}
-          {fields.length === 0 && (
-            <span className="plot-panel__empty">
-              Nothing plotted. Pick a field, or click one in the Status list.
-            </span>
-          )}
         </div>
         <LaButton variant="secondary" size="sm" onClick={onPick}>
           Add field
@@ -284,10 +271,11 @@ export default function PlotPanel({
           ×
         </button>
       </div>
+      {/* No caption under it: the time axis is labelled on the canvas, and
+          each series owning its own scale is what the colored Y numbers and
+          the chips' ranges show. An empty plot likewise says nothing -- Add
+          field is beside it. */}
       <canvas ref={canvasRef} className="plot-panel__canvas" />
-      <p className="plot-panel__axis" ref={axisRef}>
-        each series scaled to its own range
-      </p>
     </div>
   )
 }

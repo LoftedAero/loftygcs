@@ -37,6 +37,10 @@ describe('what to say about progress', () => {
     })
   })
 
+  it('says nothing for item 0, which is home and what a vehicle with no mission reports', () => {
+    expect(missionProgress(0, [], 0, 0).position).toBeNull()
+  })
+
   it('still reports the sequence when the plan here is not the one aboard', () => {
     // A mission uploaded from somewhere else, or none loaded here. The
     // number is true; only the name needs a local plan.

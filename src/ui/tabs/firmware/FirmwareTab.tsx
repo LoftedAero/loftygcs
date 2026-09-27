@@ -247,17 +247,22 @@ function FirmwareCard() {
   const detectBoard = async () => {
     setLoadError('')
     setNote('')
+    // Pressing it again is "that was the wrong board": the old one goes back
+    // to its firmware rather than being left in its bootloader -- but only
+    // once the new detect has finished, and only if it did not end on that
+    // same board (see the `finally`). Let go first, as this used to, and the
+    // board about to be read was rebooted out of its bootloader just as its
+    // port was asked for: the bench showed the chooser up with nothing but a
+    // phantom in it, answered moments later by the firmware's SLCAN port.
+    const previous = board
+    let kept: SerialPort | undefined
     try {
-      // Pressing it again is "that was the wrong board": let the old one go
-      // back to its firmware first, rather than leaving it in its bootloader.
-      const previous = board
       if (previous) {
         setBoard(null)
         setVehicle(null)
         setPlatform('')
         setPinnedVersion(null)
         dropImage()
-        if (previous.mode === 'serial') await bootBoard(previous.port).catch(() => {})
       }
       if (blocked) {
         setLoadError(blocked)
@@ -313,10 +318,19 @@ function FirmwareCard() {
       setPinnedVersion(null)
       setPlatform('')
       setBoard({ mode: 'serial', info, port: info.port })
+      kept = info.port
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'could not identify the board')
     } finally {
       setStep('')
+      // Web Serial hands back the same SerialPort object for the same device,
+      // so identity is "the same board": a board detected again stays in its
+      // bootloader, ready to flash; one that was replaced is booted back.
+      // Measured on a Cube: the second press was answered with the same
+      // port, no chooser, and the board sat in its bootloader afterwards.
+      if (previous?.mode === 'serial' && previous.port !== kept) {
+        await bootBoard(previous.port).catch(() => {})
+      }
     }
   }
 
@@ -575,8 +589,11 @@ function FirmwareCard() {
           the flash, which put "find out what this is" below everything that
           depends on knowing. */}
       <Step n={1} label="Board">
+        {/* Blue, a working control: the card's one orange action is the
+            flash, which is what the whole card is for. Two orange buttons
+            in one card left neither reading as the one to press. */}
         <LaButton
-          variant={board ? 'ghost' : 'primary'}
+          variant={board ? 'ghost' : 'secondary'}
           disabled={busy || !!step || !!blocked}
           title={blocked ?? undefined}
           onClick={() => void detectBoard()}

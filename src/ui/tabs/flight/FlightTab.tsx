@@ -39,7 +39,22 @@ export default function FlightTab() {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const gridRef = useRef<HTMLDivElement>(null)
+  const belowRef = useRef<HTMLDivElement>(null)
   const layout = useFlightLayoutStore()
+
+  // How tall the controls are right now. They wrap as the column narrows, so
+  // their height is measured rather than assumed, and the pinned panel is
+  // capped to leave room for them and for a usable lower pane beneath.
+  const [controlsH, setControlsH] = useState(0)
+  useEffect(() => {
+    const controls = belowRef.current?.querySelector('.flight-controls')
+    if (!controls) return
+    const ro = new ResizeObserver(() =>
+      setControlsH(Math.ceil(controls.getBoundingClientRect().height)),
+    )
+    ro.observe(controls)
+    return () => ro.disconnect()
+  }, [])
 
   // The HUD's right-click shortcut to the video settings. It has to open the
   // pane as well as select it: with the lower pane switched off, changing
@@ -92,9 +107,14 @@ export default function FlightTab() {
   // column's remainder" between siblings.
   const grid = (
     <div
-      className={`flight-grid${fillVisible ? '' : ' flight-grid--single'}`}
+      className={`flight-grid${fillVisible ? '' : ' flight-grid--single'}${aspectVisible ? '' : ' flight-grid--no-aspect'}${layout.showMessages ? '' : ' flight-grid--no-pane'}`}
       ref={gridRef}
-      style={{ '--split': `${(layout.ratio * 100).toFixed(2)}%` } as React.CSSProperties}
+      style={
+        {
+          '--ratio': layout.ratio.toFixed(4),
+          '--controls-h': `${controlsH}px`,
+        } as React.CSSProperties
+      }
     >
       {aspectVisible && (
         <div className="flight-grid__aspect">{aspectIsHud ? hudPanel : mapPanel}</div>
@@ -109,7 +129,7 @@ export default function FlightTab() {
       )}
       {/* Always present: it carries the controls even when the panel above
           them is switched off. */}
-      <div className="flight-grid__below">
+      <div className="flight-grid__below" ref={belowRef}>
         <FlightControls />
         {layout.showMessages && (
           <LogPane

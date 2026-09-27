@@ -419,7 +419,11 @@ design decisions are recorded there and in code comments.
   the contiguous fill point must be ignored rather than written, or a lost packet leaves a hole
   in the middle of a log that nothing later fills. Log directories differ — real hardware
   mounts the card at `/APM/LOGS`, SITL has none and keeps them in `/logs` — so the service
-  probes both rather than assuming.
+  probes both rather than assuming. **A cancel returns at once and closes the session behind
+  it** (`MavFtpClient.cancelRead`): awaiting the TerminateSession ack held the button for 589 ms
+  against SITL, because the one-request-at-a-time server answers it only after the burst already
+  on its way -- which is also why the next request after a cancel waits about that long. A
+  canceled read never falls back to sequential reads, and it ends quietly, not as an error.
 - **Launching SITL has three choices, and each hides a trap** (`electron/sitl-core.ts`).
   *Which build*: a custom executable is identified by reading ArduPilot's own
   `ArduPlane V4.6.3` banner out of the binary rather than by asking, because the wrong answer
@@ -757,7 +761,12 @@ design decisions are recorded there and in code comments.
   serial is left running nothing**, so "Change board" and unmounting the screen both call
   `bootBoard` to jump it back into the firmware it still has — the bench stranded a Cube three
   times before that existed; pressing Detect again releases the previous board the same way, so
-  there is no separate "change board". **Detecting reboots the board, so it is guarded**: armed
+  there is no separate "change board" -- but only *after* the new detect, and only if it ended
+  on a different board. Released first, the board about to be read was rebooted out of its
+  bootloader just as its port was asked for; the chooser came up over a phantom, and the auto-pick
+  then answered it with the firmware's SLCAN port, which is why the list-difference fallback in
+  `serial-autopick.ts` now takes nothing a driver names MAVLink or SLCAN. **Detecting reboots the
+  board, so it is guarded**: armed
   is refused outright (an armed vehicle is one whose motors can turn, on the ground or not), and
   so are MAV_STATE ACTIVE and the two failsafe states, CRITICAL and EMERGENCY — ArduPilot's own
   words for flying and for a failsafe running. Connected but standing still is *asked* rather
@@ -941,23 +950,88 @@ design decisions are recorded there and in code comments.
 - **The joystick is the one feature that can fly the aircraft, so it is built around failure.**
   ArduPilot reads RC_CHANNELS_OVERRIDE exactly as it reads a receiver — there is no separate
   simulated path, and a stuck override is a stuck stick. Hence: it is off at every start and
-  nothing persists it; it refuses to start unless the sticks are centered and the throttle is
-  down (`sticksAreSafe`, because the pad is usually on a desk under something); and it stops
-  itself on window blur, tab hide, unplug and link loss. The rule that is easiest to get wrong
-  is that **stopping means sending zeros, not going quiet** — a vehicle whose override stream
-  stops holds the last value until its own RC failsafe notices, so `RELEASE` is sent three
-  times over. Two more: an unmapped channel goes out as 65535 ("no change"), never as 1500,
-  because centering an unmapped channel drives a flight-mode switch to its middle position; and
-  a throttle gets no center deadzone, which would be a dead patch mid-travel. **With more than
-  one input device attached, nothing is read until someone says which** — a wheel, a HOTAS and
-  a gamepad on the same desk all appear in `getGamepads()`, and taking the first is taking
-  whichever the browser happened to enumerate, which on this feature means the sticks are
-  somewhere other than where the screen says they are. The choice is remembered by the device's
-  reported *id*, never its index: indices shuffle between sessions, so a remembered index is a
-  remembered different device. Proven against
-  SITL both ways — the override reaches the vehicle's RC_CHANNELS *and* the release hands them
-  back — because the encoder accepts any field name and a wrong one produces a well-formed
-  message full of zeros that a fake would happily accept.
+  nothing persists it; it refuses to start unless the spring-centered sticks are centered
+  (`sticksAreSafe`, because the pad is usually on a desk under something). Which axes those are
+  is each axis's *Centered* switch, the one property that changes behavior: a centered axis
+  gets the deadzone, expo and that check, one that stays where it is left gets none of them.
+  A spring-centered throttle is just a centered axis, sitting at 1500 when released -- right for
+  the altitude-holding modes, half throttle in manual ones. **The throttle is
+  deliberately not checked**: control taken over from a transmitter in flight is taken at hover
+  throttle, and a throttle-down check could only be passed by cutting the motors. It stops
+  itself on unplug, on a different device taking the chosen one's place, and on link loss.
+  Handing control back on purpose is the app's Release, in the pane and on the app bar from
+  every screen; a gamepad button mapped to release existed and went, as a second way to do what
+  the bar already does in one click. **Stopping means sending the release,
+  not going quiet** — a vehicle whose override stream stops holds the last value until
+  RC_OVERRIDE_TIME runs out — and **the release is a different number above channel 8**, which
+  is the trap: measured against SITL and per the spec, channels 1-8 take 65535 as "no change"
+  and 0 as release, channels 9-18 take 0 as "no change" and 65534 as release. The first version
+  released with zeros, which hands 1-8 back and leaves every switch on 9-16 held where the
+  gamepad left it; `sitl.integration.test.ts` now proves both halves on channel 10, and fails
+  against a zeros release. So every frame is built per channel from `ignoreValue`/`releaseValue`,
+  never from a literal; an unmapped channel goes out as "no change", never as 1500, because
+  centering it drives a flight-mode switch to its middle position; and a throttle gets no
+  center deadzone, which would be a dead patch mid-travel.
+  **A button is momentary, toggle, set, or flight mode.** *Set* is how several buttons make one
+  switch: each sends its one value from the press on, latched per channel, so three on the mode
+  channel are its three positions and they are not a conflict with each other. *Flight mode*
+  drives no channel at all: it stores ArduPilot's *name* for a mode and resolves it against the
+  connected vehicle when pressed, because the numbers are per vehicle (RTL is 6 on Copter, 11 on
+  Plane) and a profile moves between them; a name the vehicle lacks is said, not guessed at, and
+  it acts only while the gamepad has control. Proven in the app against SITL: Stabilize to
+  AltHold from a gamepad button, read back from the heartbeat. (A *cycle* that stepped one button
+  through a list existed briefly and went, because Set covers it with a button per position; a
+  saved one reads back as a toggle.) Two rules keep buttons from moving anything on their own. A
+  toggle starts on whichever of its values is nearest what the vehicle's channel reads now, and
+  a set channel is left alone until one of its buttons is pressed (`initialButtonState`), or
+  taking control would move every mapped switch -- the flight mode included -- to position one; and
+  a button already held when control is taken is *primed*, not stepped (`primeButtons`) — the
+  first version stepped it, which counted the held button as a press and flipped the switch on
+  the first frame. The same rule covers any change to the mapping: the press that *Learn* takes a
+  button from is still down on the next read, so the service re-primes whenever the mapping
+  object changes rather than only when the button count does.
+  **The pane shows; the dialog edits.** The Joystick pane is the sticks drawn live on the Radio
+  screen's transmitter (`StickDiagram`'s `positions`) beside a bar per mapped channel; what
+  drives each channel is changed in Configure only. The pane once carried its own copy of the
+  mapping and was taken back out: two places to make one change was worse than one click.
+  Nothing in the dialog is editable while control is taken either.
+  **It keeps flying when you look away.** The pad is read for the whole session from `App`, not
+  by the pane, so leaving the Fly screen or the Joystick pane does not drop control, and the app
+  bar says control is taken — with a Release — on every screen (`ui/shell/JoystickChip.tsx`, in
+  the middle band because that is the track allowed to change size). In the desktop app,
+  taking control turns the window's background throttling off (`app.setBackgroundThrottling`,
+  back on at release), so the *app* keeps running minimized or unfocused — measured in the built
+  app against SITL: six seconds minimized, twice RC_OVERRIDE_TIME, the channel never dropped
+  and the page's timers never slowed. **That was with a stand-in pad, so it proves the app's half
+  only; whether Windows keeps delivering a real controller's input out of focus depends on
+  which Chromium backend reads it.** HID joysticks (HOTAS, wheels, a transmitter's USB mode) come
+  through RawInput, which Chromium registers with `RIDEV_INPUTSINK` -- background delivery, by
+  its source. Xbox-type pads come through Windows.Gaming.Input (GameInput on Windows 11 behind a
+  flag), whose background behavior for a desktop app Microsoft does not document, and it is
+  untested on hardware. If that ever matters, the answer is reading those pads through XInput
+  in the main process, which Windows delivers regardless of focus; it was judged out of scope
+  (2026-09-27). A browser has no throttling switch and may freeze an unfocused pad, so there
+  losing focus still releases; a page the platform reports hidden releases in either, because
+  a stick that has stopped updating is worse than no stick.
+  **An empty device list at launch is Chromium, not a fault**: it hides every gamepad from a page
+  until a button is pressed on one of them after the app starts, and reports four at most —
+  measured on the bench with an Xbox pad and a 3Dconnexion joystick attached, `getGamepads()`
+  four nulls for as long as nobody touched either. There is no switch for it, so the list is
+  always drawn and says to press a button, rather than looking broken.
+  **With more than one input device attached, nothing is read until someone says which** — a
+  wheel, a HOTAS and a gamepad on the same desk all appear in `getGamepads()`, and taking the
+  first is taking whichever the browser happened to enumerate. The choice is remembered by the
+  device's reported *id*, never its index: indices shuffle between sessions, so a remembered
+  index is a remembered different device. **A mapping belongs to a device** by the same id —
+  plugging one in brings its own back, a device seen for the first time starts from the Mode 2
+  default rather than the last device's axis numbers, and the mapping never changes under the
+  hands while flying. Named profiles sit beside that and move as files; everything read from
+  storage or a file goes through `sanitizeConfig`, and an import must *look* like a mapping
+  first, because sanitizing any JSON at all yields a valid default and would load a
+  `package.json` as one. Proven against SITL both ways — the override reaches the vehicle's
+  RC_CHANNELS *and* the release hands them back — because the encoder accepts any field name
+  and a wrong one produces a well-formed message full of zeros that a fake would happily
+  accept.
 - **A z-index cannot climb out of a stacking context, and `.la-appbar` is one.** The SITL tray's
   panel hung inside the app bar and opened *behind* the map. Raising its z-index did nothing and
   could not: `.la-app` is a grid, so `.la-appbar` is a grid item, and a flex/grid item with any
@@ -981,15 +1055,24 @@ design decisions are recorded there and in code comments.
   if it happens again, is that the element measures fine and `elementFromPoint` over it returns
   something else.
 
+- **The Fly screen's two sizes are both bounded** (`.flight-grid` in `app.css`), measured by
+  sweeping six window sizes from 1280x720 to 3440x1440 against six splitter positions. The
+  pinned panel's row is its 4:3 height *capped* to leave room for the controls (measured live,
+  since they wrap) and 150px of lower pane: uncapped, the lower pane was 9px at 1280x720 and the
+  HUD ran off the bottom of an ultrawide. The left column is held between 440px floors on both
+  sides -- below that the controls spilled out of their box and the lower pane's tabs wrapped --
+  and stops at the width where the capped panel fills it, since past that the splitter only drew
+  empty bands beside the HUD. The right-click menus place themselves by their measured size.
 - **The lower pane is where a second thing goes, not a new panel.** Messages, Status,
   Preflight, Camera and Joystick are tabs of one pane (`LOG_PANES` in
   `stores/flight-layout-store.ts`), because they are all the same thing: something you look at
   in the space under the flight controls, one at a time. Camera and joystick began as panels of
   their own toggled from the View menu, which put "point the camera" in a menu about window
   layout and had them competing with the pane for the same room. Two consequences worth
-  keeping: a pane is mounted only while it is showing, which is what stops the joystick polling
-  the gamepad while you are reading messages; and a saved pane name is validated on load,
-  because a name that no longer exists renders nothing at all with no clue in the tab strip.
+  keeping: a pane is mounted only while it is showing, so nothing that must outlive it can live
+  in it — the joystick once did, and closing the pane dropped control, which is why its reading
+  loop now belongs to the app; and a saved pane name is validated on load, because a name that
+  no longer exists renders nothing at all with no clue in the tab strip.
 
 - **ADS-B reports say which of their own fields to believe, and that is the whole feature**
   (`protocol/adsb.ts`). ADSB_VEHICLE carries all fourteen fields whatever the receiver actually
@@ -1154,6 +1237,19 @@ packets (hence `circular`, ~145 KB a keyframe), and `avdec_h264` conceals a trun
 still emits a frame, so the decoded frame count matches unless `output-corrupt=false` is set.
 The size assertions there are calibrated against measured values, not guessed — if one fails,
 suspect the fixture went slack before suspecting the client.
+
+**A video stream reconnects by itself, and says why it is down** (`services/video.ts`,
+`video-error.ts`). Measured in the built app against GStreamer: every failure the desktop side
+reports is followed by a "Stopped", which the service treated as a clean stop and so wiped the
+error the instant it arrived -- a refused connection, an unreachable camera and a stream killed
+mid-flight all went silently back to Connect. The first report of an attempt is now the one
+acted on; Node's codes read as the vehicle link's sentences ("Nothing is listening at …"); and
+anything but a malformed request (bad scheme, not H.264, credentials, 401/403/404) retries at
+1, 2, 4, then every 5 s until Disconnect -- a stream that goes silent while playing included,
+since a camera that stops sending without closing its socket is the drop no event reports.
+Killing and restarting the test source mid-stream comes back to "Playing" untouched. The
+desktop side forwards a source's events only while it is the current one, or a stopped
+stream's "Stopped" reaches the next attempt and reads as a drop.
 
 **SITL gotcha that bit us twice:** it accepts exactly one TCP client and exits the moment that
 client disconnects, so never probe the port to check readiness — watch stdout for the

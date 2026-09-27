@@ -14,12 +14,19 @@ import { videoService, type VideoStatus } from '../../../services/video'
 //
 // Two forms, because those are the two a vehicle actually offers: an RTSP
 // stream from a camera or companion computer, and a UDP port something is
-// already pushing RTP at.
-
-const EXAMPLES = [
-  { label: 'RTSP camera', value: 'rtsp://10.66.0.2:8554/stream' },
-  { label: 'RTP over UDP', value: 'udp://:5600' },
-]
+// already pushing RTP at. The label names both and the placeholder shows the
+// first; two example links that filled the field in went, because they were
+// orange text competing with Connect for the pane's one primary action.
+//
+// H.264 only, which is what essentially every airborne camera and companion
+// computer produces. Credentials go in the URL -- rtsp://user:pass@host/path
+// -- and are sent as an authentication header rather than in the request
+// line. That used to be a paragraph under the field; it is what the code
+// does, not something to read before connecting.
+//
+// Connect means "keep this stream on the HUD": a drop reconnects by itself
+// until Disconnect (services/video.ts), and the one status line says what is
+// playing, what it is doing, or why it is not.
 
 export default function VideoPane() {
   const url = useFlightLayoutStore((s) => s.videoUrl)
@@ -55,8 +62,10 @@ export default function VideoPane() {
             }}
           />
         </label>
+        {/* Ghost, as the app bar's Disconnect is: stopping the picture is not
+            destructive, and blue is for the controls that set something. */}
         {live ? (
-          <LaButton variant="secondary" onClick={() => void videoService.close()}>
+          <LaButton variant="ghost" onClick={() => void videoService.close()}>
             Disconnect
           </LaButton>
         ) : (
@@ -66,32 +75,17 @@ export default function VideoPane() {
         )}
       </div>
 
-      <div className="la-row la-row--wrap video-examples">
-        {EXAMPLES.map((e) => (
-          <button
-            key={e.value}
-            type="button"
-            className="la-link-btn"
-            onClick={() => setDraft(e.value)}
-          >
-            {e.label}
-          </button>
-        ))}
-      </div>
-
-      {!desktop && (
-        <LaHint error>
-          Network video needs the desktop app. A browser cannot open an RTSP or raw UDP stream, and
-          neither can be reached from a page.
+      {/* A browser can open neither an RTSP nor a raw UDP stream. Otherwise
+          one line, always there -- what is happening, what is playing, or why
+          it is not -- so a status arriving moves nothing. Red while the
+          picture is down, retrying or not. */}
+      {!desktop ? (
+        <LaHint error>Network video needs the desktop app.</LaHint>
+      ) : (
+        <LaHint error={status.state === 'error' || status.state === 'retrying'}>
+          {status.text || <>&nbsp;</>}
         </LaHint>
       )}
-      {status.text && <LaHint error={status.state === 'error'}>{status.text}</LaHint>}
-
-      <p className="app-placeholder">
-        H.264 only, which is what essentially every airborne camera and companion computer produces.
-        Credentials go in the URL — <code>rtsp://user:pass@host:554/stream</code> — and are sent as
-        an authentication header rather than in the request itself.
-      </p>
     </div>
   )
 }

@@ -86,6 +86,8 @@ contextBridge.exposeInMainWorld('loftgcs', {
     getVersion: () => ipcRenderer.invoke('app:version'),
     openExternal: (url: string) => ipcRenderer.send('app:open-external', url),
     fetchFirmware: (url: string) => ipcRenderer.invoke('app:fetch-firmware', url),
+    setBackgroundThrottling: (allowed: boolean) =>
+      ipcRenderer.send('app:background-throttling', allowed),
   },
 
   // Video arrives here as a compressed H.264 bitstream and is decoded in the

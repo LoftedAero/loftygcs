@@ -10,6 +10,8 @@ import {
   isFailsafe,
   linkLabel,
   tapeTicks,
+  hudMessage,
+  HUD_MESSAGE_MS,
 } from './hud-draw'
 import { SENSOR_BITS } from '../../../protocol/sensors'
 
@@ -207,5 +209,32 @@ describe('the GPS readout', () => {
     expect(gpsUsable(2)).toBe(false)
     expect(gpsUsable(3)).toBe(true)
     expect(gpsUsable(6)).toBe(true)
+  })
+})
+
+describe('the message on the HUD', () => {
+  const at = 100_000
+  const text = (severity: number, s: string, when = at) => ({ severity, text: s, at: when })
+
+  it('shows the vehicle’s latest warning, and not its chatter', () => {
+    const texts = [
+      text(2, 'PreArm: Need Position Estimate', at - 500),
+      text(6, 'Reached waypoint #2'),
+    ]
+    expect(hudMessage(texts, null, at)).toBe('PreArm: Need Position Estimate')
+  })
+
+  it('shows whichever is newer, the vehicle’s warning or the app’s note', () => {
+    const texts = [text(4, 'Mode change to Guided failed: requires position', at - 1000)]
+    expect(hudMessage(texts, { text: 'RTL: no answer', at }, at)).toBe('RTL: no answer')
+    expect(hudMessage(texts, { text: 'RTL: no answer', at: at - 2000 }, at)).toBe(
+      'Mode change to Guided failed: requires position',
+    )
+  })
+
+  it('goes after a few seconds', () => {
+    const texts = [text(3, 'Crash: Disarming', at)]
+    expect(hudMessage(texts, null, at + HUD_MESSAGE_MS - 1)).toBe('Crash: Disarming')
+    expect(hudMessage(texts, null, at + HUD_MESSAGE_MS)).toBeNull()
   })
 })

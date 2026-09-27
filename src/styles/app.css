@@ -60,6 +60,13 @@
      takes it too, so a title row with buttons and one without carry their
      orange rules on the same line. */
   --app-card-head-h: 30px;
+  /* The app bar's controls and status pills: the sheet's regular button
+     height, so a pill and the button beside it are one height. */
+  --app-bar-control-h: 30px;
+  /* The app bar's status pills' least width: the vehicle state's longest
+     word beside the readings, "Not ready", measured 111px. The gamepad pill
+     takes it too, so the two pills side by side are one size. */
+  --app-bar-pill-w: 112px;
   /* One width for the buttons on a card's title row, so a set of actions reads
      as a set rather than as labels of different lengths. Sized to the longest,
      "Calibrate accelerometer"; a longer label still grows past it. */
@@ -67,6 +74,67 @@
   /* The channel monitor's label column, sized to its widest possible label,
      "Throttle REV" -- measured at 79px at the monitor's 12px. */
   --app-rc-label-w: 80px;
+  /* One width for the buttons in the Fly screen's lower pane, so a row of
+     them reads as a set and a button whose label changes with state --
+     Record / Stop recording, Take / Release control, Connect / Disconnect --
+     does not resize under the pointer. Sized to the longest of those at
+     the regular button size: "Release control" measured 118px, and 112
+     moved the button beside it 6px the moment control was taken. */
+  --app-pane-btn-w: 124px;
+  /* The Fly screen's two sides at their narrowest: the lower pane's seven
+     tabs fit on one line down to here (they need about 430px), the
+     controls' top row wraps cleanly into its two groups, and a map narrower
+     than this has lost the room to be read. */
+  --app-fly-side-min: 440px;
+  /* The least of the lower pane the pinned panel may leave: its tabs and
+     about five lines of messages. */
+  --app-fly-pane-min: 150px;
+  /* The Fly screen's top-row buttons: the longest label either way,
+     "Takeoff" and "Disarm", at the regular button's padding. */
+  --app-fc-btn-w: 76px;
+  /* The Sets and Run on the strip under it. */
+  --app-fc-set-w: 52px;
+  /* The camera pane: the two dials at the size the concept was drawn at, and
+     a settings column that stops growing once its buttons are comfortable. */
+  --app-cam-side-min: 240px;
+  --app-cam-side-max: 340px;
+  /* A heading and the gap under it; a switch row and the gap above it. */
+  --app-cam-head: 24px;
+  --app-cam-switch-row: 32px;
+  --app-cam-btn-h: 44px;
+  --app-cam-btn-h-max: 64px;
+  /* The smallest a dial is drawn; under it the pane scrolls instead. */
+  --app-cam-dial-min-h: 110px;
+  --app-cam-zoom-w: 32px;
+  --app-cam-icon: 22px;
+  /* The joystick pane's channel bars, and its setup dialog's controls. */
+  /* Two bars a row beside the stick picture, at 1920px and at 2560px alike:
+     narrower and the wide pane ran three rows of short bars. */
+  --app-js-bar-w: 200px;
+  --app-js-name-w: 52px;
+  /* The device list: "Press a button on a controller" and a typical pad name. */
+  --app-js-device-w: 260px;
+  /* The stick picture: its drawing's width over its height, and the range of
+     widths it is drawn at. */
+  --app-js-sticks-aspect: calc(240 / 152);
+  --app-js-sticks-min: 180px;
+  /* The device row above it: one button high. */
+  --app-js-head-h: 30px;
+  --app-js-sticks-max: 380px;
+  --app-js-num-w: 64px;
+  /* The gamepad settings dialog's buttons are the Joystick pane's width, one
+     width across the pane and the dialog it opens. */
+  --app-js-btn-w: var(--app-pane-btn-w);
+  --app-js-channel-w: 128px;
+  /* A pick is a select wide enough for "Button 15" and its Learn beside it. */
+  --app-js-select-w: 112px;
+  --app-js-pick-w: calc(var(--app-js-select-w) + var(--la-space-2) + var(--app-js-btn-w));
+  --app-js-mode-w: 124px;
+  /* A switch's column in the axes table: its heading, "Centered", is wider
+     than the switch. */
+  --app-js-switch-col-w: 76px;
+  --app-js-x-w: 24px;
+  --app-js-profile-w: 180px;
   /* The Outputs table's Position bar. Height is the sheet's `.la-input`, so the
      bar sits on the same lines as the PWM boxes beside it and the row keeps its
      height. Width was 120px, Mission Planner's bar near enough; it gave 24px to
@@ -762,6 +830,24 @@
   color: var(--la-ink);
 }
 
+/* --- Disabled controls keep the ordinary pointer ----------------------
+   The sheet gives a disabled button, field, select, slider and radio the
+   not-allowed cursor -- a red no-entry sign under the pointer every time it
+   passes one. Greyed already says "not now", and a control's hover text says
+   why where it matters; the sign only reads as something refused. So every
+   disabled control, the sheet's and this app's own, keeps the default
+   pointer. The sheet's selectors are repeated at their own specificity, since
+   this file comes after it and a later rule of equal weight wins. */
+:disabled,
+[aria-disabled='true'],
+.la-btn:disabled,
+.la-input:disabled,
+.la-select:disabled,
+.la-slider:disabled,
+.la-radio input:disabled {
+  cursor: default;
+}
+
 /* Preview marker in the action bar. Amber, which is the warn role -- status,
    never an action -- and sized to be noticed without competing with the
    parameter write button at the other end of the bar. */
@@ -1022,16 +1108,24 @@
    these stacked into a column taller than the screen; a pane is wide, so
    the groups sit side by side and the whole thing is one glance. */
 .view-pane {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--la-space-4) var(--la-space-5);
+  /* Each group as wide as its content, and the spare width between the
+     groups rather than inside them. Stretched to share the pane, the columns
+     put more space between a label and its switch than between one column
+     and the next. Wrapping rather than a fixed four across: at the narrowest
+     the Fly screen's column allows, four did not fit and Arrangement was cut
+     off at the right. */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
   align-content: start;
+  gap: var(--la-space-4) var(--la-space-5);
   padding: var(--la-space-3);
   overflow-y: auto;
 }
 .view-pane__group {
   display: flex;
   flex-direction: column;
+  flex: none;
   gap: var(--la-space-2);
   min-width: 0;
 }
@@ -1045,8 +1139,17 @@
 }
 .view-pane__actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--la-space-2);
+}
+/* Each switch at its column's right edge, so a column of them lines up
+   rather than each sitting wherever its own label ends -- "Messages" put
+   its switch 30px right of "Map"'s. */
+.view-pane .la-switch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--la-space-4);
 }
 
 /* ── The Video pane ──
@@ -1070,44 +1173,226 @@
   flex: 1;
   min-width: 0;
 }
+/* A URL reads from its start; the sheet centers an input's text. */
+.video-pane__form .la-input {
+  text-align: left;
+}
+/* The buttons across the lower pane's panes, at one width. */
+.joystick-panel__row .la-btn,
+.view-pane__actions .la-btn,
+.video-pane__form .la-btn {
+  min-width: var(--app-pane-btn-w);
+}
 
 /* ── Camera and gimbal ──
    A pane of the lower pane, beside Messages and Preflight: something you
    look at in the space under the controls, one at a time. It brings no
-   surface of its own -- the pane already is one. */
+   surface of its own -- the pane already is one, and a box inside a box
+   reads as two things rather than one.
+   Three columns: the pitch dial, the yaw dial with the one switch that is
+   about yaw under it, and the mount and camera settings on one edge. */
 .camera-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--la-space-3);
-  padding: var(--la-space-3);
-  /* No surface of its own: it is a pane of the log pane now, and a box
-     inside a box reads as two things rather than one. */
+  /* Scales to the pane: it takes the pane's height and is the size
+     container the dials measure against. They were drawn at a fixed size and
+     sat in the top-left corner of a pane three times their height. Below the
+     dials' smallest useful size it scrolls, as the other panes do. */
+  flex: 1;
   min-height: 0;
+  container-type: size;
+  padding: var(--la-space-3);
   overflow: auto;
 }
-.camera-panel__row {
-  display: flex;
-  align-items: center;
-  gap: var(--la-space-2);
-  flex-wrap: wrap;
+.camera-panel__grid {
+  /* What is left for the dials: the height under their headings (never less
+     than a usable dial), and the width once the settings column at its
+     narrowest and the two gaps are taken. The dials split that width in
+     proportion to their own shapes. */
+  --cam-h: max(calc(100cqh - var(--app-cam-head)), var(--app-cam-dial-min-h));
+  --cam-w: calc(100cqw - var(--app-cam-side-min) - 2 * var(--la-space-5));
+  --pitch-w: min(calc(var(--cam-h) * var(--pitch-aspect)), calc(var(--cam-w) * var(--pitch-share)));
+  --yaw-w: min(
+    calc((var(--cam-h) - var(--app-cam-switch-row)) * var(--yaw-aspect)),
+    calc(var(--cam-w) * var(--yaw-share))
+  );
+  display: grid;
+  grid-template-columns:
+    var(--pitch-w) var(--yaw-w)
+    minmax(var(--app-cam-side-min), var(--app-cam-side-max));
+  gap: var(--la-space-5);
+  align-items: start;
 }
-.camera-panel__label {
+.camera-panel__dial,
+.camera-panel__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+  min-width: 0;
+}
+/* Lock yaw sits centered under the dial it changes. */
+.camera-panel__dial > .la-switch {
+  align-self: center;
+}
+.camera-panel__head {
+  margin: 0;
   font-size: var(--la-size-xs);
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--la-ink-3);
-  min-width: 56px;
 }
-.camera-panel__readout,
-.camera-panel__status {
-  font-family: var(--la-font-mono);
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-2);
+.camera-panel__side .camera-panel__head:not(:first-child) {
+  margin-top: var(--la-space-2);
+}
+
+/* The dials. One line weight; blue is where the mount says it is, the orange
+   ring where it was last told to go. */
+.cam-dial {
+  display: block;
+  /* The column is sized for it (see .camera-panel__grid); the whole dial --
+     arcs, strokes, the number -- is in viewBox units, so it scales as one
+     drawing. */
+  width: 100%;
+  height: auto;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: var(--la-radius-sm);
+}
+.cam-dial:focus-visible {
+  outline: 2px solid var(--la-blue);
+  outline-offset: 2px;
+}
+.cam-dial.is-disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.cam-dial__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 28;
+}
+.cam-dial__track,
+.cam-dial__live {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.cam-dial__track {
+  stroke: var(--la-line-strong);
+}
+.cam-dial__live {
+  stroke: var(--la-blue);
+}
+.cam-dial__tick {
+  stroke: var(--la-ink-3);
+  stroke-width: 1.5;
+}
+.cam-dial__pip {
+  fill: var(--la-blue);
+}
+.cam-dial__target {
+  fill: none;
+  stroke: var(--la-orange);
+  stroke-width: 2;
+}
+.cam-dial__value {
+  fill: var(--la-ink);
+  font-family: var(--la-font);
+  font-size: var(--la-size-xl);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.camera-panel__readout {
-  margin-left: auto;
+
+/* Photo and Record: the largest controls in the pane, a glyph and a word
+   each, because taking the picture is what the pane is for. */
+.camera-panel__shoot {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) var(--app-cam-zoom-w);
+  gap: var(--la-space-2);
+}
+.cam-btn,
+.cam-zoom {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-space-2);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cam-btn {
+  /* Grows with the pane, within reason: a 44px button is right under a
+     small pane and lost beside a large one. */
+  height: clamp(var(--app-cam-btn-h), 16cqh, var(--app-cam-btn-h-max));
+  padding: 0 var(--la-space-3);
+  font-size: var(--la-size-md);
+  white-space: nowrap;
+}
+.cam-btn svg {
+  width: var(--app-cam-icon);
+  height: var(--app-cam-icon);
+  flex: none;
+}
+.cam-btn__ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+.cam-btn__shutter {
+  fill: currentColor;
+}
+.cam-btn__rec {
+  fill: var(--la-bad);
+}
+/* Recording is a state, so the red it wears is status, not an action. */
+.cam-btn.is-recording {
+  border-color: var(--la-bad);
+}
+.cam-btn:hover:enabled,
+.cam-zoom:hover:enabled {
+  border-color: var(--la-blue);
+}
+.cam-btn:disabled,
+.cam-zoom:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.camera-panel__zoom {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--la-space-1);
+}
+.cam-zoom {
+  padding: 0;
+  font-size: var(--la-size-lg);
+  line-height: 1;
+}
+
+/* The result of the last press: a line that is always there, so a result
+   appearing moves nothing, and that clears itself. */
+.camera-panel__status {
+  margin: 0;
+  min-height: 1.5em;
+  font-family: var(--la-font-mono);
+  font-size: var(--la-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--la-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.camera-panel__status--busy {
+  color: var(--la-ink-3);
+}
+.camera-panel__status--ok {
+  color: var(--la-ok);
+}
+.camera-panel__status--bad {
+  color: var(--la-bad);
 }
 
 /* ── Import shape picker ──
@@ -1263,18 +1548,50 @@
    channel bars are the only way to see a stuck stick, so they are wide
    enough to read at a glance and the center mark is drawn on every one. */
 .joystick-panel {
+  /* The size container the stick picture measures against: it takes the
+     pane's height, as the camera dials do, rather than sitting at a fixed
+     size in the corner of a pane three times as tall. */
+  flex: 1;
+  min-height: 0;
+  container-type: size;
   display: flex;
   flex-direction: column;
   gap: var(--la-space-3);
   padding: var(--la-space-3);
-  min-height: 0;
   overflow: auto;
+}
+.joystick-panel__body {
+  display: grid;
+  /* The picture is as tall as the pane allows, within a floor it stays
+     legible at and a ceiling past which it only takes room from the bars. */
+  grid-template-columns:
+    clamp(
+      var(--app-js-sticks-min),
+      calc((100cqh - var(--app-js-head-h) - var(--la-space-3)) * var(--app-js-sticks-aspect)),
+      var(--app-js-sticks-max)
+    )
+    minmax(0, 1fr);
+  gap: var(--la-space-5);
+  /* The bars sit level with the picture's middle rather than along its top. */
+  align-items: center;
+}
+.joystick-panel__sticks .stick-diagram {
+  max-width: none;
+}
+.joystick-panel__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-3);
+  min-width: 0;
 }
 .joystick-panel__row {
   display: flex;
-  align-items: center;
-  gap: var(--la-space-3);
   flex-wrap: wrap;
+  align-items: center;
+  /* At the right, over the bars: the picture takes the left of the pane,
+     and a row starting above it read as a caption for the drawing. */
+  justify-content: flex-end;
+  gap: var(--la-space-3);
 }
 .joystick-panel__label {
   font-size: var(--la-size-xs);
@@ -1282,20 +1599,39 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--la-ink-3);
-  min-width: 56px;
+  flex: none;
 }
 .joystick-panel__pick {
-  max-width: 260px;
+  /* One width whatever it holds, so a device appearing or a longer name
+     moves nothing; the full id is in its tooltip. */
+  width: var(--app-js-device-w);
+  min-width: 0;
 }
-.joystick-panel__pad,
-.joystick-panel__live {
-  font-family: var(--la-font-mono);
-  font-size: var(--la-size-xs);
-  color: var(--la-ink-2);
+.joystick-panel__row .la-btn {
+  flex: none;
 }
-.joystick-panel__live {
-  color: var(--la-bad);
-  font-weight: 600;
+.joystick-panel__bars {
+  display: grid;
+  /* Equal columns as many as fit: the four sticks are two by two in a narrow
+     pane, and sixteen mapped channels are four rows of four in a wide one.
+     Flowed rather than wrapped, four bars had gone three and one. */
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--app-js-bar-w), 100%), 1fr));
+  gap: var(--la-space-2) var(--la-space-5);
+}
+/* A narrow pane -- the Fly screen's column at its narrowest -- has no room
+   for the picture beside the bars: it goes above them, at the smallest size
+   it reads at, and the pane scrolls as the others do. */
+@container (max-width: 560px) {
+  .joystick-panel__body {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+  .joystick-panel__sticks {
+    width: var(--app-js-sticks-min);
+  }
+  .joystick-panel__main {
+    justify-self: stretch;
+  }
 }
 .joystick-bar {
   display: flex;
@@ -1305,11 +1641,19 @@
 .joystick-bar__name {
   font-size: var(--la-size-xs);
   color: var(--la-ink-3);
-  min-width: 52px;
+  min-width: var(--app-js-name-w);
+}
+/* The live picture follows the sticks as they are read; the easing that
+   makes the Radio screen's instructions glide would make these lag. */
+.stick-diagram--live .stick-diagram__knob {
+  transition: none;
 }
 .joystick-bar__track {
   position: relative;
-  width: 96px;
+  /* Takes the column, so the two bars in a row are one length and the
+     values line up at its end. */
+  flex: 1;
+  min-width: 0;
   height: 8px;
   border-radius: var(--la-radius-sm);
   background: var(--la-line);
@@ -1336,29 +1680,128 @@
   min-width: 34px;
   text-align: right;
 }
-.joystick-setup {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--la-size-sm);
-  margin-bottom: var(--la-space-3);
+/* The gamepad settings dialog: two mapping tables of up to eight columns,
+   which the sheet's 640px wide card cannot hold without squeezing them. */
+.la-modal__card:has(.js-setup) {
+  /* Wide enough that a six-position cycle's values fit their box whole. */
+  width: min(940px, 100%);
 }
-.joystick-setup th {
-  text-align: left;
+.js-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
+}
+.js-setup__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--la-space-2);
+}
+.js-setup__group > .app-table {
+  align-self: stretch;
+}
+.js-setup__head {
+  margin: 0;
   font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--la-ink-3);
-  padding-bottom: var(--la-space-1);
 }
-.joystick-setup td {
-  padding: var(--la-space-1) var(--la-space-2) var(--la-space-1) 0;
-  vertical-align: middle;
+/* Every button in the dialog is one width, footer included: derived from one
+   token, so a reworded label cannot pull a row out of line. */
+.la-modal__card:has(.js-setup) .la-btn {
+  min-width: var(--app-js-btn-w);
 }
-.joystick-setup td.num,
-.joystick-setup th.num {
+.js-setup__headrow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--la-space-3);
+}
+.js-profiles {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  width: 100%;
+}
+.js-profiles .la-select,
+.js-profiles .la-input {
+  width: var(--app-js-profile-w);
+  min-width: 0;
+}
+.js-profiles__note {
+  font-size: var(--la-size-sm);
+  color: var(--la-ok);
+}
+.js-profiles__note.is-bad {
+  color: var(--la-bad);
+}
+/* The two mapping tables share their leading and trailing columns -- channel,
+   the control with its Learn, and then what it sends and remove -- so both
+   read down one set of columns. The axes table's spacer column is what lets
+   its last two land where the buttons table's do. Its three settings are
+   switch, switch, box, each the width of the widest heading, "Centered". */
+.js-grid--axes {
+  grid-template-columns:
+    var(--app-js-channel-w) var(--app-js-pick-w) var(--app-js-switch-col-w)
+    var(--app-js-switch-col-w) var(--app-js-num-w) minmax(0, 1fr) var(--app-js-num-w)
+    var(--app-js-x-w);
+}
+.js-grid--buttons {
+  grid-template-columns:
+    var(--app-js-channel-w) var(--app-js-pick-w) var(--app-js-mode-w)
+    minmax(0, 1fr) var(--app-js-num-w) var(--app-js-x-w);
+}
+.js-grid .la-select,
+.js-grid .la-input {
+  width: 100%;
+  min-width: 0;
+}
+.js-grid.is-bad > .la-select:first-child {
+  border-color: var(--la-bad);
+}
+.js-grid__value {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  min-width: 0;
+}
+.js-grid__value > .la-input {
+  flex: 1;
+}
+.js-grid__num {
   text-align: right;
   font-family: var(--la-font-mono);
   font-variant-numeric: tabular-nums;
+}
+.js-grid__unit {
+  text-transform: none;
+}
+/* An axis or button pick with its Learn beside it. */
+.js-grid__pick {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  min-width: 0;
+}
+.js-grid__pick > .la-select,
+.js-grid__pick > .la-input {
+  flex: none;
+  width: var(--app-js-select-w);
+  min-width: 0;
+}
+/* Release and deadzone, on the tables' first two columns: the same inset as a
+   table row, so each control sits under the column above it. */
+.js-setup__fields {
+  display: grid;
+  grid-template-columns: var(--app-js-channel-w) var(--app-js-pick-w);
+  gap: var(--la-space-2) var(--la-space-3);
+  align-items: center;
+  padding: 0 var(--la-space-3);
+}
+.js-setup__label {
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-2);
 }
 
 /* ── Vehicle files ──
@@ -2070,8 +2513,8 @@
      moving. The connecting states are longer and overrun this, which costs
      nothing: they only occur before a vehicle exists, so there is nothing
      to their right, and the bar's spacer takes the difference. */
-  min-width: 112px;
-  height: 30px;
+  min-width: var(--app-bar-pill-w);
+  height: var(--app-bar-control-h);
   padding: 0 var(--la-space-3);
   border: 1px solid transparent;
   border-radius: var(--la-radius-sm);
@@ -2153,6 +2596,60 @@ button.app-status__state--warn:hover {
 }
 button.app-status__state--bad:hover {
   background: color-mix(in srgb, var(--la-bad) 52%, transparent);
+}
+
+/* The gamepad has control (ui/shell/JoystickChip.tsx). The warn tint the
+   status pill uses, because it is a state someone must stay aware of rather
+   than a fault, lifted toward white for the permanently dark bar as the
+   pill's tones are; its Release is the sheet's own ghost button on the bar. */
+.app-joystick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  flex: none;
+  margin-left: var(--la-space-4);
+}
+/* Green, as the vehicle state beside it is when all is well: the gamepad
+   having control is a status, and a healthy one. Not amber, which on this bar
+   is the readiness warning. Shaped exactly as that pill is -- height, corner,
+   type and tint -- because two status pills side by side in two shapes read
+   as two kinds of thing. */
+.app-joystick__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-space-2);
+  min-width: var(--app-bar-pill-w);
+  height: var(--app-bar-control-h);
+  padding: 0 var(--la-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--la-radius-sm);
+  background: color-mix(in srgb, var(--la-ok) 34%, transparent);
+  color: var(--app-on-dark);
+  font-size: var(--la-size-md);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.app-joystick__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--la-ok) 55%, white);
+}
+/* Release is red: it is the way out of the gamepad flying the aircraft, the
+   destructive-action exception to green-and-red-are-status. The sheet's red
+   is drawn for a light ground, so on the charcoal bar it is lifted toward
+   white the way the bar's other reds are, or it reads as a dim outline. Hover
+   is the sheet's own solid red. */
+.la-appbar .app-joystick .la-btn--danger {
+  border-color: color-mix(in srgb, var(--la-bad) 75%, white);
+  color: color-mix(in srgb, var(--la-bad) 62%, white);
+}
+.la-appbar .app-joystick .la-btn--danger:hover:enabled {
+  background: var(--la-bad);
+  border-color: var(--la-bad);
+  color: var(--app-on-dark);
 }
 
 /* One reading: a caption over its value. Captioned rather than left to speak
@@ -2576,6 +3073,13 @@ button.app-status__state--bad:hover {
   max-width: none;
   padding: var(--la-space-4);
 }
+/* Inside Setup, though, a filling tab keeps the card grid's margin: at 16px
+   Sensors, Overview, OSD and the rest sat 8px up and left of every other tab
+   on the rail, so the content jumped as you moved between them. Fly and Plan,
+   which have no rail, keep the tighter one. */
+.app-main:not(.app-main--full) > .app-content--flush {
+  padding: var(--la-space-5);
+}
 /* A filling tab still shows an ordinary card when it has nothing to fill
    with -- MAVFTP and the Inspector before a vehicle, Parameters before its
    table loads. In a stretch column that card took the whole window, so a
@@ -2683,15 +3187,15 @@ button.app-status__state--bad:hover {
    rules end on the same line: a control's height of content under the rule
    either way. A title in a header row takes that height itself, and the row
    adds its padding and rule; a plain title is border-box, so its minimum has
-   to count them. Scoped to Sensors at first, and the next screen to need it
-   was 4px out. */
+   to count them. Scoped to Sensors at first, then the column screens, and
+   each screen left out was the next one found out of line -- Outputs and
+   Overview in the audit against the UX rules -- so it is every Setup card. */
 .la-card__head > .la-card__title {
   display: flex;
   align-items: center;
   min-height: var(--app-card-head-h);
 }
-.sensors-screen .la-card > .la-card__title,
-.config-screen .la-card > .la-card__title {
+.app-main:not(.app-main--full) > .app-content .la-card > .la-card__title {
   display: flex;
   align-items: center;
   min-height: calc(var(--app-card-head-h) + var(--la-space-2) + 2px);
@@ -4299,11 +4803,11 @@ button.app-status__state--bad:hover {
 .la-modal__card:has(.rc-wizard) {
   width: min(920px, 100%);
 }
-/* Cancel and the step's action are one pair, so one size -- the compass
-   dialog's rule. A fixed width rather than the widest-of-two, because the
-   action is relabeled at every step ("Start", "Sticks are centered",
-   "Waiting for the stick…") and a pair sized to its words resized under the
-   pointer from one step to the next. */
+/* Cancel and the step's action are one pair, so one size -- the width the
+   accelerometer and compass dialogs use too. A fixed width rather than the
+   widest-of-two, because the action is relabeled at every step ("Start",
+   "Sticks are centered", "Waiting for the stick…") and a pair sized to its
+   words resized under the pointer from one step to the next. */
 .la-modal:has(.rc-wizard) .la-modal__actions .la-btn {
   min-width: var(--app-card-action-w);
 }
@@ -4563,7 +5067,7 @@ button.app-status__state--bad:hover {
 .live-panel__side {
   display: flex;
   flex-direction: column;
-  gap: var(--la-space-4);
+  gap: var(--la-space-3);
   min-height: 0;
 }
 
@@ -4577,11 +5081,22 @@ button.app-status__state--bad:hover {
   padding: var(--la-space-4);
   gap: 0;
 }
+/* The last card takes the column's slack, as a stacked column's last card
+   does on every other screen, so its foot lands on the Attitude card's
+   whatever number of sensors the vehicle reports. */
+.live-panel__side > .la-card:last-child {
+  flex: 1 0 auto;
+}
 
+/* Only the spacing under the title: its size and its row are every card's,
+   which is what puts these rules on Attitude's line. The gap it replaces is
+   the card's own, set to 0 above.
+   Full-size titles cost the column 60px, and it had 8 to spare, so the room
+   comes from this column's own spacing -- the gap between its cards, this
+   margin, and the readout rows' line-height below -- rather than from
+   shrinking the titles back out of line: measured at 1920x1100, no scroll. */
 .live-panel__side .la-card__title {
-  font-size: var(--la-size-md);
-  margin-bottom: var(--la-space-3);
-  padding-bottom: var(--la-space-1);
+  margin-bottom: var(--la-space-2);
 }
 
 .vehicle-view {
@@ -4717,7 +5232,7 @@ button.app-status__state--bad:hover {
   gap: var(--la-space-3);
   padding: 1px 0;
   font-size: var(--la-size-sm);
-  line-height: 1.55;
+  line-height: 1.4;
 }
 
 .stat-row__label {
@@ -5152,14 +5667,6 @@ button.app-status__state--bad:hover {
   width: var(--app-servo-set-w);
   flex: none;
 }
-/* The sheet gives every disabled button the not-allowed cursor. These are
-   disabled most of the time -- with the sticks at rest the trim already
-   matches -- so the pointer met a no-entry sign on almost every pass down the
-   table, which reads as something refused rather than nothing to do. The
-   greyed button already says it; the hover text says why. */
-.servo-position__set:disabled {
-  cursor: default;
-}
 /* The type of the PWM boxes beside it, so the row reads as four numbers. */
 .servo-position__value {
   position: relative;
@@ -5335,6 +5842,9 @@ button.app-status__state--bad:hover {
 .flight-panels {
   flex: 1;
   min-height: 0;
+  /* The box the grid inside it measures against (cqw/cqh): the grid's own
+     track sizes cannot query the grid. */
+  container-type: size;
 }
 
 .flight-toolbar {
@@ -5364,17 +5874,51 @@ button.app-status__state--bad:hover {
  * divider is dragged; when that bites, the aspect panel's row shrinks and the
  * panel letterboxes rather than stretching.
  */
+/* Two sizes decide this layout, and both are bounded.
+   The left column is the dragged fraction, held between a floor on either
+   side: dragged far left, the controls were crushed into a 250px column and
+   spilled out of it; dragged far right, the map went to a strip.
+   The pinned panel's row is its 4:3 height at that width -- but never more
+   than leaves room below for the controls (measured, since they wrap) and a
+   lower pane someone can use. Uncapped, a wide column made the panel so
+   tall that the lower pane was 9px at 1280x720 and the panel ran off the
+   bottom of a 3440x1440 window. A capped panel keeps its shape and centers
+   in its column. */
 .flight-grid {
+  --below-need: calc(
+    var(--controls-h) + var(--la-space-2) + var(--app-fly-pane-min) + var(--la-space-2)
+  );
+  /* As wide as the panel can use, and no wider: past the width at which its
+     height meets the cap, a wider column only drew empty bands either side
+     of it -- 300px a side on an ultrawide -- so the divider stops there and
+     the map keeps the width instead. */
+  --cap-w: calc((100cqh - var(--below-need)) * 4 / 3);
+  --left-w: clamp(
+    var(--app-fly-side-min),
+    min(calc(var(--ratio) * 100cqw), var(--cap-w)),
+    calc(100cqw - var(--app-fly-side-min) - var(--la-space-2))
+  );
   display: grid;
-  grid-template-columns: var(--split) var(--la-space-2) minmax(0, 1fr);
-  grid-template-rows: minmax(0, auto) minmax(210px, 1fr);
+  grid-template-columns: var(--left-w) var(--la-space-2) minmax(0, 1fr);
+  grid-template-rows:
+    max(0px, min(calc(var(--left-w) * 3 / 4), calc(100cqh - var(--below-need))))
+    minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-height: 0;
   gap: 0 0;
 }
+.flight-grid--no-pane {
+  --below-need: calc(var(--controls-h) + var(--la-space-2));
+}
 .flight-grid--single {
+  --left-w: 100cqw;
   grid-template-columns: minmax(0, 1fr);
+}
+/* No pinned panel: its row takes nothing, and nothing caps the column. */
+.flight-grid--no-aspect {
+  --cap-w: 100cqw;
+  grid-template-rows: 0 minmax(0, 1fr);
 }
 
 .flight-grid__aspect {
@@ -5384,7 +5928,6 @@ button.app-status__state--bad:hover {
   min-height: 0;
   display: flex;
   justify-content: center;
-  aspect-ratio: 4 / 3;
 }
 /* Sized from the row's height with an aspect of its own, so when the row is
    capped it letterboxes horizontally instead of stretching. */
@@ -5689,10 +6232,6 @@ button.app-status__state--bad:hover {
   flex-wrap: wrap;
   gap: var(--la-space-2);
 }
-.plot-panel__empty {
-  color: var(--la-ink-3);
-  font-size: var(--la-size-sm);
-}
 .plot-chip {
   display: inline-flex;
   align-items: center;
@@ -5759,13 +6298,6 @@ button.app-status__state--bad:hover {
   flex: 1;
   min-height: 0;
   width: 100%;
-}
-.plot-panel__axis {
-  margin: 0;
-  padding: 0 var(--la-space-2) var(--la-space-1);
-  color: var(--la-ink-3);
-  font-size: var(--la-size-xs);
-  text-align: right;
 }
 
 /* --- The field picker ------------------------------------------------ */
@@ -6003,10 +6535,6 @@ body.is-splitting .flight-map {
   color: #ff8f88;
 }
 
-.video-examples {
-  gap: var(--la-space-4);
-  margin-bottom: var(--la-space-2);
-}
 .flight-hud__canvas {
   position: absolute;
   inset: 0;
@@ -6016,12 +6544,11 @@ body.is-splitting .flight-map {
 
 /* --- Actions ---------------------------------------------------------- */
 
-/* One control surface, in three tiers of prominence. Mode and arm are what
-   everything else adjusts, so they are full size on the plain surface; the
-   nudges and the occasional command sit on a recessed strip below, at the
-   design system's smaller sizes. The size steps are the system's own --
-   38px, 30px, 26px -- so the hierarchy is one you can see without reading
-   the labels. */
+/* One control surface, in two tiers. Mode, arm and the jumps are what
+   everything else adjusts, so they are 38px on the plain surface; the nudges
+   and the occasional command sit on a recessed strip below at the regular
+   30px. It was three sizes, with the strip at the small 26px -- so the Set
+   beside the mode and the Sets beside the fields, one job, were two sizes. */
 .flight-controls {
   display: flex;
   flex-direction: column;
@@ -6036,16 +6563,22 @@ body.is-splitting .flight-map {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--la-space-2);
+  gap: var(--la-space-2) var(--la-space-5);
   padding: var(--la-space-3);
 }
-/* One height across the top row. The mode picker and Arm were 38px and the
-   three jumps 30px, which is a step small enough to read as a mistake
-   rather than as a hierarchy -- and the hierarchy is already carried by
-   color and width: Arm is the only orange thing on the screen and keeps
-   `--lg`'s wider padding, so raising the jumps to meet it costs nothing. */
+.flight-controls__group {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  flex: none;
+}
+/* One height and one width across the top row, the width holding the
+   longest label either way -- "Takeoff", and "Disarm" once armed -- so Arm
+   turning into Disarm moves nothing beside it. Arm is set apart by being the
+   only orange thing on the screen, not by being wider. */
 .flight-controls__primary .la-btn {
   min-height: 38px;
+  min-width: var(--app-fc-btn-w);
 }
 
 /* Fixed, not `min-width`. At a minimum the picker grew for a longer mode
@@ -6073,13 +6606,15 @@ body.is-splitting .flight-map {
   border-top: 1px solid var(--la-line);
 }
 .flight-controls__secondary .la-select {
-  height: 26px;
   min-width: 0;
   font-size: var(--la-size-sm);
 }
 .flight-controls__secondary .la-input {
-  height: 26px;
   font-size: var(--la-size-sm);
+}
+/* The strip's Sets and Run: one job, one width. */
+.flight-controls__secondary .la-btn {
+  min-width: var(--app-fc-set-w);
 }
 .flight-controls__secondary .la-field__label {
   font-size: var(--la-size-xs);
@@ -6091,24 +6626,15 @@ body.is-splitting .flight-map {
   flex: none;
 }
 
-/* The occasional command, at the far end. `margin-left: auto` rather than a
-   spacer element before it: a spacer holds the end of whatever line it
-   lands on, so once the strip wrapped -- and at this panel's width it does
-   -- the spacer sat at the end of the first line and the action list began
-   the second one at the left, which is the opposite of where it belongs. */
+/* The occasional command, last. It wraps at this panel's width, and was
+   pushed to the right-hand end, where on its own line it sat as a stray
+   under the fields; labelled and from the left it reads as one more field. */
 .flight-controls__run {
   display: flex;
   align-items: center;
   gap: var(--la-space-1);
-  margin-left: auto;
 }
 
-.flight-controls__sep {
-  width: 1px;
-  align-self: stretch;
-  margin: 0 var(--la-space-1);
-  background: var(--la-line-strong);
-}
 .flight-controls__field {
   display: flex;
   align-items: center;
@@ -6134,11 +6660,6 @@ body.is-splitting .flight-map {
 .flight-controls__primary .flight-progress {
   margin-left: auto;
 }
-.flight-controls__status {
-  margin: 0;
-  padding: 0 var(--la-space-3) var(--la-space-2);
-}
-
 /* The log takes the rest of the stack under the panel, so it is what
    absorbs the height the fixed-aspect panel gives up or takes. */
 .flight-log {
@@ -6956,6 +7477,19 @@ body.is-splitting .flight-map {
 .log-list__item:disabled {
   opacity: 0.5;
   cursor: default;
+}
+/* The row being downloaded is its own progress bar, filled to --pct. It is
+   disabled with the rest while the transfer runs, but it is the one row that
+   must not fade. */
+.log-list__item.is-downloading {
+  background: linear-gradient(
+    to right,
+    var(--la-blue-soft) var(--pct, 0%),
+    transparent var(--pct, 0%)
+  );
+}
+.log-list__item.is-downloading:disabled {
+  opacity: 1;
 }
 .log-list__name {
   font-family: var(--la-font-mono);
@@ -7939,12 +8473,19 @@ body.is-splitting .flight-map {
   gap: var(--la-space-2);
   margin-right: auto;
 }
-/* Cancel and Start are one pair of choices, so they are one size. Sized to
-   their own words, a narrow ghost beside a wide primary reads as an
-   afterthought rather than the other half of a decision. A floor rather than
-   a fixed width, so a longer label still fits. */
+/* Cancel and Start are one pair of choices, so they are one size -- and the
+   same size as the radio calibration's (see .rc-wizard), so the three
+   calibration dialogs share one row of buttons. It was a 7em floor, which
+   sized the pair to its words and let "Capturing…" resize it mid-run. */
 .la-modal:has(.cal-att) .la-modal__actions .la-btn {
-  min-width: 7em;
+  min-width: var(--app-card-action-w);
+}
+/* ...which the sheet's 560px card cannot hold beside the compass dialog's
+   fitness setting: the dropdown ran over Cancel and its label wrapped. Both
+   attitude dialogs take the width, the accelerometer's too, so the two
+   siblings stay one size; their tiles simply draw a little larger. */
+.la-modal__card:has(.cal-att) {
+  width: min(680px, 100%);
 }
 /* In a dialog the six go three and three. The auto-fit track above lands on
    four-and-two at a modal's width, which reads as a row that ran out rather

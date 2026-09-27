@@ -483,6 +483,11 @@ export class ProtocolEngine {
    * over a link that may be a telemetry radio -- a transfer with no visible
    * progress is indistinguishable from one that has hung.
    */
+  /** Stop the file read in progress -- see MavFtpClient.cancelRead. */
+  cancelDownload() {
+    this.ftp.cancelRead()
+  }
+
   downloadFile(path: string): Promise<Uint8Array> {
     // Throttled: a burst read delivers a packet every third of a
     // millisecond, and a ten-megabyte log produced forty-three thousand

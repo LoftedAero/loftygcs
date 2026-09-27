@@ -58,12 +58,17 @@ const NOT_BL_NAME = /mavlink|slcan|telem/i
  * interface is believed over a product string that says bootloader.
  */
 export function looksLikeBootloader(p: PortLike): boolean {
-  if (p.driverName && NOT_BL_NAME.test(p.driverName)) return false
+  if (saysNotBootloader(p)) return false
   if (p.driverName && BL_NAME.test(p.driverName)) return true
   if (BL_NAME.test(p.displayName ?? '')) return true
   const vid = num(p.vendorId)
   const pid = num(p.productId)
   return (vid === 0x1209 && pid === 0x5741) || (vid === 0x26ac && pid === 0x0011)
+}
+
+/** A port whose driver name says it is one of a running board's interfaces. */
+function saysNotBootloader(p: PortLike): boolean {
+  return !!p.driverName && NOT_BL_NAME.test(p.driverName)
 }
 
 /**
@@ -98,7 +103,15 @@ export function pickBootloaderPort(
   if (arrivedBl.length > 1) return null
   if (bl.length === 1) return bl[0]!.portId
   if (bl.length > 1) return null
-  return newPortSince(portList, lastIds)
+  // The last resort trusts arrival alone, so it takes nothing the driver
+  // names as a running board's interface. Measured on the bench: a Cube
+  // booting its firmware mid-request added "Cube Orange SLCAN" as the one new
+  // port, and this answered with it -- the probe got silence, the reboot went
+  // down a CAN link, and the chooser that followed never closed.
+  return newPortSince(
+    portList.filter((p) => !saysNotBootloader(p)),
+    lastIds,
+  )
 }
 
 /** The port that appeared since the last request, if there is exactly one. */

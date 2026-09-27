@@ -122,19 +122,29 @@ export function verticalSpeedLabel(units: UnitPrefs): string {
  */
 export function formatDistance(meters: number, unit: DistanceUnit, decimals?: number): string {
   const v = toDistance(meters, unit)
-  return v.toFixed(decimals ?? (unit === 'ft' ? 0 : Math.abs(v) < 100 ? 1 : 0))
+  return fixed(v, decimals ?? (unit === 'ft' ? 0 : Math.abs(v) < 100 ? 1 : 0))
 }
 
 export function formatSpeed(ms: number, unit: SpeedUnit, decimals?: number): string {
   const v = toSpeed(ms, unit)
-  return v.toFixed(decimals ?? (unit === 'ms' ? 1 : 0))
+  return fixed(v, decimals ?? (unit === 'ms' ? 1 : 0))
+}
+
+/**
+ * `toFixed`, without its "-0". A vehicle sitting on the ground reads a hair
+ * under zero, and rounding keeps the sign: the HUD's altitude box and the
+ * altitude field both said "-0" for a vehicle that had not moved.
+ */
+export function fixed(v: number, decimals: number): string {
+  const s = v.toFixed(decimals)
+  return /^-0(\.0+)?$/.test(s) ? s.slice(1) : s
 }
 
 export function formatVerticalSpeed(ms: number, units: UnitPrefs): string {
   const v = toVerticalSpeed(ms, units)
   // Feet per minute are whole numbers -- "500", never "500.0" -- and a
   // tenth of a meter per second is the smallest climb worth reading.
-  return resolveVerticalSpeed(units) === 'fpm' ? v.toFixed(0) : v.toFixed(1)
+  return fixed(v, resolveVerticalSpeed(units) === 'fpm' ? 0 : 1)
 }
 
 /** Every choice a preferences control offers, with the label it shows. */

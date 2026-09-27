@@ -249,10 +249,10 @@ function SensorCard() {
       {/* The one card that cannot show empty rows: the list is whatever the
           board reports as fitted, so with no board there is nothing to name
           -- and naming the usual suspects would invent them. */}
-      {!live ? (
-        <p className="app-placeholder">No vehicle.</p>
-      ) : readings.length === 0 ? (
-        <p className="app-placeholder">The vehicle has not reported its sensor status yet.</p>
+      {/* The Fly screen's words for the same state, so waiting reads the same
+          everywhere; with no vehicle and with no report yet, it is waiting. */}
+      {!live || readings.length === 0 ? (
+        <p className="app-placeholder">Waiting for telemetry…</p>
       ) : (
         readings.map((r) => {
           const t = SENSOR_TONE[r.state]

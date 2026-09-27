@@ -462,7 +462,7 @@ function OutputOptionsCard() {
         />
       }
     >
-      <ParamField param="SERVO_RATE" label="Servo rate" unit="Hz" showName />
+      <ParamField param="SERVO_RATE" label="Servo rate" showName />
       {protocols.map((f) => {
         const present = entries.has(f.param)
         return (

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { MavFtpClient, parseDirEntries } from './mavftp'
+import { FtpCancelled, MavFtpClient, parseDirEntries } from './mavftp'
 import { FtpError, FtpOp, decodeFtpPacket, encodeFtpPacket } from './packet'
 
 // A scripted device on the other end of the client: every sent payload is
@@ -12,7 +12,13 @@ function scriptedDevice(file: Uint8Array, { dropFirstRead = false } = {}) {
       // Replies echo seq+1; deliver async like a real link.
       queueMicrotask(() =>
         client.handlePayload(
-          encodeFtpPacket({ seq: (req.seq + 1) & 0xffff, session, opcode, offset: req.offset, ...(data ? { data } : {}) }),
+          encodeFtpPacket({
+            seq: (req.seq + 1) & 0xffff,
+            session,
+            opcode,
+            offset: req.offset,
+            ...(data ? { data } : {}),
+          }),
         ),
       )
     }
@@ -270,6 +276,41 @@ describe('burst reads', () => {
     const out = await client.readFile('/logs/1.BIN')
     expect(out).toEqual(file)
     expect(saw).toContain(FtpOp.ReadFile)
+  })
+})
+
+describe('canceling a read', () => {
+  const file = new Uint8Array(1000).map((_, i) => (i * 7) & 0xff)
+
+  it('stops a burst, ends the session, and does not fall back to plain reads', async () => {
+    // Silent, so the burst is still waiting when the cancel lands.
+    const { client, saw } = burstDevice(file, 'silent')
+    const read = client.readFile('/logs/1.BIN')
+    await vi.waitFor(() => expect(saw).toContain(FtpOp.BurstReadFile))
+    client.cancelRead()
+    await expect(read).rejects.toBeInstanceOf(FtpCancelled)
+    // The session is closed so the vehicle stops sending, and the slow path a
+    // failed burst would take is not taken for a file nobody wants.
+    expect(saw.slice(saw.indexOf(FtpOp.BurstReadFile))).toContain(FtpOp.TerminateSession)
+    expect(saw).not.toContain(FtpOp.ReadFile)
+  })
+
+  it('stops the plain-read path too, part way', async () => {
+    const { client, saw } = burstDevice(file, 'unsupported')
+    const read = client.readFile('/logs/1.BIN', (got) => {
+      if (got > 0) client.cancelRead()
+    })
+    await expect(read).rejects.toBeInstanceOf(FtpCancelled)
+    expect(saw.filter((op) => op === FtpOp.ReadFile).length).toBeLessThan(file.length / 239)
+    expect(saw.at(-1)).toBe(FtpOp.TerminateSession)
+  })
+
+  it('does not carry over to the next read', async () => {
+    const { client } = burstDevice(file, 'silent')
+    const first = client.readFile('/logs/1.BIN')
+    client.cancelRead()
+    await expect(first).rejects.toBeInstanceOf(FtpCancelled)
+    expect(await client.readFile('/logs/1.BIN')).toEqual(file)
   })
 })
 

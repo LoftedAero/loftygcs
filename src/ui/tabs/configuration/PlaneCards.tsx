@@ -178,13 +178,15 @@ function AirspeedCard() {
       fields={[
         { param: 'ARSPD_USE', label: 'Enable airspeed sensor' },
         { param: 'ARSPD_TYPE', label: 'Sensor type', ...(use === 0 ? { disabled: true } : {}) },
-        { param: 'AIRSPEED_MIN', label: 'Minimum airspeed', unit: 'm/s' },
-        { param: 'AIRSPEED_CRUISE', label: 'Cruise airspeed', unit: 'm/s' },
-        { param: 'AIRSPEED_MAX', label: 'Maximum airspeed', unit: 'm/s' },
-        { param: 'AIRSPEED_STALL', label: 'Stall airspeed', unit: 'm/s' },
+        // No unit written here: the metadata gives each its own, so the page
+        // is right for whatever a release says, as Power and Failsafe are.
+        { param: 'AIRSPEED_MIN', label: 'Minimum airspeed' },
+        { param: 'AIRSPEED_CRUISE', label: 'Cruise airspeed' },
+        { param: 'AIRSPEED_MAX', label: 'Maximum airspeed' },
+        { param: 'AIRSPEED_STALL', label: 'Stall airspeed' },
         // The throttle that holds the cruise speed above, which is why it
         // reads here rather than among the attitude limits.
-        { param: 'TRIM_THROTTLE', label: 'Cruise throttle', unit: '%' },
+        { param: 'TRIM_THROTTLE', label: 'Cruise throttle' },
       ]}
     />
   )

@@ -239,7 +239,8 @@ export default function CompassPriority() {
         </div>
       ))}
       </div>
-      <p className="la-hint">The order takes effect when the vehicle reboots.</p>
+      {/* No standing line saying the order waits for a restart: a swap raises
+          the restart prompt itself, which says so when it is true. */}
     </section>
   )
 }

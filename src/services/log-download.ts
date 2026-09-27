@@ -73,11 +73,16 @@ export async function listVehicleLogs(): Promise<void> {
   try {
     const { dir, logs } = await findLogDir()
     useLogStore.getState().setVehicleLogs(logs)
-    useLogStore.getState().setVehicleStatus(
-      logs.length === 0
-        ? { kind: 'error', text: `No logs in ${dir}. Has this vehicle flown since its last format?` }
-        : { kind: 'idle' },
-    )
+    useLogStore
+      .getState()
+      .setVehicleStatus(
+        logs.length === 0
+          ? {
+              kind: 'error',
+              text: `No logs in ${dir}. Has this vehicle flown since its last format?`,
+            }
+          : { kind: 'idle' },
+      )
   } catch (err) {
     useLogStore.getState().setVehicleStatus({ kind: 'error', text: describe(err) })
   }
@@ -98,8 +103,25 @@ export async function downloadVehicleLog(log: VehicleLog): Promise<void> {
     useLogStore.getState().setVehicleStatus({ kind: 'idle' })
     useLogStore.getState().loadBytes(log.name, bytes)
   } catch (err) {
-    useLogStore.getState().setVehicleStatus({ kind: 'error', text: describe(err) })
+    // Choosing to stop is not a failure, and says nothing: the list is back
+    // as it was, which is the answer.
+    useLogStore
+      .getState()
+      .setVehicleStatus(isCancel(err) ? { kind: 'idle' } : { kind: 'error', text: describe(err) })
   }
+}
+
+/** Stop the download in progress; it ends quietly, back at the list. */
+export function cancelVehicleLogDownload(): void {
+  void connectionService.cancelDownload().catch(() => {})
+}
+
+/**
+ * A read stopped on purpose. Matched on the message because the error has
+ * crossed the worker boundary, which keeps its words and loses its class.
+ */
+function isCancel(err: unknown): boolean {
+  return err instanceof Error && /transfer canceled/.test(err.message)
 }
 
 /** Save the log currently open to a file, so it need not be fetched twice. */
@@ -138,7 +160,8 @@ function download(name: string, data: string | Uint8Array, type: string): void {
 function describe(err: unknown): string {
   if (!(err instanceof Error)) return String(err)
   // A NAK code on its own tells a pilot nothing.
-  if (isMissing(err)) return `No log directory on this vehicle (looked in ${LOG_DIRS.join(' and ')}).`
+  if (isMissing(err))
+    return `No log directory on this vehicle (looked in ${LOG_DIRS.join(' and ')}).`
   if (/timed out/.test(err.message)) {
     // Two quite different causes, and nothing here can tell them apart:
     // firmware without MAVFTP never answers at all, and a loaded telemetry

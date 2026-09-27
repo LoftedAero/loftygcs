@@ -4,6 +4,7 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
 import AppStatus from './AppStatus'
+import JoystickChip from './JoystickChip'
 import ParamProgress from './ParamProgress'
 import SimTray from './SimTray'
 import ThemeToggle from './ThemeToggle'
@@ -103,6 +104,7 @@ export default function AppBar() {
           without it the connection controls would fall into it. */}
       <div className="app-bar__band app-bar__band--center">
         <AppStatus />
+        <JoystickChip />
       </div>
 
       {/* Out of the grid's flow entirely (absolutely placed on the bar's

@@ -54,7 +54,7 @@ export default function CompassCalCard() {
           silently: no STATUSTEXT, just MAV_RESULT_FAILED. So the one
           precondition this screen can see, it checks, rather than offering a
           button whose only outcome is a refusal. */}
-      {!anyUsed && <LaHint>No compass is set to Use, so there is nothing to calibrate.</LaHint>}
+      {!anyUsed && <LaHint>No compass is set to Use.</LaHint>}
 
       {calibrating && <CompassCalWizard onClose={() => setCalibrating(false)} />}
     </LaCard>

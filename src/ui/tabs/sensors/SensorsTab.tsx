@@ -25,10 +25,12 @@ type LevelStatus = { text: string; tone: 'busy' | 'ok' | 'bad' }
 // Inertial and magnetic calibration.
 export default function SensorsTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
-  if (!connected) {
-    return (
-      <NeedsVehicle title="Sensors" />
-    )
+  // Drawn once the parameters are in, as every other Setup tab is: drawn
+  // before, Hardware ID needed a "waiting for the parameters" line of its own
+  // and the calibration cards filled in under the reader.
+  const ready = useParamStore((s) => s.loadState === 'ready')
+  if (!connected || !ready) {
+    return <NeedsVehicle title="Sensors" />
   }
   return (
     <div className="sensors-screen">
@@ -130,7 +132,11 @@ function AccelCard() {
           {/* Right beside the button that produced it. The full text is the
               hover text, because a long failure shortens to fit the row. */}
           {level && (
-            <span className={`card-status card-status--${level.tone}`} role="status" title={level.text}>
+            <span
+              className={`card-status card-status--${level.tone}`}
+              role="status"
+              title={level.text}
+            >
               {level.text}
             </span>
           )}

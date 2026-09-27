@@ -210,3 +210,33 @@ export function tapeStep(kind: 'speed' | 'altitude', unit: string): number {
       return 5
   }
 }
+
+/** MAV_SEVERITY_WARNING: this and everything more severe reaches the HUD. */
+export const HUD_MESSAGE_SEVERITY = 4
+/** How long a message stays on the HUD. */
+export const HUD_MESSAGE_MS = 8000
+
+/**
+ * The one message the HUD shows, or null: the newest of the vehicle's
+ * warnings and the app's own note about a command, while it is recent.
+ *
+ * Warning and worse only -- "PreArm: Need Position Estimate", "Mode change
+ * to Guided failed: requires position" -- because the vehicle also reports
+ * every waypoint reached and every parameter saved, and a HUD that shows
+ * those has taught its reader to stop looking before the one that matters.
+ * The full feed is the Messages pane.
+ */
+export function hudMessage(
+  statusTexts: readonly { severity: number; text: string; at: number }[],
+  note: { text: string; at: number } | null,
+  now: number,
+): string | null {
+  let newest: { text: string; at: number } | null = note
+  for (let i = statusTexts.length - 1; i >= 0; i--) {
+    const t = statusTexts[i]!
+    if (t.severity > HUD_MESSAGE_SEVERITY) continue
+    if (!newest || t.at > newest.at) newest = t
+    break
+  }
+  return newest && now - newest.at < HUD_MESSAGE_MS ? newest.text : null
+}

@@ -361,6 +361,16 @@ app.whenReady().then(() => {
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`)
     return await res.arrayBuffer()
   })
+  // Background throttling off while the gamepad has control, and back on the
+  // moment it does not. Throttled, a window that is covered, minimized or
+  // simply not focused runs its timers at a crawl and -- the part that
+  // matters -- reports itself hidden, which pauses gamepad input: the override
+  // stream would go on sending whatever the sticks said last. Only for as long
+  // as control is taken, because unthrottled the whole window keeps drawing
+  // when nobody can see it.
+  ipcMain.on('app:background-throttling', (e, allowed: unknown) => {
+    e.sender.setBackgroundThrottling(allowed !== false)
+  })
   ipcMain.on('app:open-external', (_e, url: string) => {
     // Web links, plus mailto -- a file: or custom scheme from a compromised
     // renderer must not reach the shell. mailto is the one exception worth

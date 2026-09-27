@@ -19,7 +19,11 @@ import net from 'node:net'
 import { once } from 'node:events'
 
 export const SITL_HOST = '127.0.0.1'
-export const SITL_PORT = 5760
+/**
+ * SITL_PORT reaches a second simulator started with `-I1` (5770) when 5760
+ * is somebody else's -- a flight in progress is not a test fixture.
+ */
+export const SITL_PORT = Number(process.env.SITL_PORT) || 5760
 
 /**
  * A socket to SITL, waiting out a relaunch.
@@ -41,7 +45,7 @@ export async function connectSitl(timeoutMs = 30000): Promise<net.Socket> {
       socket.on('error', () => {})
       return socket
     } catch {
-      if (Date.now() > deadline) throw new Error('could not reach SITL on TCP 5760')
+      if (Date.now() > deadline) throw new Error(`could not reach SITL on TCP ${SITL_PORT}`)
       await new Promise((r) => setTimeout(r, 500))
     }
   }

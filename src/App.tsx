@@ -32,6 +32,7 @@ import InspectorTab from './ui/tabs/inspector/InspectorTab'
 import FlightTab from './ui/tabs/flight/FlightTab'
 import MissionTab from './ui/tabs/mission/MissionTab'
 import SimFieldPicker from './ui/shell/SimFieldPicker'
+import { startReading } from './services/joystick'
 
 function SetupContent() {
   const activeTab = useUiStore((s) => s.activeTab)
@@ -85,6 +86,12 @@ export default function App() {
   // survive a disconnect needs nothing of this file. Nothing is prompted
   // about on the way: the parameters those screens stage against are cleared
   // by the disconnect, so there is nothing left to lose.
+  // The gamepad is read for the whole session, not only while its pane is
+  // open: control taken on the Fly screen stays taken on every other one.
+  useEffect(() => {
+    startReading()
+  }, [])
+
   useEffect(() => {
     if (connected) return
     const offline = visibleTabs(false)

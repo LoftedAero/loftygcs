@@ -11,6 +11,7 @@ import { ProtocolEngine } from './engine'
 import { fenceFromItems, fenceToItems, rallyFromItems, rallyToItems } from './geofence'
 import { parseHome } from '../sim-home'
 import { parseDataflash } from './dataflash'
+import { ignoreValue, RELEASE } from './joystick'
 import type { ProtocolEvent } from './types'
 
 /** MAV_TYPE values that are copters, from the heartbeat. */
@@ -552,6 +553,89 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       // stale override.
       for (let i = 0; i < 3; i++) override([0, 0, 0, 0, 0, 0, 0, 0])
       await new Promise((r) => setTimeout(r, 200))
+      engine.stop()
+      socket?.destroy()
+    }
+  }, 120000)
+
+  it('hands back a channel above 8 with its own release value, not zero', async () => {
+    // Above channel 8 the special values move: zero means "no change" and
+    // 65534 is the release. A release built of zeros therefore leaves a
+    // switch channel held wherever the gamepad left it -- which is exactly
+    // the frame this app used to send. RELEASE and ignoreValue are the
+    // app's own, so this pins what the joystick service really transmits.
+    const events: ProtocolEvent[] = []
+    let socket: net.Socket | null = null
+    const engine = new ProtocolEngine((out) => {
+      if (out.t === 'tx') socket?.write(out.bytes)
+      else if (out.t === 'evt') events.push(out.evt)
+    })
+    socket = await connectVehicle(engine, events, (s) => (socket = s))
+
+    const latest = (field: string): number | undefined => {
+      for (let i = events.length - 1; i >= 0; i--) {
+        const e = events[i]
+        if (e?.t === 'fields' && e.values[field] !== undefined) return e.values[field]
+      }
+      return undefined
+    }
+    const override = (channels: readonly number[]) => {
+      const fields: Record<string, number> = { targetSystem: 1, targetComponent: 1 }
+      channels.forEach((v, i) => (fields[`chan${i + 1}Raw`] = v))
+      engine.send('RC_CHANNELS_OVERRIDE', fields)
+    }
+    /** Every channel left alone except channel 10. */
+    const ch10 = (value: number) =>
+      Array.from({ length: 18 }, (_, i) => (i === 9 ? value : ignoreValue(i + 1)))
+    const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
+    const HELD = 1678
+
+    try {
+      await waitFor(
+        () => latest('RC_CHANNELS.chan10Raw') !== undefined,
+        20000,
+        'the RC_CHANNELS stream',
+      )
+      const before = latest('RC_CHANNELS.chan10Raw')!
+      expect(before).not.toBe(HELD)
+
+      const hold = setInterval(() => override(ch10(HELD)), 100)
+      try {
+        await waitFor(
+          () => latest('RC_CHANNELS.chan10Raw') === HELD,
+          20000,
+          'the vehicle to read the overridden channel 10',
+        )
+      } finally {
+        clearInterval(hold)
+      }
+
+      // Zero on channel 10 is "no change": for a second -- well inside
+      // RC_OVERRIDE_TIME's default of 3 s -- it must go on reading HELD.
+      for (let i = 0; i < 10; i++) {
+        override(ch10(0))
+        await pause(100)
+      }
+      expect(latest('RC_CHANNELS.chan10Raw')).toBe(HELD)
+
+      // Refresh the override so its timeout cannot be what hands it back,
+      // then send the app's release and expect it back within a second.
+      override(ch10(HELD))
+      await pause(200)
+      for (let i = 0; i < 3; i++) {
+        override(RELEASE)
+        await pause(60)
+      }
+      const released = Date.now()
+      await waitFor(
+        () => latest('RC_CHANNELS.chan10Raw') === before,
+        1500,
+        'the vehicle to take channel 10 back',
+      )
+      expect(Date.now() - released).toBeLessThan(1500)
+    } finally {
+      for (let i = 0; i < 3; i++) override(RELEASE)
+      await pause(200)
       engine.stop()
       socket?.destroy()
     }

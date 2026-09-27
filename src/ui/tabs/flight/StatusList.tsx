@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { fieldRegistry } from '../../../services/telemetry-fields'
+import { fixed } from '../../../units'
 
 // Every telemetry field the vehicle is sending, with its live value.
 //
@@ -23,10 +24,31 @@ export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
   const [, tick] = useState(0)
   const version = useRef(-1)
   const namesRef = useRef<string[]>([])
+  const rowsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), REFRESH_MS)
     return () => clearInterval(id)
+  }, [])
+
+  // The fields fill down each column and then across, so this pane only
+  // ever scrolls sideways -- which an ordinary mouse wheel cannot do; only a
+  // tilting wheel or a trackpad reached the columns off to the right. The
+  // wheel's vertical turn scrolls it sideways instead. Registered directly
+  // rather than through React, whose wheel listener is passive and so cannot
+  // stop the page scrolling as well.
+  useEffect(() => {
+    const el = rowsRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      // Sideways already (a tilt or a trackpad), or nothing to scroll.
+      if (e.deltaX !== 0 || e.deltaY === 0 || el.scrollWidth <= el.clientWidth) return
+      e.preventDefault()
+      // Firefox reports in lines; a line of a column is a row's height.
+      el.scrollLeft += e.deltaMode === 1 ? e.deltaY * 21 : e.deltaY
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
   // The name list only changes when a field is seen for the first time, so
@@ -74,7 +96,7 @@ export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
       )}
       {/* Kept out of the grid: inside it a message would be squeezed into one
           250px column and a single row's height. */}
-      <div className="status-list__rows">
+      <div className="status-list__rows" ref={rowsRef}>
         {shown.map((name) => {
           const v = fieldRegistry.latest(name)
           const on = plottedSet.has(name)
@@ -120,7 +142,7 @@ function format(v: number | undefined): string {
   if (!Number.isFinite(v)) return '—'
   if (Number.isInteger(v)) return String(v)
   const abs = Math.abs(v)
-  if (abs >= 1000) return v.toFixed(0)
-  if (abs >= 1) return v.toFixed(2)
-  return v.toFixed(4)
+  if (abs >= 1000) return fixed(v, 0)
+  if (abs >= 1) return fixed(v, 2)
+  return fixed(v, 4)
 }

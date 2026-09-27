@@ -36,20 +36,6 @@ export default function ViewPane() {
       </section>
 
       <section className="view-pane__group">
-        {/* A map layer, not a panel: it draws over the map rather than
-            taking room from anything. On by default, because a vehicle with
-            no receiver draws nothing anyway -- the switch is for the field
-            where the sky is busy and the markers are over the plan. */}
-        <h4 className="view-pane__head">Map layers</h4>
-        <LaSwitch
-          label="ADS-B traffic"
-          checked={layout.showTraffic}
-          disabled={!layout.showMap}
-          onChange={() => layout.toggle('showTraffic')}
-        />
-      </section>
-
-      <section className="view-pane__group">
         <h4 className="view-pane__head">HUD layers</h4>
         <LaSwitch
           label="Horizon"
@@ -66,12 +52,26 @@ export default function ViewPane() {
       </section>
 
       <section className="view-pane__group">
+        {/* A map layer, not a panel: it draws over the map rather than
+            taking room from anything. On by default, because a vehicle with
+            no receiver draws nothing anyway -- the switch is for the field
+            where the sky is busy and the markers are over the plan. */}
+        <h4 className="view-pane__head">Map layers</h4>
+        <LaSwitch
+          label="ADS-B traffic"
+          checked={layout.showTraffic}
+          disabled={!layout.showMap}
+          onChange={() => layout.toggle('showTraffic')}
+        />
+      </section>
+
+      <section className="view-pane__group">
         <h4 className="view-pane__head">Arrangement</h4>
         <div className="view-pane__actions">
-          <LaButton variant="secondary" size="sm" onClick={layout.swap}>
+          <LaButton variant="secondary" onClick={layout.swap}>
             Swap panels
           </LaButton>
-          <LaButton variant="ghost" size="sm" onClick={layout.reset}>
+          <LaButton variant="ghost" onClick={layout.reset}>
             Reset
           </LaButton>
         </div>

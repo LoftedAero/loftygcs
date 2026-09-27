@@ -1,8 +1,12 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { LaButton, LaHint } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useLogStore } from '../../../stores/log-store'
-import { downloadVehicleLog, listVehicleLogs } from '../../../services/log-download'
+import {
+  cancelVehicleLogDownload,
+  downloadVehicleLog,
+  listVehicleLogs,
+} from '../../../services/log-download'
 
 // The logs on the vehicle's card: list them, pick one, watch it come across.
 //
@@ -32,54 +36,58 @@ export default function VehicleLogs() {
     <section className="app-col__group">
       <h3 className="app-col__head">On the vehicle</h3>
 
-      <LaButton
-        variant="secondary"
-        size="block"
-        disabled={working || !connected}
-        onClick={() => void run(listVehicleLogs)}
-      >
-        {status.kind === 'listing' ? 'Listing…' : logs.length ? 'Refresh list' : 'List logs'}
-      </LaButton>
+      {/* During a download this button is its Cancel: the list cannot be
+          refreshed mid-transfer anyway, and a Cancel of its own would add a
+          row to the column for as long as the download ran. */}
+      {status.kind === 'downloading' ? (
+        <LaButton variant="ghost" size="block" onClick={cancelVehicleLogDownload}>
+          Cancel download
+        </LaButton>
+      ) : (
+        <LaButton
+          variant="secondary"
+          size="block"
+          disabled={working || !connected}
+          onClick={() => void run(listVehicleLogs)}
+        >
+          {status.kind === 'listing' ? 'Listing…' : logs.length ? 'Refresh list' : 'List logs'}
+        </LaButton>
+      )}
       {!connected && <LaHint>Connect a vehicle to read its logs.</LaHint>}
 
-      {status.kind === 'downloading' && (
-        <>
-          <p className="app-col__note">
-            {status.name} — {formatSize(status.got)}
-            {status.total > 0 && ` of ${formatSize(status.total)}`}
-          </p>
-          <progress
-            className="log-progress"
-            value={status.got}
-            max={Math.max(1, status.total)}
-            aria-label={`Downloading ${status.name}`}
-          />
-        </>
-      )}
-      {status.kind === 'error' && <LaHint error>{status.text}</LaHint>}
-
+      {/* A download shows in its own row -- filling from the left, its size
+          turned into how far it has got -- rather than on a line of its own
+          above the list, which pushed every row down 37px for as long as the
+          transfer ran and read "— — of 553 kB" before the first bytes. */}
       {logs.length > 0 && (
         <div className="log-list">
-          {logs.map((l) => (
-            <button
-              key={l.path}
-              type="button"
-              className="log-list__item"
-              disabled={working}
-              onClick={() => void run(() => downloadVehicleLog(l))}
-            >
-              <span className="log-list__name">{l.name}</span>
-              <span className="log-list__size">{formatSize(l.size)}</span>
-            </button>
-          ))}
+          {logs.map((l) => {
+            const pct =
+              status.kind === 'downloading' && status.name === l.name
+                ? Math.floor((100 * status.got) / Math.max(1, status.total || l.size))
+                : null
+            return (
+              <button
+                key={l.path}
+                type="button"
+                className={`log-list__item${pct !== null ? ' is-downloading' : ''}`}
+                style={pct !== null ? ({ '--pct': `${pct}%` } as CSSProperties) : undefined}
+                disabled={working}
+                aria-label={pct !== null ? `Downloading ${l.name}, ${pct}%` : undefined}
+                onClick={() => void run(() => downloadVehicleLog(l))}
+              >
+                <span className="log-list__name">{l.name}</span>
+                <span className="log-list__size">
+                  {pct !== null ? `${pct}%` : formatSize(l.size)}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
-      {logs.length > 0 && (
-        <LaHint>
-          Newest first. Downloading opens the log here; it is not saved to disk unless you save
-          it.
-        </LaHint>
-      )}
+      {/* Under the list, not above it: a line that comes and goes goes last,
+          where nothing below it can be moved. */}
+      {status.kind === 'error' && <LaHint error>{status.text}</LaHint>}
     </section>
   )
 }

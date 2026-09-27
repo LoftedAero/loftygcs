@@ -624,6 +624,11 @@ class ConnectionService {
     return worker.downloadFile(path)
   }
 
+  /** Stop the file read in progress. The download rejects as canceled. */
+  cancelDownload() {
+    return this.worker?.cancelDownload() ?? Promise.resolve()
+  }
+
   /** Write a file to the vehicle. Progress arrives as fileProgress events. */
   uploadFile(path: string, bytes: Uint8Array) {
     const worker = this.worker

@@ -101,11 +101,21 @@ export function parseDirEntries(data: Uint8Array): (FtpDirEntry | null)[] {
   return out
 }
 
+/** A read stopped by `cancelRead`, told apart from a failure by its name. */
+export class FtpCancelled extends Error {
+  constructor() {
+    super('transfer canceled')
+    this.name = 'FtpCancelled'
+  }
+}
+
 export class MavFtpClient {
   private seq = 0
   private pending = new Map<number, Pending>()
   /** Set while a burst read is running; see burstOnce. */
-  private burst: { onPacket: (p: FtpPacket) => void } | null = null
+  private burst: { onPacket: (p: FtpPacket) => void; cancel: () => void } | null = null
+  /** Set by `cancelRead` and seen by the read in progress; cleared by the next. */
+  private readCancelled = false
 
   constructor(
     private sendPayload: (payload: number[]) => void,
@@ -135,6 +145,21 @@ export class MavFtpClient {
     } else {
       p.resolve(pkt)
     }
+  }
+
+  /**
+   * Stop the file read in progress.
+   *
+   * The read rejects with `FtpCancelled` and ends its session on the vehicle,
+   * which is what stops a burst: the vehicle otherwise goes on sending the
+   * rest of a ten-megabyte log into a client that has stopped listening, and
+   * the next request queues behind it. It does not fall back to sequential
+   * reads the way a failed burst does -- nobody wants the slow path to a file
+   * they just gave up on. Other requests in flight are left alone.
+   */
+  cancelRead() {
+    this.readCancelled = true
+    this.burst?.cancel()
   }
 
   /** Abandon everything in flight (link closed, probe abandoned). */
@@ -194,12 +219,7 @@ export class MavFtpClient {
     for (;;) {
       let reply
       try {
-        reply = await this.request(
-          FtpOp.ListDirectory,
-          0,
-          index,
-          new TextEncoder().encode(path),
-        )
+        reply = await this.request(FtpOp.ListDirectory, 0, index, new TextEncoder().encode(path))
       } catch (err) {
         if (err instanceof FtpNak && err.code === FtpError.EndOfFile) break
         throw err
@@ -227,7 +247,11 @@ export class MavFtpClient {
   }
 
   /** Read one chunk; null means EOF. Always call with the same chunk size. */
-  async readChunk(session: number, offset: number, size = FTP_MAX_DATA): Promise<Uint8Array | null> {
+  async readChunk(
+    session: number,
+    offset: number,
+    size = FTP_MAX_DATA,
+  ): Promise<Uint8Array | null> {
     try {
       // The byte count rides in the header's size field; data stays empty.
       const reply = await this.request(FtpOp.ReadFile, session, offset, undefined, size)
@@ -274,6 +298,7 @@ export class MavFtpClient {
       }
 
       this.burst = {
+        cancel: () => finish(() => reject(new FtpCancelled())),
         onPacket: (pkt) => {
           if (pkt.opcode === FtpOp.Nak) {
             const code = pkt.data[0] ?? FtpError.Fail
@@ -398,14 +423,33 @@ export class MavFtpClient {
     path: string,
     onProgress?: (got: number, total: number) => void,
   ): Promise<Uint8Array> {
+    this.readCancelled = false
+    const stopIfCancelled = () => {
+      if (this.readCancelled) throw new FtpCancelled()
+    }
     await this.resetSessions()
+    stopIfCancelled()
     const { session, size } = await this.openFileRO(path)
+    // A cancel returns at once and closes the session behind it. Awaiting the
+    // close first held the button up for 589 ms against SITL: ArduPilot
+    // serves one FTP request at a time, so the TerminateSession ack waited
+    // for the rest of the burst already on its way.
+    const closeAndStop = (err: unknown): never => {
+      void this.terminate(session)
+      throw err
+    }
+    try {
+      stopIfCancelled()
+    } catch (err) {
+      closeAndStop(err)
+    }
     if (size > 0) {
       try {
         const out = new Uint8Array(size)
         let at = 0
         let stalled = 0
         while (at < size) {
+          stopIfCancelled()
           const end = await this.burstOnce(session, at, out, (got) => onProgress?.(got, size))
           if (end <= at) {
             // No progress at all: two in a row means bursts are not
@@ -418,14 +462,17 @@ export class MavFtpClient {
         }
         await this.terminate(session)
         return out
-      } catch {
-        // Fall through to the sequential path on the same open session.
+      } catch (err) {
+        // A cancel ends the read here; anything else falls through to the
+        // sequential path on the same open session.
+        if (err instanceof FtpCancelled) closeAndStop(err)
       }
     }
     const chunks: Uint8Array[] = []
     let offset = 0
     try {
       for (;;) {
+        stopIfCancelled()
         const chunk = await this.readChunk(session, offset)
         if (chunk === null) break
         chunks.push(chunk)

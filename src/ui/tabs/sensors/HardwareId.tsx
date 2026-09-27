@@ -1,6 +1,4 @@
 import { useParamStore } from '../../../stores/param-store'
-import { useConnectionStore } from '../../../stores/connection-store'
-import { LaHint } from '../../components/La'
 import { DEVICE_SLOTS, decodeDeviceId, describeDevice } from '../../../protocol/device-id'
 
 // What is actually plugged into this board.
@@ -22,20 +20,9 @@ import { DEVICE_SLOTS, decodeDeviceId, describeDevice } from '../../../protocol/
 // works on a vehicle that has gone quiet.
 
 export default function HardwareId() {
-  const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
+  // The Sensors tab draws this only once the parameters are in, so there is
+  // no connecting or loading state to describe here.
   const entries = useParamStore((s) => s.entries)
-
-  if (!connected) {
-    return (
-      <p className="app-placeholder">
-        Connect a vehicle and this lists the sensors its firmware has detected, with the bus and
-        address each one was found on.
-      </p>
-    )
-  }
-  if (entries.size === 0) {
-    return <p className="app-placeholder">Waiting for the parameters this is read from…</p>
-  }
 
   // Present means the parameter exists: a vehicle with one compass has no
   // COMPASS_DEV_ID2 at all, and an empty row for it would suggest a slot
@@ -97,12 +84,9 @@ export default function HardwareId() {
         </p>
       )}
 
-      {/* Only when something is unnamed. It explains a row that is already
-          on screen, and with every part recognised it is a paragraph about
-          a situation the reader is not in. */}
-      {live.some(({ slot, value }) => !decodeDeviceId(value!, slot.cls)!.name) && (
-        <LaHint>A device type this build has no name for keeps its number.</LaHint>
-      )}
+      {/* A device type this build cannot name keeps its number in the Part
+          column. That used to be explained in a line under the table; the
+          number standing where a name would is the explanation. */}
     </div>
   )
 }

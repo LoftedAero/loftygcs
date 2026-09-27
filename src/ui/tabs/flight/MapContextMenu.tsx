@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useMenuPlacement } from '../../components/menu-placement'
 import { LaButton, LaHint } from '../../components/La'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 
@@ -57,11 +58,8 @@ export default function MapContextMenu({
     }
   }, [onClose])
 
-  // Kept on screen when the click lands near an edge.
-  const style: React.CSSProperties = {
-    left: Math.min(point.x, window.innerWidth - 250),
-    top: Math.min(point.y, window.innerHeight - 260),
-  }
+  // Kept on screen when the click lands near an edge, by its own size.
+  const style = useMenuPlacement(point, boxRef)
 
   const guided = modeName === 'Guided'
 

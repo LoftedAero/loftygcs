@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useMenuPlacement } from '../../components/menu-placement'
 import { LaButton, LaSwitch } from '../../components/La'
 import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 
@@ -23,9 +24,6 @@ export interface HudContextMenuProps {
   onVideo: () => void
 }
 
-/** Roughly how tall the panel is, for keeping it on screen. */
-const PANEL_H = 250
-
 export default function HudContextMenu({ point, onClose, onVideo }: HudContextMenuProps) {
   const layout = useFlightLayoutStore()
   const boxRef = useRef<HTMLDivElement>(null)
@@ -49,11 +47,8 @@ export default function HudContextMenu({ point, onClose, onVideo }: HudContextMe
     }
   }, [onClose])
 
-  // Kept on screen when the click lands near an edge.
-  const style: React.CSSProperties = {
-    left: Math.max(8, Math.min(point.x, window.innerWidth - 246)),
-    top: Math.max(8, Math.min(point.y, window.innerHeight - PANEL_H)),
-  }
+  // Kept on screen when the click lands near an edge, by its own size.
+  const style = useMenuPlacement(point, boxRef)
 
   return (
     <div className="context-menu hud-menu" style={style} ref={boxRef} role="menu">

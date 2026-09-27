@@ -36,18 +36,36 @@ export interface StickDiagramProps {
    * clear of the rudder-arm gesture (see IDENTIFY_STEPS).
    */
   throttle?: 'up' | 'down'
+  /**
+   * Live stick positions, -1 to 1 with the channel's high end positive, in
+   * place of an instruction: the gamepad pane draws where the sticks are
+   * rather than where to put them. A function left out stays centered.
+   */
+  positions?: Partial<Record<StickFunction, number>>
 }
 
 export default function StickDiagram({
   active,
   direction = 'max',
   throttle = 'down',
+  positions,
 }: StickDiagramProps) {
-  const spec = active ? STICK_SPECS[active] : null
+  const spec = active && !positions ? STICK_SPECS[active] : null
   // +1 toward the max direction's side of the drawing, -1 toward the min's.
   const toward = direction === 'max' ? 1 : -1
 
   const offsetFor = (side: 'left' | 'right') => {
+    if (positions) {
+      const off = { x: 0, y: 0 }
+      for (const [fn, v] of Object.entries(positions) as [StickFunction, number][]) {
+        const s = STICK_SPECS[fn]
+        if (s.stick !== side || !Number.isFinite(v)) continue
+        const d = THROW * s.sense * Math.max(-1, Math.min(1, v))
+        if (s.axis === 'x') off.x = d
+        else off.y = -d
+      }
+      return off
+    }
     // Mode 2: the left stick's vertical is the throttle.
     const off = { x: 0, y: side === 'left' ? (throttle === 'up' ? -THROW : THROW) : 0 }
     if (spec && spec.stick === side) {
@@ -61,13 +79,15 @@ export default function StickDiagram({
 
   return (
     <svg
-      className="stick-diagram"
+      className={positions ? 'stick-diagram stick-diagram--live' : 'stick-diagram'}
       viewBox="0 0 240 152"
       role="img"
       aria-label={
-        spec
-          ? `Move the ${spec.label.toLowerCase()} stick ${direction === 'max' ? spec.maxDirection : spec.minDirection}`
-          : 'Transmitter with the sticks centered and the throttle down'
+        positions
+          ? 'Transmitter showing the stick positions being sent'
+          : spec
+            ? `Move the ${spec.label.toLowerCase()} stick ${direction === 'max' ? spec.maxDirection : spec.minDirection}`
+            : 'Transmitter with the sticks centered and the throttle down'
       }
     >
       <rect x="8" y="20" width="224" height="124" rx="22" className="stick-diagram__case" />
@@ -83,7 +103,10 @@ export default function StickDiagram({
       {(['left', 'right'] as const).map((side) => {
         const cx = CX[side]
         const off = offsetFor(side)
-        const isActive = spec?.stick === side
+        // Live, a stick is lit when something drives it.
+        const isActive = positions
+          ? Object.keys(positions).some((fn) => STICK_SPECS[fn as StickFunction].stick === side)
+          : spec?.stick === side
         return (
           <g key={side}>
             <circle cx={cx} cy={CY} r={BEZEL_R} className="stick-diagram__bezel" />

@@ -91,9 +91,17 @@ export function describeLinkError(err: unknown, opts: TransportOptions): string 
   if (isCancellation(err)) return null
   const raw = err instanceof Error ? err.message : String(err)
   const message = cleanMessage(raw)
+  return describeCode(message, linkTarget(opts)) ?? (message || 'The connection failed.')
+}
+
+/**
+ * The sentence for a network error code in `message`, naming `target`, or
+ * null when it carries none. Shared with the video stream, whose sockets
+ * fail in exactly the same words.
+ */
+export function describeCode(message: string, target: string): string | null {
   const code = CODE.exec(message)?.[1]
-  if (code) return BY_CODE[code]!(linkTarget(opts))
-  return message || 'The connection failed.'
+  return code ? BY_CODE[code]!(target) : null
 }
 
 /**

@@ -115,6 +115,12 @@ export interface LoftGcsBridge {
     openExternal(url: string): void
     /** Main-process fetch, restricted to firmware.ardupilot.org (no CORS there). */
     fetchFirmware(url: string): Promise<ArrayBuffer>
+    /**
+     * Whether this window may be throttled in the background. Off only while
+     * the gamepad has control: throttled, a covered or minimized window
+     * pauses gamepad input and slows the override stream to a crawl.
+     */
+    setBackgroundThrottling(allowed: boolean): void
   }
 
   /**

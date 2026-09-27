@@ -92,6 +92,11 @@ export class WorkerClient {
     return this.request({ op: 'downloadFile', path }) as Promise<Uint8Array>
   }
 
+  /** Stop the file read in progress; it rejects as canceled. */
+  cancelDownload(): Promise<void> {
+    return this.request({ op: 'cancelDownload' }) as Promise<void>
+  }
+
   uploadFile(path: string, bytes: Uint8Array): Promise<void> {
     return this.request({ op: 'uploadFile', path, bytes }) as Promise<void>
   }

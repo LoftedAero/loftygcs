@@ -17,6 +17,7 @@
 
 import { compassTicks, tapeTicks, type ArmReadiness, tapeStep } from './hud-draw'
 import {
+  fixed,
   formatSpeed,
   formatVerticalSpeed,
   speedLabel,
@@ -40,6 +41,12 @@ const RED = '#FF453A'
 // is what actually makes it match: the same alpha over the dark panel
 // background rather than over sky came out much heavier.
 const PANEL = 'rgba(14, 17, 22, 0.26)'
+/**
+ * The chips words sit on over the ladder -- the readiness line and the
+ * vehicle's warning. At 0.5 a rung's "30" still read through NOT READY TO
+ * ARM; opaque enough that the words are the only thing in the box.
+ */
+const CHIP = 'rgba(14, 17, 22, 0.82)'
 const PANEL_EDGE = 'rgba(255, 255, 255, 0.18)'
 const MONO = '"Roboto Mono", ui-monospace, monospace'
 const SANS = '"Work Sans", system-ui, sans-serif'
@@ -69,6 +76,8 @@ export interface HudState {
   showArmedBanner: boolean
   failsafe: boolean
   readiness: ArmReadiness
+  /** The vehicle's latest warning, or the app's note on a command; null for none. */
+  message: string | null
   horizon: boolean
   overlays: boolean
   /**
@@ -300,6 +309,29 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     })
   }
 
+  // The latest warning, Mission Planner's place for it: below the horizon
+  // center, mirroring the state words above it, on a chip so a ladder rung
+  // cannot run through the words. Cut to fit between the tapes rather than
+  // wrapped -- a second line would land on the readiness chip -- with the
+  // Messages pane holding the whole of it.
+  if (st.message) {
+    const size = 12 * s
+    const y = cy + Math.min(w, h) * 0.17
+    const room = w - 2 * (tapeW + gap) - 24 * s
+    ctx.save()
+    ctx.font = `600 ${Math.round(size)}px ${SANS}`
+    let text = st.message
+    while (text.length > 4 && ctx.measureText(text).width > room) text = text.slice(0, -2)
+    if (text !== st.message) text = `${text.trimEnd()}…`
+    const tw = ctx.measureText(text).width + 20 * s
+    ctx.beginPath()
+    ctx.roundRect(cx - tw / 2, y - 14 * s, tw, 20 * s, 8 * s)
+    ctx.fillStyle = CHIP
+    ctx.fill()
+    ctx.restore()
+    write(text, cx, y, { size, weight: '600', font: SANS, align: 'center', color: RED })
+  }
+
   if (st.readiness === 'ready' || st.readiness === 'notReady') {
     const ready = st.readiness === 'ready'
     const label = ready ? 'READY TO ARM' : 'NOT READY TO ARM'
@@ -316,7 +348,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     ctx.save()
     ctx.beginPath()
     ctx.roundRect(cx - tw / 2, y - 12 * s, tw, 17 * s, 8 * s)
-    ctx.fillStyle = 'rgba(14, 17, 22, 0.5)'
+    ctx.fillStyle = CHIP
     ctx.fill()
     ctx.restore()
     // Its own line above the corners, so it never runs into the battery on
@@ -687,7 +719,7 @@ function paintTape(
   ctx.fill()
   ctx.stroke()
   ctx.restore()
-  write(value.toFixed(0), x + w / 2, midY + 4.5 * s, {
+  write(fixed(value, 0), x + w / 2, midY + 4.5 * s, {
     size: 14 * s,
     weight: '600',
     align: 'center',

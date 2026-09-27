@@ -271,6 +271,7 @@ export type EngineRequest =
   | { op: 'clearMission'; missionType: number }
   | { op: 'listFiles'; path: string }
   | { op: 'downloadFile'; path: string }
+  | { op: 'cancelDownload' }
   | { op: 'uploadFile'; path: string; bytes: Uint8Array }
   | { op: 'removeFile'; path: string }
   | { op: 'createDirectory'; path: string }
