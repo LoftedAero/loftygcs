@@ -18,22 +18,11 @@ import type { FtpDirEntry } from '../../../protocol/ftp/mavftp'
 
 // The vehicle's SD card, over MAVFTP.
 //
-// This is where the things ArduPilot keeps as files rather than parameters
-// live: Lua scripts, OSD fonts, terrain tiles, the odd log or config. Until
-// now getting a script onto a board meant pulling the card, which in the
-// field means finding a laptop and a reader.
+// For what ArduPilot keeps as files rather than parameters: Lua scripts, OSD
+// fonts, terrain tiles, logs and configs.
 //
-//   ┌────────────────────────────────┬──────────┐
-//   │ /APM/scripts                   │ upload,  │
-//   │ ..                             │ download,│
-//   │ [D] logs                       │ new      │
-//   │ [F] rangefinder.lua    1.4 kB  │ folder,  │
-//   │                                │ delete   │
-//   └────────────────────────────────┴──────────┘
-//
-// Deleting is the one destructive thing here and it asks first, naming what
-// it is about to remove: there is no recycle bin on a flight controller,
-// and a mis-clicked delete of a font or a script is a flight not flown.
+// Delete asks first and names the target; a flight controller has no
+// recycle bin.
 
 export default function FilesTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected')
@@ -47,16 +36,14 @@ export default function FilesTab() {
   const [newFolder, setNewFolder] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<{ entry: FtpDirEntry; to: string } | null>(null)
 
-  // Listed on arrival rather than behind a button: an empty screen with a
-  // "List" button on it is a screen that has told you nothing.
+  // List on arrival rather than behind a button.
   useEffect(() => {
     if (connected) void openStart()
   }, [connected])
 
   const busy = status.kind === 'busy'
-  // The root is ArduPilot's merged view of the filesystem and its virtual
-  // mounts, and a file written there never appears in the listing. Better
-  // to say so than to offer a transfer that silently does nothing.
+  // The root is ArduPilot's merged view of the filesystem and virtual mounts;
+  // a file written there never appears in the listing.
   const atRoot = isMergedRoot(path)
   const selected = entries.find((e) => e.name === selectedName) ?? null
 
@@ -70,11 +57,8 @@ export default function FilesTab() {
 
   return (
     <div className="files">
-      {/* The path bar is the pane's header, inside the frame -- the shape
-          Parameters already has. It used to sit above the frame in a row of
-          its own, which pushed both the listing and the column down the page
-          and left the top of the screen empty beside it. What names the
-          listing belongs to the listing. */}
+      {/* The path bar is the pane's header, inside the frame, as on
+          Parameters. */}
       <div className="files__pane">
         <div className="files__bar">
           <span className="files__path" title={path}>
@@ -194,9 +178,8 @@ export default function FilesTab() {
             >
               New folder
             </LaButton>
-            {/* Renaming is how a Lua script is switched off without deleting
-              it: ArduPilot only runs *.lua, so rangefinder.lua.off stays on
-              the card and stops running. */}
+            {/* Renaming disables a Lua script without deleting it: ArduPilot
+              only runs *.lua, so rangefinder.lua.off stays on the card. */}
             <LaButton
               variant="secondary"
               size="block"
@@ -327,8 +310,8 @@ export default function FilesTab() {
 function pickAndUpload(): void {
   const input = document.createElement('input')
   input.type = 'file'
-  // Attached rather than floating: a detached input's click is ignored by
-  // some browsers, and a test cannot reach one either.
+  // Attached to the document: some browsers ignore click() on a detached
+  // input, and tests cannot reach one.
   input.style.display = 'none'
   document.body.appendChild(input)
   input.onchange = () => {

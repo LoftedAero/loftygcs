@@ -7,26 +7,19 @@ import {
 } from './radio-cal'
 import { pwmPct as pct } from '../../pwm-scale'
 
-// Live receiver input, one bar per channel. Two things make this more useful
-// than a row of numbers: the bar shows where a channel sits inside its own
-// travel, and once the wizard has identified a stick, the channel carrying it
-// says so -- which is the answer Mission Planner leaves you to work out.
+// Live receiver input, one bar per channel. Each bar shows where the channel
+// sits in its own travel, and channels the wizard has identified are named.
 
 export interface ChannelMonitorProps {
   channels: readonly number[]
   /** Recorded extremes, drawn as ticks while a sweep is in progress. */
   travel?: readonly Travel[] | undefined
   mapping?: Partial<Record<StickFunction, Mapping>> | undefined
-  /** Extra name per channel from an aircraft profile. */
-  labels?: Record<number, string | undefined>
   /** Channel the wizard is watching right now. */
   highlight?: number | null | undefined
   /**
-   * Rows to draw whatever the receiver reports -- a channel it does not send
-   * is a dash. The Radio card fixes this at sixteen, so it is one height with
-   * an 8-channel receiver, a 16-channel one, or nothing switched on yet; it
-   * had been a sentence until the first RC_CHANNELS, then as many bars as
-   * that message counted.
+   * Rows to draw whatever the receiver reports; a channel it does not send is
+   * a dash. The Radio card fixes this at sixteen so its height is constant.
    */
   slots?: number
 }
@@ -35,7 +28,6 @@ export default function ChannelMonitor({
   channels,
   travel,
   mapping,
-  labels,
   highlight,
   slots = 0,
 }: ChannelMonitorProps) {
@@ -62,21 +54,15 @@ export default function ChannelMonitor({
             key={channel}
             className={`rc-monitor__row${highlight === channel ? ' is-watched' : ''}`}
           >
-            {/* What the channel carries, right-aligned against its number,
-                and the number against its bar: with the name after the
-                number, a column wide enough for "Throttle reversed" left
-                every unnamed channel's number that far from its bar. The
-                column stays reserved, so bars do not move as the wizard
-                names sticks. REV is the transmitter's own word for it. */}
+            {/* The channel's function, right-aligned before its number, in a
+                reserved column so bars do not move as sticks are named. REV
+                is the transmitter's term. */}
             <span className="rc-monitor__label">
               {fn && <span className="rc-monitor__fn">{STICK_SPECS[fn].label}</span>}
               {reversed && (
                 <span className="rc-monitor__rev" title="Reversed">
                   REV
                 </span>
-              )}
-              {!fn && labels?.[channel] && (
-                <span className="rc-monitor__profile">{labels[channel]}</span>
               )}
             </span>
             <span className="rc-monitor__num">{channel}</span>

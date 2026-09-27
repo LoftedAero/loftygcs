@@ -23,12 +23,9 @@ const MAV_CMD_SCRIPTING = 42701
 const FORCE_MAGIC = 21196
 
 /**
- * How long a takeoff keeps trying to reach Guided by default.
- *
- * Generous because the vehicle refuses Guided with "requires position" until
- * its EKF has a good enough fix, and that lags arming by a noticeable margin
- * -- a vehicle will arm quite happily some seconds before it will accept
- * Guided. Long enough to ride that out; short enough to still be an answer.
+ * How long a takeoff keeps trying to reach Guided by default. The vehicle
+ * refuses Guided with "requires position" until its EKF has a good fix,
+ * which can lag arming by several seconds.
  */
 const GUIDED_WAIT_MS = 20000
 
@@ -40,11 +37,9 @@ export function setMode(customMode: number): Promise<number> {
 /**
  * Wait for the heartbeat to actually report a mode.
  *
- * ArduPilot acknowledges DO_SET_MODE before it has committed to the change,
- * and a mode it then refuses -- "Mode change to Guided failed: requires
- * position" is the everyday one -- leaves the ack saying ACCEPTED while the
- * vehicle stays where it was. Anything that depends on being in a mode has
- * to read the heartbeat, not the ack.
+ * ArduPilot acks DO_SET_MODE before committing to the change, so a mode it
+ * then refuses ("Mode change to Guided failed: requires position") still
+ * reads ACCEPTED. Only the heartbeat says whether the mode was taken.
  */
 export async function modeReached(customMode: number, timeoutMs = 4000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
@@ -82,46 +77,37 @@ export function disarm(force = false): Promise<number> {
 /**
  * Climb to an altitude.
  *
- * Copter only accepts NAV_TAKEOFF in Guided (or in a running Auto mission),
- * so a takeoff pressed from Stabilize -- which is where a freshly booted
- * vehicle sits -- is refused, and the aircraft then auto-disarms on the
- * ground a few seconds later having done nothing. Every other station puts
- * the mode change behind the button, so this does too: ask for Guided,
- * confirm it from the heartbeat, then command the climb.
+ * Copter only accepts NAV_TAKEOFF in Guided (or a running Auto mission), and
+ * a freshly booted vehicle sits in Stabilize. So, like other ground
+ * stations, this switches to Guided, confirms it from the heartbeat, then
+ * commands the climb.
  *
- * Three airframes, two routes, all of it measured against SITL rather than
- * inferred -- and the ack alone is not enough to tell them apart, because a
- * quadplane accepts *both* and flies them very differently:
+ * Airframes differ, and the ack alone cannot tell them apart because a
+ * quadplane accepts both routes:
  *
  *   copter      Guided + NAV_TAKEOFF   climbs to the altitude asked for
- *   quadplane   Guided + NAV_TAKEOFF   ACCEPTED; 20 m up, 3 m of ground
- *                                      track -- a vertical takeoff
- *               mode TAKEOFF           also accepted, but 277 m of ground
- *                                      track: a runway takeoff run, which
- *                                      is not what a VTOL aircraft is for
+ *   quadplane   Guided + NAV_TAKEOFF   vertical takeoff
+ *               mode TAKEOFF           also accepted, but flies a runway
+ *                                      takeoff run
  *   fixed wing  NAV_TAKEOFF            FAILED, even armed and in Guided
  *               mode TAKEOFF           climbs away down the runway
  *
- * NAV_VTOL_TAKEOFF is UNSUPPORTED on both plane types -- a mission item
- * with no runtime handler -- so there is no third command to reach for.
+ * NAV_VTOL_TAKEOFF is UNSUPPORTED on both plane types (a mission item with
+ * no runtime handler).
  *
- * The split therefore needs `Q_ENABLE`, because **MAV_TYPE cannot tell a
- * quadplane from a fixed wing**: both report FIXED_WING(1).
+ * The split needs `Q_ENABLE`, because MAV_TYPE cannot tell a quadplane from
+ * a fixed wing: both report FIXED_WING(1).
  */
 export type TakeoffStyle = 'guided' | 'mode' | 'unsupported'
 
 /**
  * How this airframe leaves the ground.
  *
- * Pure and exported so the button and the command agree by construction --
- * a screen that decides this separately is a screen that can label one
- * thing and do another.
+ * Exported so the button label and the command share one answer.
  *
- * `Q_ENABLE` absent means the parameters have not arrived yet, and the two
- * wrong answers are not equally wrong: guessing fixed wing on a quadplane
- * starts a 277 m runway run in a VTOL aircraft, while guessing quadplane on
- * a fixed wing gets FAILED back and nothing happens. So an unknown takes
- * the route that fails harmlessly.
+ * `Q_ENABLE` absent means parameters have not arrived yet. Guessing
+ * quadplane on a fixed wing just gets FAILED back, while guessing fixed wing
+ * on a quadplane starts a runway run, so the unknown case takes Guided.
  */
 export function takeoffStyle(vehicleType: number, qEnable: number | undefined): TakeoffStyle {
   const cls = vehicleClass(vehicleType)
@@ -136,8 +122,7 @@ export async function takeoff(altitudeM: number, guidedWaitMs = GUIDED_WAIT_MS):
 
   if (style === 'unsupported') return MAV_RESULT_UNSUPPORTED
   if (style === 'mode') {
-    // A fixed wing. The altitude is the vehicle's own TKOFF_ALT; ours is
-    // not offered, because ArduPlane's takeoff sequence owns it.
+    // A fixed wing climbs to its own TKOFF_ALT; ours is not used.
     const takeoffMode = modeNumberByName(v.vehicleType, 'Takeoff')
     if (takeoffMode === undefined) return MAV_RESULT_UNSUPPORTED
     return setModeConfirmed(takeoffMode)
@@ -145,11 +130,8 @@ export async function takeoff(altitudeM: number, guidedWaitMs = GUIDED_WAIT_MS):
 
   const guided = modeNumberByName(v.vehicleType, 'Guided')
   if (guided !== undefined && v.customMode !== guided) {
-    // Retried, not asked once: "requires position" is the refusal a vehicle
-    // gives while its EKF is still settling, and it clears within a couple
-    // of seconds. One attempt lands on it often enough that a single press
-    // looked like the button did nothing at all. If it is still refused at
-    // the end of this, the reason is real and the caller reports it.
+    // Retried: "requires position" is refused while the EKF is still
+    // settling and usually clears within a couple of seconds.
     let result = 4
     const deadline = Date.now() + guidedWaitMs
     for (;;) {
@@ -159,12 +141,9 @@ export async function takeoff(altitudeM: number, guidedWaitMs = GUIDED_WAIT_MS):
     }
     if (result !== 0) return result
 
-    // Copter disarms itself after about ten seconds sitting armed on the
-    // ground, and reaching Guided can eat that whole window -- so the mode
-    // switch we just did is quite capable of costing us the arm the button
-    // required before it would let itself be pressed. Re-arm rather than
-    // refuse: the only way to get here is a vehicle that was armed a moment
-    // ago, and pressing Takeoff is not an ambiguous thing to have done.
+    // Copter disarms itself after about ten seconds armed on the ground, and
+    // reaching Guided can take that long. The vehicle was armed when Takeoff
+    // was pressed, so re-arm.
     if (!useVehicleStore.getState().armed) {
       const rearmed = await arm()
       if (rearmed !== 0) return rearmed
@@ -195,10 +174,9 @@ export function clearRoi(): Promise<number> {
 /**
  * Move home to a point on the map.
  *
- * param1 = 0 means "use the location I am giving you" rather than the
- * vehicle's present position. Altitude is left at zero: ArduPilot resolves it
- * from terrain or the EKF origin, and a number guessed from a map click would
- * be worse than no number at all.
+ * param1 = 0 means use the given location rather than the vehicle's current
+ * position. Altitude is left at zero for ArduPilot to resolve from terrain or
+ * the EKF origin.
  */
 export function setHome(latDeg: number, lonDeg: number): Promise<number> {
   return connectionService.runCommand(MAV_CMD_DO_SET_HOME, [0, 0, 0, 0, latDeg, lonDeg, 0], 5000)
@@ -208,7 +186,7 @@ export function setHome(latDeg: number, lonDeg: number): Promise<number> {
  * Change the target speed.
  *
  * param1 picks which speed: 0 airspeed, 1 groundspeed. param3 is a throttle
- * percentage, and -1 leaves it alone -- passing 0 there would command idle.
+ * percentage, and -1 leaves it alone; passing 0 there would command idle.
  */
 export function changeSpeed(speedMs: number, groundspeed = true): Promise<number> {
   return connectionService.runCommand(
@@ -231,9 +209,8 @@ export function triggerCamera(): Promise<number> {
 
 /** The preflight calibration ArduPilot runs on the ground (barometer etc.). */
 export function preflightCalibration(): Promise<number> {
-  // param3 = 1 is the ground-pressure/airspeed calibration; the gyro and
-  // accel entries are deliberately left off, since those have their own
-  // guided flows on the Sensors tab.
+  // param3 = 1 is the ground-pressure/airspeed calibration. Gyro and accel
+  // have their own flows on the Sensors tab.
   return connectionService.runCommand(MAV_CMD_PREFLIGHT_CALIBRATION, [0, 0, 1, 0, 0, 0, 0], 10000)
 }
 
@@ -245,9 +222,8 @@ export function restartScripting(): Promise<number> {
 
 /** Reboot the autopilot. The link drops and has to be reconnected. */
 export function rebootAutopilot(): Promise<number> {
-  // Say so before sending it. ArduPilot obeys without acking, so on USB the
-  // device can be gone before this promise settles -- and a drop the app
-  // asked for is not a failure to report, it is a wait to sit through.
+  // Before sending: ArduPilot may obey without acking, so on USB the device
+  // can be gone before this promise settles.
   connectionService.expectReboot()
   // param1 = 1 reboots the autopilot; anything higher shuts it down instead.
   return connectionService.runCommand(
@@ -285,9 +261,8 @@ export function gotoGuided(latDeg: number, lonDeg: number, altRelM?: number) {
 /**
  * Change the guided altitude, holding position.
  *
- * Sent as a position target at the vehicle's present latitude and longitude
- * rather than as a command, so it goes through exactly the path a "fly here"
- * does and cannot disagree with it.
+ * Sent as a position target at the vehicle's current position, the same
+ * path "fly here" uses.
  */
 export function setGuidedAltitude(altRelM: number) {
   const v = useVehicleStore.getState()

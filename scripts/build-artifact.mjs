@@ -1,15 +1,10 @@
-// Build the shareable single-file demo of the app.
+// Builds the single-file demo into dist-demo/:
+//   index.html    the whole app in one file (JS, CSS and worker inlined).
+//   artifact.html the same content as a body fragment, for hosts that wrap
+//                 fragments in their own document skeleton.
 //
-// Produces two things in dist-demo/:
-//   index.html    -- the whole app in one file (JS, CSS, worker inlined);
-//                    open it anywhere a static file serves.
-//   artifact.html -- the same content as a body fragment (no doctype/html/
-//                    head/body), which is the form the Claude artifact host
-//                    wants -- it wraps fragments in its own skeleton.
-//
-// In the artifact sandbox only same-origin + a short CDN allowlist load, so
-// OSM map tiles and the param-metadata fetch fail there (both degrade
-// gracefully); demo mode needs neither.
+// Sandboxed hosts block OSM tiles and the parameter metadata fetch; both
+// degrade gracefully and demo mode needs neither.
 import { build } from 'vite'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 import react from '@vitejs/plugin-react'
@@ -27,18 +22,15 @@ await build({
   build: {
     outDir: 'dist-demo',
     target: 'es2022',
-    // The single file has no server to fetch from, so the 3D models have to
-    // travel inside it. They are the reason this limit is measured in
-    // megabytes rather than kilobytes.
+    // Large enough to inline the 3D models, since there is no server to fetch them from.
     assetsInlineLimit: 4_000_000,
   },
 })
 
 const html = readFileSync(path.resolve('dist-demo/index.html'), 'utf8')
 
-// Keep only what the artifact skeleton doesn't provide: title, the Google
-// Fonts links (on the artifact CSP allowlist), the inlined styles and the
-// inlined module script, plus the app's mount point.
+// Keep only what the host skeleton doesn't provide: title, font links, the
+// inlined styles and module script, and the mount point.
 const pick = (re) => [...html.matchAll(re)].map((m) => m[0]).join('\n')
 const title = pick(/<title>[\s\S]*?<\/title>/g)
 const fontLinks = pick(/<link[^>]+(?:fonts\.googleapis|fonts\.gstatic)[^>]*>/g)

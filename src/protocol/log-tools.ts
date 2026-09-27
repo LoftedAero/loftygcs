@@ -1,18 +1,14 @@
 // Which of ArduPilot's WebTools can do anything with this log?
 //
 // The tools live at firmware.ardupilot.org and run in the browser: you open
-// one and drop a .bin into it. There is no upload API to hand the log
-// across, so the app's job is to open the right page and to say up front
-// whether the log has what the tool needs -- FilterReview against a log
-// with no raw IMU data is a blank screen and ten minutes of wondering why,
-// and the answer was knowable before leaving.
+// one and drop a .bin into it. There is no upload API, so the app opens the
+// right page and says up front whether the log has what the tool needs.
 //
-// The requirements here are the tools' own: FilterReview reads batch
-// sampler records (ISBH/ISBD, from INS_LOG_BAT_MASK) or raw gyro records;
-// PID Review reads the rate-controller PID records; MAGFit fits compass
-// readings against the world magnetic model, which takes both MAG and a
-// position. Hardware Report reads the parameters and boot messages every
-// log has.
+// Requirements: FilterReview reads batch sampler records (ISBH/ISBD, from
+// INS_LOG_BAT_MASK) or raw gyro records; PID Review reads the rate-controller
+// PID records; MAGFit fits compass readings against the world magnetic model,
+// so it needs MAG and a position. Hardware Report reads the parameters and
+// boot messages every log has.
 
 import type { ParsedLog } from './dataflash'
 

@@ -4,43 +4,24 @@ import CardParamActions from '../../components/CardParamActions'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useParamStore } from '../../../stores/param-store'
 
-// The IMU's filtering, on a screen of its own and ahead of Tuning in the rail,
-// because it is a different sitting in the order the work is done: ArduPilot's
-// tuning process sets the harmonic notch from a batch-sampler log first, then
-// autotunes the gains. Filters are set once per airframe from a log; gains are
-// revisited. Mission Planner keeps these on its Extended Tuning page; there
-// they made this app's Tuning screen a page and a half of cards.
+// The IMU's filtering, ahead of Tuning in the rail: ArduPilot's tuning
+// process sets the harmonic notch from a batch-sampler log first, then tunes
+// the gains.
 //
-// The rate controller's own filters (target, error, D) are here as well,
-// though they belong to the rate PID rather than to the sensor: they are set in
-// the same sitting as the gyro filter -- ArduPilot's tuning setup derives them
-// from it -- and then left alone while the gains are tuned. A quadplane has two
-// sets, the fixed wing's and the VTOL motors', as rows of one card: every
-// vehicle gets the same four cards in the same places, because a card that
-// does one job should not change name or position with the airframe. Nor are
-// these on Sensors,
-// where the low-pass pair once sat beside the calibrations because they are
-// INS_ parameters: a filter frequency is not something set while calibrating a
-// board, it is a decision made against a log.
+// The rate controller's filters (target, error, D) are here too, since they
+// are set alongside the gyro filter. A quadplane's fixed-wing and VTOL sets
+// are rows of one card, so every vehicle gets the same four cards.
 //
-// Both harmonic notches, where Mission Planner shows only the first. The
-// second (INS_HNTC2_*) is on every 4.7 vehicle, measured on Copter, Plane and
-// a quadplane.
+// Both harmonic notches are shown; the second (INS_HNTC2_*) is on every 4.7
+// vehicle.
 //
-// **Each notch's enable gates the rest of it, live.** Off, the vehicle reports
-// the enable alone; set to 1, it reports the other eight at once -- measured on
-// Copter 4.7.1, 1,370 parameters to 1,378 with no restart, and the metadata
-// marks none of them RebootRequired. So the enable is `OSD_TYPE`'s kind of
-// field: written when it is chosen, then a quiet re-read, which is where the
-// new rows come from. Staged behind the card's Write it changed the vehicle and
-// left the rows greyed, because nothing read the list again. The rows after it
-// are reserved -- drawn greyed while the vehicle does not report them -- so the
-// card is one height either way.
+// Each notch's enable gates its other eight parameters, which appear without
+// a restart. So the enable writes immediately and triggers a quiet re-read,
+// like `OSD_TYPE`. The following rows are reserved (drawn disabled while
+// absent) so the card keeps its height.
 
-// The low-pass filters and the batch sampler -- the log the notches are set
-// from -- as one card. They were two, and five cards cannot pair up in two
-// columns; these are the two that are one subject, every row an INS_ setting
-// on the IMU's own sample stream.
+// The low-pass filters and the batch sampler (the log the notches are set
+// from) share one card: all INS_ settings on the IMU's sample stream.
 const IMU: ParamFieldSpec[] = [
   { param: 'INS_GYRO_FILTER', label: 'Gyro filter' },
   { param: 'INS_ACCEL_FILTER', label: 'Accel filter' },
@@ -117,13 +98,12 @@ export default function FiltersTab() {
     return <NeedsVehicle title="Filters" />
   }
 
-  // Tuning's test of what the aircraft is: a fixed-wing rate loop is a plane,
-  // and Q_A_ gains beside it are a quadplane's VTOL motors.
+  // Same test as Tuning: a fixed-wing rate loop is a plane, and Q_A_ gains
+  // beside it mean a quadplane.
   const plane = entries.has('RLL_RATE_P')
   const vtol = entries.has('Q_A_RAT_RLL_P')
 
-  // A plane's rows under its own names, then -- on a quadplane -- the VTOL
-  // motors' under Q_A_, labelled so the two sets cannot be mistaken.
+  // A plane's rows, then on a quadplane the VTOL motors' Q_A_ rows, labeled.
   const rows = [
     ...(plane
       ? rateFilters((a, f) => `${a.plane}_RATE_${f}`)
@@ -131,9 +111,7 @@ export default function FiltersTab() {
     ...(vtol ? rateFilters((a, f) => `Q_A_RAT_${a.multirotor}_${f}`, 'VTOL') : []),
   ]
 
-  // Rows rather than two stacked columns, so a card is the height of the one
-  // beside it: the two notches are the same card twice, and in columns the
-  // second was stretched to whatever the other column added up to.
+  // Rows rather than columns, so paired cards share a height.
   return (
     <div className="config-screen config-screen--even">
       {card('IMU', IMU)}

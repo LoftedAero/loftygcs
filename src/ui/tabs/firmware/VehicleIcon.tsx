@@ -12,22 +12,11 @@ import {
 /**
  * The eight ArduPilot vehicle types as symbols, Mission Planner's arrangement.
  *
- * Material Design Icons (`@mdi/js`, Apache-2.0, which GPL-3.0 accepts), and
- * the reason to take a set rather than draw eight is consistency: hand-drawn
- * glyphs agree on stroke width and nothing else, so a quad built from
- * circles sat beside a plane built from a filled silhouette and the row read
- * as eight drawings rather than one family. MDI happens to carry all eight
- * subjects, which is unusual enough to be the deciding factor -- most sets
- * have an aeroplane and a car and then nothing for a submarine, a dish or a
- * CAN node.
+ * Material Design Icons (`@mdi/js`, Apache-2.0, compatible with GPL-3.0),
+ * chosen for a consistent family; MDI covers all but one of the subjects.
+ * 24x24 filled paths taking `currentColor`, drawn at 40px.
  *
- * They are 24x24 filled paths taking `currentColor`, so a selected tile
- * tints the drawing along with its label. Checked at 40px, the size they are
- * used at, which is the only size that matters.
- *
- * Keyed by `mav-type`, the manifest's own discriminator, so a vehicle
- * appearing there that this file has not learned shows up as a missing key
- * rather than as a silently wrong picture.
+ * Keyed by the manifest's `mav-type`; an unknown type gets a generic chip.
  */
 export default function VehicleIcon({ vehicle }: { vehicle: string }) {
   return (
@@ -38,20 +27,12 @@ export default function VehicleIcon({ vehicle }: { vehicle: string }) {
 }
 
 /**
- * The one glyph that is drawn here rather than taken from the set.
+ * Glyphs drawn here because MDI has no airship (only hot-air and party
+ * balloons).
  *
- * MDI carries no airship -- checked, all 7,447 of them: the only balloons
- * are a hot-air balloon and a party balloon. `mdiAirballoon` stood in for a
- * while and read as exactly what it is, a hot-air balloon, which is a
- * different aircraft rather than a stylized one.
- *
- * Three parts, because two of them are what stop it being something else.
- * The **gondola** below the hull is the whole difference from `mdiSubmarine`
- * sitting two tiles away, which is the same elongated body with its tower on
- * *top*. The **tail fin** is what stops a finless hull reading as a capsule
- * or a pill. And the fin has to be a slim blade: the first attempt used a
- * swept wedge as tall as the hull and the result was a fish -- rendered at
- * 40px beside its neighbours, which is the only way this gets judged.
+ * The blimp is hull, tail fin and gondola. The gondola underneath tells it
+ * from `mdiSubmarine`, whose tower is on top; a slim fin keeps the hull from
+ * reading as a capsule without turning it into a fish.
  */
 const DRAWN: Record<string, ReactNode> = {
   Blimp: (
@@ -70,15 +51,12 @@ const PATHS: Record<string, string> = {
   Copter: mdiQuadcopter,
   HELICOPTER: mdiHelicopter,
   FIXED_WING: mdiAirplane,
-  // Side view: MDI's plain `car` is a front three-quarter that reads as a
-  // hatchback, where the side view reads as "a thing that drives".
+  // Side view; MDI's plain `car` reads as a hatchback.
   GROUND_ROVER: mdiCarSide,
   SUBMARINE: mdiSubmarine,
-  // The dish, not the satellite: ArduPilot's tracker is the ground station
-  // that points at the aircraft, and `satellite` is a spacecraft.
+  // A dish: the tracker is a ground antenna pointing at the aircraft.
   ANTENNA_TRACKER: mdiSatelliteUplink,
-  // Blimp is in DRAWN below -- MDI has no airship.
-  // Not a vehicle at all: a CAN node, drawn as the chip it is so nobody
-  // reads it as another airframe.
+  // Blimp is in DRAWN above.
+  // A CAN node, not a vehicle.
   CAN_PERIPHERAL: mdiChip,
 }

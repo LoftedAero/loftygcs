@@ -6,25 +6,18 @@ import { closeAllLinks, registerLinkIpc } from './ipc-links'
 import { registerSitlIpc, stopSim } from './sitl'
 import { registerVideoHandlers, stopVideo } from './video'
 
-// The renderer is the same build the browser gets; Electron's job is the
-// window, the privileged link sockets (ipc-links.ts), and the Web Serial
-// permission plumbing. All renderer access to any of it goes through
-// preload.ts -- contextIsolation and sandbox stay on.
+// The renderer is the same build the browser gets. Electron adds the window,
+// the privileged link sockets (ipc-links.ts) and the Web Serial permission
+// plumbing, all reached through preload.ts with contextIsolation and sandbox on.
 
 let mainWindow: BrowserWindow | null = null
 
 // Electron fires select-serial-port when the renderer calls
-// navigator.serial.requestPort(). This process owns the answer: it forwards
-// the candidate list to the renderer so the app can draw its own chooser in
-// the house style, holds the callback until somebody -- or the rule below --
-// answers, and keeps the list **live** for as long as the request is open.
-//
-// Live because Chromium tells this process about every port that appears or
-// goes away while a request is pending (`serial-port-added` / `-removed`),
-// and a chooser that showed the list as it stood when it opened was a
-// chooser that could not see the board plugged in a second later. Measured
-// on the bench: the bootloader was not in the list, and restarting the whole
-// flow was the only way to get a list that had it.
+// navigator.serial.requestPort(). Main forwards the candidate list to the
+// renderer, which draws its own chooser, and holds the callback until the user
+// or the auto-pick rule answers. The list stays live while the request is
+// open (`serial-port-added` / `-removed`), so a board plugged in after the
+// chooser opens still shows up.
 interface OpenPortRequest {
   /** Every port currently on the machine, as far as this request knows. */
   ports: Map<string, Electron.SerialPort>
@@ -45,9 +38,8 @@ const traceSerial = (...args: unknown[]) => {
 }
 const brief = (p: Electron.SerialPort) => `${p.portName}(${p.portId}) "${p.displayName}"`
 
-// The same switch for the USB side. WebUSB in the shell shows nobody a
-// chooser -- main answers `select-usb-device` itself -- so a DFU board that
-// is not found leaves no trace on screen at all, which is what this is for.
+// The same switch for USB. Main answers `select-usb-device` itself with no
+// chooser, so a DFU board that is not found leaves no trace on screen.
 const traceUsb = (...args: unknown[]) => {
   if (process.env.LOFTGCS_DEBUG_USB) console.log('[usb]', ...args)
 }
@@ -57,8 +49,7 @@ const briefUsb = (d: { vendorId?: number; productId?: number; productName?: stri
     .padStart(4, '0')} "${d.productName ?? ''}"`
 
 // Every port Chromium listed the last time it asked, and whether the next
-// ask should be answered from the difference rather than shown. See the
-// select-serial-port handler for why this is safe.
+// ask should be answered from the difference rather than shown.
 let lastSerialPortIds = new Set<string>()
 let autoPickNewPort: { wait: boolean } | null = null
 
@@ -78,27 +69,17 @@ function createWindow() {
     },
   })
   mainWindow.setMenuBarVisibility(false)
-  // Maximized, not fullscreen: a ground station is a window someone alt-tabs
-  // to a browser and a log viewer from, and true fullscreen hides the taskbar
-  // it takes to get back. The width and height above stay as the restored
-  // size, so un-maximizing gives a usable window rather than a sliver.
+  // Maximized rather than fullscreen, so the taskbar stays reachable. The
+  // size above is the restored size.
   mainWindow.maximize()
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 
   /**
-   * A renderer that reloads has forgotten every link it opened.
-   *
-   * The sockets live here, in the main process, and are closed one id at a
-   * time by the renderer that opened them -- so a reload leaks them, and a
-   * bound UDP link keeps its port. The next connection then fails with
-   * EADDRINUSE on a machine where nothing appears to be running, which is
-   * the kind of thing that gets blamed on the autopilot. The video
-   * receiver is bound the same way and goes for the same reason.
-   *
-   * `did-start-loading` also fires for the first load, where there is
-   * nothing to close and this costs nothing. The simulator is deliberately
-   * left alone: it is a separate process serving a port, not renderer
-   * state, and reloading the window is not a reason to end a flight.
+   * A reloaded renderer has forgotten every link it opened. The sockets and
+   * the video receiver live here and are closed by id from the renderer, so
+   * a reload would leak them and a bound UDP port would then fail with
+   * EADDRINUSE. The simulator is left running: it is a separate process, not
+   * renderer state.
    */
   const dropRendererState = () => {
     closeAllLinks()
@@ -109,15 +90,11 @@ function createWindow() {
 
   const serialSession = mainWindow.webContents.session
 
-  // Put the list in front of the user, in the house style. The descriptors
-  // travel with the port, because a list of COM7 / COM12 is not a choice
-  // anyone can make. The OS product string is the honest source for "which
-  // board is this"; the ids are what identifies it when the string is
-  // missing or generic, which is most CH340-style adapters. `displayName` is
-  // the USB *product* string, which describes the device and not the
-  // interface -- so a CubeOrange's MAVLink and SLCAN ports arrive as two
-  // identical rows. The Windows driver names them apart, and that is the
-  // same source Mission Planner reads; see serial-names.ts.
+  // Send the list to the renderer's chooser with the USB descriptors, since
+  // bare COM names are not a choice anyone can make. `displayName` is the USB
+  // product string, which names the device rather than the interface, so a
+  // CubeOrange's MAVLink and SLCAN ports look identical. The Windows driver
+  // names tell them apart (serial-names.ts).
   const publishPorts = (r: OpenPortRequest) => {
     traceSerial('publish', [...r.ports.values()].map(brief))
     r.shown = true
@@ -137,9 +114,8 @@ function createWindow() {
     })
   }
 
-  // One request ends here, however it ends. `serial:done` closes a chooser
-  // that main answered over the top of; for one the user answered it is a
-  // no-op, the modal having closed itself.
+  // Every request ends here. `serial:done` closes a chooser that main answered
+  // on the user's behalf; if the user answered, the modal is already closed.
   const endPortRequest = (portId: string) => {
     const r = openPortRequest
     if (!r) return
@@ -150,25 +126,15 @@ function createWindow() {
     if (r.shown) mainWindow?.webContents.send('serial:done')
   }
 
-  // Answer for the user when the answer is a fact rather than a choice --
-  // the port that appeared while the board rebooted into its bootloader.
-  // The rule is in serial-autopick.ts, where it can be tested; `initial`
-  // rather than the previous request's list is what an arrival is measured
-  // against, because a bootloader seen in some earlier request still counts
-  // as new to this one. Exactly one, or keep waiting.
-  //
-  // Decided with the Windows driver names in hand, not Chromium's product
-  // strings alone: after a reboot the old MAVLink port lingers as a phantom
-  // whose product string reads as a bootloader too, and only the driver name
-  // says which of the two is real. Async for that reason, so it re-checks
-  // that this is still the open request before answering it.
+  // Answer for the user when there is exactly one bootloader port that
+  // appeared while the board rebooted (rule in serial-autopick.ts). Windows
+  // driver names are needed because after a reboot the old MAVLink port
+  // lingers as a phantom whose product string also reads as a bootloader.
+  // That lookup is async, so recheck that this is still the open request.
   const tryAutoAnswer = async (r: OpenPortRequest, before: ReadonlySet<string>) => {
     if (!r.auto) return false
-    // `withDriverNames` replaces `displayName` with the Windows friendly
-    // name, which is what the chooser wants. The recogniser wants both --
-    // the product string to spot a bootloader, the driver name to veto a
-    // phantom -- so the two are kept apart here rather than one overwriting
-    // the other.
+    // `withDriverNames` overwrites `displayName` with the driver name. The
+    // recognizer needs both, so keep them apart.
     const list = [...r.ports.values()]
     const named = await withDriverNames(
       list.map((p) => ({
@@ -205,7 +171,7 @@ function createWindow() {
       'auto=' + JSON.stringify(autoPickNewPort),
       portList.map(brief),
     )
-    // Chromium serialises requests, but a stale one must never answer a new one.
+    // Chromium serializes requests, but a stale one must never answer a new one.
     if (openPortRequest) endPortRequest('')
 
     const before = lastSerialPortIds
@@ -225,13 +191,10 @@ function createWindow() {
 
     void tryAutoAnswer(r, before).then((answered) => {
       if (answered || openPortRequest !== r) return
-      // Not obvious. For the ask before a reboot that is the end of it: the
-      // chooser comes up at once. For the ask *after* one, the renderer sent
-      // it the moment the reboot went out, while its click still counted as
-      // a gesture, and the board takes a second or two to come back -- so
-      // the chooser is held back that long rather than flashing up and
-      // vanishing. Live either way, so it shows the port the moment it does
-      // arrive, and a bootloader arriving later still answers itself.
+      // A request made right after a reboot (while the click is still a user
+      // gesture) holds the chooser back briefly, since the board takes a
+      // second or two to come back. A bootloader arriving later still
+      // answers the request itself.
       if (!arm?.wait) {
         publishPorts(r)
         return
@@ -266,10 +229,8 @@ function createWindow() {
   ipcMain.on('serial:choose', (_e, portId: string) => endPortRequest(portId))
   ipcMain.on('serial:cancel', () => endPortRequest(''))
 
-  // Web Serial and WebUSB need these handlers to say yes; without them
-  // Chromium's default denies the APIs outside a browser profile. USB stays
-  // scoped to the ST DFU bootloader (0483:DF11), which is how a board with no
-  // ArduPilot bootloader gets one -- not a recovery path.
+  // Without these handlers Chromium denies Web Serial and WebUSB outside a
+  // browser profile. USB is limited to the ST DFU bootloader (0483:DF11).
   mainWindow.webContents.session.setPermissionCheckHandler(
     (_wc, permission) => permission === 'serial' || permission === 'usb',
   )
@@ -284,17 +245,10 @@ function createWindow() {
     return false
   })
 
-  // WebUSB's requestDevice: only DFU devices are ever requested, so pick
-  // the first match rather than building a chooser for a one-device list.
-  //
-  // And **hold the request if there is no match yet**, exactly as the serial
-  // chooser does. Measured on the bench, with a board sitting in DFU mode
-  // since before the app launched: `getDevices()` was empty 2.3 s in, this
-  // list was empty at 4.6 s, and Chromium enumerated the device 1.2 s after
-  // that. Answering "(none)" on the first look therefore reported no board
-  // while one was on the bus and WinUSB-bound -- the whole DFU path, failing
-  // on a race nobody could see, because the shell answers this event itself
-  // and so shows no chooser to notice was wrong.
+  // WebUSB's requestDevice: only DFU devices are ever requested, so pick the
+  // first match. With no match yet, hold the request: Chromium can enumerate
+  // a device that was plugged in before the app started over a second after
+  // the request arrives.
   const usbSession = mainWindow.webContents.session
   const isDfu = (d: { vendorId: number; productId: number }) =>
     d.vendorId === 0x0483 && d.productId === 0xdf11
@@ -317,9 +271,8 @@ function createWindow() {
       if (isDfu(device)) settle(device.deviceId)
     }
     usbSession.on('usb-device-added', onAdded)
-    // The same 2.5 s the serial hold uses, and for the same reason: long
-    // enough for a device that is coming, short enough that a board which is
-    // simply not there still fails while somebody is still watching.
+    // Same hold as the serial side: long enough for a device that is coming,
+    // short enough that a missing board still fails promptly.
     const timer = setTimeout(() => settle(undefined), 2500)
   })
 
@@ -336,23 +289,18 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // Only the Google Fonts hosts are legitimate remote origins for the shell
-  // itself; everything else the app fetches (firmware manifests, param
-  // metadata) goes through explicit fetch() calls that can fail gracefully.
-  // A stricter CSP via response headers only covers http(s) responses, so the
-  // packaged file:// load is instead kept safe by sandbox + contextIsolation
-  // and by never loading remote pages into this window.
-  // Web Serial goes through the check/device handlers set in createWindow,
-  // not this one -- so everything that does arrive here can be denied.
+  // The window never loads remote pages; the packaged file:// load relies on
+  // sandbox and contextIsolation, since a header CSP only covers http(s).
+  // Serial and USB go through the handlers in createWindow, so every
+  // permission request that reaches this one is denied.
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, cb) => {
     cb(false)
   })
 
   ipcMain.handle('app:version', () => app.getVersion())
 
-  // Firmware downloads: firmware.ardupilot.org sends no CORS headers, so
-  // the renderer cannot fetch it directly; the main process can. Locked to
-  // that one origin -- this is a firmware pipe, not a general proxy.
+  // firmware.ardupilot.org sends no CORS headers, so the renderer cannot
+  // fetch from it directly. Locked to that origin; this is not a general proxy.
   ipcMain.handle('app:fetch-firmware', async (_e, url: string) => {
     if (typeof url !== 'string' || !url.startsWith('https://firmware.ardupilot.org/')) {
       throw new Error('refused: only firmware.ardupilot.org URLs')
@@ -361,31 +309,23 @@ app.whenReady().then(() => {
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`)
     return await res.arrayBuffer()
   })
-  // Background throttling off while the gamepad has control, and back on the
-  // moment it does not. Throttled, a window that is covered, minimized or
-  // simply not focused runs its timers at a crawl and -- the part that
-  // matters -- reports itself hidden, which pauses gamepad input: the override
-  // stream would go on sending whatever the sticks said last. Only for as long
-  // as control is taken, because unthrottled the whole window keeps drawing
-  // when nobody can see it.
+  // Background throttling is off while the gamepad has control. A throttled
+  // window that is covered or unfocused reports itself hidden, which pauses
+  // gamepad input while the override stream keeps sending the last sticks.
   ipcMain.on('app:background-throttling', (e, allowed: unknown) => {
     e.sender.setBackgroundThrottling(allowed !== false)
   })
   ipcMain.on('app:open-external', (_e, url: string) => {
-    // Web links, plus mailto -- a file: or custom scheme from a compromised
-    // renderer must not reach the shell. mailto is the one exception worth
-    // making: the worst it can do is open a compose window the user still
-    // has to send, where file: hands over files and a registered custom
-    // scheme can launch an application outright.
+    // Web links and mailto only. A file: or custom scheme from a compromised
+    // renderer could open files or launch applications.
     if (typeof url === 'string' && /^(https?:\/\/|mailto:)/.test(url)) {
       void shell.openExternal(url)
     }
   })
 
-  // Armed by the flash path immediately before it reboots a board: the next
-  // request is for that board's bootloader, and the app can recognise it
-  // without asking. One-shot, and it expires -- an arm left standing could
-  // silently answer an unrelated request minutes later.
+  // Armed by the flash path just before it reboots a board, so the next
+  // request can recognize the bootloader without asking. One-shot and
+  // expiring, so it cannot answer an unrelated request later.
   ipcMain.on('serial:auto-pick-new', (_e, opts: { wait?: boolean } = {}) => {
     traceSerial('armed', JSON.stringify(opts))
     const arm = { wait: !!opts.wait }

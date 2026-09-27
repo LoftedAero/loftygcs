@@ -1,8 +1,6 @@
 // The parts of the HUD that are decisions rather than drawing: which ticks a
-// tape shows, what the compass ribbon reads at a given heading, and what the
-// vehicle's state actually means. Kept out of the canvas so they can be
-// tested, because "is this vehicle in failsafe" is not something to get wrong
-// on a screen someone flies from.
+// tape shows, what the compass ribbon reads at a heading, and what the
+// vehicle's state means. Kept out of the canvas so they can be tested.
 
 /** MAV_STATE values. Only the ones that mean something to a pilot. */
 export const MAV_STATE = {
@@ -16,8 +14,7 @@ export const MAV_STATE = {
  * Whether the heartbeat is reporting a failsafe.
  *
  * ArduPilot raises the system status to CRITICAL when a failsafe triggers and
- * EMERGENCY when it is in a terminal state, so those two are the condition --
- * everything below them is ordinary operation.
+ * EMERGENCY in a terminal state.
  */
 export function isFailsafe(systemStatus: number): boolean {
   return systemStatus === MAV_STATE.critical || systemStatus === MAV_STATE.emergency
@@ -28,9 +25,9 @@ export type ArmReadiness = 'armed' | 'ready' | 'notReady' | 'unknown'
 /**
  * What to say about arming.
  *
- * The prearm bit only means something when the vehicle says it reports one;
- * a build that never sets it would otherwise read as a permanent "not ready"
- * and train the pilot to ignore the line that matters.
+ * The prearm health bit only counts when the present mask says the vehicle
+ * reports it; otherwise a build that never sets it would always read "not
+ * ready".
  */
 export function armReadiness(
   armed: boolean,
@@ -55,17 +52,16 @@ export interface Tick {
 /**
  * Ticks for a vertical tape centered on `value`.
  *
- * Generated from a rounded anchor rather than from the live value, so the
- * marks hold still and the tape slides past them. Ticks anchored to the value
- * itself jitter in place at telemetry rate and are unreadable.
+ * Generated from a rounded anchor rather than the live value, so the marks
+ * hold still and the tape slides past them instead of jittering.
  */
 export function tapeTicks(value: number, halfSpan: number, step: number, majorEvery = 2): Tick[] {
   const ticks: Tick[] = []
   const lo = Math.ceil((value - halfSpan) / step) * step
   const hi = value + halfSpan
   for (let v = lo; v <= hi; v += step) {
-    // Rounded because floating point accumulation turns 0 into 1e-15, which
-    // then prints as "0" but fails an equality check on the major test.
+    // Rounded because floating-point accumulation turns 0 into 1e-15, which
+    // fails the major-tick test.
     const n = Math.round(v / step)
     ticks.push({ value: n * step, offset: n * step - value, major: n % majorEvery === 0 })
   }
@@ -98,8 +94,7 @@ export function angleDelta(a: number, b: number): number {
 /**
  * Labels for the compass ribbon around a heading.
  *
- * Cardinal points win over the number at the same bearing, which is how every
- * HUD does it and how a pilot reads "SW" rather than "225".
+ * Cardinal points replace the number at the same bearing ("SW", not "225").
  */
 export function compassTicks(heading: number, halfSpanDeg: number, step = 15): CompassTick[] {
   const out: CompassTick[] = []
@@ -124,24 +119,18 @@ export function batteryLabel(volts: number, amps: number, pct: number): string {
   const parts: string[] = []
   if (volts > 0) parts.push(`${volts.toFixed(1)}V`)
   if (amps > 0) parts.push(`${amps.toFixed(1)}A`)
-  // -1 is "the vehicle has no estimate", which is different from a flat pack.
+  // -1 means the vehicle has no estimate, which is not a flat pack.
   if (pct >= 0) parts.push(`${Math.round(pct)}%`)
   return parts.join('  ')
 }
 
 /**
- * GPS fix quality, in the words a pilot uses for it.
+ * GPS fix quality, from MAVLink's GPS_FIX_TYPE.
  *
- * The fix type is what decides whether the aircraft can hold a position at
- * all, so it leads; the satellite count is the number that moves while you
- * wait for it, so it follows. GPS_FIX_TYPE from MAVLink, and its first two
- * values are different problems with the same symptom: 0 is NO_GPS -- no
- * receiver is talking to the autopilot at all, which is a wiring or a port
- * configuration to go and fix -- where 1 is NO_FIX, a receiver that is
- * present and searching, which is a matter of waiting. Mission Planner
- * distinguishes them for that reason and so does this. 3 is the ordinary
- * fix, and the RTK types are named because someone who has set up an RTK
- * base wants to see it took.
+ * 0 (NO_GPS) and 1 (NO_FIX) are kept apart, as Mission Planner does: the
+ * first means no receiver is talking to the autopilot (wiring or port
+ * configuration), the second a receiver still searching. The RTK types are
+ * named so an RTK setup can be confirmed.
  */
 export function gpsKind(fixType: number): string {
   return fixType >= 6
@@ -161,19 +150,16 @@ export function gpsKind(fixType: number): string {
 
 export function gpsLabel(fixType: number, sats: number): string {
   const kind = gpsKind(fixType)
-  // Satellites only once there are some to count: "No fix 0" says the same
-  // thing twice, and a receiver that has not reported yet says nothing.
-  // Named, because the line opposite says "RSSI 83%" and "28 pkt/s" -- a
-  // bare number among labelled ones is the one a reader has to stop at.
+  // Satellite count only when nonzero, and labeled like the link line's
+  // values.
   return sats > 0 ? `GPS: ${kind}  ${sats} sats` : `GPS: ${kind}`
 }
 
 /**
  * Whether the fix is one a position-holding mode can fly on.
  *
- * Three is the threshold ArduPilot itself uses: below it the vehicle refuses
- * Loiter, Auto and RTL, which is exactly when a pilot wants the number to be
- * shouting rather than sitting quietly in a corner.
+ * 3D is ArduPilot's own threshold: below it the vehicle refuses Loiter, Auto
+ * and RTL.
  */
 export function gpsUsable(fixType: number): boolean {
   return fixType >= 3
@@ -182,7 +168,7 @@ export function gpsUsable(fixType: number): boolean {
 /** Link line: receiver RSSI where the vehicle reports it, else packet rate. */
 export function linkLabel(rcRssi: number, packetsPerSec: number | undefined): string {
   const parts: string[] = []
-  // RC_CHANNELS carries RSSI as 0-254; a percentage is what people read.
+  // RC_CHANNELS carries RSSI as 0-254; shown as a percentage.
   if (rcRssi >= 0) parts.push(`RSSI ${Math.round((rcRssi / 254) * 100)}%`)
   if (packetsPerSec !== undefined && packetsPerSec > 0) {
     parts.push(`${packetsPerSec.toFixed(0)} pkt/s`)
@@ -191,12 +177,9 @@ export function linkLabel(rcRssi: number, packetsPerSec: number | undefined): st
 }
 
 /**
- * How far apart a tape's labelled ticks sit, in the unit being shown.
- *
- * A tape spans seven steps, so the step decides how much sky the pilot sees
- * at once. Ten meters of altitude and ten feet are not the same amount of
- * sky, so the number has to change with the unit or the imperial tape
- * scrolls three times too fast to read.
+ * How far apart a tape's labeled ticks sit, in the unit being shown. A tape
+ * spans seven steps, so the step changes with the unit or an imperial tape
+ * scrolls three times too fast.
  */
 export function tapeStep(kind: 'speed' | 'altitude', unit: string): number {
   if (kind === 'altitude') return unit === 'ft' ? 25 : 10
@@ -220,11 +203,9 @@ export const HUD_MESSAGE_MS = 8000
  * The one message the HUD shows, or null: the newest of the vehicle's
  * warnings and the app's own note about a command, while it is recent.
  *
- * Warning and worse only -- "PreArm: Need Position Estimate", "Mode change
- * to Guided failed: requires position" -- because the vehicle also reports
- * every waypoint reached and every parameter saved, and a HUD that shows
- * those has taught its reader to stop looking before the one that matters.
- * The full feed is the Messages pane.
+ * Warning severity and worse only, since the vehicle also reports routine
+ * events such as every waypoint reached. The full feed is in the Messages
+ * pane.
  */
 export function hudMessage(
   statusTexts: readonly { severity: number; text: string; at: number }[],

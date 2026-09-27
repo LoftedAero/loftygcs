@@ -1,19 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
 
-/** How long a success stays up. Long enough to notice, short enough to ignore. */
+/** How long a success stays up. */
 const FADE_MS = 2200
 
-// The answer to "did that land?", for screens that write as you go.
+// Write confirmation for screens that write as you go.
 //
-// A success fades; a failure does not. They are not the same news: a write
-// that worked needs only to be seen once, while a write that did not leaves
-// the control showing a value the vehicle does not have, and that is worth
-// keeping on screen until something else happens.
+// A success fades; a failure stays, because the control is then showing a
+// value the vehicle does not have.
 //
-// It is `aria-live` so the answer reaches somebody who is not watching this
-// corner of the screen, and `polite` rather than `assertive` because it must
-// not interrupt: this is confirmation, not an alarm.
+// `aria-live="polite"`: a confirmation, not an alarm.
 export default function WriteFeedback({
   params,
   prefixes,
@@ -24,22 +20,16 @@ export default function WriteFeedback({
   /** Answer only for parameters starting with one of these. */
   prefixes?: readonly string[]
   /**
-   * A mark beside the control that wrote, rather than a sentence under a card.
-   *
-   * A tick or a cross, not a word. "Saved" needed 68px of room kept clear
-   * beside every control that might show it, which a 77px PWM box in a table
-   * of them cannot give up -- and the room had to be permanent, or the layout
-   * moved every time a write landed. A glyph needs 16px and says the same
-   * thing. The words survive for screen readers and in the hover, where the
-   * failure can be a full sentence rather than two words.
+   * A tick or cross beside the control, rather than a sentence under the
+   * card. A glyph needs 16px of permanently reserved room where a word needs
+   * far more. The full text is kept for screen readers and the tooltip.
    */
   inline?: boolean
 }) {
   const latest = useWriteFeedbackStore((s) => s.latest)
   const clear = useWriteFeedbackStore((s) => s.clear)
   // The store keeps one slot for the whole app, so each instance answers only
-  // for what it owns -- otherwise every field on a screen said "Saved" for a
-  // change made in one of them.
+  // for the parameters it owns.
   const scoped = params !== undefined || prefixes !== undefined
   const mine =
     latest &&
@@ -58,8 +48,7 @@ export default function WriteFeedback({
       clear()
     }, FADE_MS)
     return () => clearTimeout(t)
-    // `at` rather than the object: two writes of the same parameter are two
-    // pieces of news, and the timer has to restart for the second.
+    // Keyed on `at` so a second write of the same parameter restarts the timer.
   }, [mine?.at, mine, clear])
 
   const base = inline ? 'write-feedback write-feedback--inline' : 'write-feedback'
@@ -77,8 +66,7 @@ export default function WriteFeedback({
       {inline ? (
         <>
           <Mark ok={shown.ok} />
-          {/* The words the glyph replaced, for anything that cannot see it.
-              `aria-live` was already announcing them and still does. */}
+          {/* The text for screen readers. */}
           <span className="app-sr-only">{shown.ok ? success : failure}</span>
         </>
       ) : shown.ok ? (
@@ -94,13 +82,8 @@ export default function WriteFeedback({
 }
 
 /**
- * The tick and the cross.
- *
- * Shape as well as colour, which is this app's rule wherever a state is
- * signalled -- the live mode-switch row carries a filled dot beside its tint
- * for the same reason. Drawn here rather than taken from an icon set: two
- * glyphs is not a reason to take one on, and they have to follow
- * `currentColor` so the ok and bad tones reach them.
+ * The tick and the cross: state is signaled by shape as well as color. Drawn
+ * inline so they follow `currentColor`.
  */
 function Mark({ ok }: { ok: boolean }) {
   return (

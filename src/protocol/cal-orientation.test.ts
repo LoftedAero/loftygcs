@@ -8,10 +8,8 @@ import {
 
 const deg = (d: number) => (d * Math.PI) / 180
 
-// The geometry here decides which tile lights up and when it completes, and a
-// sign error in it is the kind that looks like "the app doesn't notice I
-// turned it over". So each attitude is checked against the one thing that
-// defines it: where earth's "down" points in body frame.
+// Each attitude is checked against what defines it: where earth's "down"
+// points in body frame.
 
 describe('recognising the six calibration attitudes', () => {
   it('puts down along +Z when the vehicle is level', () => {
@@ -48,8 +46,7 @@ describe('recognising the six calibration attitudes', () => {
   })
 
   it('says nothing when the vehicle is between attitudes', () => {
-    // Held at 45 degrees it is not in either, and claiming one would count
-    // turns against the wrong tile.
+    // Claiming either would count turns against the wrong tile.
     expect(orientationFor(deg(45), 0)).toBeNull()
     expect(orientationFor(0, deg(45))).toBeNull()
   })
@@ -67,10 +64,9 @@ describe('measuring the turn about earth vertical', () => {
   })
 
   it('reads *roll* rate when the vehicle is nose down', () => {
-    // The whole reason this is a projection rather than `yaw`. At pitch -90
-    // the body X axis points at the ground, so spinning about vertical shows
-    // up as roll rate -- and Euler yaw is degenerate there and says nothing
-    // useful at all.
+    // At pitch -90 body X points at the ground, so spinning about vertical
+    // shows up as roll rate, and Euler yaw is degenerate. Hence a projection
+    // rather than yaw.
     const r = verticalRate(0, deg(-90), { rollRateRad: 1.2, pitchRateRad: 0, yawRateRad: 0 })
     expect(r).toBeCloseTo(1.2, 5)
   })
@@ -81,8 +77,7 @@ describe('measuring the turn about earth vertical', () => {
   })
 
   it('ignores rotation that is not about vertical', () => {
-    // Level, tipping nose up and down: no progress around the vertical axis,
-    // however energetic.
+    // Level, tipping nose up and down: no progress around vertical.
     const r = verticalRate(0, 0, { rollRateRad: 2, pitchRateRad: 2, yawRateRad: 0 })
     expect(r).toBeCloseTo(0, 6)
   })

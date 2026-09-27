@@ -13,9 +13,7 @@ import {
   routeSamples,
 } from './mission-terrain'
 
-// The field these coordinates sit in is CMAC, whose real elevation is 584 m
-// -- the same place the SITL default home uses, so the numbers here are the
-// ones a bench test against SITL would produce.
+// These coordinates are at CMAC (584 m), SITL's default home.
 
 const HOME = { x: -353632621, y: 1491652374, z: 584 }
 
@@ -121,7 +119,7 @@ describe('putting the frames on one axis', () => {
 
   it('reads a terrain altitude against the ground under that waypoint', () => {
     // Home is 584 but the ground here is 600: a terrain-frame 50 m is 650,
-    // not 634. Getting this wrong is the bug that flies into the ridge.
+    // not 634.
     const [a] = itemAltitudes(plan([{ frame: 10, z: 50 }]), 584, grids)
     expect(a!.amslM).toBeCloseTo(650, 3)
   })
@@ -132,8 +130,7 @@ describe('putting the frames on one axis', () => {
   })
 
   it('leaves out items that carry no altitude', () => {
-    // DO_SET_SERVO has no height; inventing one draws a mission that does
-    // not exist.
+    // DO_SET_SERVO has no height.
     const alts = itemAltitudes(plan([{ command: 183, x: 0, y: 0 }, { z: 50 }]), 584, grids)
     expect(alts).toHaveLength(1)
   })
@@ -142,8 +139,7 @@ describe('putting the frames on one axis', () => {
 describe('clearance', () => {
   it('finds a hill between two waypoints, not just at them', () => {
     // Both waypoints are 100 m over 584 m ground. Halfway along, the ground
-    // rises to 700 -- so the leg has 16 m of clearance where each end has
-    // 100. A check that only looked at waypoints would call this fine.
+    // rises to 700, so the leg has 16 m of clearance where each end has 100.
     const p = plan([
       { x: HOME.x, y: HOME.y, z: 100 },
       { x: HOME.x, y: HOME.y + 200000, z: 100 },
@@ -159,8 +155,7 @@ describe('clearance', () => {
     const worst = minClearance(ground, items)
     expect(worst).not.toBeNull()
     expect(worst!.minM).toBeCloseTo(-16, 0)
-    // Named by the leg it is on: "between 1 and 2" is actionable where
-    // "17,375 m along the route" has to be counted out on the map.
+    // Named by the leg it is on.
     expect(worst!.from).toBe('u0')
     expect(worst!.to).toBe('u1')
   })
@@ -215,8 +210,7 @@ describe('what zero relative altitude means', () => {
   })
 
   it('stands the first waypoint in for a home nobody has placed', () => {
-    // The evening-before case: a route sketched on the map with no vehicle
-    // anywhere near it still gets a ground line.
+    // A route sketched with no vehicle and no home still gets a ground line.
     const p = plan([{ x: HOME.x, y: HOME.y, z: 50 }], null)
     expect(homeElevation(p, flat(600))).toEqual({ amslM: 600, source: 'route' })
   })
@@ -232,8 +226,7 @@ describe('how steeply each leg climbs', () => {
   const at = (uid: string, amslM: number, d: number) => ({ uid, amslM, d })
 
   it('reads a three-degree approach as three degrees', () => {
-    // The standard glide slope, and the reason this column exists: 300 m
-    // of descent over 5.72 km.
+    // The standard glide slope: 300 m of descent over 5.72 km.
     const slopes = legSlopes([at('a', 300, 0), at('b', 0, 5723)])
     expect(slopes.get('b')!.deg).toBeCloseTo(-3, 1)
   })
@@ -254,8 +247,7 @@ describe('how steeply each leg climbs', () => {
   })
 
   it('refuses a leg with no horizontal distance', () => {
-    // A takeoff climbs straight up. Ninety degrees is arithmetically true
-    // and reads as a slope someone could fly, which it is not.
+    // A takeoff climbs straight up, which has no gradient.
     expect(legSlopes([at('a', 0, 0), at('b', 100, 0)]).has('b')).toBe(false)
   })
 
@@ -274,9 +266,8 @@ describe('how steeply each leg climbs', () => {
 
 describe('the approach onto a landing', () => {
   it('measures the last leg, which itemAltitudes leaves out', () => {
-    // A land command's altitude is ignored by ArduPilot, so it is not on
-    // the profile -- but it is on the ground, and the leg onto it is the
-    // one an approach is planned around.
+    // ArduPilot ignores a land command's altitude, so it is not on the
+    // profile, but the leg onto it slopes down to the ground.
     const p = plan(
       [
         { command: 16, x: HOME.x, y: HOME.y, z: 100 },
@@ -293,8 +284,7 @@ describe('the approach onto a landing', () => {
   })
 
   it('leaves the clearance check alone', () => {
-    // The same mission must not read as flying into the ground just
-    // because it ends on it.
+    // Ending on the ground is not flying into it.
     const p = plan(
       [
         { command: 16, x: HOME.x, y: HOME.y, z: 100 },

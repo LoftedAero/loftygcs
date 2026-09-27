@@ -3,14 +3,11 @@
 //   node scripts/package-web.mjs
 //
 // Produces dist/LoftGCS_<version>_web.zip, whose contents unzip straight
-// into a bucket or a Pages drop -- the build already uses base './', so it
-// works from a domain root or any subpath without being rebuilt.
+// into a bucket or a Pages site. The build uses base './', so it works from a
+// domain root or any subpath.
 //
-// Two things a host has to get right, so they are stated here rather than
-// discovered: it must be HTTPS (Web Serial refuses to exist otherwise, and
-// the USB connection is the whole point of the web channel), and index.html
-// should not be cached for long or testers will keep loading a stale build
-// after an update.
+// The host must serve HTTPS (Web Serial is unavailable otherwise), and should
+// not cache index.html for long or users will keep loading a stale build.
 import { execFileSync } from 'node:child_process'
 import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -23,9 +20,7 @@ console.log(`building the web bundle for v${version}…`)
 execFileSync(process.execPath, [path.join('node_modules', 'vite', 'bin', 'vite.js'), 'build'], {
   stdio: 'inherit',
   // vite.config reads the version from npm_package_version, which only npm
-  // sets. Run this file directly and the bundle would report 0.0.0 while the
-  // zip beside it claimed the real version -- so it is passed explicitly
-  // rather than inherited by luck.
+  // sets, so pass it explicitly for when this file is run directly.
   env: { ...process.env, npm_package_version: version },
 })
 

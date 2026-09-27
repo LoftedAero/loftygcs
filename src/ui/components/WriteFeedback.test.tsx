@@ -3,8 +3,8 @@ import { act, cleanup, render, screen, within } from '@testing-library/react'
 import WriteFeedback from './WriteFeedback'
 import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
 
-// Sensors has two cards that write as you go, sharing one feedback slot. A
-// change made in one of them has to be answered in that one only.
+// Sensors has two write-as-you-go cards sharing one feedback slot; feedback
+// must appear only in the card that made the change.
 
 function TwoCards() {
   return (

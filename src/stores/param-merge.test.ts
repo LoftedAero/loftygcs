@@ -2,12 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useParamStore } from './param-store'
 import type { ParamRecord } from '../protocol/types'
 
-// A background refresh must not cost anyone their staged edits.
-//
-// `loaded` rebuilds the set from scratch, which is right for the first
-// download and wrong for a second one: it flips `loadState` (blanking every
-// curated tab while it runs) and it drops dirty entries. `merged` is what a
-// refresh uses.
+// A background refresh must keep staged edits. `loaded` rebuilds from scratch
+// (flipping `loadState` and dropping dirty entries), so a refresh uses `merged`.
 
 const rec = (name: string, value: number): ParamRecord => ({ name, value, mavType: 4 })
 
@@ -40,7 +36,7 @@ describe('merging a refreshed parameter set', () => {
   })
 
   it('picks up parameters the vehicle did not report before', () => {
-    // The whole reason for the refresh: OSD_TYPE gates the panel subtree.
+    // OSD_TYPE gates the panel subtree, which is why the refresh exists.
     expect(useParamStore.getState().entries.has('OSD1_ALTITUDE_EN')).toBe(false)
     useParamStore.getState().merged([rec('OSD_TYPE', 1), rec('OSD1_ALTITUDE_EN', 1)])
     expect(useParamStore.getState().entries.has('OSD1_ALTITUDE_EN')).toBe(true)

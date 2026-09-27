@@ -11,10 +11,8 @@ import ThemeToggle from './ThemeToggle'
 import { hasIpLinks } from '../../env'
 import type { TransportKind } from '../../transport/Transport'
 
-// Top-level mode switch. Deliberately NOT orange: the bar already has one
-// primary action (Connect), and the house rule is one per region. The active
-// segment inverts to a light surface instead, which reads as "you are here"
-// without competing for the eye.
+// Top-level mode switch. Not orange: Connect is the bar's one primary action.
+// The active segment inverts to a light surface instead.
 function ModeSwitch() {
   const mode = useUiStore((s) => s.mode)
   const setMode = useUiStore((s) => s.setMode)
@@ -35,10 +33,9 @@ function ModeSwitch() {
   )
 }
 
-// The charcoal app bar: brand badge, title, mode switch, vehicle status,
-// connection controls. Connect stays the one orange action in the bar
-// (DESIGN.md color hierarchy) -- which is why the status indicators beside
-// it are color-as-status only and never look pressable.
+// The app bar: brand, mode switch, vehicle status, connection controls.
+// Connect is the one orange action; the status indicators use color for
+// status only and never look pressable.
 export default function AppBar() {
   const phase = useConnectionStore((s) => s.phase)
   const selectedKind = useConnectionStore((s) => s.selectedKind)
@@ -48,12 +45,9 @@ export default function AppBar() {
   const setPreferencesOpen = useUiStore((s) => s.setPreferencesOpen)
 
   const busy = phase === 'opening' || phase === 'handshaking'
-  // A reboot wait is a link in progress, not an absent one: the service is
-  // already reopening the same port, and a second Connect would race it for
-  // the device -- on serial, putting a chooser up over a reconnect that was
-  // about to succeed. The wait ends itself (REBOOT_RETURN_MS in the service),
-  // dropping to an error that re-enables Connect, and Disconnect stays live
-  // throughout as the way to give up sooner.
+  // During a reboot wait the service is already reopening the port, and a
+  // second Connect would race it. The wait times out on its own
+  // (REBOOT_RETURN_MS), and Disconnect stays live to give up sooner.
   const linked = busy || phase === 'connected' || phase === 'linkLost' || phase === 'rebooting'
 
   const connect = () => {
@@ -67,17 +61,12 @@ export default function AppBar() {
   }
 
   return (
-    // Three bands, and the middle one is centered on the *window* rather
-    // than on the space the other two leave. That needs three tracks: a
-    // pair of spacers can only center between the groups, and this bar's
-    // groups differ by about 230px, so the status sat visibly right of
-    // center. `1fr auto 1fr` puts it on the window's midline whenever both
-    // sides fit, and gives way gracefully when they do not.
+    // A three-track grid (`1fr auto 1fr`) centers the status on the window
+    // rather than between the two side groups, which differ in width.
     //
-    // Grid rather than the sheet's flex row for the same reason -- and it
-    // avoids a trap: `lofted-aero.css` sets `.la-appbar__spacer { flex: 1 1
-    // auto }` and then `.la-appbar > * { flex: none }` twelve lines later,
-    // at higher specificity, so its spacer has never actually sprung.
+    // Spacers would not work anyway: `lofted-aero.css` sets
+    // `.la-appbar__spacer { flex: 1 1 auto }` and then overrides it with
+    // `.la-appbar > * { flex: none }` at higher specificity.
     <header className="la-appbar">
       <div className="app-bar__band">
         <img
@@ -100,15 +89,13 @@ export default function AppBar() {
         <ThemeToggle />
       </div>
 
-      {/* Always rendered, empty or not: it is the grid's middle track, and
-          without it the connection controls would fall into it. */}
+      {/* Always rendered: it holds the grid's middle track. */}
       <div className="app-bar__band app-bar__band--center">
         <AppStatus />
         <JoystickChip />
       </div>
 
-      {/* Out of the grid's flow entirely (absolutely placed on the bar's
-          own foot), so it adds no fourth track and cannot move anything. */}
+      {/* Absolutely positioned along the bar's bottom edge, outside the grid. */}
       <ParamProgress />
 
       <div className="app-bar__band app-bar__band--right">
@@ -119,11 +106,8 @@ export default function AppBar() {
           title="Connection type"
         >
           <option value="serial">USB serial</option>
-          {/* A browser tab cannot open a raw socket, so offering TCP and UDP
-            there is offering two ways to fail. They are the first thing
-            anyone opens this menu to look at, which made the web build read
-            as broken before it had done anything. A WebSocket bridge is the
-            browser's route to the same simulators and radios, and it stays. */}
+          {/* A browser cannot open raw sockets, so TCP and UDP are desktop
+            only. WebSocket is the browser's route to the same targets. */}
           {ipLinks && <option value="tcp">TCP</option>}
           {ipLinks && <option value="udp">UDP</option>}
           <option value="ws">WebSocket</option>
@@ -144,7 +128,7 @@ export default function AppBar() {
   )
 }
 
-/** A gear, drawn rather than imported: eight teeth on a ring. */
+/** A gear: eight teeth on a ring. */
 function GearIcon() {
   return (
     <svg width="16" height="16" viewBox="-12 -12 24 24" aria-hidden="true">

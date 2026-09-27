@@ -1,7 +1,6 @@
 // The protocol engine: the single stateful object between raw link bytes and
-// typed events. Environment-agnostic by construction -- it runs inside the
-// app's Web Worker and, identically, in plain Node for tests and SITL
-// integration runs.
+// typed events. Environment-agnostic, so it runs in the app's Web Worker and
+// in plain Node for tests and SITL integration runs.
 import { MavFramer, encodeFrame } from './frames'
 import { decodeFrameFields } from './serializer'
 import { collectFields } from './fields'
@@ -31,9 +30,8 @@ const GCS_COMPID = 190
 
 const HEARTBEAT_INTERVAL_MS = 1000
 const TELEMETRY_FLUSH_MS = 50
-// Slower than the instrument path: a status list and a plot do not need
-// twenty updates a second, and this one carries every field the vehicle has
-// ever sent rather than a handful.
+// Slower than the instrument path: it carries every field the vehicle has
+// sent, and a status list or plot does not need 20 Hz.
 const FIELDS_FLUSH_MS = 100
 const LINKSTATS_INTERVAL_MS = 1000
 // 4 Hz for every stream: plenty for readouts, gentle on telemetry radios.
@@ -42,21 +40,13 @@ const STREAM_RATE_HZ = 4
 /** Smallest gap between file-transfer progress events, in milliseconds. */
 const PROGRESS_INTERVAL_MS = 100
 
-// Inspector snapshots. 400 ms is fast enough that values visibly move and
-// slow enough that a snapshot of every message type costs nothing. The EMA
-// keeps a 1 Hz message from reading as 0 and 2.5 Hz on alternate windows.
+// Inspector snapshot interval. The EMA keeps a 1 Hz message from alternating
+// between 0 and 2.5 Hz across windows.
 const INSPECT_FLUSH_MS = 400
 /**
- * How often the traffic picture goes out, and how long a target survives
- * without a fresh report.
- *
- * Reports arrive about once a second per aircraft and aeroplanes do not jump,
- * so a snapshot every second is as much as any display can use. The timeout
- * is deliberately several times that: ADS-B reception drops in and out at
- * range, and an aircraft that blinks off the map every time a report is
- * missed is worse than one drawn a few seconds stale. ArduPilot's own list
- * ages out on its side too, so a target it has genuinely lost stops arriving
- * and leaves here as well.
+ * Traffic snapshot interval and target timeout. Reports arrive about once a
+ * second per aircraft; the timeout is several times that because ADS-B
+ * reception drops in and out at range.
  */
 const TRAFFIC_FLUSH_MS = 1000
 const TRAFFIC_TIMEOUT_MS = 15000
@@ -74,8 +64,8 @@ export class ProtocolEngine {
   private vehicleCompid = 1
   private streamsRequested = false
   private lastStats = { frames: 0, droppedBytes: 0, badFrames: 0 }
-  // Always counted -- one map upsert per message is free next to the decode
-  // that already happened -- but only snapshotted while someone is looking.
+  // Always counted (cheap next to the decode), but only snapshotted while the
+  // inspector is open.
   private inspectRows = new Map<
     string,
     {
@@ -95,9 +85,8 @@ export class ProtocolEngine {
   /** Whether the last flush said anything, so "now empty" is still said once. */
   private trafficSent = false
 
-  // MAVFTP is a fast path, not a requirement: a 500 ms op timeout makes the
-  // capability probe fail fast on firmware without it, instead of the
-  // "hanging on param MAVFTP" stall Mission Planner is known for.
+  // MAVFTP is a fast path, not a requirement: a short op timeout lets
+  // firmware without it fall back quickly instead of stalling.
   private ftp = new MavFtpClient((payload) => this.sendFtpPayload(payload), 500)
   private paramStream = new ParamStreamClient(
     (msgName, fields) => this.send(msgName, fields),
@@ -215,8 +204,8 @@ export class ProtocolEngine {
   }
 
   private handleMessage(msg: DecodedMessage) {
-    // Before the switch: every message contributes to the generic field set,
-    // including the ones handled specially below.
+    // Every message contributes to the generic field set, including the ones
+    // handled specially below.
     collectFields(msg, this.fieldValues)
     this.recordForInspector(msg)
     // Ignore our own reflected traffic (UDP loops and some bridges echo).
@@ -254,10 +243,8 @@ export class ProtocolEngine {
         return
       }
       case 'AUTOPILOT_VERSION': {
-        // flight_sw_version packs the version into one uint32, high byte
-        // first: major, minor, patch, then FIRMWARE_VERSION_TYPE. Reading
-        // it as four bytes rather than as a number keeps the shift out of
-        // every consumer.
+        // flight_sw_version packs major, minor, patch and
+        // FIRMWARE_VERSION_TYPE into one uint32, high byte first.
         const packed = Number(msg.fields.flightSwVersion ?? 0)
         this.emit({
           t: 'evt',
@@ -269,8 +256,8 @@ export class ProtocolEngine {
               patch: (packed >>> 8) & 0xff,
               type: packed & 0xff,
             },
-            // The capability field is a uint64 and arrives as a BigInt on
-            // some decoders; every bit anyone uses is well inside 2^53.
+            // A uint64 that some decoders return as a BigInt; every bit in
+            // use is well inside 2^53.
             capabilities: Number(msg.fields.capabilities ?? 0),
             vendorId: Number(msg.fields.vendorId ?? 0),
             productId: Number(msg.fields.productId ?? 0),
@@ -282,10 +269,8 @@ export class ProtocolEngine {
         return
       }
       case 'ADSB_VEHICLE': {
-        // Kept by ICAO address and flushed as a picture, not forwarded per
-        // report -- see TRAFFIC_FLUSH_MS. A report with no valid position
-        // decodes to null and is dropped here rather than stored as a target
-        // that cannot be drawn.
+        // Kept by ICAO address and flushed as a snapshot (TRAFFIC_FLUSH_MS).
+        // Reports without a valid position decode to null and are dropped.
         const target = decodeAdsbVehicle(msg.fields)
         if (target) this.traffic.set(target.icao, target)
         return
@@ -314,10 +299,9 @@ export class ProtocolEngine {
         this.mission.handleMessage(msg.msgName, msg.fields)
         return
       case 'COMMAND_LONG':
-        // The vehicle asking the GCS for something. The only one this app
-        // answers is the accelerometer calibration's position request; our
-        // own outbound commands cannot be confused with it, because reflected
-        // GCS traffic is dropped above.
+        // A request from the vehicle. The only one handled is the accel
+        // calibration's position request; our own reflected commands were
+        // dropped above.
         if (msg.fields.command === MAV_CMD_ACCELCAL_VEHICLE_POS) {
           this.emit({
             t: 'evt',
@@ -346,9 +330,7 @@ export class ProtocolEngine {
             calStatus: msg.fields.calStatus as number,
             pct: msg.fields.completionPct as number,
             completionMask: msg.fields.completionMask as number[],
-            // "Body frame direction vector for display" -- where the vehicle
-            // is pointing right now, which is what makes the coverage
-            // picture navigable rather than merely informative.
+            // Body-frame direction vector: where the vehicle points now.
             direction: [
               msg.fields.directionX as number,
               msg.fields.directionY as number,
@@ -388,9 +370,7 @@ export class ProtocolEngine {
 
   private requestStreams() {
     if (this.vehicleSysid === null) return
-    // Legacy stream request; it still works on every ArduPilot version and
-    // is one message. Per-message SET_MESSAGE_INTERVAL tuning can come with
-    // the flight screen, which is the first thing that needs higher rates.
+    // Legacy stream request: one message, and it works on every ArduPilot version.
     this.send('REQUEST_DATA_STREAM', {
       targetSystem: this.vehicleSysid,
       targetComponent: this.vehicleCompid,
@@ -401,13 +381,9 @@ export class ProtocolEngine {
   }
 
   /**
-   * Ask what firmware this is.
-   *
-   * MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES, which every ArduPilot answers
-   * with AUTOPILOT_VERSION. Fired once and forgotten: the version is used
-   * to pick matching parameter metadata, and a vehicle that will not say
-   * simply gets the current release's, which is what it got before this
-   * existed.
+   * Sends MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES, answered with
+   * AUTOPILOT_VERSION. Fire and forget: without an answer, parameter
+   * metadata falls back to the current release.
    */
   private requestVersion() {
     if (this.vehicleSysid === null) return
@@ -415,21 +391,10 @@ export class ProtocolEngine {
   }
 
   /**
-   * Ask the vehicle to say its boot banner again.
-   *
-   * MAV_CMD_DO_SEND_BANNER (42428), ArduPilot's own, and what Mission
-   * Planner sends for the same reason. The banner is where the **frame**
-   * is announced -- "QuadPlane initialised, Frame: F-35B" -- and
-   * `vehicle-store` latches that to draw the aircraft as itself rather than
-   * as a generic plane.
-   *
-   * Without this the line is only ever heard by a GCS that happened to be
-   * attached when the vehicle booted: it is sent once, and the status feed
-   * is a capped ring it scrolls out of. Connect to a vehicle already
-   * running -- which is the normal case -- and the app could not know what
-   * it was looking at. The command is fired and forgotten like the version
-   * request: a vehicle that does not implement it answers UNSUPPORTED and
-   * nothing here depends on the reply, only on the STATUSTEXTs that follow.
+   * Asks the vehicle to repeat its boot banner (MAV_CMD_DO_SEND_BANNER, as
+   * Mission Planner does). The banner announces the frame, which
+   * `vehicle-store` latches, and is otherwise sent only once at boot. Fire
+   * and forget: only the STATUSTEXTs that follow matter.
    */
   private requestBanner() {
     if (this.vehicleSysid === null) return
@@ -476,24 +441,16 @@ export class ProtocolEngine {
     return this.ftp.listDirectory(path)
   }
 
-  /**
-   * Read a file off the vehicle.
-   *
-   * Progress is reported per chunk because a dataflash log is megabytes
-   * over a link that may be a telemetry radio -- a transfer with no visible
-   * progress is indistinguishable from one that has hung.
-   */
-  /** Stop the file read in progress -- see MavFtpClient.cancelRead. */
+  /** Stops the file read in progress (see MavFtpClient.cancelRead). */
   cancelDownload() {
     this.ftp.cancelRead()
   }
 
+  /** Reads a file off the vehicle, reporting progress. */
   downloadFile(path: string): Promise<Uint8Array> {
-    // Throttled: a burst read delivers a packet every third of a
-    // millisecond, and a ten-megabyte log produced forty-three thousand
-    // progress events -- each one a postMessage, a store write and a
-    // render, to move a bar by a quarter of a pixel. Ten a second is more
-    // than the eye resolves and the last one is always sent.
+    // Throttled to 10 Hz: a burst read delivers a packet every third of a
+    // millisecond, and each event is a postMessage, a store write and a
+    // render. The final event is always sent.
     let lastAt = 0
     return this.ftp.readFile(path, (got, total) => {
       const now = Date.now()
@@ -504,10 +461,9 @@ export class ProtocolEngine {
   }
 
   /**
-   * Write a file to the vehicle -- a Lua script, an OSD font, a terrain
-   * tile. Slower than a download by an order of magnitude: there is no
-   * burst write, and ArduPilot serves one FTP request at a time, so this is
-   * 239 bytes a round trip and the progress bar is not decoration.
+   * Writes a file to the vehicle. Much slower than a read: there is no burst
+   * write and ArduPilot serves one FTP request at a time, so this is 239
+   * bytes per round trip.
    */
   async uploadFile(path: string, bytes: Uint8Array): Promise<void> {
     let lastAt = 0
@@ -560,12 +516,8 @@ export class ProtocolEngine {
   }
 
   /**
-   * The sky as it stands, and only when it has changed.
-   *
-   * Expiry happens here rather than on a timer of its own: this is the only
-   * thing that reads the map, so a target that has aged out has not been
-   * seen by anyone in the meantime. The empty-to-empty case sends nothing,
-   * which is the ordinary case for every vehicle without a receiver fitted.
+   * Expires stale targets and sends the current traffic picture. Nothing is
+   * sent while the picture stays empty (the usual case with no receiver).
    */
   private flushTraffic() {
     const cutoff = Date.now() - TRAFFIC_TIMEOUT_MS

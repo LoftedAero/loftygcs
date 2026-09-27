@@ -2,14 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { LaButton, LaModal } from '../../components/La'
 import { fieldRegistry } from '../../../services/telemetry-fields'
 
-// Choosing what to plot.
-//
-// Mission Planner shows every field at once as a grid of several hundred
-// checkboxes. It is complete, and it is unusable without already knowing the
-// name you want and where it sits. This shows the same set, but filtered as
-// you type and grouped by the message each field came from -- with the live
-// value beside every row, since half of finding the right field is
-// recognising the number next to it.
+// Chooses what to plot: every telemetry field, filtered as you type, grouped
+// by source message, with the live value beside each row so a field can be
+// recognized by its number.
 
 const REFRESH_MS = 300
 
@@ -45,8 +40,8 @@ export default function FieldPicker({ open, selected, onToggle, onClose }: Field
       out.set(group, list)
     }
     return [...out.entries()]
-    // Recomputed on every tick so newly-seen fields appear; the cost is a
-    // string scan over a few hundred names.
+    // Recomputed on every tick so newly seen fields appear; it is a string
+    // scan over a few hundred names.
   }, [needle, names.length, names])
 
   const chosen = new Set(selected)

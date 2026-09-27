@@ -6,11 +6,28 @@
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/LoftedAero/loftgcs.git"
+    "url": "git+https://github.com/LoftedAero/loftgcs.git"
+  },
+  "homepage": "https://github.com/LoftedAero/loftgcs",
+  "bugs": {
+    "url": "https://github.com/LoftedAero/loftgcs/issues"
+  },
+  "keywords": [
+    "ardupilot",
+    "mavlink",
+    "ground-control-station",
+    "gcs",
+    "drone",
+    "uav",
+    "electron",
+    "web-serial"
+  ],
+  "engines": {
+    "node": ">=22"
   },
   "main": "dist-electron/main.cjs",
   "type": "module",
-  "//desktopName": "Top level, not under build.linux: electron-builder reads it from the package metadata. It becomes StartupWMClass in the .desktop file, which is what makes a running window associate with its launcher icon on GNOME and KDE instead of showing a generic one.",
+  "//desktopName": "Top level, not under build.linux: electron-builder reads it from here for the .desktop file's StartupWMClass.",
   "desktopName": "loft-gcs.desktop",
   "scripts": {
     "dev": "vite",
@@ -28,7 +45,9 @@
     "video:testsrc": "node scripts/video-testsrc.mjs rtsp",
     "video:testsrc:udp": "node scripts/video-testsrc.mjs udp",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",
@@ -38,7 +57,6 @@
     "mavlink-mappings": "^1.0.22-20260311",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-leaflet": "^5.0.0",
     "three": "^0.185.1",
     "zustand": "^5.0.0"
   },

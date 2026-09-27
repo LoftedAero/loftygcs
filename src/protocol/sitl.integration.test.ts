@@ -1,9 +1,9 @@
 // @vitest-environment node
 //
-// Integration against REAL ArduPilot SITL over TCP -- the check the original
-// ArduConfigurator never had. Start SITL first (npm run sitl), then:
+// Integration tests against real ArduPilot SITL over TCP. Start SITL first
+// (npm run sitl), then:
 //   SITL=1 npm test
-// Skipped otherwise, so the ordinary unit run never needs a simulator.
+// Skipped otherwise.
 import { describe, expect, it } from 'vitest'
 import type net from 'node:net'
 import { connectSitl } from '../test-fixtures/sitl-client'
@@ -35,11 +35,9 @@ async function connectVehicle(
 ): Promise<net.Socket> {
   for (let attempt = 0; ; attempt++) {
     const socket = await connectSitl()
-    // SITL exits the moment its one client disconnects, so tearing a test
-    // down races its shutdown and the reset arrives as an unhandled
-    // exception -- which made a fully green run exit non-zero, defeating the
-    // gate the run exists to be. There is nothing to recover from here: the
-    // test is already over.
+    // SITL exits when its one client disconnects, so teardown races its
+    // shutdown and the reset would surface as an unhandled exception that
+    // fails an otherwise green run.
     socket.on('error', () => {})
     const seen = events.length
     // Wire tx before starting: the engine requests streams the moment the
@@ -87,23 +85,17 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       )
       expect(kinds.has('attitude')).toBe(true)
 
-      // The vehicle says what firmware it is, which is what picks
-      // matching parameter metadata. Field names on the decoded message
-      // are the decoder's, not ours, so this is the only place that
-      // catches a rename or a mis-cased key -- a wrong key reads as
-      // undefined and silently decodes to version 0.0.0.
+      // The firmware version picks the parameter metadata. Field names come
+      // from the decoder, so this catches a renamed or mis-cased key, which
+      // would silently decode as version 0.0.0.
       await waitFor(() => events.some((e) => e.t === 'version'), 15000, 'AUTOPILOT_VERSION')
       const version = events.find((e) => e.t === 'version')
       if (version?.t !== 'version') throw new Error('unreachable')
       expect(version.firmware.major).toBeGreaterThanOrEqual(4)
       expect(version.firmware.minor).toBeLessThan(100)
-      // Capabilities decode to *something* -- the field is read, not that any
-      // particular bit is set. This asserted MAV_PROTOCOL_CAPABILITY_FTP on
-      // the grounds that "a real ArduPilot has it", and ArduPlane does not:
-      // it reports zero for that bit and serves MAVFTP perfectly well, which
-      // the param download below proves by coming back over FTP. It is the
-      // same lesson a real flight controller taught the MAVFTP screen (see
-      // CLAUDE.md), and the test had encoded the belief the app gave up.
+      // Only that the field is read, not that any particular bit is set:
+      // ArduPlane reports no MAV_PROTOCOL_CAPABILITY_FTP bit yet serves MAVFTP,
+      // as the parameter download below shows.
       expect(version.capabilities).toBeGreaterThan(0)
 
       // ArduPilot always talks at boot; STATUSTEXT decode is exercised too.
@@ -120,31 +112,21 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       const elapsed = Date.now() - t0
       expect(result.source).toBe('ftp') // real ArduPilot serves @PARAM/param.pck
       expect(result.params.length).toBeGreaterThan(500) // Copter ~1400, Plane ~1300
-      // The Phase 2 gate. 3,500 rather than the 3,000 it was written at,
-      // because that number was calibrated against Copter alone: measured
-      // three runs each on one machine, Copter serves its 1,370 parameters
-      // in 2.40-2.53 s and Plane its 1,419 in 2.88-3.10 s -- about 20% more
-      // time per parameter, consistently, so a fixed-wing run failed a gate
-      // the app was passing. What the gate is actually for is catching a
-      // fall back to the PARAM_REQUEST_LIST stream, which takes thirty
-      // seconds or more; 3.5 s still catches that by a factor of ten, and
-      // catches an FTP path that has genuinely doubled in cost.
+      // The Phase 2 gate. Copter serves its ~1,370 parameters in about 2.5 s
+      // and Plane its ~1,419 in about 3.1 s. The gate exists to catch a fall
+      // back to the PARAM_REQUEST_LIST stream, which takes thirty seconds or
+      // more.
       expect(elapsed).toBeLessThan(3500)
 
-      // A parameter every vehicle has, to prove the set is the real one and
-      // not an empty success. Two wrong answers preceded this one and both
-      // are instructive: FRAME_CLASS is Copter's (and a quadplane's), where
-      // a fixed-wing Plane has no frame class at all; and SYSID_THISMAV is
-      // gone from current firmware, renamed MAV_SYSID -- the same parameter
-      // CLAUDE.md already warns is not what it looks like. FORMAT_VERSION is
-      // the storage format marker, which every ArduPilot vehicle has carried
-      // for as long as there has been storage to version.
+      // A parameter every vehicle has, to prove the set is real. FRAME_CLASS
+      // is absent on a fixed wing and SYSID_THISMAV is renamed MAV_SYSID in
+      // current firmware; FORMAT_VERSION, the storage format marker, is
+      // always present.
       expect(result.params.find((p) => p.name === 'FORMAT_VERSION')).toBeDefined()
 
-      // Write + verify + restore a harmless parameter. Copter 4.7 renamed
-      // LOIT_SPEED (cm/s) to LOIT_SPEED_MS (m/s), and Plane has neither --
-      // its loiter radius is WP_LOITER_RAD -- so the write is proved on
-      // whichever of them this vehicle actually carries.
+      // Write, verify and restore a harmless parameter. Copter 4.7 renamed
+      // LOIT_SPEED (cm/s) to LOIT_SPEED_MS (m/s), and Plane has neither
+      // (WP_LOITER_RAD instead), so use whichever this vehicle carries.
       const loit = result.params.find((p) =>
         ['LOIT_SPEED_MS', 'LOIT_SPEED', 'WP_LOITER_RAD'].includes(p.name),
       )
@@ -155,12 +137,9 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       const restored = await engine.setParam(loit!.name, loit!.value, loit!.mavType)
       expect(restored).toBeCloseTo(loit!.value, 3)
 
-      // --- OSD: the screen editor's assumption, checked against real
-      // firmware. The editor is built on every panel being an
-      // OSD{screen}_{PANEL}_{EN,X,Y} triplet, so a panel with a missing
-      // coordinate would be a control that writes a parameter the vehicle
-      // does not have. The OSD is a compile-time option, hence the guard --
-      // a build without it is a legitimate configuration, not a failure.
+      // --- OSD: the editor assumes every panel is an
+      // OSD{screen}_{PANEL}_{EN,X,Y} triplet. The OSD is a compile-time
+      // option, so a build without it is skipped rather than failed.
       const names = new Set(result.params.map((p) => p.name))
       const enables = [...names].filter((n) => /^OSD1_.+_EN$/.test(n))
       if (enables.length === 0) {
@@ -175,8 +154,7 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
         // Four layout screens, as the screen picker offers.
         for (const n of [1, 2, 3, 4]) expect(names.has(`OSD${n}_ENABLE`)).toBe(true)
 
-        // And a coordinate really is writable: this is what dragging a
-        // panel and hitting Write Params comes down to.
+        // A coordinate is writable, which is what dragging a panel does.
         const altX = result.params.find((p) => p.name === 'OSD1_ALTITUDE_X')
         expect(altX).toBeDefined()
         const moved = await engine.setParam(altX!.name, altX!.value + 1, altX!.mavType)
@@ -202,9 +180,8 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       const motorResult = await engine.runCommand(209, [1, 0, 5, 1, 0, 0, 0], 5000)
       expect([0, 1, 2, 3, 4]).toContain(motorResult)
 
-      // --- Missions: the Phase 6 gate. Upload against the real storage
-      // and read back what it kept -- the virtual FC agreeing with us
-      // proves nothing about ArduPilot's mission validation.
+      // --- Missions: the Phase 6 gate. Upload to real mission storage and
+      // read back what it kept.
       const home = await engine.downloadMission(0).then((m) => m[0])
       const wp = (seq: number, lat: number, lon: number, alt: number) => ({
         seq,
@@ -232,11 +209,9 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       await engine.uploadMission(plan, 0)
       const readBack = await engine.downloadMission(0)
       expect(readBack).toHaveLength(plan.length)
-      // Items after home must survive byte-exact in the fields that matter.
-      // Except the frame on commands that carry no coordinates: ArduPilot
-      // stores those without one and reports frame 0 on read-back (our RTL
-      // went up as frame 3 and came home as 0 -- found here, first contact).
-      // The mission store must not read that as a difference either.
+      // Items after home must survive exactly in the fields that matter,
+      // except the frame on commands with no coordinates: ArduPilot stores
+      // those without one and reports frame 0 on read-back.
       for (let i = 1; i < plan.length; i++) {
         expect(readBack[i]).toMatchObject({
           seq: i,
@@ -264,11 +239,9 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
     }
   }, 90000)
 
-  // Runs only when SITL was launched somewhere specific:
+  // Runs only when SITL was launched at a specific home:
   //   npm run sitl -- --home 38.9034,-77.0365,20,90
   //   SITL=1 SITL_HOME=38.9034,-77.0365,20,90 npm test
-  // Which is the whole point of being able to set it -- a simulator at your
-  // own field is only useful if the vehicle actually reports being there.
   it.runIf(process.env.SITL_HOME)(
     'boots where it was told to',
     async () => {
@@ -312,11 +285,8 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
   )
 
   it('lists and downloads a dataflash log over MAVFTP', async () => {
-    // The listing opcode is the one that does not work like the others:
-    // its offset field is an entry index rather than a byte offset, and
-    // the device ends the listing by NAKing EndOfFile, which is a normal
-    // reply. Both are easy to get wrong against a scripted fake and
-    // obvious against a real one.
+    // The listing opcode's offset is an entry index rather than a byte
+    // offset, and the device ends the listing by NAKing EndOfFile.
     const events: ProtocolEvent[] = []
     let socket: net.Socket | null = null
     const engine = new ProtocolEngine((out) => {
@@ -326,23 +296,17 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
     socket = await connectVehicle(engine, events, (s) => (socket = s))
 
     try {
-      // SITL has no SD card: it runs on the host filesystem rooted at
-      // its working directory, so its logs are at /logs where real
-      // hardware mounts them at /APM/LOGS. The service probes both; this
-      // test names the one the simulator actually has.
+      // SITL keeps its logs at /logs, where real hardware uses /APM/LOGS.
       const entries = await engine.listFiles('/logs')
       // SITL has been flying throughout this suite, so it has logs.
       const logs = entries.filter((e) => e.kind === 'file' && /\.bin$/i.test(e.name))
       expect(logs.length).toBeGreaterThan(0)
-      // Sizes come back with the names, which is what lets the UI say
-      // what a download is going to cost before starting it.
+      // Sizes come back with the names.
       expect(logs.some((l) => (l.size ?? 0) > 0)).toBe(true)
-      // The listing includes '.' and '..' as directories; neither is a
-      // log and neither may reach the picker.
+      // The listing includes '.' and '..' as directories.
       expect(logs.some((l) => l.name === '.' || l.name === '..')).toBe(false)
 
-      // Take the smallest, so this test is about the mechanism and not
-      // about waiting for ten megabytes over a loopback socket.
+      // The smallest, to keep the test quick.
       const smallest = logs
         .filter((l) => (l.size ?? 0) > 0)
         .sort((a, b) => (a.size ?? 0) - (b.size ?? 0))[0]!
@@ -364,11 +328,8 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
   }, 240000)
 
   it('writes, reads back and deletes a file over MAVFTP', async () => {
-    // The write path has no burst mode and no fallback, so nothing about
-    // it is exercised by the download test: CreateFile hands back a
-    // session that every WriteFile has to use, the offsets are absolute,
-    // and a real autopilot is the only thing that will complain if any of
-    // that is wrong. A scripted fake agrees with whatever we wrote.
+    // The write path has no burst mode and no fallback: CreateFile returns
+    // a session every WriteFile must use, and offsets are absolute.
     const events: ProtocolEvent[] = []
     let socket: net.Socket | null = null
     const engine = new ProtocolEngine((out) => {
@@ -377,18 +338,12 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
     })
     socket = await connectVehicle(engine, events, (s) => (socket = s))
 
-    // Bigger than one 239-byte chunk, and not a repeating pattern: a
-    // chunking bug that reordered or dropped a block would still produce
-    // the right length.
-    // Bigger than one 239-byte chunk, and not a repeating pattern: a
-    // chunking bug that reordered or dropped a block would still produce
-    // the right length.
+    // Larger than one 239-byte chunk and not a repeating pattern, so a
+    // reordered or dropped block shows.
     const content = new Uint8Array(1500).map((_, i) => (i * 37 + (i >> 3)) & 0xff)
-    // In a directory this test makes, not at the root. ArduPilot's FTP
-    // root is a merged view of the mounts (@ROMFS, @SYS) beside the real
-    // filesystem, and a file created there does not come back in the
-    // listing -- found here rather than assumed. Real hardware has the
-    // same shape with the card at /APM.
+    // Not at the root: ArduPilot's FTP root is a merged view of the virtual
+    // mounts (@ROMFS, @SYS) and the real filesystem, and a file created
+    // there does not appear in the listing.
     const dir = '/loftgcs-ftp-test'
     const path = `${dir}/written.bin`
 
@@ -410,8 +365,7 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       const sent = events.filter((e) => e.t === 'fileProgress' && e.path === path)
       expect(sent.length).toBeGreaterThan(0)
 
-      // Rename, which packs two paths into one payload -- the only
-      // opcode that does.
+      // Rename is the only opcode that packs two paths into one payload.
       await engine.renameFile(path, `${dir}/moved.bin`)
       const renamed = await engine.listFiles(dir)
       expect(renamed.map((e) => e.name)).toContain('moved.bin')
@@ -422,8 +376,7 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       // A directory that is gone cannot be listed; that is the proof.
       await expect(engine.listFiles(dir)).rejects.toThrow()
     } finally {
-      // Never leave anything behind: SITL's working directory is the
-      // checkout, and the next run should start clean whatever failed.
+      // SITL's working directory is the checkout, so always clean up.
       await engine.removeFile(path).catch(() => {})
       await engine.removeFile(`${dir}/moved.bin`).catch(() => {})
       await engine.removeDirectory(dir).catch(() => {})
@@ -433,16 +386,14 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
   }, 120000)
 
   it('speaks the mount and camera protocols this firmware actually has', async () => {
-    // What a scripted fake cannot answer: which generation of the mount
-    // protocol this firmware understands, and what it says when there is
-    // nothing to point. Both matter -- ArduPilot answers all of them even
-    // with MNT1_TYPE at zero, and the *code* it answers with is the only
-    // difference between "pointed" and "no mount configured".
+    // Which mount protocol generations this firmware understands, and what
+    // it answers with no mount: ArduPilot answers all of them even with
+    // MNT1_TYPE at zero, and only the result code tells "pointed" from "no
+    // mount configured".
     //
-    // A configured mount is deliberately not tested here: MNT1_TYPE needs
-    // a reboot, and the SITL runner wipes parameters on every launch (-w
-    // with a defaults file) so nothing survives one. The angle decode is
-    // covered by gimbal.test.ts against known quaternions instead.
+    // A configured mount cannot be tested: MNT1_TYPE needs a reboot, and the
+    // runner wipes parameters on every launch. gimbal.test.ts covers the
+    // angle decode.
     const events: ProtocolEvent[] = []
     let socket: net.Socket | null = null
     const engine = new ProtocolEngine((out) => {
@@ -455,10 +406,8 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       const params = await engine.downloadParams()
       expect(params.params.find((p) => p.name === 'MNT1_TYPE')?.value).toBe(0)
 
-      // MAV_RESULT: 0 accepted, 3 unsupported, 4 failed. The distinction
-      // is the whole point -- 4 means "understood, but there is no mount",
-      // where 3 would mean this firmware has never heard of the command
-      // and the station should be sending the older one.
+      // MAV_RESULT: 0 accepted, 3 unsupported, 4 failed. 4 means understood
+      // but no mount; 3 would mean the station should send the older command.
       const pitchYaw = await engine.runCommand(1000, [-45, 0, 0, 0, 8, 0, 0], 8000)
       expect(pitchYaw).toBe(4)
       const mountControl = await engine.runCommand(205, [-45, 0, 0, 0, 0, 0, 2], 8000)
@@ -466,11 +415,9 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       // Same for the camera: understood, nothing to trigger.
       expect(await engine.runCommand(2000, [0, 0, 1, 0, 0, 0, 0], 8000)).toBe(4)
 
-      // Which status message to decode is not a matter of preference.
-      // Asking for MOUNT_STATUS (158) is DENIED by this firmware -- the
-      // message is gone -- while GIMBAL_DEVICE_ATTITUDE_STATUS (285) is
-      // accepted. Both decoders are kept for older vehicles, but this is
-      // why the modern one is the one that matters.
+      // Current firmware denies a request for MOUNT_STATUS (158) and accepts
+      // GIMBAL_DEVICE_ATTITUDE_STATUS (285). Both decoders are kept for older
+      // vehicles.
       const modern = await engine.runCommand(511, [285, 200000, 0, 0, 0, 0, 0], 8000)
       const legacy = await engine.runCommand(511, [158, 200000, 0, 0, 0, 0, 0], 8000)
       expect(modern).toBe(0)
@@ -482,14 +429,12 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
   }, 120000)
 
   it('flies the sticks: an RC override reaches the vehicle and is handed back', async () => {
-    // The only check that proves the override actually works. The encoder
-    // takes whatever field names it is given, so a wrong one -- chan1_raw
-    // for chan1Raw -- produces a well-formed message full of zeros that a
-    // fake would accept and a real vehicle would read as a failsafe.
+    // The encoder accepts any field name, so a wrong one (chan1_raw for
+    // chan1Raw) produces a well-formed message full of zeros.
     //
-    // Handing control back is checked too, and it is the half that
-    // matters: a station that stops sending leaves the vehicle holding
-    // the last stick position until its own RC failsafe notices.
+    // Handing control back matters most: a station that stops sending leaves
+    // the vehicle holding the last stick position until its RC failsafe
+    // notices.
     const events: ProtocolEvent[] = []
     let socket: net.Socket | null = null
     const engine = new ProtocolEngine((out) => {
@@ -537,8 +482,7 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
         clearInterval(held)
       }
 
-      // Zero is the release, and it is the message that has to arrive:
-      // the channel must go back to what the simulated receiver says.
+      // Zero releases the channel back to the simulated receiver.
       for (let i = 0; i < 3; i++) {
         override([0, 0, 0, 0, 0, 0, 0, 0])
         await new Promise((r) => setTimeout(r, 60))
@@ -549,8 +493,7 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
         'the vehicle to take its sticks back',
       )
     } finally {
-      // Whatever happened above, do not leave a simulator flying on a
-      // stale override.
+      // Never leave a simulator flying on a stale override.
       for (let i = 0; i < 3; i++) override([0, 0, 0, 0, 0, 0, 0, 0])
       await new Promise((r) => setTimeout(r, 200))
       engine.stop()
@@ -559,11 +502,9 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
   }, 120000)
 
   it('hands back a channel above 8 with its own release value, not zero', async () => {
-    // Above channel 8 the special values move: zero means "no change" and
-    // 65534 is the release. A release built of zeros therefore leaves a
-    // switch channel held wherever the gamepad left it -- which is exactly
-    // the frame this app used to send. RELEASE and ignoreValue are the
-    // app's own, so this pins what the joystick service really transmits.
+    // Above channel 8 zero means "no change" and 65534 is the release, so a
+    // release of zeros leaves a switch channel held. RELEASE and ignoreValue
+    // are the app's own, so this pins what the joystick service transmits.
     const events: ProtocolEvent[] = []
     let socket: net.Socket | null = null
     const engine = new ProtocolEngine((out) => {
@@ -610,8 +551,8 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
         clearInterval(hold)
       }
 
-      // Zero on channel 10 is "no change": for a second -- well inside
-      // RC_OVERRIDE_TIME's default of 3 s -- it must go on reading HELD.
+      // Zero on channel 10 is "no change": for a second (well inside
+      // RC_OVERRIDE_TIME's default of 3 s) it must go on reading HELD.
       for (let i = 0; i < 10; i++) {
         override(ch10(0))
         await pause(100)
@@ -651,11 +592,9 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
     socket = await connectVehicle(engine, events, (s) => (socket = s))
 
     try {
-      // Around SITL's default home at Canberra. Two polygons of the SAME
-      // kind and the SAME vertex count, deliberately: on the wire nothing
-      // separates them but the running count each vertex carries in
-      // param1, and this is the case that proves the grouping is real
-      // rather than an artifact of our own serializer.
+      // Around SITL's default home at Canberra. Two polygons of the same
+      // kind and vertex count: on the wire only the vertex count each item
+      // carries in param1 separates them.
       const box = (lat: number, lon: number, d: number) => [
         { x: Math.round((lat - d) * 1e7), y: Math.round((lon - d) * 1e7) },
         { x: Math.round((lat + d) * 1e7), y: Math.round((lon - d) * 1e7) },
@@ -702,9 +641,7 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       expect(circle?.kind === 'circle' && circle.radiusM).toBeCloseTo(75, 1)
       expect(back.returnPoint?.x).toBe(fence.returnPoint.x)
 
-      // An empty fence must actually remove it, not be a no-op: a fence
-      // you think you deleted but the vehicle still enforces is the worst
-      // outcome available.
+      // An empty upload must actually remove the fence.
       await engine.uploadMission([], 1)
       expect(await engine.downloadMission(1)).toHaveLength(0)
 
@@ -724,11 +661,8 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
 
       // --- And MISSION_CLEAR_ALL, which is what the Clear button sends ---
       //
-      // Not the same message as an empty upload, and the app offers it as
-      // a deliberate "forget this" rather than inferring one from an empty
-      // editor. It has to work for all three mission_types: a fence the
-      // vehicle still enforces after the screen says it is gone is the
-      // worst outcome available here.
+      // A different message from an empty upload, and it must work for all
+      // three mission_types.
       await engine.uploadMission(fenceToItems(fence), 1)
       await engine.uploadMission(rallyToItems(rally), 2)
       expect(await engine.downloadMission(1)).not.toHaveLength(0)
@@ -753,16 +687,9 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
     })
     socket = await connectVehicle(engine, events, (s) => (socket = s))
 
-    // Copter only, and not because the app cannot fly a plane: ArduPlane
-    // refuses NAV_TAKEOFF in Guided outright -- fixed wings take off by
-    // rolling or being thrown, and only quadplanes accept the command -- so
-    // running this against Plane tests ArduPilot's design decision rather
-    // than anything here. Asked of the connection this test already has,
-    // from the heartbeat that connecting waited for: a second connection
-    // just to identify the airframe lands in the gap while the runner
-    // relaunches, which is a flake bought for nothing. Skipped rather than
-    // deleted -- point `npm run sitl` at a copter and this is still the
-    // Phase 5 gate.
+    // Copter only: ArduPlane refuses NAV_TAKEOFF in Guided by design. The
+    // airframe is read from the heartbeat already received, since a second
+    // connection would race the runner's relaunch.
     const hb = events.find((e) => e.t === 'heartbeat')
     if (!(hb?.t === 'heartbeat' && COPTER_TYPES.has(hb.vehicleType))) {
       engine.stop()
@@ -792,11 +719,11 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       expect(await engine.runCommand(176, [1, 4, 0, 0, 0, 0, 0], 5000)).toBe(0)
       await waitFor(() => lastMode() === 4, 10000, 'guided mode in heartbeat')
 
-      // Arm + takeoff as one resilient sequence. A freshly-wiped SITL
-      // needs the EKF position estimate before it arms; the arm ack can
-      // land before the armed heartbeat; and an armed copter that sits on
-      // the ground auto-disarms. So: (re)arm whenever the heartbeat says
-      // disarmed, confirm via heartbeat, and retry takeoff until accepted.
+      // Arm and take off as one retrying sequence. A freshly wiped SITL
+      // needs an EKF position estimate before it arms, the arm ack can land
+      // before the armed heartbeat, and an armed copter sitting on the ground
+      // disarms itself. So rearm whenever the heartbeat says disarmed and
+      // retry takeoff until accepted.
       const armedNow = () => {
         const hb = [...events].reverse().find((e) => e.t === 'heartbeat')
         return hb?.t === 'heartbeat' && (hb.baseMode & 128) !== 0

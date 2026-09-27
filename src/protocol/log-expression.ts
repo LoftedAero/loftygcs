@@ -1,21 +1,14 @@
 // Plotting something the log does not record.
 //
-// "ATT.DesRoll - ATT.Roll" is the tracking error, "sqrt(IMU.AccX^2 +
-// IMU.AccY^2)" is lateral acceleration, "BARO.Alt * 3.28084" is feet. None
-// of them is a field, all of them are questions people ask of a log, and
-// plot.ardupilot.org lets you type them.
+// e.g. "ATT.DesRoll - ATT.Roll" (tracking error), "sqrt(IMU.AccX^2 +
+// IMU.AccY^2)", "BARO.Alt * 3.28084" (feet), as plot.ardupilot.org allows.
 //
-// A parser rather than eval(). Not only because eval on a string from a
-// file would be a hole, but because eval cannot see `ATT.Roll` as a
-// reference to resample -- the whole job here is turning names into series
-// and lining their timestamps up.
+// A parser rather than eval(): eval on a string from a file is unsafe, and
+// references like `ATT.Roll` have to be resolved to series and resampled.
 //
-// Series arrive at different rates: ATT at 10 Hz, IMU at 50, GPS at 5.
-// Every expression is evaluated on the time base of its *first* reference,
-// with the others sampled onto it. First rather than fastest, because the
-// leading term is what the reader was thinking in -- and interpolating a
-// slow signal up is honest where decimating a fast one hides what it did
-// between samples.
+// Series arrive at different rates (ATT 10 Hz, IMU 50, GPS 5). An expression
+// is evaluated on the time base of its first reference, with the others
+// interpolated onto it.
 
 import { getSeries, type ParsedLog, type Series } from './dataflash'
 
@@ -35,9 +28,9 @@ type Token =
   | { t: 'ref'; v: string }
   | { t: 'op'; v: string }
   | { t: 'fn'; v: string }
-  | { t: '('; }
-  | { t: ')'; }
-  | { t: ','; }
+  | { t: '(' }
+  | { t: ')' }
+  | { t: ',' }
 
 /** Functions an expression may call, all elementwise. */
 const FUNCTIONS: Record<string, (...a: number[]) => number> = {
@@ -58,7 +51,7 @@ const FUNCTIONS: Record<string, (...a: number[]) => number> = {
   ceil: Math.ceil,
   round: Math.round,
   sign: Math.sign,
-  /** Degrees from radians and back, since half of ArduPilot is one and half the other. */
+  /** Degrees from radians and back; ArduPilot logs use both. */
   deg: (r: number) => (r * 180) / Math.PI,
   rad: (d: number) => (d * Math.PI) / 180,
 }
@@ -132,8 +125,7 @@ type Node =
  * Recursive descent, lowest precedence first.
  *
  * `^` binds tighter than unary minus and is right-associative, so -2^2 is
- * -4 and 2^3^2 is 512 -- the conventions a spreadsheet uses, which is what
- * anyone typing here will expect.
+ * -4 and 2^3^2 is 512.
  */
 function parse(tokens: Token[]): Node {
   let at = 0
@@ -259,11 +251,8 @@ function sampleAt(s: Series, t: number, hint: number): { value: number; index: n
 }
 
 /**
- * Evaluate an expression across a log.
- *
- * Throws ExpressionError with something a person can act on: the message
- * goes straight into the field under the input box, so "Unknown name" beats
- * "unexpected token" every time.
+ * Evaluate an expression across a log. Throws ExpressionError with a message
+ * suitable for showing under the input box.
  */
 export function evaluateExpression(log: ParsedLog, source: string): ExpressionResult {
   const text = source.trim()
@@ -296,12 +285,10 @@ export function evaluateExpression(log: ParsedLog, source: string): ExpressionRe
     const at = new Map<string, number>()
     for (const ref of references) {
       if (ref === baseRef) {
-        // The timeline's own series is read straight off, not resampled.
-        // Interpolating a series onto its own timestamps is a no-op only
-        // while they are strictly increasing -- and they are not: a vehicle
-        // with two barometers logs both instances into one BARO series at
-        // the same microsecond, and resampling there returned a neighbour's
-        // value instead of this row's.
+        // The timeline's own series is read directly, not resampled: its
+        // timestamps are not strictly increasing (two barometers log into
+        // one BARO series at the same microsecond), so interpolating would
+        // return a neighbor's value.
         at.set(ref, base.values[i]!)
         continue
       }
@@ -334,8 +321,8 @@ function evaluate(node: Node, at: ReadonlyMap<string, number>): number {
           return a - b
         case '*':
           return a * b
-        // Division by zero gives Infinity rather than throwing: one bad
-        // sample should leave a gap in a trace, not lose the whole plot.
+        // Division by zero gives Infinity rather than throwing, leaving a gap
+        // instead of losing the plot.
         case '/':
           return a / b
         case '%':

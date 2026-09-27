@@ -4,14 +4,9 @@ import { LaSelect } from '../../components/La'
 import { fieldLabel } from '../../../protocol/log-labels'
 import { useLogStore } from '../../../stores/log-store'
 
-// The data table, filtered to one message type at a time.
-//
-// Mission Planner's model, and the right one: a log holds sixty-odd message
-// types with entirely different columns, so "all the records" is not a table
-// at all -- it is sixty tables interleaved. Picking the message first is what
-// makes the columns mean anything.
-//
-// Virtualized because a single message can run to sixty thousand records.
+// The log data table, one message type at a time (as in Mission Planner),
+// since each type has its own columns. Virtualized because one message type
+// can run to tens of thousands of records.
 
 export default function LogTable() {
   const log = useLogStore((s) => s.log)
@@ -76,8 +71,7 @@ export default function LogTable() {
                   return (
                     <th key={f.name} scope="col" title={named ?? undefined}>
                       {f.name}
-                      {/* Channel functions in the header, so the column
-                          says what it is rather than which pin it was. */}
+                      {/* The channel's function, not just its number. */}
                       {named && <span className="log-table__fn">{named}</span>}
                       {f.unit && <span className="log-table__unit">{f.unit}</span>}
                     </th>

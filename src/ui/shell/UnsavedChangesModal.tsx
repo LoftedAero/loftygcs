@@ -6,15 +6,9 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { connectionService } from '../../services/connection'
 import { MODES, TABS } from '../../stores/ui-store'
 
-// Leaving a page with parameter edits that were never sent.
-//
-// The list rather than a count, for the same reason the write confirmation
-// shows one: what the user needs is not "are you sure" but "which ones", and
-// the moment that matters is the edit they had forgotten making.
-//
-// Three ways out, and all three are real. Discard exists because half of
-// these prompts are answered by someone who was experimenting; Stay exists
-// because the other half meant to write and had not noticed the button.
+// Leaving a page with parameter edits that were never sent. Lists the edits
+// rather than counting them, since the one that matters is the one the user
+// forgot making. Offers write, discard or stay.
 
 export default function UnsavedChangesModal() {
   const pending = useUiStore((s) => s.pendingNav)
@@ -46,8 +40,7 @@ export default function UnsavedChangesModal() {
     try {
       const result = await connectionService.writeDirtyParams()
       useParamStore.getState().setLastWrite(result)
-      // A failed write keeps you here: leaving now would carry the failure
-      // off the page that could explain it.
+      // A failed write stays on the page that can explain the failure.
       if (result.failed.length === 0) commit()
       else cancel()
     } finally {

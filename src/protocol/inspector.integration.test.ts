@@ -1,8 +1,7 @@
 // @vitest-environment node
 //
-// The inspector against real ArduPilot: the counts, rates and fields it
-// reports come from a live SITL rather than frames this repo encoded for
-// itself. Start SITL first (npm run sitl), then SITL=1 npm test.
+// The inspector against a live SITL. Start SITL first (npm run sitl), then
+// SITL=1 npm test.
 import { describe, expect, it } from 'vitest'
 import type net from 'node:net'
 import { connectSitl } from '../test-fixtures/sitl-client'
@@ -17,8 +16,7 @@ describe.runIf(process.env.SITL === '1')('inspector against SITL', () => {
       if (out.t === 'tx') socket?.write(out.bytes)
       else if (out.t === 'evt') events.push(out.evt)
     })
-    // Retried: the runner relaunches SITL between files, and connecting
-    // into that gap is a race, not a result.
+    // Retried, since the runner relaunches SITL between files.
     socket = await connectSitl()
     socket.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
     engine.start()
@@ -52,7 +50,6 @@ describe.runIf(process.env.SITL === '1')('inspector against SITL', () => {
     expect(att.count).toBeGreaterThan(8)
     expect(typeof att.fields['roll']).toBe('number')
 
-    // A healthy SITL session talks in many voices, not three.
     expect(rows.length).toBeGreaterThan(10)
     // Counts are cumulative and never regress across snapshots.
     const prev = snapshots[snapshots.length - 2]!.rows.find((r) => r.msgName === 'ATTITUDE')!

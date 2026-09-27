@@ -3,9 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import RebootPrompt from './RebootPrompt'
 import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
 
-// One dialog for the whole app, and a reminder on each card after Later. Every
-// card used to carry the whole prompt, which stacked three dialogs on a
-// three-card screen and showed none on a screen without cards.
+// One dialog for the whole app, and a reminder on each card after Later.
 
 afterEach(() => {
   cleanup()

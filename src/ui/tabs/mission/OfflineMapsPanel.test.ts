@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { describeOutcome } from './OfflineMapsPanel'
 import type { PrefetchProgress } from '../../../services/tile-cache'
 
-// The message is composed from what the download reports, never from what it
-// was asked for -- the first version said "Stored N map tiles" from the
-// request, which on a dead network was a success message over a cache that
-// had gained nothing.
+// The message comes from what the download reports, not what was requested,
+// so a dead network does not produce a success message.
 
 const run = (done: number, failed = 0, cached = 0): PrefetchProgress => ({
   done,

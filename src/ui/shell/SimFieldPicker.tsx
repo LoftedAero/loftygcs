@@ -11,31 +11,16 @@ import type { BaseLayerId } from '../tabs/flight/map-layers'
 import { loadTerrain } from '../../services/terrain'
 import { groundLevel, sampleElevation } from '../../services/terrain-math'
 
-// Pick where the simulated vehicle boots by pointing at it.
+// Pick where the simulated vehicle boots by pointing at it on a map. A typed
+// coordinate with a transposed digit still parses and boots the vehicle far
+// away; a point on imagery can be checked by eye.
 //
-// Typing a latitude and a longitude is the one part of setting up a
-// simulator that needs a second window open, and the numbers are the part
-// nobody can check by eye: a transposed digit still parses, and the vehicle
-// boots in a field a hundred kilometers away looking perfectly healthy.
-// Pointing at the place is self-verifying -- you can see the runway.
+// It also sets the heading, by turning an arrow to match the runway (with
+// RealFlight, `--home`'s yaw orients the scenery), and the AMSL altitude,
+// looked up from the Terrarium tiles and left editable.
 //
-// Two things this carries that a coordinate pair typed from a map does not:
-//
-// *The heading.* With RealFlight, `--home`'s yaw is what lines the scenery's
-// runway up with the map, so it is not a detail (see CLAUDE.md). It is set
-// here by turning an arrow drawn over the imagery until it matches the
-// runway underneath, which is the comparison someone actually wants to make
-// and cannot make against a number.
-//
-// *The altitude.* It is AMSL and it is the EKF origin, and almost nobody
-// knows their field's elevation offhand. The same Terrarium tiles the
-// mission profile uses have it, so it is looked up rather than asked for --
-// and left editable, because a surveyed number beats a 38 m raster sample.
-//
-// Rendered from App, not from the tray that opens it: the tray dismisses on
-// any outside click, and a picker mounted inside it would unmount the
-// moment someone clicked the map. Opening it closes the tray and closing it
-// puts the tray back, so the round trip lands where it started.
+// Rendered from App rather than inside the tray, because the tray closes on
+// any outside click. Closing the picker reopens the tray.
 
 /** Where a picker with nothing to go on starts. */
 const FALLBACK_ZOOM = 17
@@ -46,8 +31,7 @@ export default function SimFieldPicker() {
   const setSimTrayOpen = useUiStore((s) => s.setSimTrayOpen)
   const homeText = useHomeText()
   const setHomeText = useSimStore((s) => s.setHomeText)
-  // Which default an unset home would boot at, so the picker opens over the
-  // same place the tray says it would rather than somewhere else entirely.
+  // Decides the default home, so the picker opens where an unset home boots.
   const physics = useSimStore((s) => s.physics)
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -57,23 +41,20 @@ export default function SimFieldPicker() {
 
   const [layerId, setLayerId] = useState<BaseLayerId>(loadBaseLayer)
   const [home, setHome] = useState<SimHome>(() => defaultHome(physics.kind))
-  /** Null while a lookup is in flight, so the field can say so. */
+  /** True while an elevation lookup is in flight. */
   const [lookingUp, setLookingUp] = useState(false)
 
-  // Seed from whatever the tray currently holds, each time it opens -- the
-  // picker is a way of editing that value, not a separate one.
+  // Seed from the tray's current value each time it opens.
   useEffect(() => {
     if (!open) return
     const parsed = parseHome(homeText)
     setHome('home' in parsed ? parsed.home : defaultHome(physics.kind))
-    // Keyed on `open` alone, deliberately: re-seeding from homeText while
-    // the dialog is up would fight the marker someone is dragging.
+    // Keyed on `open` alone so re-seeding does not fight the marker being
+    // dragged.
   }, [open])
 
-  // The map is built when the dialog opens and torn down when it closes.
-  // Leaflet measures its container on creation, and a container inside a
-  // hidden modal measures zero -- so there is nothing to keep alive between
-  // openings anyway.
+  // Built on open and removed on close: Leaflet measures its container on
+  // creation, and a hidden modal measures zero.
   useEffect(() => {
     if (!open) return
     const el = containerRef.current
@@ -102,10 +83,8 @@ export default function SimFieldPicker() {
       markerRef.current = null
       baseRef.current = null
     }
-    // Keyed on `open` alone: `home` and `layerId` are read once to place the
-    // opening view, and re-running this on either would rebuild the map
-    // under the person using it. Later changes are handled by the effects
-    // below, which move the map rather than replace it.
+    // Keyed on `open` alone: `home` and `layerId` only set the opening view,
+    // and the effects below handle later changes without rebuilding the map.
   }, [open])
 
   // Swapping imagery keeps the view; only the tiles change.
@@ -123,11 +102,8 @@ export default function SimFieldPicker() {
   }, [home.headingDeg, open])
 
   /**
-   * Move home, and look the ground up under it.
-   *
-   * The elevation is not awaited before the coordinates land: a tile fetch
-   * is a network round trip, and a marker that does not move until it
-   * finishes reads as a dropped click.
+   * Move home and look up the ground elevation. The coordinates update
+   * before the tile fetch completes so the marker responds at once.
    */
   async function applyPoint(latDeg: number, lonDeg: number) {
     setHome((h) => ({ ...h, latDeg, lonDeg }))
@@ -137,13 +113,11 @@ export default function SimFieldPicker() {
       const at = { lat: latDeg, lon: lonDeg }
       const grids = await loadTerrain([at])
       const raw = sampleElevation(grids, at)
-      // Only overwrite when the raster actually answered. Terrarium carries
-      // bathymetry, so a field beside water reads below zero without the
-      // clamp the mission profile already applies.
+      // Only overwrite when the raster answered. `groundLevel` clamps
+      // Terrarium's bathymetry to sea level.
       if (raw !== null) setHome((h) => ({ ...h, altM: Math.round(groundLevel(raw)) }))
     } catch {
-      // An elevation nobody could fetch is not a reason to refuse a
-      // location; the altitude stays whatever it was and is editable.
+      // Keep the previous altitude; it is still editable.
     } finally {
       setLookingUp(false)
     }
@@ -151,7 +125,7 @@ export default function SimFieldPicker() {
 
   function close() {
     setOpen(false)
-    // Back where they came from, with the value they just chose in view.
+    // Return to the tray.
     setSimTrayOpen(true)
   }
 
@@ -193,12 +167,8 @@ export default function SimFieldPicker() {
               </button>
             ))}
           </div>
-          {/* No min or max, deliberately: a heading is a circle, and bounds
-              are what stop the spinner from ever leaving it. With min=0 the
-              browser clamps the down arrow at zero and the wrap below never
-              sees a value to wrap -- so 0 stepped down stays 0 rather than
-              becoming 359. The bounds live in `wrapHeading` instead, which
-              also catches a pasted 450 or a negative. */}
+          {/* No min or max: the browser would clamp the stepper at 0 instead
+              of letting `wrapHeading` turn -1 into 359. */}
           <LaField label="Heading" unit="°" htmlFor="field-heading">
             <LaInput
               id="field-heading"
@@ -206,9 +176,7 @@ export default function SimFieldPicker() {
               step={1}
               value={String(home.headingDeg)}
               onChange={(e) => {
-                // An emptied field is mid-edit, not a heading of zero:
-                // snapping to 0 there would quietly change where the
-                // aircraft points while someone was retyping it.
+                // An empty field is mid-edit, not a heading of zero.
                 if (e.target.value.trim() === '') return
                 const v = Number(e.target.value)
                 if (Number.isFinite(v)) setHome((h) => ({ ...h, headingDeg: wrapHeading(v) }))
@@ -244,11 +212,8 @@ export function wrapHeading(deg: number): number {
 }
 
 /**
- * The marker: a point with an arrow out of it.
- *
- * Drawn rather than a rotated stock pin because the arrow is the control --
- * it is compared against a runway in the imagery underneath, so it needs a
- * visible nose and a fixed pivot at the exact coordinate.
+ * The marker: a point with a heading arrow, pivoting on the exact coordinate
+ * so it can be lined up with a runway.
  */
 function fieldIcon(headingDeg: number): L.DivIcon {
   return L.divIcon({

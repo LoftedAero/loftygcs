@@ -2,15 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { BOARD_COUNT, UNAMBIGUOUS_ID_COUNT, timerGroups } from './timer-groups'
 
 // The table is generated from ArduPilot's hwdef tree by
-// scripts/hwdef-timer-groups.mjs. What is worth pinning is not its contents --
-// they are upstream's to change -- but the three things the generator has to
-// get right, each checked against a board whose hwdef was read by hand.
+// scripts/hwdef-timer-groups.mjs. Its contents are upstream's; these tests pin
+// what the generator has to get right, against known boards.
 
 describe('the generated timer-group table', () => {
   it('has a plausible number of boards', () => {
-    // A guard against a generator run that silently produced almost nothing:
-    // the first version emitted 218 boards because its board-id regex dropped
-    // every hyphenated symbol, which looked like a complete table.
+    // Guards against a generator run that silently drops boards (for example
+    // a board-id regex that skips hyphenated symbols).
     expect(BOARD_COUNT).toBeGreaterThan(300)
     expect(UNAMBIGUOUS_ID_COUNT).toBeGreaterThan(150)
   })
@@ -49,21 +47,19 @@ describe('the generated timer-group table', () => {
   })
 
   it('refuses to answer from a board id that means several boards', () => {
-    // Id 9 is CubeBlack and Pixhawk1 and fmuv3 and skyviper, which are not the
-    // same hardware. Answering from the id alone would have shown one of them
-    // another's pinout.
+    // Id 9 is CubeBlack, Pixhawk1, fmuv3 and skyviper, which are different
+    // hardware.
     expect(timerGroups('CubeBlack', 0)).not.toBeNull()
     expect(timerGroups('Pixhawk1', 0)).not.toBeNull()
     expect(timerGroups(null, 9)).toBeNull()
-    // MatekH743 is ambiguous too, and for a subtler reason: its `-bdshot`
-    // sibling shares id 1013 and moves the outputs to different timers
-    // (TIM8 1-2 against TIM3 1-2), so the id cannot say which is plugged in.
+    // MatekH743's `-bdshot` sibling shares id 1013 but uses different timers
+    // (TIM8 1-2 against TIM3 1-2).
     expect(timerGroups(null, 1013)).toBeNull()
     expect(timerGroups('MatekH743', 0)!.groups[0]).toEqual([1, 2, 'TIM8'])
     expect(timerGroups('MatekH743-bdshot', 0)!.groups[0]).toEqual([1, 2, 'TIM3'])
 
-    // ...but an id whose every board agrees is a fine fallback for a vehicle
-    // that did not name itself.
+    // An id whose boards all agree is a usable fallback when the vehicle does
+    // not name itself.
     const cube = timerGroups('CubeOrange', 0)!
     expect(timerGroups(null, 140)).toEqual(cube)
   })

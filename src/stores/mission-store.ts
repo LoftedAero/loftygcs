@@ -23,11 +23,9 @@ import type { MissionItem } from '../protocol/types'
 
 // The plan being edited, plus what is known about the vehicle's copy of it.
 //
-// `synced` is the last plan we know the vehicle has -- set by a successful
-// read or write, and nothing else. Comparing against it is what makes the
-// dirty state honest: not "has anything been clicked" but "does the vehicle
-// disagree with the screen". A plan loaded from a file is dirty on arrival,
-// because the vehicle has not seen it.
+// `synced` is the last plan the vehicle is known to have, set only by a
+// successful read or write. Dirty means the vehicle disagrees with the
+// screen, so a plan loaded from a file is dirty on arrival.
 
 /** How new items are created, until the user says otherwise. */
 export interface MissionDefaults {
@@ -44,45 +42,29 @@ export type TransferState =
   | { kind: 'done'; text: string }
 
 /**
- * The divider position, versioned.
- *
- * A stored split outranks the default, which is right -- it is a choice
- * someone made by dragging. But the default changed because the *pane*
- * changed underneath it: the altitude profile is twice the height it was,
- * and a split chosen for the old one leaves the new profile squeezed. A
- * value stored against the old layout is not a preference about this one,
- * so the key is bumped and everyone starts from the new default once.
- * Drag it anywhere and that is kept, as before.
+ * The divider position. The key is versioned because a split stored against
+ * an earlier pane layout does not fit the current one.
  */
 const SPLIT_KEY = 'loftgcs.mission.split.v2'
 
-/**
- * Where the divider sits before anyone drags it.
- *
- * Taken from where this project's own pilot settled it after using the
- * screen, rounded: the profile at full height with two rows of the list
- * under it. Guessing at this produced two wrong answers first.
- */
+/** Default divider: the profile at full height with two list rows below. */
 const DEFAULT_SPLIT = 0.65
 
 function loadSplit(): number {
   try {
     const v = Number(localStorage.getItem(SPLIT_KEY))
     if (Number.isFinite(v) && v > 0.15 && v < 0.9) return v
-    // The pane it was chosen for no longer exists; do not carry it over.
+    // Drop the split stored under the old key.
     localStorage.removeItem('loftgcs.mission.split')
   } catch {
-    // Storage blocked; the default is a reasonable answer.
+    // Storage blocked; use the default.
   }
   return DEFAULT_SPLIT
 }
 
 /**
- * Which of the three plans the screen is editing.
- *
- * All three are drawn on the map at once and only one takes clicks. Hiding
- * the fence while planning a mission is how you plan a mission through it,
- * so the switch changes what you *edit*, never what you can see.
+ * Which of the three plans the screen is editing. All three are always
+ * drawn; only the edited one takes clicks.
  */
 export type PlanKind = 'mission' | 'fence' | 'rally'
 
@@ -104,12 +86,8 @@ export interface MissionState {
   /** Where the plan came from, for the title bar. */
   sourceName: string | null
   /**
-   * The middle of what the map is showing, degrees * 1e7.
-   *
-   * Kept here so an item added from the *table* has somewhere to go: with
-   * no neighbors and no home there is no other reference, and a waypoint
-   * at latitude zero is a mission to the Gulf of Guinea rather than one
-   * you can see and drag.
+   * The center of the map view, degrees * 1e7. Where an item added from the
+   * table goes when it has no neighbors and there is no home.
    */
   mapCenter: { x: number; y: number } | null
   setMapCenter(at: { x: number; y: number }): void
@@ -118,11 +96,8 @@ export interface MissionState {
   setSplit(ratio: number): void
 
   /**
-   * The survey area being drawn, or null when not surveying. Held apart from
-   * the plan because it is not itself a mission: the polygon is the input,
-   * and the waypoints it generates are the output that gets flown. Keeping
-   * the polygon means the grid can be re-cut at a different spacing without
-   * redrawing the area.
+   * The survey area being drawn, or null when not surveying. Kept apart from
+   * the plan so the grid can be regenerated without redrawing the area.
    */
   survey: SurveyDraft | null
   startSurvey(): void
@@ -166,10 +141,7 @@ export interface MissionState {
 
   setPlan(plan: MissionPlan, opts?: { synced?: boolean; name?: string }): void
   addItem(command: number, at?: { x: number; y: number }): string
-  /**
-   * Insert after the item at `index` -- what the row's + button does, and
-   * how items are added without touching the map. -1 appends.
-   */
+  /** Insert after the item at `index` (the row's + button). -1 appends. */
   addItemAfter(index: number, command?: number): string
   updateItem(uid: string, patch: Partial<Omit<PlanItem, 'uid'>>): void
   removeItem(uid: string): void
@@ -183,13 +155,9 @@ export interface MissionState {
 }
 
 /**
- * Where an item added from the table goes on the map.
- *
- * Between its neighbors when it has two, so inserting into a leg puts the
- * new waypoint on that leg rather than on top of one end. Otherwise it
- * takes the position it follows -- an item stacked exactly on its
- * predecessor is obvious and one drag from right, where a waypoint at
- * latitude zero is a mission that flies to the Gulf of Guinea.
+ * Where an item added from the table goes on the map: midway between its
+ * neighbors when it has two, otherwise on the item it follows, otherwise the
+ * fallback.
  */
 function insertPosition(
   plan: MissionPlan,
@@ -245,9 +213,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   fenceDraft: [],
 
   setEditing(kind) {
-    // Switching away abandons anything half-drawn: a two-corner polygon is
-    // not a fence, and keeping it would only resurface later as a shape the
-    // vehicle rejects.
+    // Switching away abandons anything half-drawn.
     set({ editing: kind, fenceTool: null, fenceDraft: [], selectedShape: null })
   },
   selectShape(uid) {
@@ -267,9 +233,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         return
       case 'inclusionCircle':
       case 'exclusionCircle': {
-        // One click is a whole circle: there is nothing to accumulate, and
-        // dragging out a radius on a map is a worse way to say "300 m" than
-        // typing it into the field that appears.
+        // One click places a circle at a default radius, edited afterward.
         const uid = newFenceUid()
         const shape: FenceShape = {
           uid,
@@ -427,15 +391,13 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   },
 
   setSplit(ratio) {
-    // Clamped so the divider cannot be dragged until one pane has no usable
-    // height -- a map or a table you have to drag back out of is worse than
-    // one that simply stops.
+    // Clamped so neither pane loses all usable height.
     const clamped = Math.max(0.2, Math.min(0.85, ratio))
     set({ split: clamped })
     try {
       localStorage.setItem(SPLIT_KEY, String(clamped))
     } catch {
-      // Not remembering the split is a nuisance, never a failure.
+      // Not remembering the split is harmless.
     }
   },
 
@@ -443,8 +405,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
     set({
       plan,
       selected: null,
-      // A file load leaves synced alone: the vehicle still holds whatever it
-      // held, and the difference is exactly what the dirty flag should show.
+      // A file load leaves synced alone: the vehicle still holds what it held.
       ...(opts?.synced ? { synced: clonePlan(plan) } : {}),
       ...(opts?.name !== undefined ? { sourceName: opts.name } : {}),
     })
@@ -467,9 +428,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
       y: at && spec?.location !== false ? at.y : 0,
       z: spec?.altitude === false ? 0 : defaults.altM,
     }
-    // A takeoff belongs first, wherever it was clicked -- it is the one
-    // command whose position in the list is not a matter of taste, and an
-    // RTL after it is the usual next thought.
+    // A takeoff always goes first.
     const items = command === 22 ? [item, ...plan.items] : [...plan.items, item]
     set({ plan: { ...plan, items }, selected: uid })
     return uid
@@ -574,11 +533,8 @@ export function isDirty(s: MissionState): boolean {
 }
 
 /**
- * Does the fence on screen disagree with the vehicle's?
- *
- * Compared through the wire form rather than field by field: that is exactly
- * what would be uploaded, so two fences that serialize the same are the same
- * fence however differently they were built.
+ * Does the fence on screen disagree with the vehicle's? Compared by wire
+ * form, since that is what would be uploaded.
  */
 export function fenceDirty(s: MissionState): boolean {
   if (!s.fenceSynced) return s.fence.shapes.length > 0 || s.fence.returnPoint !== null

@@ -1,19 +1,13 @@
-// Painting the HUD. Kept apart from the React shell so the frame loop stays
-// readable and this stays a single place to reason about how the instrument
-// looks.
+// Painting the HUD, kept apart from the React shell.
 //
-// Rooted in primary flight display convention rather than invented: airspeed
-// on the left and altitude on the right of the attitude indicator; a bank
-// scale marked at 10, 20, 30 and 45 degrees with a slip/skid trapezoid riding
-// under its pointer; a pitch ladder graduated finely near the horizon and
-// coarsely further out, dashed below it so up and down are distinguishable at
-// a glance without reading a number.
+// Follows primary flight display convention: airspeed left and altitude right
+// of the attitude indicator; a bank scale marked at 10, 20, 30 and 45 degrees
+// with a slip/skid trapezoid under its pointer; a pitch ladder graduated
+// finely near the horizon and dashed below it.
 //
-// The typographic rules are the other half. Values are monospaced so digits
-// do not dance as they change; labels are a lighter, letter-spaced sans at
-// two thirds the brightness, so the eye lands on the number and not its name.
-// Text is lifted off the background with a soft shadow rather than a hard
-// outline -- an outline at these sizes is what made the old HUD look thick.
+// Values are monospaced so digits do not jitter; labels are a dimmer,
+// letter-spaced sans. Text is separated from the background with a soft
+// shadow rather than an outline, which looks heavy at these sizes.
 
 import { compassTicks, tapeTicks, type ArmReadiness, tapeStep } from './hud-draw'
 import {
@@ -36,15 +30,12 @@ const DIM = 'rgba(255, 255, 255, 0.62)'
 const AMBER = '#F7941D'
 const GREEN = '#35D07F'
 const RED = '#FF453A'
-// Light enough that the horizon reads through all three bars. The heading
-// ribbon uses the same value and now has the horizon drawn behind it, which
-// is what actually makes it match: the same alpha over the dark panel
-// background rather than over sky came out much heavier.
+// Light enough that the horizon reads through the tapes and the heading
+// ribbon, which also has the horizon drawn behind it.
 const PANEL = 'rgba(14, 17, 22, 0.26)'
 /**
- * The chips words sit on over the ladder -- the readiness line and the
- * vehicle's warning. At 0.5 a rung's "30" still read through NOT READY TO
- * ARM; opaque enough that the words are the only thing in the box.
+ * Background of the chips behind the readiness line and the vehicle's
+ * warning, opaque enough that ladder rungs do not show through the words.
  */
 const CHIP = 'rgba(14, 17, 22, 0.82)'
 const PANEL_EDGE = 'rgba(255, 255, 255, 0.18)'
@@ -81,10 +72,8 @@ export interface HudState {
   horizon: boolean
   overlays: boolean
   /**
-   * A video picture is showing behind this canvas. The horizon then draws its
-   * symbology only -- line, ladder, bank scale -- and leaves out the sky and
-   * ground fill, which would otherwise paint straight over the picture and
-   * make switching video on look like it did nothing at all.
+   * Video is showing behind this canvas, so the horizon draws only its
+   * symbology (line, ladder, bank scale) and no sky or ground fill.
    */
   videoBehind: boolean
 }
@@ -100,7 +89,7 @@ interface Text {
   shadow?: number
 }
 
-/** Gradients are per-height, so building them every frame is pure waste. */
+/** Gradients depend only on height, so they are cached. */
 let skyCache: { h: number; sky: CanvasGradient; ground: CanvasGradient } | null = null
 
 function gradients(ctx: CanvasRenderingContext2D, h: number) {
@@ -119,8 +108,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   ctx.clearRect(0, 0, w, h)
   if (w < 40 || h < 40) return
 
-  // Proportional to the panel, which is resizable: constants that suit a
-  // small corner panel leave a full-window HUD with a hairline ladder.
+  // Proportional to the panel, which is resizable.
   const s = Math.min(1.5, Math.max(0.75, Math.min(w, h) / 320))
   const ribbonH = 24 * s
   const tapeW = 50 * s
@@ -137,10 +125,8 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     ctx.textAlign = o.align ?? 'left'
     ctx.textBaseline = 'alphabetic'
     if (CAN_LETTER_SPACE && o.spacing) ctx.letterSpacing = `${o.spacing}px`
-    // A soft shadow rather than an outline: legible over sky, ground or
-    // video, without the thickness a stroke adds at these sizes. Kept light
-    // -- a heavy one reads as a glow, which is worst on the colored state
-    // text where the dark halo muddies the color it surrounds.
+    // A light, soft shadow: legible over sky, ground or video without the
+    // thickness of an outline or a halo that muddies colored text.
     ctx.shadowColor = 'rgba(0, 0, 0, 0.55)'
     ctx.shadowBlur = (o.shadow ?? 2.6) * s
     ctx.shadowOffsetY = 1
@@ -198,15 +184,12 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
 
   paintRibbon(ctx, w, ribbonH, st.headingDeg, s, write)
 
-  // Short tapes centered on the horizon, as Mission Planner has them. The
-  // height that frees up is what the speeds and the vertical speed sit in,
-  // directly under the bar each belongs to.
+  // Short tapes centered on the horizon, as in Mission Planner, leaving room
+  // for the speed readouts under each.
   const tapeH = Math.max(80, (h - ribbonH) * 0.52)
   const tapeTop = Math.max(ribbonH + gap, cy - tapeH / 2)
   const tapeBottom = tapeTop + tapeH
-  // Converted here rather than upstream: the tapes, the readouts under them
-  // and their labels all have to agree, and one conversion point is how
-  // they cannot drift apart.
+  // Converted once here so the tapes, readouts and labels agree.
   const spd = st.units.speed
   const dst = st.units.distance
   paintTape(
@@ -236,9 +219,8 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
 
   paintAircraft(ctx, cx, cy, s)
 
-  // Under the speed bar: the two speeds. Under the altitude bar: vertical
-  // speed and throttle. Same two lines each way, so the panel reads as a
-  // pair rather than as a left side and a right side.
+  // Under the speed tape: the two speeds. Under the altitude tape: vertical
+  // speed and throttle.
   const u1 = tapeBottom + 17 * s
   const u2 = u1 + 15 * s
   const left = gap
@@ -267,17 +249,14 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     align: 'right',
   })
   write(st.linkText, right, ribbonH + 18 * s, { size: corner, align: 'right' })
-  // GPS opposite the link, on the same line: both answer "can I trust what
-  // this thing is telling me", and they are the two that decide whether a
-  // position mode is available at all. Red without a usable fix -- status,
-  // and the one number on this screen that turns a Loiter into a refusal.
+  // GPS opposite the link on the same line. Red without a usable fix, since
+  // position modes are then refused.
   write(st.gpsText, left, ribbonH + 18 * s, {
     size: corner,
     ...(st.gpsUsable ? {} : { color: RED, weight: '600' }),
   })
 
-  // State, centered and unmissable. Sits above the horizon center so the
-  // aircraft symbol stays readable underneath it.
+  // State, centered above the aircraft symbol.
   const stateY = cy - Math.min(w, h) * 0.17
   if (!st.armed) {
     write('DISARMED', cx, stateY, {
@@ -309,11 +288,9 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     })
   }
 
-  // The latest warning, Mission Planner's place for it: below the horizon
-  // center, mirroring the state words above it, on a chip so a ladder rung
-  // cannot run through the words. Cut to fit between the tapes rather than
-  // wrapped -- a second line would land on the readiness chip -- with the
-  // Messages pane holding the whole of it.
+  // The latest warning, below the horizon center as in Mission Planner.
+  // Truncated to fit between the tapes rather than wrapped; the Messages
+  // pane has the full text.
   if (st.message) {
     const size = 12 * s
     const y = cy + Math.min(w, h) * 0.17
@@ -336,13 +313,10 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     const ready = st.readiness === 'ready'
     const label = ready ? 'READY TO ARM' : 'NOT READY TO ARM'
     const y = h - 25 * s
-    // On its own chip: it sits over the bottom of the pitch ladder, and a
-    // rung running through the middle of the words is exactly the sort of
-    // thing you do not want to squint past before a flight.
+    // On a chip so ladder rungs do not run through the words.
     ctx.save()
     ctx.font = `600 ${Math.round(11 * s)}px ${SANS}`
-    // measureText does not know about the letter-spacing the text is drawn
-    // with, so the chip has to allow for it or it comes out too narrow.
+    // measureText ignores letter-spacing, so the chip allows for it.
     const tw = ctx.measureText(label).width + label.length * 1.1 * s + 20 * s
     ctx.restore()
     ctx.save()
@@ -351,8 +325,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     ctx.fillStyle = CHIP
     ctx.fill()
     ctx.restore()
-    // Its own line above the corners, so it never runs into the battery on
-    // one side or the mode on the other.
+    // Its own line above the corners, clear of the battery and mode.
     write(label, cx, y, {
       size: 11 * s,
       weight: '600',
@@ -381,17 +354,15 @@ function paintHorizon(
     ctx.translate(0, ((st.pitch * 180) / Math.PI) * pxPerDeg)
   }
 
-  // Sky and ground run the full height, behind the heading ribbon included:
-  // the ribbon is then a translucent panel over the horizon exactly as the
-  // tapes are, which is what makes the three read as one instrument.
+  // Sky and ground run the full height, behind the heading ribbon too, so the
+  // ribbon is a translucent panel like the tapes.
   ctx.save()
   ctx.beginPath()
   ctx.rect(0, 0, w, h)
   ctx.clip()
   place()
   const reach = Math.max(w, h) * 2
-  // Over video the fill is left out, so the camera picture is what fills the
-  // sky and ground and the horizon becomes a line drawn on it.
+  // Over video the fill is omitted and the horizon is just a line.
   if (!st.videoBehind) {
     const g = gradients(ctx, h * 2)
     ctx.fillStyle = g.sky
@@ -407,17 +378,14 @@ function paintHorizon(
   ctx.stroke()
   ctx.restore()
 
-  // The ladder stops at the ribbon, though. Letting it run on behind a panel
-  // that thin means its rungs and numbers show through the heading scale.
+  // The ladder stops at the ribbon so it does not show through the scale.
   ctx.save()
   ctx.beginPath()
   ctx.rect(0, top, w, h - top)
   ctx.clip()
   place()
 
-  // Pitch ladder. Finely graduated near the horizon and coarsely further
-  // out, as a PFD is; dashed below the horizon so the sign of the pitch
-  // reads without finding a number.
+  // Pitch ladder: finer near the horizon, dashed below it.
   ctx.lineCap = 'butt'
   const maxDeg = 60
   for (let deg = -maxDeg; deg <= maxDeg; deg += 5) {
@@ -435,7 +403,7 @@ function paintHorizon(
     ctx.moveTo(-half, y)
     ctx.lineTo(half, y)
     ctx.stroke()
-    // Down-turned ends, the detail that makes a ladder read as a ladder.
+    // Down-turned ends.
     if (major) {
       ctx.setLineDash([])
       const tick = (deg > 0 ? 1 : -1) * 5 * s
@@ -446,9 +414,7 @@ function paintHorizon(
       ctx.lineTo(half, y + tick)
       ctx.stroke()
     }
-    // Numbered on the left only, as Mission Planner's HUD is. Numbering both
-    // sides doubles the clutter and pushes the ladder into whichever top
-    // corner the link readout wants.
+    // Numbered on the left only, as in Mission Planner, to reduce clutter.
     if (major) {
       ctx.setLineDash([])
       ctx.font = `500 ${Math.round(10 * s)}px ${MONO}`
@@ -540,8 +506,7 @@ function paintAircraft(ctx: CanvasRenderingContext2D, cx: number, cy: number, s:
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)'
     ctx.lineWidth = 5.5 * s
   }
-  // Wings either side of a center vee. They nearly meet on purpose: with a
-  // wide gap the vee reads as a stray mark rather than as the nose of one
+  // Wings either side of a center vee, nearly meeting so it reads as one
   // symbol.
   wing(() => {
     ctx.beginPath()
@@ -577,9 +542,8 @@ function paintRibbon(
 ) {
   const halfSpan = 48
   const pxPerDeg = w / 2 / halfSpan
-  // Labels that would land under the heading box are dropped rather than
-  // drawn behind it. The margin allows for the label's own width: excluding
-  // only its center leaves a "150" showing as "50".
+  // Skip labels that would sit under the heading box, allowing for the
+  // label's own width.
   const boxHalf = 22 * s + 14 * s
   ctx.save()
   ctx.fillStyle = PANEL
@@ -612,7 +576,7 @@ function paintRibbon(
   }
   ctx.restore()
 
-  // A chevron, not a box: it points at the ribbon instead of covering it.
+  // A chevron rather than a box, so it does not cover the ribbon.
   const label = Math.round(heading).toString().padStart(3, '0')
   ctx.save()
   ctx.fillStyle = 'rgba(14, 17, 22, 0.82)'
@@ -691,8 +655,7 @@ function paintTape(
   }
   ctx.restore()
 
-  // The live value in a box that points at the horizon, so the eye can find
-  // it without leaving the attitude picture.
+  // The live value in a box pointing at the horizon.
   const bh = 20 * s
   const nose = 6 * s
   ctx.save()

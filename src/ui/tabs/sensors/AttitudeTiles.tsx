@@ -3,24 +3,12 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 import planeSheet from './cal-attitudes-plane.png'
 import f35bSheet from './cal-attitudes-f35b.png'
 
-// Six attitudes as six pictures: the shared part of both calibrations.
+// Six attitude tiles, shared by the compass and accelerometer calibrations.
 //
-// **The aircraft is a picture of the real model, rendered ahead of time**
-// (`npm run cal-art`, scripts/make-cal-art.mjs). Six hand-drawn silhouettes
-// came first and were the weakest part of the screen: a vehicle on its side
-// or nose down is hard to draw as a flat shape, and each view had to be
-// authored separately, so the six looked like six different aircraft. These
-// are the same airframe, in the same six attitudes and the same held yaw --
-// but as a sprite sheet, because they are 72px and static, and a WebGL
-// context plus a GLTF parse for that is a cost with nothing to show for it.
-// Frames are in `ORIENTATIONS` order, which is what makes the index below the
-// frame number.
-//
-// The accelerometer wizard drew a live three.js airframe here instead, turning
-// to whichever side the vehicle asked for. It was the better picture and the
-// worse screen: the same six attitudes are the subject of both calibrations,
-// and showing them two different ways made two screens out of one idea. The
-// tiles also say what the model could not -- which sides are done.
+// The pictures are a sprite sheet pre-rendered from the real model
+// (`npm run cal-art`, scripts/make-cal-art.mjs), since a WebGL context is not
+// worth it for six small static images. Frames are in `ORIENTATIONS` order,
+// so the orientation index is the frame number.
 
 export interface AttitudeTile {
   /** Which attitude, and so which frame of the sheet. */
@@ -40,28 +28,18 @@ function useSheet() {
   const airframe = useVehicleStore((s) => s.airframe)
   return airframe === 'f35b'
     ? { url: f35bSheet, credit: false }
-    : // Always the aircraft, whatever the vehicle is: a multirotor is nearly
-      // flat, so on its side it is a sliver with no up or down to it, where a
-      // wing and a fin read in all six.
+    : // The airplane even for a multirotor: a flat quad on its side is an
+      // unreadable sliver, while a wing and fin read in all six attitudes.
       { url: planeSheet, credit: true }
 }
 
 /**
- * The turn being asked for: around the vertical, whichever way up it is.
- *
- * Drawn on every attitude that is still to do, not only the one in progress.
- * It is the *instruction* -- the same turn is wanted in all six -- and with it
- * on the active tile alone the other five looked like a different kind of
- * thing, as though only one of them involved turning. Faint until its tile is
- * the one being worked on.
- *
- * The ellipse is in earth frame and needs no variant per attitude: the
- * aircraft is rotated inside a world whose horizontal stays horizontal on
- * screen, so one arc lies in the plane of the turn in all six pictures.
+ * The requested turn about vertical, drawn on every attitude still to do
+ * (faint until its tile is active). The arc is in earth frame, so one shape
+ * fits all six pictures.
  */
 function SpinArrow() {
-  // Behind the aircraft rather than under it, so it reads as the path the
-  // vehicle travels rather than as a label stuck below the picture.
+  // Behind the aircraft, as the path it travels.
   return (
     <svg className="cal-att__spin" viewBox="0 0 72 72" aria-hidden="true">
       <path d="M12 50 A 24 10 0 1 0 56 44" fill="none" />
@@ -95,12 +73,8 @@ export default function AttitudeTiles({ tiles }: { tiles: AttitudeTile[] }) {
                 />
               </span>
               <span className="cal-att__label">{tile.label}</span>
-              {/* Progress without a word for it: the bar under the current
-                  tile fills as the turns are made. Every tile keeps the space
-                  for it, drawn or not -- otherwise the tile being worked on is
-                  the one that grows, and the row jumps each time the highlight
-                  moves. The empty one is a spacer and says so, rather than
-                  being a progressbar announcing itself six times over. */}
+              {/* Every tile reserves the bar's space so the row does not jump;
+                  the empty one is a hidden spacer, not a progressbar. */}
               {tile.progress === null ? (
                 <span className="cal-att__bar cal-att__bar--empty" aria-hidden="true" />
               ) : (
@@ -120,9 +94,8 @@ export default function AttitudeTiles({ tiles }: { tiles: AttitudeTile[] }) {
           )
         })}
       </ol>
-      {/* CC-BY is owed for showing the biplane, and a rendering of it is still
-          it. See src/models/ATTRIBUTION.md, which says to add a line anywhere
-          else it appears -- this is the third. */}
+      {/* The biplane is CC-BY-4.0 and a rendering of it still needs the
+          credit. See src/models/ATTRIBUTION.md. */}
       {sheet.credit && (
         <p className="la-card__note model-credit">
           Aircraft model:{' '}

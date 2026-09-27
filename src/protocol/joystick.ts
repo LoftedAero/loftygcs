@@ -1,35 +1,24 @@
 // Turning a gamepad into RC channels.
 //
-// This is the one feature here that can fly the aircraft, so the shape of
-// it is chosen for what happens when something goes wrong rather than for
-// what happens when everything works.
+// Channels are microseconds, 1000 to 2000, centered at 1500. ArduPilot reads
+// RC_CHANNELS_OVERRIDE exactly as it reads a receiver, so a stuck override is
+// a stuck stick.
 //
-// The unit is the same one a transmitter sends: a channel is microseconds,
-// 1000 to 2000, centered at 1500. ArduPilot reads RC_CHANNELS_OVERRIDE
-// exactly as it reads a receiver, which is what makes this useful and also
-// what makes it dangerous: there is no separate "simulated" path, and a
-// stuck override is a stuck stick.
-//
-// **The two special values are not the same on every channel**, and this is
-// the trap. Measured against SITL, and it is what the MAVLink spec says:
+// The two special values differ by channel (MAVLink spec, confirmed on SITL):
 //
 //               ignore ("no change")   release to the receiver
 //   ch 1-8      65535                  0
 //   ch 9-18     0 or 65535             65534
 //
-// So a release that sends zeros hands channels 1-8 back and *leaves 9-16
-// held* at whatever they were last told -- a switch channel stuck where the
-// gamepad left it, for as long as the vehicle runs. Every frame here is
-// built per channel from `ignoreValue` and `releaseValue`, never from a
-// literal.
+// A release of all zeros hands back 1-8 and leaves 9-16 held, so every frame
+// is built per channel from `ignoreValue` and `releaseValue`.
 //
-// Stopping is sending the release, not going quiet: a vehicle whose override
-// simply stops holds the last value until RC_OVERRIDE_TIME runs out.
+// Stopping means sending the release, not going quiet: a vehicle whose
+// override stream stops holds the last value until RC_OVERRIDE_TIME runs out.
 //
-// Pure: no Gamepad API, no timers, no sending. The service above it owns all
-// of that, and this owns the arithmetic that decides where the controls are.
+// Pure: no Gamepad API, timers or sending; the service above owns those.
 
-/** Microseconds, the range every transmitter and every autopilot agrees on. */
+/** Microseconds. */
 export const PWM_MIN = 1000
 export const PWM_MID = 1500
 export const PWM_MAX = 2000
@@ -64,22 +53,15 @@ export interface AxisMap {
   axis: number
   reverse: boolean
   /**
-   * Whether the stick springs back to its middle when let go. A centered
-   * axis gets the deadzone and expo, and must be near its middle before
-   * control is taken; one that stays where it is left -- a throttle, a
-   * slider, a dial -- gets neither and is not checked, having no rest
-   * position. That is the only difference: a spring-centered throttle is
-   * simply a centered axis, and sits at 1500 when released.
-   *
-   * It was once a three-way `rest` (center / low / free), where `low` meant
-   * a throttle that had to be down before control was taken. That check
-   * went, and with it the only thing that told `low` from `free`.
+   * Whether the stick springs back to its middle. A centered axis gets the
+   * deadzone and expo and must be near its middle before control is taken;
+   * one that stays where it is left (a throttle, slider or dial) gets neither
+   * and is not checked.
    */
   centered: boolean
   /**
-   * Softening around center, 0 to 1. Cubic, the same curve transmitters
-   * call expo -- fine control where the stick is nearly still, full
-   * authority at the stops. Only a centered axis has a center to soften.
+   * Softening around center, 0 to 1: the cubic curve transmitters call expo.
+   * Only applies to a centered axis.
    */
   expo: number
 }
@@ -90,10 +72,8 @@ export interface AxisMap {
  * `momentary` sends its second value while held and its first otherwise;
  * `toggle` flips between its two on each press. `set` sends its one value
  * from the press on, until another `set` button on the same channel is
- * pressed -- three of them on the flight-mode channel are three positions of
- * a mode switch. `mode` drives no channel at all: it asks the vehicle for a
- * flight mode by name, which works whatever the vehicle's mode channel and
- * its table say.
+ * pressed (three on the mode channel make a three-position switch). `mode`
+ * drives no channel: it asks the vehicle for a flight mode by name.
  */
 export type ButtonMode = 'momentary' | 'toggle' | 'set' | 'mode'
 
@@ -106,10 +86,8 @@ export interface ButtonMap {
   /** Microseconds: two for momentary and toggle, one for set, none for mode. */
   values: number[]
   /**
-   * The flight mode a `mode` button asks for, by ArduPilot's name for it
-   * ("Loiter", "RTL"). A name rather than a number because the numbers are
-   * per vehicle -- RTL is 6 on Copter and 11 on Plane -- and a profile moves
-   * between vehicles.
+   * The flight mode a `mode` button asks for, by ArduPilot's name ("Loiter",
+   * "RTL"). Mode numbers differ per vehicle (RTL is 6 on Copter, 11 on Plane).
    */
   flightMode?: string
 }
@@ -124,10 +102,9 @@ export interface JoystickConfig {
 /**
  * A Mode 2 transmitter, as nearly as a gamepad can be one.
  *
- * Left stick is throttle and yaw, right stick is pitch and roll, which is
- * what almost every pilot in the world has in their hands. The Gamepad API
+ * Left stick is throttle and yaw, right stick pitch and roll. The Gamepad API
  * reports Y axes as -1 up, so throttle is reversed (stick up is more) and
- * pitch is not (stick forward is nose down, the same as a real elevator).
+ * pitch is not (stick forward is nose down).
  */
 export const DEFAULT_CONFIG: JoystickConfig = {
   axes: [
@@ -162,8 +139,7 @@ export function defaultValues(mode: ButtonMode): number[] {
 function deaden(v: number, deadzone: number): number {
   const size = Math.abs(v)
   if (size <= deadzone) return 0
-  // Without the rescale the stick jumps from zero to the deadzone's worth
-  // of authority the moment it leaves the dead patch.
+  // Rescale so output does not jump when the stick leaves the deadzone.
   const scaled = (size - deadzone) / (1 - deadzone)
   return Math.sign(v) * scaled
 }
@@ -176,18 +152,16 @@ function applyExpo(v: number, expo: number): number {
 /**
  * One axis, from the gamepad's -1..1 to microseconds.
  *
- * Clamped at both ends rather than trusted: a worn stick reads past 1.0 on
- * some pads, and a channel above 2000 is a value ArduPilot will read as a
- * failsafe rather than as full deflection.
+ * Clamped: a worn stick can read past 1.0, and ArduPilot may read a channel
+ * above 2000 as a failsafe rather than full deflection.
  */
 export function axisToPwm(raw: number, map: AxisMap, deadzone: number): number {
   if (!Number.isFinite(raw)) return PWM_MID
   const signed = map.reverse ? -raw : raw
   const shaped = map.centered
     ? applyExpo(deaden(signed, deadzone), map.expo)
-    : // An axis that stays where it is left gets neither: there is no
-      // center to be soft around, and a deadzone there is a dead patch
-      // mid-travel.
+    : // No deadzone or expo: on a non-centered axis a deadzone is a dead
+      // patch mid-travel.
       Math.min(1, Math.max(-1, signed))
   const pwm = Math.round(PWM_MID + shaped * (PWM_MAX - PWM_MID))
   return Math.min(PWM_MAX, Math.max(PWM_MIN, pwm))
@@ -199,17 +173,16 @@ export interface PadState {
 }
 
 /**
- * What each button mapping currently holds: whether it was down last read,
- * and which of its values it is on. A toggle needs both -- a press is a
- * change, not a level -- so this is carried from one read to the next.
+ * Per-button state carried between reads: whether it was down last read
+ * (a toggle acts on the press edge) and which of its values it is on.
  */
 export interface ButtonState {
   down: boolean[]
   position: number[]
   /**
    * The value the last `set` button pressed on each channel sent, indexed by
-   * channel - 1; null until one is pressed. Held per channel rather than per
-   * button because the buttons sharing a channel are one switch.
+   * channel - 1; null until one is pressed. Per channel because the buttons
+   * sharing a channel act as one switch.
    */
   latched: (number | null)[]
 }
@@ -220,10 +193,8 @@ const noLatches = (): (number | null)[] => Array.from({ length: CHANNELS }, () =
  * A starting state that matches the vehicle, where it is known.
  *
  * Each toggle starts on whichever of its values is nearest to what that
- * channel reads now. Starting them all on their first value would, the
- * moment control was taken, move every switch mapped here to position one.
- * A `set` channel is left alone until one of its buttons is pressed, for the
- * same reason: taking control must not change the flight mode.
+ * channel reads now, and a `set` channel is left alone until one of its
+ * buttons is pressed, so taking control does not move any switch.
  */
 export function initialButtonState(
   config: JoystickConfig,
@@ -247,9 +218,8 @@ export function initialButtonState(
 /**
  * Note which buttons are already held, without acting on any of them.
  *
- * Used when control is taken, and whenever the mapping changes: a switch
- * held down at that moment was pressed before this read and is not a press
- * now. Stepping instead would flip the switch on the first read.
+ * Used when control is taken and when the mapping changes, so a button
+ * already held does not count as a press on the first read.
  */
 export function primeButtons(
   config: JoystickConfig,
@@ -295,12 +265,9 @@ export function stepButtons(
 /**
  * The whole override message's worth of channel fields.
  *
- * Channels nothing is mapped to are sent as "no change" -- which is its own
- * number either side of channel 8 -- rather than as a center value. Sending
- * 1500 on an unmapped channel would override a flight-mode switch to its
- * middle position, which on a real aircraft is a mode change nobody asked for.
- * Where two mappings drive one channel the later one wins, which the setup
- * screen flags as a conflict.
+ * Unmapped channels are sent as "no change", never 1500, which would drive a
+ * flight-mode switch to its middle position. Where two mappings drive one
+ * channel the later one wins; the setup screen flags that as a conflict.
  */
 export function channelsFor(
   pad: PadState,
@@ -349,13 +316,10 @@ export function conflictingChannels(config: JoystickConfig): number[] {
 /**
  * Whether a pad's spring-centered sticks are near the middle.
  *
- * Checked before an override is allowed to start, because the gamepad is
- * usually on a desk with something resting on it. Only centered axes are
- * checked. A throttle that stays where it is left is deliberately not,
- * because it has to be taken wherever it is: control taken over from a
- * transmitter in flight is taken at hover throttle, and a check demanding it
- * be down could only be passed by cutting the motors. The confirm before
- * taking control and the live channel bars are what show where it is.
+ * Checked before an override starts, since the gamepad may be on a desk with
+ * something resting on it. A non-centered throttle is not checked: control
+ * taken over in flight is taken at hover throttle, and requiring it down
+ * would mean cutting the motors.
  */
 export function sticksAreSafe(pad: PadState, config: JoystickConfig): boolean {
   for (const map of config.axes) {
@@ -375,13 +339,10 @@ const num = (v: unknown, lo: number, hi: number, fallback: number) =>
 /**
  * Any stored or imported config, made into one this code can trust.
  *
- * Everything that reaches here came from storage an older build wrote, or
- * from a file somebody picked, so nothing is taken on faith: every channel
- * is clamped into range, every value into what a servo can be sent, every
- * mode to one that exists, and a map that cannot be made sense of is
- * dropped rather than guessed at. A `rest` an earlier build kept is read as
- * centered or not (only `center` was centered); a `releaseButton` is
- * dropped, since releasing is the app's, not a mapping's.
+ * Input comes from storage an older build wrote or from an imported file, so
+ * channels and values are clamped, modes checked, and unreadable maps
+ * dropped. A legacy `rest` field maps to `centered` (only `center` was
+ * centered); a legacy `releaseButton` is dropped.
  */
 export function sanitizeConfig(input: unknown): JoystickConfig {
   const src = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
@@ -409,10 +370,8 @@ export function sanitizeConfig(input: unknown): JoystickConfig {
   const buttons: ButtonMap[] = buttonsIn.flatMap((b: unknown) => {
     if (!b || typeof b !== 'object') return []
     const m = b as Record<string, unknown>
-    // An earlier `cycle` stepped through a list; it is read as a toggle
-    // between its first two, the nearest thing that still exists. The oldest
-    // shape was one value sent while held: a momentary from 'no change' to
-    // that value is not expressible, so it becomes low/that value.
+    // Legacy shapes: `cycle` becomes a toggle between its first two values,
+    // and a single held `pwm` becomes a momentary from low to that value.
     const mode: ButtonMode =
       m.mode === 'toggle' || m.mode === 'momentary' || m.mode === 'set' || m.mode === 'mode'
         ? m.mode
@@ -435,16 +394,14 @@ export function sanitizeConfig(input: unknown): JoystickConfig {
       mode,
       values,
     }
-    // A name, trimmed and bounded; resolved against the vehicle only when
-    // the button is pressed.
+    // Resolved against the vehicle only when pressed.
     if (mode === 'mode') {
       map.flightMode = typeof m.flightMode === 'string' ? m.flightMode.trim().slice(0, 32) : ''
     }
     return [map]
   })
   return {
-    // A missing list means an old or foreign file and gets the defaults; an
-    // empty one is a choice and stays empty.
+    // A missing axes list gets the defaults; an empty one stays empty.
     axes,
     buttons,
     deadzone: num(src.deadzone, 0, 0.4, DEFAULT_CONFIG.deadzone),

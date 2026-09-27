@@ -4,21 +4,12 @@ import { LaInput, LaSelect } from '../../components/La'
 import { useMissionStore } from '../../../stores/mission-store'
 import { MAV_FRAMES } from '../../../protocol/mission-commands'
 
-// What a newly placed item gets: its altitude, and which datum that
-// altitude is measured from.
+// The altitude and altitude frame given to a newly placed item. They sit on
+// the item list's header, beside the rows they stamp, on all three plans
+// (the altitude also applies to new rally points).
 //
-// On the item list's own header rather than in the settings column, because
-// they are the two fields every row underneath is stamped with -- reading
-// them in the same glance as the rows they produced is the whole point, and
-// the column is where you look for what to *do*, not for what the next
-// click will be worth.
-//
-// Shown on all three plans, because the list under them is always the
-// mission list whichever plan is being edited -- and the altitude is live on
-// Rally as well, where a new point is placed at it.
-//
-// The vehicle has never heard of either: they are editor settings, and
-// changing one does not touch an item already placed.
+// Editor settings only: nothing is sent to the vehicle, and existing items
+// are not changed.
 
 export default function NewItemDefaults() {
   const units = useUnits()
@@ -46,9 +37,7 @@ export default function NewItemDefaults() {
       <label className="mission-defaults__label" htmlFor="mission-frame">
         Altitude mode
       </label>
-      {/* The short names, because the header has no room for "Above mean sea
-          level" -- and they are the same short names the rows below use, so
-          the setting and its result read alike. The long form is on hover. */}
+      {/* Short names, matching the rows; the long form is in the tooltip. */}
       <LaSelect
         id="mission-frame"
         className="mission-defaults__frame"

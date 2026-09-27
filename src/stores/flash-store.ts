@@ -10,15 +10,8 @@ export type LoadedFirmware =
   | { kind: 'hex'; segments: HexSegment[]; label: string }
 
 /**
- * One slot per image kind, not one slot.
- *
- * The two ways onto a board take different files -- the ArduPilot serial
- * bootloader takes an `.apj`, DFU takes the `_with_bl.hex` -- and both are
- * offered at once, because whether a board already carries the ArduPilot
- * bootloader is the user's situation rather than a mode of this screen. A
- * single slot made them evict each other, so downloading the image for one
- * path silently emptied the other and its button went dead with no
- * explanation on screen.
+ * One slot per image kind: the serial bootloader takes an `.apj` and DFU
+ * takes the `_with_bl.hex`, and loading one must not evict the other.
  */
 export type LoadedApj = Extract<LoadedFirmware, { kind: 'apj' }>
 export type LoadedHex = Extract<LoadedFirmware, { kind: 'hex' }>
@@ -35,11 +28,8 @@ export type FlashPhaseUi =
   | 'error'
 
 /**
- * Which way onto the board is running.
- *
- * Both paths are on screen at once, and there is one progress bar's worth of
- * state, so the panel has to know whose it is -- without this, starting a DFU
- * flash also lit up the serial card's progress and log.
+ * Which path the running flash is on, so only that path's panel shows the
+ * shared progress and log.
  */
 export type FlashPath = 'serial' | 'dfu'
 
@@ -70,7 +60,7 @@ export const useFlashStore = create<FlashState>((set) => ({
   progress: 0,
   log: [],
   error: null,
-  // A null clears both: it is "nothing is staged", not "nothing of this kind".
+  // Null clears both slots.
   setFirmware: (fw) =>
     set(
       fw === null

@@ -17,10 +17,8 @@ export default function OsdTab() {
   }
   if (!entries.has('OSD_TYPE')) {
     return (
-      // A board without an onboard OSD chip needs a build carrying MSP
-      // DisplayPort or an analog OSD before any of these parameters exist,
-      // which is a firmware choice made elsewhere; the one line says the
-      // state this vehicle is in.
+      // OSD parameters exist only in builds with MSP DisplayPort or an
+      // analog OSD compiled in.
       <LaCard title="OSD" note="This firmware build has no OSD support compiled in." />
     )
   }

@@ -8,17 +8,10 @@ import { parseParamFile, sameValue } from '../../../protocol/param-file'
 
 // The OSD page's actions column.
 //
-// Save and load are limited to the OSD parameters, which is the useful unit:
-// a screen layout is a hundred-odd OSD{n}_*_EN/X/Y triplets plus a handful of
-// OSD_* settings, and it is the one part of a configuration that genuinely
-// does transfer between aircraft -- where you like the battery voltage on
-// screen has nothing to do with which airframe is underneath it.
-//
-// Mission Planner does not have this. Its OSD screen offers Copy Layout and
-// Paste Layout, which move one screen to another through the clipboard within
-// a session, and its file handling is the generic whole-parameter save. A
-// filtered .param file is the same idea that survives closing the app, and it
-// stays in the format every other tool in the ecosystem reads.
+// Save and load cover only the OSD parameters (the OSD{n}_*_EN/X/Y triplets
+// and OSD_* settings), since a screen layout transfers between aircraft where
+// the rest of a configuration does not. The file is an ordinary .param file,
+// so other tools can read it.
 
 /** Everything the OSD owns: OSD_* settings and the per-screen OSDn_* items. */
 export function isOsdParam(name: string): boolean {
@@ -26,17 +19,15 @@ export function isOsdParam(name: string): boolean {
 }
 
 /**
- * The OSD's one column: what you do first -- vehicle actions, the layout file
- * -- and what you set after, as groups of the same tile (`children`), the
- * order every screen's column keeps.
+ * The OSD's actions column: vehicle actions and the layout file first, then
+ * settings groups (`children`).
  */
 export default function OsdActions({ children }: { children?: ReactNode }) {
   return (
     <div className="app-col-shell">
       <div className="app-col app-col--fields">
-        {/* Scoped to the OSD's own parameters, as a card's Write is to its
-            card's: an edit staged on another screen is not this page's to
-            send. */}
+        {/* Scoped to OSD parameters, so edits staged on other screens are
+            not sent from here. */}
         <VehicleParamActions
           title="OSD"
           owns={isOsdParam}
@@ -44,9 +35,6 @@ export default function OsdActions({ children }: { children?: ReactNode }) {
         />
         <section className="app-col__group">
           <h3 className="app-col__head">Layout file</h3>
-          {/* That these touch only the OSD parameters is what the buttons
-              say by being in a group called Layout file, and is the whole
-              subject of this file's header comment. */}
           <SaveLayout />
           <LoadLayout />
         </section>
@@ -57,11 +45,9 @@ export default function OsdActions({ children }: { children?: ReactNode }) {
 }
 
 /**
- * A settings group in the column: ParamCard's field list, as a section of the
- * column rather than a card of its own. The same presence rule -- a parameter
- * the vehicle does not report is not drawn, and a group with none is not
- * either. `children` are rows of the group's own after the fields, such as a
- * button opening a dialog; they are drawn only with the group.
+ * A settings group in the column: ParamCard's field list as a column section.
+ * Parameters the vehicle lacks are not drawn, and an empty group is hidden.
+ * `children` are extra rows after the fields, such as a dialog button.
  */
 export function OsdSettings({
   title,
@@ -87,8 +73,8 @@ export function OsdSettings({
           {...(f.writeNow ? { writeNow: true } : {})}
           {...(f.gatesOthers ? { gatesOthers: true } : {})}
           {...(f.optionLabels ? { optionLabels: f.optionLabels } : {})}
-          // Too narrow here for a bitmask's names or ArduPilot's longer value
-          // names: "2 selected", short names, the full text on hover.
+          // The column is narrow: bitmasks show a count and values short
+          // names, with the full text on hover.
           bitmaskCount
           shortOptions
         />
@@ -122,8 +108,7 @@ function SaveLayout() {
       <LaButton variant="secondary" size="block" onClick={save}>
         Save layout to file
       </LaButton>
-      {/* Always drawn: the result sits between the two buttons, and mounting
-          it on demand pushed Load layout down the column. */}
+      {/* Always rendered so Load layout does not shift when a note appears. */}
       <LaHint>{note}</LaHint>
     </>
   )
@@ -132,10 +117,8 @@ function SaveLayout() {
 /**
  * Load an OSD layout, staging only the OSD parameters it contains.
  *
- * A whole-vehicle .param file works here too and is a normal thing to hand
- * it: everything outside the OSD is ignored rather than applied, which is
- * the difference between borrowing somebody's screen layout and inheriting
- * their tuning.
+ * A whole-vehicle .param file works too: everything outside the OSD is
+ * ignored, so loading a layout never brings in someone else's tuning.
  */
 function LoadLayout() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -206,8 +189,7 @@ function LoadLayout() {
             {result?.ignoredNonOsd === 1 ? ' was' : 's were'} ignored.
           </p>
         )}
-        {/* Usually a different firmware version or panel set -- which is not
-            something the reader can act on here. */}
+        {/* Usually a different firmware version or panel set. */}
         {(result?.absent ?? 0) > 0 && (
           <LaHint>
             {result?.absent} OSD parameter{result?.absent === 1 ? '' : 's'} in the file

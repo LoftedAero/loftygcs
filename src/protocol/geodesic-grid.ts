@@ -1,31 +1,24 @@
 // The 80 sphere sections ArduPilot's compass calibration reports coverage in.
 //
-// MAG_CAL_PROGRESS carries a `completion_mask` of ten bytes -- eighty bits,
-// one per section -- and the sections are the faces of an icosahedron
-// tessellated by a factor of two: each of the twenty triangles split into
-// four by bisecting its edges, every vertex projected onto the sphere. A
-// section's index is `i * 4 + j` for icosahedron triangle i in [0,20) and
-// sub-triangle j in [0,4), and the mask bit is
-// `completion_mask[section / 8] & (1 << (section % 8))`.
+// MAG_CAL_PROGRESS carries a ten-byte `completion_mask`, one bit per section.
+// The sections are the faces of an icosahedron tessellated by a factor of
+// two: each of the twenty triangles split into four by bisecting its edges,
+// with every vertex projected onto the sphere. A section's index is
+// `i * 4 + j` for icosahedron triangle i in [0,20) and sub-triangle j in
+// [0,4), and its bit is `completion_mask[section / 8] & (1 << (section % 8))`.
 //
-// **The ordering is not ours to choose.** It is transcribed from
-// AP_GeodesicGrid.h's own specification, including the order of the twenty
-// triangles and the order of the four sub-triangles within each. Get either
-// wrong and the picture is still a plausible-looking sphere with plausible
-// patches lit -- just the wrong ones, which is the kind of wrong nobody
-// notices. `geodesic-grid.test.ts` checks the shape of the result against
-// facts that follow from the specification rather than from this code.
+// The ordering of both the triangles and the sub-triangles is transcribed
+// from AP_GeodesicGrid.h. A wrong order still draws a plausible sphere, just
+// with the wrong patches lit.
 
-/** The golden ratio, which is where the icosahedron's vertices come from. */
+/** The golden ratio, from which the icosahedron's vertices are built. */
 const G = (1 + Math.sqrt(5)) / 2
 
 export type Vec3 = readonly [number, number, number]
 
 /**
- * The first ten icosahedron triangles, verbatim from AP_GeodesicGrid.h.
- *
- * The other ten are their opposites: T_(i+10) = -T_i, which the header states
- * and which is why only half are written here.
+ * The first ten icosahedron triangles, verbatim from AP_GeodesicGrid.h. The
+ * other ten are their opposites: T_(i+10) = -T_i.
  */
 const HALF: readonly (readonly Vec3[])[] = [
   [

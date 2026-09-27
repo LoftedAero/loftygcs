@@ -5,17 +5,9 @@ import { decodeSensors, SENSOR_BITS } from '../../../protocol/sensors'
 import { prearmFailures } from '../../../protocol/prearm'
 import { armReadiness } from './hud-draw'
 
-// "Why won't it arm", answered in one place.
-//
-// Everything here was already on screen somewhere: the prearm bit is in the
-// HUD's readiness dot, the sensor health is a list on the Overview tab, and
-// ArduPilot's own reasons scroll past in the message feed. Separately none
-// of them answers the question -- a red dot with no reason, a healthy sensor
-// list while the vehicle refuses, a reason that scrolled away thirty seconds
-// ago. Together they do.
-//
-// The reasons come first because they are the specific answer; the sensors
-// follow as the general one, for the case where the vehicle has not said.
+// "Why won't it arm", answered in one place: the prearm bit, ArduPilot's
+// reported reasons, and any unhealthy sensors. The reasons come first; the
+// sensors cover the case where the vehicle has not said why.
 
 /** Reasons age out after a minute, so the view refreshes to notice. */
 const TICK_MS = 2000
@@ -35,9 +27,7 @@ export default function PreflightPanel() {
   }, [])
 
   if (!connected) {
-    // The same words the Messages and Status panes use, because it is the
-    // same state: nothing has arrived yet. Three panes describing one
-    // situation three ways made the tab strip read as three failures.
+    // The same wording as the Messages and Status panes.
     return <p className="app-placeholder">Waiting for telemetry…</p>
   }
 
@@ -69,13 +59,8 @@ export default function PreflightPanel() {
           ))}
         </ul>
       ) : readiness === 'notReady' ? (
-        // The bit says no and the vehicle has not said why -- which happens
-        // when the GCS connected after the messages went past. Say that,
-        // rather than showing an empty list that looks like nothing is
-        // wrong. ArduPilot repeats the reason roughly every thirty seconds,
-        // so the wait is short; that is the sort of thing a note is tempted
-        // to explain and should not -- the three notes around it are one
-        // short sentence each, and a paragraph here read as an error.
+        // Not ready, with no reason heard yet (the GCS connected after it
+        // went past). ArduPilot repeats reasons about every thirty seconds.
         <p className="preflight__note">The vehicle reports an unspecified failing check.</p>
       ) : (
         <p className="preflight__note">

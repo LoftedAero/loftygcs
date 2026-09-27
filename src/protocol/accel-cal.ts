@@ -1,12 +1,11 @@
 // Accelerometer calibration: the vehicle runs it, we relay.
 //
-// ArduPilot's onboard accel calibration decides which orientation it wants
-// next and says so over STATUSTEXT ("Place vehicle on its LEFT side and
-// press any key."). The GCS reads that prompt and answers with
-// MAV_CMD_ACCELCAL_VEHICLE_POS carrying the matching position. Following
-// the vehicle rather than assuming a fixed client-side order is what makes
-// the flow robust: if firmware changes the sequence, retries a side, or
-// skips one, the UI still tracks it.
+// ArduPilot decides which orientation it wants next. It asks by sending
+// MAV_CMD_ACCELCAL_VEHICLE_POS to the GCS every second, and prints the same
+// request once as STATUSTEXT ("Place vehicle on its LEFT side and press any
+// key."); the text is the fallback. The GCS answers with the same command for
+// that position. Following the vehicle rather than a fixed order keeps the UI
+// in step if the firmware retries or skips a side.
 
 /** MAV_CMD_ACCELCAL_VEHICLE_POS values. */
 export const ACCEL_POS = {
@@ -77,9 +76,8 @@ export function positionById(id: AccelPositionId): AccelPosition {
 }
 
 /**
- * Which orientation is this STATUSTEXT asking for? Null when the line is
- * not a position prompt. Matching is keyword-based rather than exact so
- * wording tweaks between firmware versions do not break the wizard.
+ * Which orientation this STATUSTEXT asks for, or null if it is not a position
+ * prompt. Keyword matching tolerates wording changes between firmware versions.
  */
 export function parseAccelPrompt(text: string): AccelPosition | null {
   const t = text.toLowerCase()
@@ -96,16 +94,9 @@ export function parseAccelPrompt(text: string): AccelPosition | null {
 }
 
 /**
- * The vehicle's prompt without its keyboard-era tail, and without punctuation.
- *
- * ArduPilot prints "Place vehicle on its LEFT side and press any key." -- the
- * key belongs to a console it no longer has, and the screen showing that line
- * has a button on it. The pose half is the useful half and is the firmware's
- * own wording, which is why it is kept rather than paraphrased; the caller
- * says what to press.
- *
- * Anything that does not end that way comes back as it was: a firmware whose
- * wording changed should still put its own words on screen.
+ * The vehicle's prompt minus the "and press any key" tail and trailing
+ * punctuation, keeping the firmware's own wording for the pose. Text that
+ * does not end that way is returned unchanged.
  */
 export function posePrompt(text: string): string {
   return text

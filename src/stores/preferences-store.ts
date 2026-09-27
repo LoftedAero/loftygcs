@@ -8,21 +8,13 @@ import {
   type VerticalSpeedUnit,
 } from '../units'
 
-// What the person using the app has chosen, as opposed to what the aircraft
-// is doing. Units today; language and whatever comes after it belong here
-// too, which is why this is one versioned document rather than a key per
-// setting.
+// User preferences, stored as one versioned document. Unknown keys are
+// ignored and missing ones fall back to defaults, so adding a preference
+// needs no migration and older builds can read newer stores. Only
+// reinterpreting an existing key requires bumping VERSION.
 //
-// The shape is deliberately additive: unknown keys in storage are ignored
-// and missing ones fall back to the default, so a build that adds a
-// preference reads an older browser's settings without a migration, and an
-// older build reading a newer store keeps working. Only a change that
-// *reinterprets* an existing key needs VERSION bumped.
-//
-// Theme stays in theme-store: it has to be applied to the document before
-// first paint by an inline script in index.html, which is a different
-// lifetime from everything here. The preferences dialog edits it through
-// that store rather than duplicating it.
+// Theme lives in theme-store because index.html's inline script applies it
+// before first paint.
 
 const STORAGE_KEY = 'loftgcs.preferences'
 const VERSION = 1
@@ -30,43 +22,31 @@ const VERSION = 1
 export interface Preferences {
   units: UnitPrefs
   /**
-   * What to plan for when no vehicle is connected.
-   *
-   * A mission's command set depends on the aircraft -- spline waypoints and
-   * payload place are Copter-only and a fixed wing refuses them on upload --
-   * so planning offline has to assume something. QGroundControl asks the
-   * same question (`offlineEditingVehicleClass`) and its docs say why: "when
-   * planning offline you must set them before adding any mission items so
-   * that the correct mission commands are available." Mission Planner does
-   * not ask, always assumes Copter, and has an open issue about it.
-   *
-   * It is a preference rather than plan state because it is a property of
-   * the person, not of the plan: someone who flies a plane wants plane
-   * commands every time they open the app.
+   * Which vehicle's command set to offer when planning with nothing
+   * connected (spline waypoints and payload place are Copter-only). Like
+   * QGroundControl's `offlineEditingVehicleClass`. A preference rather than
+   * plan state, since it belongs to the user.
    */
   planFor: VehicleClass
   /**
-   * How large the whole interface is drawn, 1 being 100%. For a laptop in
-   * sunlight, where bigger type is the difference between reading the HUD
-   * and guessing, and for a dense screen. Chromium's page zoom in the
-   * desktop app; a browser has its own zoom, which a page cannot set.
+   * Interface scale, 1 being 100%. Applied as page zoom in the desktop app;
+   * in a browser the page cannot set zoom.
    */
   uiScale: number
 }
 
-/** The scales offered: steps a person can tell apart, none so far apart they skip past the one wanted. */
+/** The scales offered. */
 export const UI_SCALES = [0.9, 1, 1.1, 1.25, 1.5] as const
 
 const DEFAULTS: Preferences = {
   units: DEFAULT_UNITS,
-  // Copter is the commonest ArduPilot vehicle and the one whose command set
-  // is a superset, so a wrong default costs an unused menu entry rather than
-  // a missing one.
+  // Copter's command set is a superset, so a wrong default adds an unused
+  // entry rather than hiding one.
   planFor: 'copter',
   uiScale: 1,
 }
 
-/** Read what is stored, keeping anything this build does not recognize. */
+/** Reads the stored preferences, ignoring anything this build does not recognize. */
 function load(): Preferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -82,28 +62,22 @@ function load(): Preferences {
       units: {
         distance: valid(parsed.units?.distance, ['m', 'ft'], DEFAULTS.units.distance),
         speed: valid(parsed.units?.speed, ['ms', 'kmh', 'kts', 'mph'], DEFAULTS.units.speed),
-        // Absent in anything written before the control existed, and the
-        // fallback is `follow` -- which is exactly what those builds did.
-        // So this needed no VERSION bump: nothing is reinterpreted.
+        // Older stores lack this; the `follow` default matches their behavior.
         verticalSpeed: valid(
           parsed.units?.verticalSpeed,
           ['follow', 'ms', 'fpm'],
           DEFAULTS.units.verticalSpeed,
         ),
       },
-      // Absent in anything written before this existed, and the fallback is
-      // the whole catalog, which is what those builds offered. No VERSION
-      // bump: nothing is reinterpreted.
+      // Older stores lack this; the default matches their behavior.
       planFor: valid(parsed.planFor, ['copter', 'plane', 'rover', 'other'], DEFAULTS.planFor),
-      // Only a scale this build offers: anything else -- an older build's,
-      // a hand-edited one -- is 100%, never a window drawn at 300%.
+      // Any scale this build does not offer falls back to 100%.
       uiScale: (UI_SCALES as readonly number[]).includes(parsed.uiScale as number)
         ? (parsed.uiScale as number)
         : DEFAULTS.uiScale,
     }
   } catch {
-    // Private mode, disabled storage, or something else's key at ours: the
-    // defaults are a fine answer and never a reason to fail to start.
+    // Storage unavailable or unparseable: use the defaults.
     return DEFAULTS
   }
 }
@@ -115,17 +89,12 @@ function valid<T extends string>(value: unknown, allowed: readonly T[], fallback
     : fallback
 }
 
-/**
- * The whole document, every time.
- *
- * Each setter used to write only its own slice, which was fine while there
- * was one; a second preference would have had every units setter erase it.
- */
+/** Writes the whole document, so no setter can erase another's value. */
 function save(prefs: Preferences): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: VERSION, ...prefs }))
   } catch {
-    // Not remembering a preference is a nuisance, never a failure.
+    // Failing to persist is not an error.
   }
 }
 
@@ -135,7 +104,7 @@ interface PreferencesState extends Preferences {
   setVerticalSpeedUnit(unit: VerticalSpeedUnit): void
   setPlanFor(cls: VehicleClass): void
   setUiScale(scale: number): void
-  /** Back to the shipped defaults, for a dialog that offers it. */
+  /** Restores the defaults. */
   reset(): void
 }
 
@@ -174,10 +143,5 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
   },
 }))
 
-/**
- * The unit choices, for the many components that only read them.
- *
- * A selector rather than the whole store, so a component re-renders when
- * units change and not when some future preference does.
- */
+/** The unit choices, selected so components re-render only when units change. */
 export const useUnits = (): UnitPrefs => usePreferencesStore((s) => s.units)

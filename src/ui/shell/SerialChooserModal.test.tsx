@@ -2,10 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import SerialChooserModal from './SerialChooserModal'
 
-// ttyS0-ttyS31 are the onboard UART ports every Linux box enumerates
-// whether or not anything is wired to them -- never the board somebody
-// plugged in -- so they collapse into a "Built-In" disclosure rather than
-// burying the real port under two dozen phantom rows.
+// ttyS0-ttyS31 are onboard UARTs Linux enumerates whether or not anything is
+// wired to them, so they collapse into a "Built-In" disclosure.
 
 let portsCb: ((list: SerialPortChoice[]) => void) | null = null
 let chosen: string | null = null
@@ -76,9 +74,7 @@ describe('grouping', () => {
 
   it('auto-opens the group when the only port is one of its own', () => {
     send(builtIns)
-    // list[0] is picked as the default selection, and it is a ttyS* port
-    // here, so hiding it behind a collapsed disclosure would hide the
-    // selection Connect is about to act on.
+    // The default selection is a ttyS* port here, so it must not be hidden.
     const toggle = screen.getByRole('button', { name: /Built-in/ })
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('ttyS0')).toBeTruthy()
@@ -115,8 +111,7 @@ describe('the default selection', () => {
   const connect = () => fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
 
   it('is the board, not ttyS0, when the OS lists the built-in ports first', () => {
-    // The order a Linux desktop really reports: ttyS0 upward, then the USB
-    // device. Defaulting to the OS's first row put the dot on a phantom.
+    // The order Linux reports: ttyS0 upward, then the USB device.
     send([...builtIns, board])
     expect(screen.getByRole('button', { name: /Built-in/ }).getAttribute('aria-expanded')).toBe(
       'false',

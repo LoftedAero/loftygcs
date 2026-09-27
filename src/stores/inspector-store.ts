@@ -3,10 +3,9 @@ import type { InspectorRow } from '../protocol/types'
 
 // The inspector's snapshot of the link.
 //
-// This is the one place raw traffic is allowed near React state, and it is
-// allowed because it is not raw: the worker condenses everything into one
-// snapshot every 400 ms, so the store updates at 2.5 Hz however hard the
-// link runs. The high-rate rule stands for everything else.
+// The only place link traffic reaches React state, and only as a condensed
+// snapshot the worker sends every 400 ms, so the store updates at 2.5 Hz
+// regardless of link rate.
 
 interface InspectorState {
   rows: InspectorRow[]

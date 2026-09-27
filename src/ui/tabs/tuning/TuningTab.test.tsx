@@ -4,9 +4,8 @@ import TuningTab from './TuningTab'
 import { useParamStore } from '../../../stores/param-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 
-// Which names the page draws. 4.7 renamed most of the navigation set, and the
-// page showed none of it on current firmware; both spellings are listed, and
-// a vehicle reports one.
+// Which names the page draws. 4.7 renamed most of the navigation set; both
+// spellings are listed, and a vehicle reports one.
 
 const entry = (value: number) => ({ value, origValue: value, mavType: 9, dirty: false })
 
@@ -60,7 +59,7 @@ describe('the Tuning page', () => {
   })
 
   it('takes a matrix column’s unit from the metadata, not from the page', () => {
-    // ATC_ACC_R_MAX is deg/s/s on 4.7; the page used to say cdeg/s/s.
+    // ATC_ACC_R_MAX is deg/s/s on 4.7, cdeg/s/s before.
     seed(COPTER_47, { ATC_ACC_R_MAX: { units: 'deg/s/s' } })
     render(<TuningTab />)
     const heads = [...document.querySelectorAll('.app-table__head')].map((h) => h.textContent)
@@ -89,7 +88,7 @@ describe('the Tuning page', () => {
     expect(titles()).not.toContain('Throttle')
     expect(shown()).not.toContain('YAW2SRV_DAMP')
     expect(shown()).not.toContain('THR_MAX')
-    // The attitude limits, which moved here from Configuration.
+    // The attitude limits.
     expect(shown()).toEqual(
       expect.arrayContaining(['ROLL_LIMIT_DEG', 'PTCH_LIM_MAX_DEG', 'PTCH_LIM_MIN_DEG']),
     )
@@ -134,8 +133,8 @@ describe('the Tuning page', () => {
   })
 
   it('puts Quicktune in the VTOL autotune card, as official hardware builds carry it', () => {
-    // CubeOrange's ArduPlane 4.7.1, measured: no Q_AUTOTUNE_ at all, and
-    // QWIK_ENABLE alone until it is switched on.
+    // ArduPlane 4.7.1 on a CubeOrange has no Q_AUTOTUNE_ at all, and only
+    // QWIK_ENABLE until it is switched on.
     seed({ RLL_RATE_P: 0.3, Q_A_RAT_RLL_P: 0.25, QWIK_ENABLE: 0 })
     render(<TuningTab />)
     fireEvent.click(screen.getByRole('tab', { name: 'VTOL' }))

@@ -14,9 +14,6 @@ describe('loading a log', () => {
     store().loadBytes('flight.bin', bytes)
     expect(store().status).toEqual({ kind: 'ready', name: 'flight.bin' })
     expect(store().log!.messages.size).toBeGreaterThan(50)
-    // It used to open on an altitude trace, which was a guess at what the
-    // reader came for -- and a wrong guess is a field to remove before
-    // starting rather than a head start.
     expect(store().selected).toEqual([])
   })
 
@@ -73,7 +70,6 @@ describe('the upper pane follows what was asked for', () => {
     store().toggleField({ message: 'ATT', field: 'Roll' })
     expect(store().upper).toBe('plot')
     store().toggleField({ message: 'ATT', field: 'Roll' })
-    // Nothing left to plot means nothing to look at: back to the replay.
     expect(store().upper).toBe('none')
   })
 
@@ -89,7 +85,7 @@ describe('the upper pane follows what was asked for', () => {
     store().setUpper('none')
     store().setUpper('plot')
     expect(store().split).toBe(0.5)
-    // But not again -- after that the divider stays where it was put.
+    // Not again: after that the divider stays where it was put.
     store().setSplit(0.3)
     store().setUpper('table')
     expect(store().split).toBe(0.3)
@@ -206,8 +202,6 @@ describe('assigning fields to y axes', () => {
   })
 
   it('puts fields sharing a unit on the same axis', () => {
-    // Adding Pitch after Roll means comparing them, and separate scales
-    // would draw two different pictures of the same wobble.
     store().toggleField({ message: 'ATT', field: 'Roll' })
     store().toggleField({ message: 'ATT', field: 'Pitch' })
     expect(store().selected.map((f) => f.axis)).toEqual([0, 0])
@@ -266,13 +260,11 @@ describe('defaultAxis', () => {
   })
 
   it('treats "no unit" as no reason to share', () => {
-    // Two unitless fields are not thereby the same quantity, and stacking
-    // every unlabelled field on one axis is how they all become flat lines.
+    // Two unitless fields are not necessarily the same quantity.
     expect(defaultAxis([{ axis: 0, unit: '' }], '')).toBe(1)
   })
 
   it('joins the busiest axis once they are all in use', () => {
-    // Crowded beats invisible, and the field can be moved afterwards.
     const full = [
       { axis: 0, unit: 'a' },
       { axis: 0, unit: 'a' },

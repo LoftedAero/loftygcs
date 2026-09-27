@@ -6,11 +6,9 @@ import type { MissionPlan } from '../../../protocol/mission-plan'
 
 // Ground elevation for whatever the mission currently covers.
 //
-// Keyed on the *tiles* rather than the plan: dragging a waypoint changes
-// the samples on every animation frame, and one terrain tile is ten
-// kilometers across, so the fetch that matters happens once when the
-// mission first reaches new ground. Everything after that is a synchronous
-// lookup in an already decoded grid.
+// Keyed on the tiles rather than the plan: dragging a waypoint changes the
+// samples every frame, but a terrain tile is ten kilometers across, so a
+// fetch happens only when the mission reaches new ground.
 
 export type TerrainState = 'off' | 'loading' | 'ready' | 'unavailable'
 
@@ -28,9 +26,8 @@ export function useTerrain(plan: MissionPlan, enabled: boolean): Terrain {
   const tiles = useMemo(() => {
     if (!enabled) return []
     const needed = terrainTilesFor(samples)
-    // A mission drawn across a continent would ask for hundreds of tiles
-    // and tens of megabytes to draw a profile nobody could read. The same
-    // cap the offline download uses, for the same reason.
+    // Same cap as the offline download: a continent-wide mission would need
+    // hundreds of tiles.
     return needed.length > MAX_AREA_TERRAIN_TILES ? [] : needed
   }, [samples, enabled])
   const key = useMemo(() => tiles.map(gridKey).sort().join(','), [tiles])
@@ -51,9 +48,8 @@ export function useTerrain(plan: MissionPlan, enabled: boolean): Terrain {
     void loadTerrainTiles(tilesRef.current).then((g) => {
       if (!live) return
       setGrids(g)
-      // Nothing came back: offline with no cached terrain, or the source is
-      // unreachable. The profile then draws without ground rather than
-      // drawing a flat plain that isn't there.
+      // Nothing came back (offline and uncached, or unreachable): the
+      // profile draws without ground rather than a flat plain.
       setState(g.size > 0 ? 'ready' : 'unavailable')
     })
     return () => {

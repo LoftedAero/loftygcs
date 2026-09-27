@@ -9,10 +9,8 @@ const log = parseDataflash(
 )
 
 /**
- * A log with the MODE history I want to test against.
- *
- * The real fixture is a slice of one flight and holds a single mode, so the
- * contiguity and merging rules would pass on it no matter what they did.
+ * A synthetic log with several MODE records. The real fixture holds a single
+ * mode, which would not exercise the contiguity and merging rules.
  */
 function logWithModes(times: number[], modes: number[], end = 100): ParsedLog {
   const columns = new Map<string, Float64Array | string[]>([
@@ -90,24 +88,21 @@ describe('flight mode spans', () => {
   })
 
   it('runs the last span to the end of the log, not to the last change', () => {
-    // Ending at the final MODE record would leave the most interesting part
-    // of most flights unshaded: the vehicle stayed in that mode until the
-    // recording stopped.
+    // The vehicle stays in its last mode until the recording stops.
     const spans = modeSpans(logWithModes([0, 10], [0, 4], 300))
     expect(spans[spans.length - 1]!.to).toBe(300)
   })
 
   it('merges a mode logged twice running into one span', () => {
-    // ArduPilot re-records the current mode for reasons of its own, and two
-    // touching bands of the same name would read as a mode change.
+    // ArduPilot sometimes re-records the current mode; two touching bands of
+    // the same name would read as a mode change.
     const spans = modeSpans(logWithModes([0, 10, 20, 30], [0, 4, 4, 3], 40))
     expect(spans.map((s) => s.name)).toEqual(['Stabilize', 'Guided', 'Auto'])
     expect(spans[1]).toMatchObject({ from: 10, to: 30 })
   })
 
   it('names modes for the vehicle that flew, not for a copter always', () => {
-    // Auto is 3 on Copter and 10 on Plane; a shared table would mislabel
-    // half the logs this app opens.
+    // Auto is 3 on Copter and 10 on Plane.
     const plane = logWithModes([0], [10], 20)
     plane.messages.get('VER')!.columns.set('FWS', ['ArduPlane V4.7.1'])
     expect(vehicleClassFromLog(plane)).toBe('plane')

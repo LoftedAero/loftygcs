@@ -24,8 +24,7 @@ describe('isFailsafe', () => {
   })
 
   it('is quiet for ordinary operation', () => {
-    // A HUD that shouts FAILSAFE while the vehicle sits on the bench is one
-    // the pilot learns to ignore.
+    // A false FAILSAFE on the bench teaches the pilot to ignore it.
     for (const s of [0, 1, 2, MAV_STATE.standby, MAV_STATE.active]) {
       expect(isFailsafe(s), `state ${s}`).toBe(false)
     }
@@ -45,7 +44,7 @@ describe('armReadiness', () => {
 
   it('stays quiet when the vehicle does not report prearm at all', () => {
     // Otherwise a build without the check shows a permanent "Not ready to
-    // arm", and the pilot stops reading the one line that matters.
+    // arm".
     expect(armReadiness(false, 0, 0, PREARM)).toBe('unknown')
   })
 
@@ -75,9 +74,7 @@ describe('tapeTicks', () => {
   })
 
   it('handles negative values without drifting off the step', () => {
-    // Altitude below the launch point and descent rates both go negative,
-    // and a tape whose ticks land on 4.999 prints them as 5 in the wrong
-    // place.
+    // Negative values (below launch, descending) must land exactly on ticks.
     const ticks = tapeTicks(-7, 10, 5)
     expect(ticks.map((t) => t.value)).toEqual([-15, -10, -5, 0])
     expect(ticks.find((t) => t.value === -5)?.offset).toBeCloseTo(2)
@@ -92,8 +89,7 @@ describe('angleDelta', () => {
   })
 
   it('never returns more than half a turn', () => {
-    // The antipode is ambiguous by nature, and it sits far outside any
-    // ribbon's span; all that matters is the magnitude never exceeds 180.
+    // The antipode is ambiguous; only the magnitude matters.
     for (const [a, b] of [
       [0, 180],
       [180, 0],
@@ -114,8 +110,7 @@ describe('compassTicks', () => {
 
   it('wraps across north without a gap or a 360', () => {
     // Pointing north the ribbon reads NW 330 345 N 15 30 NE: continuous
-    // across the wrap, with the bearing after 345 shown as N rather than
-    // as 360.
+    // across the wrap, with N rather than 360.
     const labels = compassTicks(0, 50, 15).map((t) => t.label)
     expect(labels).toEqual(['NW', '330', '345', 'N', '15', '30', 'NE'])
     expect(labels).not.toContain('360')
@@ -142,8 +137,7 @@ describe('batteryLabel', () => {
   })
 
   it('leaves out fields the vehicle has no sensor for', () => {
-    // A current of zero on a pack with no current sensor should not be
-    // presented as a measurement.
+    // Zero current with no current sensor is not a measurement.
     expect(batteryLabel(12.3, 0, 87)).toBe('12.3V  87%')
     expect(batteryLabel(0, 0, -1)).toBe('')
   })
@@ -178,34 +172,28 @@ describe('the GPS readout', () => {
   it('names the fix a pilot would name', () => {
     expect(gpsLabel(2, 5)).toBe('GPS: 2D  5 sats')
     expect(gpsLabel(3, 14)).toBe('GPS: 3D  14 sats')
-    // Worth naming separately: someone who set up an RTK base wants to see
-    // it took, and "3D" would hide it.
+    // RTK is named separately so an RTK setup can be confirmed.
     expect(gpsLabel(5, 20)).toBe('GPS: RTK float  20 sats')
     expect(gpsLabel(6, 20)).toBe('GPS: RTK fixed  20 sats')
   })
 
   it('leaves the satellite count out until there is one', () => {
-    // "No fix 0" says the same thing twice, and a receiver that has not
-    // reported yet has not said zero -- it has said nothing.
+    // No satellite count until the receiver reports one.
     expect(gpsLabel(1, 0)).toBe('GPS: No fix')
   })
 
   it('tells a missing receiver from one that is still searching', () => {
-    // GPS_FIX_TYPE 0 is NO_GPS: nothing is talking to the autopilot, which
-    // is a wire or a serial port to go and fix. 1 is NO_FIX: a receiver is
-    // there and searching, which is a matter of waiting. Same blank map,
-    // completely different thing to do about it -- so they get different
-    // words, as they do in Mission Planner.
+    // GPS_FIX_TYPE 0 (NO_GPS) means no receiver is talking to the autopilot;
+    // 1 (NO_FIX) means one is searching. Different causes, different words,
+    // as in Mission Planner.
     expect(gpsLabel(0, 0)).toBe('GPS: No GPS')
     expect(gpsLabel(1, 0)).toBe('GPS: No fix')
-    // A receiver reporting satellites but no fix is still searching, and
-    // saying "No GPS" over a count of them would be plainly wrong.
+    // Satellites but no fix means the receiver is still searching.
     expect(gpsLabel(1, 4)).toBe('GPS: No fix  4 sats')
   })
 
   it('calls a fix usable at exactly the threshold ArduPilot does', () => {
-    // Below 3 the vehicle refuses Loiter, Auto and RTL, which is when the
-    // number should be shouting rather than sitting quietly in a corner.
+    // Below a 3D fix the vehicle refuses Loiter, Auto and RTL.
     expect(gpsUsable(2)).toBe(false)
     expect(gpsUsable(3)).toBe(true)
     expect(gpsUsable(6)).toBe(true)

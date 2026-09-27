@@ -146,7 +146,7 @@ describe('PxUploader', () => {
 describe('bootloaderCrc32', () => {
   it('matches an independent bitwise implementation', () => {
     // Same algorithm computed without the table: reflected poly 0xEDB88320,
-    // init 0, no final xor -- px_uploader.py's variant.
+    // init 0, no final xor (px_uploader.py's variant).
     const bitwise = (bytes: Uint8Array): number => {
       let state = 0
       for (const byte of bytes) {

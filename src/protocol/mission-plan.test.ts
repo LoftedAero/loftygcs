@@ -90,8 +90,7 @@ describe('plansDiffer', () => {
   })
 
   it('ignores frame on commands that carry no position', () => {
-    // The SITL finding: an RTL uploaded as frame 3 reads back as frame 0.
-    // Treating that as a change marks every read-back mission dirty.
+    // An RTL uploaded as frame 3 reads back as frame 0, which is not an edit.
     const uploaded = plan([{ command: 20, frame: 3, x: 0, y: 0 }])
     const readBack = plan([{ command: 20, frame: 0, x: 0, y: 0 }])
     expect(plansDiffer(uploaded, readBack)).toBe(false)

@@ -4,17 +4,14 @@
 // and a link-out instead.
 
 export interface FirmwareOption {
-  /** `mav-type`, the real discriminator -- see MAV_TYPES below. */
+  /** `mav-type`; see MAV_TYPES below. */
   vehicle: string
   /** What to call `vehicle` on screen. */
   vehicleLabel: string
   channel: 'stable' | 'beta' | 'dev'
   /**
-   * True only for the row ArduPilot's own `/stable/` path serves.
-   *
-   * The manifest carries every release ever published, so "stable" alone is
-   * forty-odd builds for a board. This marks the one the project currently
-   * points at, which is what a version is defaulted to.
+   * True only for the row ArduPilot's `/stable/` path serves. The manifest
+   * lists every release ever published, so this marks the current one.
    */
   current: boolean
   platform: string
@@ -28,19 +25,13 @@ export interface FirmwareOption {
 }
 
 /**
- * `mav-type`, not `vehicletype`, and this is not cosmetic.
+ * Keyed on `mav-type`, not `vehicletype`.
  *
- * `vehicletype: "Copter"` covers *both* multirotors and traditional helis --
- * 14,708 rows that `mav-type` splits into Copter (7,427) and HELICOPTER
- * (7,281), which are different firmware images. Keyed on `vehicletype` this
- * app offered a heli build and a multirotor build under one name and picked
- * whichever sorted first, which is a wrong image flashed silently.
- *
- * It is also the key Mission Planner joins on, and the reason its detection
- * resolves: measured against the live manifest, board id x mav-type x
- * channel is exactly one row for 198 of 317 boards, several for 32 and none
- * for 87. Keyed on `vehicletype` instead it is *never* exactly one, because
- * the heli twin is always there beside it.
+ * `vehicletype: "Copter"` covers both multirotors and traditional helis,
+ * which `mav-type` splits into Copter and HELICOPTER: different firmware
+ * images. Mission Planner joins on `mav-type` too; board id x mav-type x
+ * channel is exactly one row for most boards, where on `vehicletype` the heli
+ * build always sits beside the multirotor one.
  */
 const MAV_TYPES: Record<string, string> = {
   Copter: 'Copter',
@@ -54,22 +45,11 @@ const MAV_TYPES: Record<string, string> = {
 }
 
 /**
- * The airframes the rest of this app was built and tested against.
+ * The vehicles the app's screens are built for.
  *
- * Everything else flashes perfectly well -- the manifest and the bootloader
- * do not care what the aircraft is -- but the screens downstream do: the
- * curated tabs, `takeoffStyle`, the mission catalog and the tuning matrices
- * are all Copter-or-Plane knowledge. Flashing a Rover leaves someone with a
- * working vehicle and a ground station that is guessing, which is worth
- * saying out loud once rather than discovering a screen at a time.
- *
- * `HELICOPTER` *is* in here: the manifest splits it off `Copter` because the
- * image differs, but the firmware underneath is ArduCopter and the screens
- * this warning is about are the same ones. It was outside the set on the
- * grounds that nothing here had been flown against a heli -- which is also
- * true of most multirotors, and is not what the line says. A warning shown
- * on a vehicle this app does understand is the kind that teaches people to
- * read past the ones that matter.
+ * Anything else flashes fine, but the curated tabs, `takeoffStyle`, the
+ * mission catalog and the tuning matrices are Copter and Plane knowledge.
+ * HELICOPTER is included because its firmware is ArduCopter.
  */
 const TUNED_FOR = new Set(['Copter', 'HELICOPTER', 'FIXED_WING'])
 
@@ -79,15 +59,9 @@ export function isTunedFor(vehicle: string): boolean {
 }
 
 /**
- * The vehicle choices, known without the manifest.
- *
- * The grid used to be derived from the downloaded manifest, which meant the
- * eight symbols -- the first thing on the screen and the one question the
- * user has to answer before anything else can happen -- waited on a 97,000
- * entry download and parse. The vehicles ArduPilot builds are not a fact
- * about today's manifest, so the list is static and the screen draws
- * immediately; `vehiclesIn` folds in anything the manifest gains that this
- * file has not learned.
+ * The vehicle choices, known without the manifest, so the screen can draw
+ * them before the ~97,000-entry download finishes. `vehiclesIn` adds any
+ * vehicle the manifest has that this list does not.
  */
 export const VEHICLES: { vehicle: string; label: string }[] = Object.entries(MAV_TYPES).map(
   ([vehicle, label]) => ({ vehicle, label }),
@@ -109,11 +83,9 @@ interface ManifestEntry {
 const MANIFEST_URL = 'https://firmware.ardupilot.org/manifest.json.gz'
 
 /**
- * `mav-firmware-version-type` has four shapes, not three, and the fourth is
- * most of the file: `OFFICIAL` (the `/stable/` path), `BETA`, `DEV`, and
- * `STABLE-4.6.3` for every release ever published. Reading only the first
- * three threw away 28,143 of the 33,915 flashable rows -- every firmware
- * older than today's, which is exactly what someone downgrading is after.
+ * `mav-firmware-version-type` has four shapes: `OFFICIAL` (the `/stable/`
+ * path), `BETA`, `DEV`, and `STABLE-x.y.z` for every past release. The last
+ * is most of the flashable rows, and is what a downgrade needs.
  */
 function classify(type: string): { channel: FirmwareOption['channel']; current: boolean } | null {
   if (type === 'OFFICIAL') return { channel: 'stable', current: true }
@@ -139,15 +111,13 @@ export async function loadFirmwareManifest(): Promise<FirmwareOption[]> {
 
   const options: FirmwareOption[] = []
   for (const e of json.firmware ?? []) {
-    // Only current-channel .apj builds: the flashable format, deduplicated
-    // from the ~90k historical entries.
+    // Only .apj builds (the flashable format) on a recognized channel.
     const kind = classify(e['mav-firmware-version-type'] ?? '')
     if (e.format !== 'apj' || !kind) continue
     const mavType = e['mav-type']
     if (!mavType || !e.platform || !e.url) continue
-    // A board id of 0 is "not stated", not board zero, and 65% of the
-    // manifest has no id at all (every hex/elf/bin row). Both are useless
-    // for matching a board and would poison the join.
+    // A board id of 0 means "not stated", and most non-apj rows have none.
+    // Neither can be matched to a board.
     if (typeof e.board_id !== 'number' || e.board_id === 0) continue
     options.push({
       vehicle: mavType,
@@ -170,29 +140,23 @@ export async function loadFirmwareManifest(): Promise<FirmwareOption[]> {
  * Drop the pinned copy of the release `/stable/` already serves.
  *
  * `Copter/stable/CubeOrange` and `Copter/stable-4.7.1/CubeOrange` are the
- * same build listed twice -- 1,683 of the 1,786 current rows -- and the
- * `/stable/` one is kept because it is what ArduPilot itself publishes as
- * current. The 103 without a twin are boards whose pinned directory was
- * never cut, and they stay.
+ * same build listed twice; the `/stable/` one is kept. Boards with no pinned
+ * twin are left alone.
  *
- * Exported for its test: it is a filter over the whole option list, and the
- * one mistake it can make is invisible in the result -- a row that should
- * have survived is simply not there.
+ * Exported for its test.
  */
 export function dropPinnedTwins(options: FirmwareOption[]): FirmwareOption[] {
   const key = (o: FirmwareOption) => `${o.boardId}|${o.vehicle}|${o.platform}|${o.version}`
   const currentKeys = new Set(options.filter((o) => o.current).map(key))
-  // Only a *stable* row can be the current release's twin. Leaving the
-  // channel out of this test looked right and quietly dropped all 1,787
-  // beta rows, because ArduPilot cuts beta and stable at the same version
-  // number -- so `beta 4.7.1` collided with `stable 4.7.1` and lost.
+  // Only a stable row can be a twin: ArduPilot cuts beta and stable at the
+  // same version number, so without the channel test `beta 4.7.1` would
+  // collide with `stable 4.7.1`.
   return options.filter((o) => o.current || o.channel !== 'stable' || !currentKeys.has(key(o)))
 }
 
 /**
- * Newest first. Compares numerically per segment, because "4.10.0" sorts
- * before "4.9.0" as a string and a downgrade list that puts them the wrong
- * way round offers the wrong firmware at the top.
+ * Newest first. Compares numerically per segment, since "4.10.0" sorts
+ * before "4.9.0" as a string.
  */
 export function compareVersions(a: string, b: string): number {
   const pa = a.split('.').map(Number)
@@ -228,20 +192,14 @@ export function releasesFor(
 }
 
 /**
- * What to offer without being asked: the current stable.
+ * The release to offer by default: the current stable.
  *
- * Read from the `current` flag rather than taken as the head of a
- * version-sorted list. Those agree for every board in the manifest as it
- * stands -- measured, zero groups disagree -- but they agree by coincidence:
- * `/stable/` is authoritative about which release is current, where the
- * ordering is only a fact about version strings, and the manifest already
- * carries rows whose reported version disagrees with the directory serving
- * them (Rover's stable-3.4.2 reports 3.5.0). If those two ever part company
- * the flag is the one to believe.
+ * Read from the `current` flag rather than the head of a version-sorted list,
+ * because `/stable/` is authoritative and some rows report a version that
+ * disagrees with their directory (Rover's stable-3.4.2 reports 3.5.0).
  *
- * Falling back through beta to dev is not a nicety -- Blimp has never had a
- * stable release and exists only on `dev`, so a strict "current stable or
- * nothing" leaves one of the eight vehicle choices permanently empty.
+ * Falls back through beta to dev because Blimp has never had a stable
+ * release.
  */
 export function defaultRelease(releases: FirmwareOption[]): FirmwareOption | undefined {
   return releases.find((o) => o.current) ?? releases[0]
@@ -250,13 +208,9 @@ export function defaultRelease(releases: FirmwareOption[]): FirmwareOption | und
 /**
  * The vehicles to offer, in the order they are offered.
  *
- * Declaration order of `MAV_TYPES`, not alphabetical: the grid should open
- * with the airframes most people are flashing and end with the two that are
- * not really airframes at all. Alphabetical put "Antenna Tracker" first.
- *
- * Seeded with the static eight so this answers the same before and after the
- * manifest arrives -- the grid must not gain or reorder symbols under
- * somebody's cursor once the download lands.
+ * Declaration order of `MAV_TYPES`, not alphabetical, so the common
+ * airframes come first. Seeded with the static list so the grid does not
+ * reorder when the manifest arrives.
  */
 export function vehiclesIn(all: FirmwareOption[]): { vehicle: string; label: string }[] {
   const seen = new Map<string, string>(VEHICLES.map((v) => [v.vehicle, v.label]))
@@ -266,8 +220,7 @@ export function vehiclesIn(all: FirmwareOption[]): { vehicle: string; label: str
     .sort((a, b) => {
       const ia = order.indexOf(a[0])
       const ib = order.indexOf(b[0])
-      // Anything the manifest gains that MAV_TYPES has not learned sorts
-      // last rather than first, which is what indexOf's -1 would do.
+      // Vehicles not in MAV_TYPES sort last, not first as indexOf's -1 would.
       return (ia < 0 ? order.length : ia) - (ib < 0 ? order.length : ib)
     })
     .map(([vehicle, label]) => ({ vehicle, label }))
@@ -283,14 +236,8 @@ export interface ReleaseChoice {
 /**
  * The releases a vehicle has, independent of the board.
  *
- * A release is a thing ArduPilot cuts across every board it supports, so the
- * version is a property of the firmware and not of the hardware -- which
- * matters here because the board is no longer known when this list is drawn.
- * It used to be `releasesFor(vehicle, platform)`, and once the board stopped
- * being asked for up front that meant an empty list, a permanently disabled
- * control, and "No build for this board" on a screen where no board had been
- * named. The version is chosen here and resolved against the board at flash
- * time, which is the only moment both are known.
+ * ArduPilot cuts a release across every board, so the version can be chosen
+ * before the board is known and resolved against it at flash time.
  */
 export function versionsFor(all: FirmwareOption[], vehicle: string): ReleaseChoice[] {
   const seen = new Map<string, ReleaseChoice>()
@@ -309,12 +256,11 @@ export function versionsFor(all: FirmwareOption[], vehicle: string): ReleaseChoi
 }
 
 /**
- * Every build target there is, for a board that cannot say which it is.
+ * Every build target, for a board that cannot identify itself.
  *
- * DFU has no board id, and the target is asked for before a vehicle is
- * chosen, so this is the whole catalog rather than one vehicle's slice:
- * current builds where a platform has one, every release it ever had where
- * it does not, the same fallback `platformsFor` makes.
+ * DFU has no board id and the target is chosen before the vehicle, so this
+ * covers the whole catalog, with the same current-first fallback as
+ * `platformsFor`.
  */
 export function allPlatforms(all: FirmwareOption[]): string[] {
   const live = new Set(all.filter((o) => o.current).map((o) => o.platform))
@@ -322,7 +268,7 @@ export function allPlatforms(all: FirmwareOption[]): string[] {
   return [...(live.size > 0 ? live : every)].sort()
 }
 
-/** The matching bootloader-included image for DFU recovery, by convention. */
+/** The matching bootloader-included image for DFU, by naming convention. */
 export function withBootloaderUrl(apjUrl: string): string {
   return apjUrl.replace(/\.apj$/, '_with_bl.hex')
 }
@@ -335,13 +281,9 @@ export function optionsForBoard(all: FirmwareOption[], boardId: number): Firmwar
 /**
  * The boards a vehicle can be flashed onto, narrowed to a detected board.
  *
- * Only `current` rows decide the list: a platform that existed in 4.3 and
- * was dropped is not a board anyone is holding, and putting a dead variant
- * beside a live one is a choice nobody can make correctly. A board with no
- * current build for this vehicle falls back to every release it ever had --
- * 87 of 317 board ids have no build at all on some vehicle, and an empty
- * list would read as "this app does not know your board" when the truth is
- * that this vehicle was dropped from it.
+ * Only `current` rows decide the list, so dropped platforms do not appear
+ * beside live ones. A board with no current build for this vehicle falls
+ * back to every release it ever had, rather than an empty list.
  */
 export function platformsFor(
   all: FirmwareOption[],
@@ -358,23 +300,13 @@ export function platformsFor(
 /**
  * The build to use for a detected board, or null when it is a real choice.
  *
- * `platformsFor` answers "what fits", which is not the same question. A
- * CubeOrange+ fits three: `CubeOrangePlus`, `CubeOrangePlus-bdshot` and
- * `CubeOrangePlus-SimOnHardWare`. Treating that as ambiguous meant one of
- * the commonest boards on the bench asked which build it was every single
- * time -- measured against the live manifest with a Cube Orange+ actually
- * plugged in, which is how this was found; nothing in the unit tests could
- * see it.
- *
- * The distinction that matters is variants-of-one-board versus
- * different-boards-sharing-an-id, and it is the same test `describeBoard`
- * already makes. Where every candidate is the shortest one plus a suffix,
- * the shortest is the plain build and the rest are opt-in variants
- * (`-bdshot` is bidirectional DShot; `-SimOnHardWare` is SITL running on the
- * board, which nobody flying wants), so the plain build is chosen. Where
- * they share no prefix -- board id 9 is CubePurple *and* Pixhawk1 *and*
- * fmuv3, genuinely different hardware -- there is no safe pick and the
- * caller has to ask.
+ * A CubeOrange+ fits three builds: `CubeOrangePlus`, `CubeOrangePlus-bdshot`
+ * and `CubeOrangePlus-SimOnHardWare`. Where every candidate is the shortest
+ * plus a suffix, the rest are opt-in variants of it (`-bdshot` is
+ * bidirectional DShot, `-SimOnHardWare` runs SITL on the board), so the plain
+ * build is chosen. Where they share no prefix (board id 9 is CubePurple,
+ * Pixhawk1 and fmuv3) the caller has to ask. `describeBoard` makes the same
+ * test.
  */
 export function preferredPlatform(
   all: FirmwareOption[],
@@ -392,10 +324,8 @@ export function preferredPlatform(
  * What to call a board we have only the id for.
  *
  * The manifest's `brand_name` where there is one, else the platform. Where a
- * board id covers several platforms the shared prefix is used, so id 140
- * reads "CubeOrange" rather than picking one of CubeOrange,
- * CubeOrange-bdshot and CubeOrange-SimOnHardWare and implying the board is
- * that variant.
+ * board id covers several variants of one platform, the shared prefix is
+ * used, so id 140 reads "CubeOrange".
  */
 export function describeBoard(all: FirmwareOption[], boardId: number): string | null {
   const mine = optionsForBoard(all, boardId)

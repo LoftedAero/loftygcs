@@ -3,30 +3,15 @@ import { LaButton, LaHint } from '../../components/La'
 import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 import { videoService, type VideoStatus } from '../../../services/video'
 
-// The HUD's video source, as a pane rather than a dialog.
+// The HUD's video source. A pane rather than a dialog, because it is a
+// connection that keeps reporting status.
 //
-// It was a modal reached from the View menu, which put it two levels down
-// from a screen where it is one of the things you set up before flying. It
-// is also not a question with an answer -- it is a connection you watch, so
-// it wants somewhere to keep reporting from rather than somewhere to be
-// dismissed. The lower pane is that place, beside the camera controls that
-// point the thing this is showing.
+// Two forms: an RTSP stream from a camera or companion computer, or a UDP
+// port receiving RTP. H.264 only. Credentials in the URL
+// (rtsp://user:pass@host/path) are sent as an authentication header.
 //
-// Two forms, because those are the two a vehicle actually offers: an RTSP
-// stream from a camera or companion computer, and a UDP port something is
-// already pushing RTP at. The label names both and the placeholder shows the
-// first; two example links that filled the field in went, because they were
-// orange text competing with Connect for the pane's one primary action.
-//
-// H.264 only, which is what essentially every airborne camera and companion
-// computer produces. Credentials go in the URL -- rtsp://user:pass@host/path
-// -- and are sent as an authentication header rather than in the request
-// line. That used to be a paragraph under the field; it is what the code
-// does, not something to read before connecting.
-//
-// Connect means "keep this stream on the HUD": a drop reconnects by itself
-// until Disconnect (services/video.ts), and the one status line says what is
-// playing, what it is doing, or why it is not.
+// Connect keeps the stream on the HUD, reconnecting after a drop until
+// Disconnect (services/video.ts).
 
 export default function VideoPane() {
   const url = useFlightLayoutStore((s) => s.videoUrl)
@@ -62,8 +47,7 @@ export default function VideoPane() {
             }}
           />
         </label>
-        {/* Ghost, as the app bar's Disconnect is: stopping the picture is not
-            destructive, and blue is for the controls that set something. */}
+        {/* Ghost, like the app bar's Disconnect. */}
         {live ? (
           <LaButton variant="ghost" onClick={() => void videoService.close()}>
             Disconnect
@@ -75,10 +59,9 @@ export default function VideoPane() {
         )}
       </div>
 
-      {/* A browser can open neither an RTSP nor a raw UDP stream. Otherwise
-          one line, always there -- what is happening, what is playing, or why
-          it is not -- so a status arriving moves nothing. Red while the
-          picture is down, retrying or not. */}
+      {/* A browser can open neither RTSP nor raw UDP. Otherwise one status
+          line, always rendered so nothing moves, red while the picture is
+          down. */}
       {!desktop ? (
         <LaHint error>Network video needs the desktop app.</LaHint>
       ) : (

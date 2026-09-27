@@ -22,14 +22,14 @@ import JoystickPanel from './JoystickPanel'
 import VideoPane from './VideoPane'
 import ViewPane from './ViewPane'
 
-// The flight screen, arranged as Mission Planner arranges it: one panel
-// pinned left at a fixed aspect ratio, the controls and messages filling the
-// space beneath it, and the other panel taking the full height on the right.
+// The flight screen, laid out like Mission Planner's: one panel pinned left
+// at a fixed aspect ratio with the controls and messages beneath it, and the
+// other panel taking the full height on the right. Dragging the divider
+// widens the left column, making its panel taller and the stack below it
+// shorter. Swap exchanges which panel is pinned.
 //
-// The two columns are the same height by construction, so dragging the
-// divider widens the left one, which makes its fixed-aspect panel taller,
-// which the stack underneath absorbs. Swap exchanges which panel is pinned;
-// whichever lands on the left inherits the aspect rule.
+// It renders with or without a vehicle; everything that commands the
+// aircraft is disabled without a connection (see FlightControls).
 export default function FlightTab() {
   const [follow, setFollow] = useState(true)
   const [menu, setMenu] = useState<MapMenuPoint | null>(null)
@@ -42,9 +42,8 @@ export default function FlightTab() {
   const belowRef = useRef<HTMLDivElement>(null)
   const layout = useFlightLayoutStore()
 
-  // How tall the controls are right now. They wrap as the column narrows, so
-  // their height is measured rather than assumed, and the pinned panel is
-  // capped to leave room for them and for a usable lower pane beneath.
+  // The controls wrap as the column narrows, so their height is measured and
+  // the pinned panel is capped to leave room for them and the lower pane.
   const [controlsH, setControlsH] = useState(0)
   useEffect(() => {
     const controls = belowRef.current?.querySelector('.flight-controls')
@@ -56,32 +55,21 @@ export default function FlightTab() {
     return () => ro.disconnect()
   }, [])
 
-  // The HUD's right-click shortcut to the video settings. It has to open the
-  // pane as well as select it: with the lower pane switched off, changing
-  // which tab is active would have done nothing anyone could see.
+  // The HUD's right-click shortcut to the video settings. Opens the lower
+  // pane too, in case it is switched off.
   const showVideoPane = () => {
     layout.setLogPane('video')
     if (!layout.showMessages) layout.toggle('showMessages')
   }
 
-  // Pins belong to the vehicle that was sent them: a guided target is where
-  // *that* aircraft was told to go, and a home pin is where it said its
-  // home was. Both are meaningless once it is gone, and leaving them up
-  // reads as instructions still standing.
+  // The guided target and home pins belong to the connected vehicle, so they
+  // are cleared when it goes.
   const linked = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   useEffect(() => {
     if (linked) return
     setTarget(null)
     setHomePin(null)
   }, [linked])
-
-  // Drawn with or without a vehicle. It used to be a card saying what the
-  // screen would have shown, which meant the app opened on a description of
-  // itself -- and the map is useful before a vehicle exists: it is where you
-  // look at the field, and where a mission drawn next door is already
-  // visible. Everything that commands the aircraft is disabled without a
-  // connection (see FlightControls), and the instruments read zero, which is
-  // what an instrument does when nothing is driving it.
 
   const mapPanel = (
     <MapView
@@ -100,11 +88,9 @@ export default function FlightTab() {
   const aspectVisible = aspectIsHud ? layout.showHud : layout.showMap
   const fillVisible = aspectIsHud ? layout.showMap : layout.showHud
 
-  // One grid rather than two independent columns. The top row is sized by
-  // the fixed-aspect panel and the bottom row takes the rest, so the
-  // controls on the left and the plot on the right are the same height by
-  // construction -- there is no way to express "as tall as the other
-  // column's remainder" between siblings.
+  // One grid rather than two columns: the top row is sized by the
+  // fixed-aspect panel and the bottom row takes the rest, so the controls on
+  // the left and the plot on the right always match in height.
   const grid = (
     <div
       className={`flight-grid${fillVisible ? '' : ' flight-grid--single'}${aspectVisible ? '' : ' flight-grid--no-aspect'}${layout.showMessages ? '' : ' flight-grid--no-pane'}`}
@@ -190,21 +176,10 @@ export default function FlightTab() {
 }
 
 /**
- * The lower pane: the vehicle's own messages, or every telemetry field it is
- * sending. Two views of "what is it telling me", so they share one space and
- * a header rather than competing for the screen.
- */
-/**
- * The lower pane: one thing at a time, chosen by its tab.
+ * The lower pane: one view at a time, chosen by its tab.
  *
- * Camera and joystick live here rather than as panels of their own. They
- * are things you look at in the space under the controls, which is what
- * this pane is for -- and as separate panels they competed with it for the
- * same room while being switched on from a menu about window layout.
- *
- * Each pane is mounted only while it is showing, which the joystick
- * depends on: it starts reading the gamepad when it mounts and stops when
- * it unmounts, so nothing is polled while you are reading messages.
+ * Each pane is mounted only while showing. The joystick depends on this: it
+ * reads the gamepad only while mounted.
  */
 function LogPane({
   pane,
@@ -252,9 +227,7 @@ function FlightMessages() {
     if (el) el.scrollTop = el.scrollHeight
   }, [statusTexts])
   return (
-    // The placeholder gives this the same empty state the Status pane has.
-    // A vehicle that has said nothing yet and no vehicle at all otherwise
-    // look identical here -- an empty box, which reads as a fault.
+    // The same empty-state placeholder as the Status pane.
     <textarea
       ref={logRef}
       className="la-log flight-log"

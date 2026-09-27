@@ -7,17 +7,9 @@ import {
 } from '../../../services/mission-terrain'
 import { useTerrain } from './use-terrain'
 
-// Whether this mission hits the ground.
-//
-// The profile already draws the answer -- the ground under the route, with
-// the offending stretch in red. This says the one thing a drawing cannot:
-// that there is something to look at. So it sits on the header above that
-// drawing, appears only when it has something to report, and says nothing
-// about how far or where, which the picture shows better than a number.
-//
-// It warns; it does not block. Flying low is a legitimate thing to plan --
-// a survey at 40 m over a ridge is somebody's job -- so the station's part
-// is to make sure nobody discovers the ridge from the telemetry.
+// Flags a mission that intersects terrain, on the header above the profile
+// that shows where. It warns but does not block, since low flight can be
+// intentional.
 
 export default function TerrainWarning() {
   const plan = useMissionStore((s) => s.plan)

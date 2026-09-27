@@ -3,27 +3,17 @@ import { DEFAULT_CONFIG, sanitizeConfig, type JoystickConfig } from '../protocol
 
 // The gamepad's settings and its live state.
 //
-// `active` is never persisted and never starts true. Everything else about
-// this feature is a preference; that one is a decision someone has to make
-// again every session, because it is the difference between a station that
-// is watching an aircraft and one that is flying it.
+// `active` is never persisted and never starts true: taking control is a
+// decision made again every session.
 //
-// **A mapping belongs to a device.** A gamepad, a HOTAS and a wheel have
-// nothing in common but the word "axis", so each device the browser reports
-// keeps its own mapping, and choosing it -- or plugging it in -- brings that
-// mapping back. Named profiles sit beside that: a mapping saved under a name
-// can be loaded onto any device, and written to or read from a file to move
-// it between machines. Everything read back, from storage or from a file, is
-// passed through `sanitizeConfig` before it is used.
+// Each device keeps its own mapping, since a gamepad, a HOTAS and a wheel
+// share nothing but the word "axis". Named profiles can be loaded onto any
+// device and saved to or read from a file. Everything read back goes through
+// `sanitizeConfig`.
 
 /**
- * Which device, remembered by the id the browser reports rather than by
- * its index.
- *
- * Indices shuffle between sessions -- a wheel plugged in before the pad
- * takes index 0 today and index 1 tomorrow -- so a remembered index is a
- * remembered *different device*, which on this feature means the sticks
- * are somewhere other than where the picture says they are.
+ * Which device, remembered by the id the browser reports. Indices shuffle
+ * between sessions, so a remembered index can point at a different device.
  */
 const DEVICE_KEY = 'loftgcs.joystick.device'
 /** Each device's own mapping, by its reported id. */
@@ -47,7 +37,7 @@ function write(key: string, value: unknown): void {
     if (value === null) localStorage.removeItem(key)
     else localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value))
   } catch {
-    // Not remembering is a nuisance, never a failure.
+    // Failing to persist is not an error.
   }
 }
 
@@ -114,7 +104,7 @@ interface JoystickState {
   saveProfile(name: string): void
   loadProfile(name: string): void
   deleteProfile(name: string): void
-  /** Add a profile from outside -- a file -- after sanitizing it. */
+  /** Add a profile from a file, after sanitizing it. */
   importProfile(name: string, config: unknown): void
   setLive(axes: number[], buttons: boolean[], channels: number[]): void
   setActive(active: boolean): void
@@ -145,23 +135,20 @@ export const useJoystickStore = create<JoystickState>((set, get) => ({
     if (configFor) write(DEVICES_KEY, next)
   },
   setPads(pads, pad) {
-    // Compared before writing: this runs thirty times a second, and a new
-    // array every tick re-renders the whole panel for nothing.
+    // Compared first: this runs thirty times a second, and a new array every
+    // tick would re-render the panel.
     const now = get()
     const samePads =
       now.pads.length === pads.length && now.pads.every((p, i) => p.id === pads[i]?.id)
     const samePad = now.pad?.id === pad?.id && now.pad?.index === pad?.index
     if (samePads && samePad) return
-    // A different device brings its own mapping. Never while flying: a
-    // mapping that changed under the hands mid-flight is worse than a stale
-    // one, and the service releases control on a device change anyway.
+    // A different device brings its own mapping, but never while active:
+    // the mapping must not change mid-flight.
     const switching = pad && pad.id !== now.configFor && !now.active
     if (switching) {
       const own = now.devices[pad.id]
-      // A device seen for the first time starts from the Mode 2 default, not
-      // from whatever the last device used -- a HOTAS has nothing in common
-      // with a gamepad's axis numbers. The very first device takes over the
-      // single mapping older builds kept, so an upgrade loses nothing.
+      // A new device starts from the Mode 2 default, not the last device's
+      // mapping. The very first device inherits the legacy single mapping.
       const first = Object.keys(now.devices).length === 0
       const config = own ?? (first ? now.config : DEFAULT_CONFIG)
       const devices = own ? now.devices : { ...now.devices, [pad.id]: config }

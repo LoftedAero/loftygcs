@@ -30,29 +30,18 @@ import { useMissionStore } from '../../../stores/mission-store'
 //   │ item table                    │ settings │
 //   └───────────────────────────────┴──────────┘
 //
-// The map is the primary surface because planning is a spatial task, and the
-// table sits underneath rather than beside it because rows are wide and a map
-// squeezed into half a window stops being a map. How that height is split is
-// the user's call, and it is remembered.
+// The table sits under the map rather than beside it because its rows are
+// wide. The split is draggable and remembered. Actions live in the right
+// column, as in Mission Planner.
 //
-// Actions live in the right column rather than a strip along the top: it is
-// where Mission Planner keeps them, and the column had room the map did not.
-//
-// The table starts out of the way. An empty plan is a screen where the map
-// is the only thing worth any height, so the lower pane collapses to its
-// header until the first item exists -- then it takes the remembered split,
-// a third of the height by default, and the divider becomes draggable. The
-// split someone chooses is never overwritten by that: it is the value the
-// pane springs back to.
+// With an empty plan the lower pane collapses to its header; once the first
+// item exists it takes the remembered split (a third by default).
 
 export default function MissionTab() {
   const [view, setView] = useState<{ bounds: LatLonBounds; zoom: number } | null>(null)
-  // Not persisted: it is a thing you switch on to answer one question
-  // before a trip, not a way to leave the map hatched.
+  // Not persisted: a one-off check, not a permanent overlay.
   const [coverage, setCoverage] = useState(false)
-  // Which command the next map click places. Null means the default, which
-  // is a waypoint -- see MissionMap for why clicking does something rather
-  // than nothing.
+  // Which command the next map click places; null means a waypoint.
   const [tool, setTool] = useState<number | null>(null)
   const [showProfile, setShowProfile] = useState(true)
   const [firstAt, setFirstAt] = useState<{ x: number; y: number } | null>(null)
@@ -81,8 +70,7 @@ export default function MissionTab() {
         >
           <div className="mission-map-area">
             {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
-            {/* The same strip for the fence, so drawing a boundary and
-                placing a waypoint are the same gesture on the same screen. */}
+            {/* The same strip for the fence tools. */}
             {editing === 'fence' && <FencePalette />}
             <MissionMap
               tool={tool}
@@ -93,8 +81,8 @@ export default function MissionTab() {
             />
           </div>
 
-          {/* An empty plan has nothing to resize into, and dragging there
-              would store a split chosen against an empty table. */}
+          {/* No divider on an empty plan, so no split is stored against an
+              empty table. */}
           {items > 0 && (
             <Divider
               orientation="horizontal"
@@ -109,20 +97,12 @@ export default function MissionTab() {
               <h3 className="mission-lower__title">
                 Items {items > 0 && <span className="mission-lower__count">{items}</span>}
               </h3>
-              {/* Beside the rows they stamp, not in the settings column:
-                  every row below carries whatever these two said when it was
-                  placed, and that is easier to believe when both are in one
-                  glance. On every plan, because this pane is the mission list
-                  whichever plan is selected -- and the altitude is live on
-                  Rally too, where a new point is placed at it. */}
+              {/* Beside the rows they apply to. Shown on every plan; the
+                  altitude also applies to new rally points. */}
               <NewItemDefaults />
               <span className="la-grow" />
-              {/* Centered between the count and the switch: it is the one
-                  thing on this header that is a problem, and it reads as
-                  one where neither end's furniture crowds it. */}
               {items > 0 && <TerrainWarning />}
               <span className="la-grow" />
-              {/* Nothing to show and nothing to hide until there are items. */}
               {items > 0 && (
                 <LaSwitch
                   label="Show altitude profile"
@@ -137,17 +117,12 @@ export default function MissionTab() {
         </div>
 
         <aside className="app-col-shell mission-side">
-          {/* Everything that belongs to a plan scrolls; see below for what
-              does not. */}
+          {/* Everything that belongs to a plan scrolls. */}
           <div className="app-col mission-side__scroll">
-            {/* First, because it decides what everything below it is about. */}
             <PlanKindSwitch />
-            {/* Read, write and clear are the same three actions on all three
-              plans, so they are one component in one place rather than a
-              copy per panel that drifts. */}
+            {/* Read, write and clear, shared by all three plans. */}
             <PlanActions />
-            {/* Also outside the three panels: a file means whichever plan is
-                selected, so the buttons have to exist on all of them. */}
+            {/* Files apply to whichever plan is selected. */}
             <GeoExchange />
             {editing === 'mission' && (
               <>
@@ -155,21 +130,13 @@ export default function MissionTab() {
                 <MissionSettings />
               </>
             )}
-            {/* The lists come last, above the pinned foot: they are the only
-                sections that grow, and a list with buttons under it moves
-                those buttons down the column every time something is added. */}
+            {/* Lists come last because they are the only sections that grow. */}
             {editing === 'fence' && <FencePanel />}
             {editing === 'rally' && <RallyPanel />}
           </div>
 
-          {/* Pinned to the foot rather than left at the end of the flow. It
-              is the one thing in this column that is not about the plan --
-              the tiles under the map are the same tiles whichever of the
-              three is being edited -- and it should not move when the switch
-              is flipped, which it did: a fence with six shapes is twice the
-              height of a rally list, and this slid down the column with
-              them. It was also below the fold on any window that scrolled,
-              which is most of them. */}
+          {/* Pinned to the foot: offline maps are not about the plan, so they
+              stay put when the plan switch changes the column above. */}
           <div className="mission-side__foot">
             <OfflineMapsPanel
               bounds={view?.bounds ?? null}
@@ -189,8 +156,7 @@ export default function MissionTab() {
           setFirstAt(null)
         }}
         onTakeoff={(at) => {
-          // Takeoff first, then the point that was actually clicked -- the
-          // click meant "go here", and a takeoff alone would throw that away.
+          // Takeoff first, then a waypoint at the point that was clicked.
           addItem(22)
           addItem(16, at)
           setFirstAt(null)
@@ -201,10 +167,8 @@ export default function MissionTab() {
 }
 
 /**
- * The first click on an empty plan. ArduPilot will not start an Auto mission
- * that does not begin with a takeoff, so the overwhelmingly common first item
- * is one -- but placing it silently would be guessing, and a mission that
- * begins with an unwanted climb is worse than one that asks.
+ * The first click on an empty plan. An Auto mission usually starts with a
+ * takeoff, but adding one silently would be a guess, so this asks.
  */
 function FirstItemPrompt({
   at,
@@ -217,9 +181,7 @@ function FirstItemPrompt({
   onWaypoint: (at: { x: number; y: number }) => void
   onTakeoff: (at: { x: number; y: number }) => void
 }) {
-  // Escape closes it, as it closes every other menu here. Without this the
-  // only ways out were the two buttons, and a dialog you cannot dismiss the
-  // habitual way reads as a stuck app rather than a question.
+  // Escape closes it, as it does every other menu here.
   useEffect(() => {
     if (!at) return
     const esc = (e: KeyboardEvent) => {

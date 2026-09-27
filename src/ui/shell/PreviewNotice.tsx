@@ -5,15 +5,9 @@ import { LaButton, LaModal } from '../components/La'
 
 // What a preview build says on first run.
 //
-// This is not a disclaimer for its own sake. Loft GCS arms motors, changes
-// flight modes, writes parameters and flashes firmware, and none of that has
-// been validated against real hardware yet -- so someone handed a build has
-// no way to know which parts are proven and which are merely written. Saying
-// it once, plainly, at the point they can act on it, is the difference
-// between a preview and a trap.
-//
-// Shown once per version: a tester who has read it should not have to read
-// it again every launch, but a new build is a new set of claims.
+// The app arms motors, changes modes, writes parameters and flashes firmware,
+// and a preview has not been validated against real hardware, so testers are
+// told once per version.
 
 const STORAGE_KEY = 'loftgcs.previewAcknowledged'
 
@@ -109,10 +103,7 @@ export default function PreviewNotice() {
         </li>
       </ul>
 
-      {/* The address in text as well as behind the button: a mailto: link is
-          a dead end for anyone whose machine has no mail client set up, and
-          "there was no way to tell you" is the one piece of feedback that
-          cannot arrive. */}
+      {/* The address as text too, for machines with no mail client. */}
       {BRAND.feedbackEmail && (
         <p className="preview-notice__contact">
           Send anything you find to <span className="la-selectable">{BRAND.feedbackEmail}</span>.

@@ -60,8 +60,7 @@ describe('the Filters page', () => {
   })
 
   it('reserves each notch’s rows, greyed, until the vehicle reports them', () => {
-    // They exist only once the notch is on, so the card is drawn at its full
-    // height from the start.
+    // These exist only once the notch is on; the card reserves their rows.
     seed(STOCK)
     render(<FiltersTab />)
     for (const title of ['First harmonic notch', 'Second harmonic notch']) {
@@ -122,8 +121,8 @@ describe('the Filters page', () => {
 
     seed({ ...STOCK, RLL_RATE_P: 0.3, RLL_RATE_FLTT: 3, Q_A_RAT_RLL_P: 0.25, Q_A_RAT_RLL_FLTT: 20 })
     render(<FiltersTab />)
-    // The same four cards as any other vehicle: the fixed wing's rows under
-    // their own names, the VTOL motors' under Q_A_, in the one card.
+    // The same four cards: the fixed wing's rows and the VTOL motors' Q_A_
+    // rows share one card.
     expect(titles()).toEqual([
       'IMU',
       'Rate filters',
@@ -138,8 +137,8 @@ describe('the Filters page', () => {
   })
 
   it('writes a notch’s enable when chosen and re-reads, which is where its rows come from', async () => {
-    // Measured: setting INS_HNTCH_ENABLE exposes the other eight at once, with
-    // no restart -- but only to a GCS that reads the list again.
+    // Setting INS_HNTCH_ENABLE exposes the other eight with no restart, but
+    // only to a GCS that re-reads the list.
     setParamNow.mockClear()
     refreshParams.mockClear()
     seed(STOCK)

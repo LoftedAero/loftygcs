@@ -7,9 +7,7 @@ import {
 } from './firmware-manifest'
 
 // Matching a board to its firmware, with the shape the real manifest has.
-//
-// The numbers in these comments are measured against the live
-// firmware.ardupilot.org manifest (97,248 entries), not estimated.
+// Counts in these comments are from the live firmware.ardupilot.org manifest.
 
 const opt = (
   o: Partial<FirmwareOption> & { platform: string; boardId: number },
@@ -36,8 +34,7 @@ describe('narrowing to a detected board', () => {
 
   it('names a board by its variants shared prefix, not by one of them', () => {
     // Board id 140 covers CubeOrange, CubeOrange-bdshot and
-    // CubeOrange-SimOnHardWare. Naming it after any single variant would
-    // tell someone their board is the bdshot one, which it may not be.
+    // CubeOrange-SimOnHardWare, so it is not named after any one variant.
     const all = [
       opt({ platform: 'CubeOrange', boardId: 140 }),
       opt({ platform: 'CubeOrange-bdshot', boardId: 140 }),
@@ -52,8 +49,8 @@ describe('narrowing to a detected board', () => {
   })
 
   it('falls back to the id when the platforms share no prefix', () => {
-    // Board id 9 is fourteen unrelated boards -- CubeBlack, Pixhawk1, fmuv2
-    // and more. Inventing a name for that is worse than not naming it.
+    // Board id 9 is fourteen unrelated boards (CubeBlack, Pixhawk1, fmuv2
+    // and more), so it gets no name.
     const all = [
       opt({ platform: 'CubeBlack', boardId: 9 }),
       opt({ platform: 'Pixhawk1', boardId: 9 }),
@@ -63,17 +60,15 @@ describe('narrowing to a detected board', () => {
   })
 
   it('says nothing about a board the manifest does not carry', () => {
-    // 87 of 317 board ids have no Copter build at all; a name invented for
-    // one of them would be this app claiming to recognize it.
+    // 87 of 317 board ids have no Copter build at all.
     expect(describeBoard([opt({ platform: 'CubeOrange', boardId: 140 })], 999)).toBeNull()
   })
 })
 
 describe('the vehicle key', () => {
   it('separates a traditional heli from a multirotor', () => {
-    // `vehicletype` is "Copter" for both -- 14,708 rows that `mav-type`
-    // splits into Copter and HELICOPTER. They are different images, and
-    // keyed on vehicletype the wrong one flashes silently.
+    // `vehicletype` is "Copter" for both; `mav-type` splits those 14,708
+    // rows into Copter and HELICOPTER, which are different images.
     const all = [
       opt({ platform: 'CubeOrange', boardId: 140 }),
       opt({
@@ -90,9 +85,8 @@ describe('the vehicle key', () => {
 })
 
 describe('choosing the build for a detected board', () => {
-  // Found with a Cube Orange+ on the bench: board id 1063 carries three
-  // platforms in the live manifest, so "one match or ask" sent one of the
-  // commonest boards to the prompt every time.
+  // Board id 1063 (Cube Orange+) carries three platforms in the manifest,
+  // so "one match or ask" would always prompt for a very common board.
   const plus = [
     opt({ platform: 'CubeOrangePlus', boardId: 1063 }),
     opt({ platform: 'CubeOrangePlus-bdshot', boardId: 1063 }),
@@ -104,8 +98,8 @@ describe('choosing the build for a detected board', () => {
   })
 
   it('still asks when the id covers genuinely different boards', () => {
-    // Board id 9 is CubePurple, Pixhawk1 and fmuv3 -- no shared prefix, so
-    // there is no plain build to fall back on and guessing would be wrong.
+    // Board id 9 is CubePurple, Pixhawk1 and fmuv3: no shared prefix, so
+    // there is no plain build to fall back on.
     const nine = [
       opt({ platform: 'CubePurple', boardId: 9 }),
       opt({ platform: 'Pixhawk1', boardId: 9 }),

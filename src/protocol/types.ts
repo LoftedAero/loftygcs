@@ -8,7 +8,7 @@ export interface MavFrame {
   sysid: number
   compid: number
   msgid: number
-  /** Payload as received -- MAVLink v2 truncates trailing zeros. */
+  /** Payload as received (MAVLink v2 truncates trailing zeros). */
   payload: Uint8Array
   signed: boolean
 }
@@ -18,10 +18,9 @@ export type FieldValue = number | bigint | string | number[]
 /**
  * One message type from one sender, as the inspector sees it.
  *
- * Keyed by (sysid, compid, msgid) rather than msgid alone: a gimbal's
- * ATTITUDE and the autopilot's ATTITUDE are different conversations, and
- * seeing your own GCS traffic echoed back is exactly the diagnostic a UDP
- * loop hides when senders are collapsed together.
+ * Keyed by (sysid, compid, msgid): a gimbal's ATTITUDE and the autopilot's
+ * are different streams, and seeing the GCS's own traffic echoed back is how
+ * a UDP loop is diagnosed.
  */
 export interface InspectorRow {
   sysid: number
@@ -60,28 +59,23 @@ export type ProtocolEvent =
   | { t: 'telemetry'; batch: TelemetryDelta[] }
   /**
    * Every numeric field the vehicle has sent, by `MESSAGE.field`, sampled at
-   * a fixed rate. This is the generic path that feeds the status list and the
-   * plots -- as opposed to `telemetry`, which is the curated set the flight
-   * instruments read. Every value is resent each tick rather than only the
-   * changed ones, so the samples are evenly spaced and a plot can draw them
-   * without having to guess at the gaps.
+   * a fixed rate for the status list and plots (`telemetry` is the curated
+   * set the instruments read). Every value is resent each tick so samples
+   * are evenly spaced.
    */
   | { t: 'fields'; at: number; values: Record<string, number> }
   | { t: 'statustext'; severity: number; text: string }
   /**
-   * Other aircraft, as a whole picture rather than a stream of reports.
-   *
-   * A snapshot of everything currently heard, sent at a fixed low rate: a
-   * transponder receiver in busy airspace produces a report per aircraft per
-   * second and ArduPilot forwards all of them, so a per-message event would
-   * be tens of store writes a second to move markers that move slowly.
+   * Snapshot of all ADS-B traffic currently heard, sent at a fixed low rate.
+   * Busy airspace produces a report per aircraft per second, too many to
+   * forward individually.
    */
   | { t: 'traffic'; targets: AdsbTarget[] }
   | { t: 'inspector'; rows: InspectorRow[] }
   | { t: 'commandAck'; command: number; result: number }
   | { t: 'linkStats'; stats: LinkStats }
   | { t: 'paramProgress'; got: number; total: number; source: 'ftp' | 'stream' }
-  /** A file coming off the vehicle over MAVFTP -- a log, mostly. */
+  /** A file coming off the vehicle over MAVFTP, usually a log. */
   | { t: 'fileProgress'; path: string; got: number; total: number }
   | { t: 'missionProgress'; got: number; total: number; dir: 'read' | 'write' }
   | {
@@ -95,15 +89,12 @@ export type ProtocolEvent =
     }
   | { t: 'magCalReport'; compassId: number; calStatus: number; fitness: number; autosaved: number }
   /**
-   * The side the accelerometer calibration is waiting to be placed in.
+   * The side the accelerometer calibration is waiting for.
    *
-   * ArduPilot *asks*, repeatedly, with a COMMAND_LONG of its own
-   * (`send_accelcal_vehicle_position`, every second) -- where the
-   * "Place vehicle on its LEFT side" text is printed once and never again.
-   * A ground station driven by the text alone therefore cannot rejoin a
-   * calibration already in progress, which is the state the vehicle is left
-   * in whenever a wizard is closed mid-run: there is no MAVLink way to cancel
-   * one, so it sits waiting until the vehicle is armed or restarted.
+   * ArduPilot repeats this request every second as a COMMAND_LONG
+   * (`send_accelcal_vehicle_position`), while the "Place vehicle on its LEFT
+   * side" text is printed only once. Following the command lets the wizard
+   * rejoin a calibration already in progress, which MAVLink cannot cancel.
    */
   | { t: 'accelCalPosition'; position: number }
   /**
@@ -119,12 +110,9 @@ export type ProtocolEvent =
       vendorId: number
       productId: number
       /**
-       * ArduPilot's own board id -- `APJ_BOARD_ID`, the number its hwdef
-       * declares and the one `firmware.ardupilot.org`'s manifest keys builds
-       * by. It rides in AUTOPILOT_VERSION's `board_version` shifted up
-       * sixteen bits (`uint32_t(APJ_BOARD_ID) << 16`), which is why it is
-       * shifted back rather than read whole. Zero when the vehicle does not
-       * say, which SITL does not.
+       * ArduPilot's `APJ_BOARD_ID`, which the firmware manifest keys builds
+       * by. Carried in AUTOPILOT_VERSION's `board_version` shifted up 16 bits.
+       * Zero when the vehicle does not say (SITL does not).
        */
       boardId: number
     }
@@ -170,11 +158,10 @@ export type TelemetryDelta =
     }
   | { k: 'battery'; voltageV: number; currentA: number; remainingPct: number }
   /**
-   * One battery monitor's own reading, from BATTERY_STATUS. `id` is the
-   * monitor's instance: 0 is BATT_, 1 is BATT2_. SYS_STATUS carries only the
-   * primary, so this is the only place a second pack is heard from. Voltage
-   * is null when the message says none was measured; current and remaining
-   * keep the wire's -1 for the same.
+   * One battery monitor's reading, from BATTERY_STATUS. `id` is the monitor
+   * instance (0 is BATT_, 1 is BATT2_); SYS_STATUS carries only the primary.
+   * Voltage is null when not measured; current and remaining keep the wire's
+   * -1 for that.
    */
   | {
       k: 'batteryStatus'
@@ -188,20 +175,15 @@ export type TelemetryDelta =
   /**
    * What sixteen outputs are actually driving, from one SERVO_OUTPUT_RAW.
    *
-   * `port` 0 is SERVO1-16 and 1 is SERVO17-32; `valuesUs[0]` is the first of
-   * that port's sixteen. ArduPilot sends 0 for an output with nothing on it
-   * (it rewrites the HAL's 65535 to 0 before sending), and there is no
-   * separate sentinel the way `battery_remaining` has -1.
+   * `port` 0 is SERVO1-16 and 1 is SERVO17-32. ArduPilot sends 0 for an
+   * output with nothing on it.
    */
   | { k: 'servoOutputs'; port: number; valuesUs: number[] }
   | { k: 'sensors'; present: number; enabled: number; health: number }
   /**
-   * Where the vehicle is in its mission, as the vehicle sees it.
-   *
-   * Two messages, kept as one fact because they answer one question and
-   * either can arrive without the other: MISSION_CURRENT says which item is
-   * being flown, NAV_CONTROLLER_OUTPUT says how far away it is. A field is
-   * null when the message carrying it has not arrived.
+   * Where the vehicle is in its mission: MISSION_CURRENT gives the item,
+   * NAV_CONTROLLER_OUTPUT the distance. A field is null until its message
+   * arrives.
    */
   | {
       k: 'missionProgress'
@@ -232,12 +214,10 @@ export interface ParamRecord {
 }
 
 /**
- * One mission item, in wire terms: x and y are latitude and longitude in
- * degrees * 1e7 (MISSION_ITEM_INT's fixed-point form -- floats lose meters of
- * precision at earth scale, which is why the float message is deprecated).
- * Sequence 0 is home by ArduPilot convention; the vehicle replaces its
- * content with the real home at arming, so what a plan carries there is the
- * *planned* home, a reference point rather than a command.
+ * One mission item in wire terms: x and y are latitude and longitude in
+ * degrees * 1e7 (MISSION_ITEM_INT; floats lose meters of precision). Sequence
+ * 0 is home by ArduPilot convention and is replaced with the real home at
+ * arming, so a plan's item 0 is only the planned home.
  */
 export interface MissionItem {
   seq: number

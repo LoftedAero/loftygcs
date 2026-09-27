@@ -3,17 +3,11 @@ import { useUnits } from '../../../stores/preferences-store'
 import { distanceLabel, fromDistance, toDistance } from '../../../units'
 import { LaField, LaHint, LaInput } from '../../components/La'
 
-// Rally points: the places a vehicle is sent instead of home.
+// Rally points: places a vehicle is sent instead of home. One item each on
+// the wire; while rally is being edited, a map click adds a point.
 //
-// Simpler than the fence in every way -- one item each on the wire, one
-// marker each on the map, and the only thing to set is how high to arrive.
-// There is no tool to arm: while this is the plan being edited, a map click
-// adds a point, the same way a click adds a waypoint in Mission.
-//
-// Read, write and clear are in PlanActions above, shared with the other two
-// plans, so this is only the list -- and it sits at the foot of the column,
-// below the file buttons, so that adding a point does not push the buttons
-// above it down the column while you work.
+// Read, write and clear live in the shared PlanActions, so this is only the
+// list, placed last in the column so it grows without moving the buttons.
 
 export default function RallyPanel() {
   const units = useUnits()
@@ -48,9 +42,7 @@ export default function RallyPanel() {
               ✕
             </button>
           </div>
-          {/* Relative to home, always: ArduPilot stores rally altitudes
-                that way, and an AMSL number typed here would arrive as a
-                very different height. */}
+          {/* Relative to home, as ArduPilot stores rally altitudes. */}
           <LaField
             label="Altitude above home"
             unit={distanceLabel(units.distance)}

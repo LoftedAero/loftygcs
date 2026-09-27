@@ -5,10 +5,8 @@ import { useCalStore } from '../../../stores/cal-store'
 import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 
-// A failed calibration is the case people repeat, and the one this dialog
-// could not offer: the verdict is reachable only from a vehicle that refuses
-// to fit a sphere, so the buttons it shows are pinned here rather than found
-// on a bench.
+// The verdict screens, including failure, which is hard to reproduce on real
+// hardware.
 
 const DO_START = 42424
 const DO_CANCEL = 42426
@@ -39,8 +37,7 @@ beforeEach(() => {
   sent.length = 0
   useCalStore.getState().magCalReset()
   useWriteFeedbackStore.getState().rebootDone()
-  // Reboot now is gated on a live link, as ArduPilot gates the command
-  // itself -- without this the button under test is disabled.
+  // Reboot now needs a live link, or the button is disabled.
   useConnectionStore.setState({ phase: 'connected' })
 })
 afterEach(cleanup)
@@ -52,9 +49,8 @@ describe('the compass calibration dialog after a run', () => {
     expect(screen.getByText(/calibration failed/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    // Stopped before started: a start sent while the calibrator is still
-    // sitting in FAILED races the report it is still re-sending, which would
-    // re-open the verdict on top of the new run.
+    // Cancel before starting: the calibrator keeps re-sending its FAILED
+    // report, which would otherwise reopen the verdict over the new run.
     await vi.waitFor(() => expect(sent).toEqual([DO_CANCEL, DO_START]))
     expect(useCalStore.getState().magCal.running).toBe(true)
   })
@@ -67,8 +63,7 @@ describe('the compass calibration dialog after a run', () => {
   })
 
   it('offers the restart on the verdict that owes it, not in a second dialog', async () => {
-    // The offsets are on the vehicle and the firmware is still flying the old
-    // ones, which used to be said by a dialog raised as this one closed.
+    // The new offsets take effect only after a reboot.
     reported(4)
     render(<CompassCalWizard onClose={() => {}} />)
     expect(screen.getByText(/requires reboot/)).toBeTruthy()
@@ -88,8 +83,7 @@ describe('the compass calibration dialog after a run', () => {
 
   it('closes by stopping the vehicle, not just the screen', () => {
     // ArduPilot re-sends MAG_CAL_REPORT while its calibrator sits in SUCCESS
-    // or FAILED, so a dialog that only cleared its own copy was re-filled a
-    // second later.
+    // or FAILED, so the vehicle must be told to stop.
     reported(5)
     let closed = false
     render(<CompassCalWizard onClose={() => (closed = true)} />)

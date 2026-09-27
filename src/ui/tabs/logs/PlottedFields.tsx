@@ -11,17 +11,10 @@ import {
   useLogStore,
 } from '../../../stores/log-store'
 
-// What is on the plot, and which y axis each trace is drawn against.
-//
-// The axis assignment is the point of this list. Two traces on one axis are
-// directly comparable and two on separate axes are not, so which is which
-// has to be a choice rather than something inferred -- desired roll against
-// actual roll means nothing on separate scales, and an altitude against a
-// servo output means nothing on the same one.
-//
-// Defaults get it right often enough that most people will never touch it:
-// fields sharing a unit land on the same axis, a new unit takes the next
-// free one. See defaultAxis in the store.
+// What is on the plot, and which y axis each trace uses. Traces on one axis
+// are directly comparable, so the assignment is the user's choice. By
+// default fields sharing a unit share an axis and a new unit takes the next
+// free one (defaultAxis in the store).
 
 export default function PlottedFields() {
   const log = useLogStore((s) => s.log)
@@ -53,14 +46,12 @@ export default function PlottedFields() {
 
       {selected.map((f, i) => {
         const id = `${f.message}.${f.field}`
-        // An expression is its own name and has no unit: the arithmetic
-        // could have turned meters into anything.
+        // An expression has no unit.
         const named = f.expression ? null : fieldLabel(log.params, f.message, f.field)
         const unit = f.expression ? '' : fieldUnit(log, f.message, f.field)
         const color = traceColor(f, i)
         const series = traceSeries(log, f)
-        // Over the visible window, not the whole log: the number worth
-        // reading is the one for what is on screen.
+        // Over the visible window, not the whole log.
         const stats = series
           ? seriesStats(series, timeWindow?.t0 ?? 0, timeWindow?.t1 ?? logEnd(log))
           : null

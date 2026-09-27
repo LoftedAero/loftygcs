@@ -1,29 +1,19 @@
-// Turning the vehicle's numbers into the reader's units.
+// Converting the vehicle's numbers to the reader's units.
 //
-// Everything inside this app is SI, because MAVLink is: meters, meters per
-// second, radians. That never changes -- conversion happens at the edge, on
-// the way to a screen and on the way back from a keyboard, and nothing in
-// between ever holds feet. A units bug that reaches a mission altitude is a
-// flying-into-terrain bug, so the canonical value is the one in the store
-// and the converted one is always derived.
+// Everything inside the app is SI, as MAVLink is. Conversion happens only at
+// the edge: on the way to the screen and back from the keyboard. The stored
+// value is canonical and the displayed one is always derived, because a units
+// bug in a mission altitude is a flying-into-terrain bug.
 //
-// Kept dependency-free and outside src/protocol so both the renderer and any
-// future consumer can use it, in the same spirit as src/sim-home.ts.
+// Dependency-free, like src/sim-home.ts.
 
 export type DistanceUnit = 'm' | 'ft'
 export type SpeedUnit = 'ms' | 'kmh' | 'kts' | 'mph'
 
 /**
- * How climb rate reads.
- *
- * `follow` is the aviation convention and the default: vertical speed is
- * feet per minute wherever horizontal distance is in feet, whatever the
- * airspeed unit -- a pilot flying in knots still calls a climb "five hundred
- * feet a minute", never "8 feet a second". It stayed the only behavior for a
- * while on the grounds that a third dropdown was worse than the convention,
- * and it is still what the app does out of the box; the other two exist
- * because the convention is a default, not a rule, and someone reading
- * altitude in feet off a metric airframe has a reason to break it.
+ * How climb rate reads. `follow` (the default) is the aviation convention:
+ * feet per minute whenever distance is in feet, whatever the airspeed unit.
+ * The other two override it.
  */
 export type VerticalSpeedUnit = 'follow' | 'ms' | 'fpm'
 
@@ -64,7 +54,7 @@ export function toDistance(meters: number, unit: DistanceUnit): number {
   return meters / DISTANCE[unit].perUnit
 }
 
-/** The reader's distance unit back to meters -- the only value we store. */
+/** The reader's distance unit back to meters, the only value we store. */
 export function fromDistance(value: number, unit: DistanceUnit): number {
   return value * DISTANCE[unit].perUnit
 }
@@ -90,11 +80,8 @@ export function speedLabel(unit: SpeedUnit): string {
 // ---------------------------------------------------------- vertical speed
 
 /**
- * Which climb-rate unit is actually in force.
- *
- * The one place `follow` is turned into a real unit, so nothing downstream
- * has to know the convention -- everything below takes the resolved unit and
- * the preference is read exactly once, here.
+ * Which climb-rate unit is in force. The only place `follow` is resolved, so
+ * nothing downstream needs to know the convention.
  */
 export function resolveVerticalSpeed(units: UnitPrefs): ResolvedVerticalSpeed {
   if (units.verticalSpeed !== 'follow') return units.verticalSpeed
@@ -112,13 +99,9 @@ export function verticalSpeedLabel(units: UnitPrefs): string {
 // -------------------------------------------------------------- formatting
 
 /**
- * A rounded string for display.
- *
- * The precision follows the unit rather than the number: a foot is a third
- * of a metre and a knot is about two, so the same number of decimals in a
- * bigger unit shows *less* than it did in meters. Feet and knots therefore
- * drop a decimal that meters keep, and nothing here ever shows more
- * precision than the sensor behind it has.
+ * A rounded string for display. Precision follows the unit: feet and knots
+ * drop the decimal that meters keep, so nothing shows more precision than
+ * the sensor has.
  */
 export function formatDistance(meters: number, unit: DistanceUnit, decimals?: number): string {
   const v = toDistance(meters, unit)
@@ -131,9 +114,8 @@ export function formatSpeed(ms: number, unit: SpeedUnit, decimals?: number): str
 }
 
 /**
- * `toFixed`, without its "-0". A vehicle sitting on the ground reads a hair
- * under zero, and rounding keeps the sign: the HUD's altitude box and the
- * altitude field both said "-0" for a vehicle that had not moved.
+ * `toFixed` without "-0". A vehicle on the ground often reads a hair under
+ * zero, and rounding keeps the sign.
  */
 export function fixed(v: number, decimals: number): string {
   const s = v.toFixed(decimals)
@@ -142,8 +124,7 @@ export function fixed(v: number, decimals: number): string {
 
 export function formatVerticalSpeed(ms: number, units: UnitPrefs): string {
   const v = toVerticalSpeed(ms, units)
-  // Feet per minute are whole numbers -- "500", never "500.0" -- and a
-  // tenth of a meter per second is the smallest climb worth reading.
+  // Whole feet per minute; tenths of a meter per second.
   return fixed(v, resolveVerticalSpeed(units) === 'fpm' ? 0 : 1)
 }
 
@@ -153,13 +134,7 @@ export const DISTANCE_CHOICES: { id: DistanceUnit; label: string }[] = [
   { id: 'ft', label: 'Feet' },
 ]
 
-/**
- * The climb-rate choices.
- *
- * `follow` leads because it is the default and the convention; its label is
- * filled in with whatever it currently resolves to, so the dropdown says
- * what it is doing rather than making it a thing to work out.
- */
+/** The climb-rate choices, the default `follow` first. */
 export const VERTICAL_SPEED_CHOICES: { id: VerticalSpeedUnit; label: string }[] = [
   { id: 'follow', label: 'Follow distance' },
   { id: 'ms', label: 'Meters per second' },

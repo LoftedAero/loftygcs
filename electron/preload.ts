@@ -1,8 +1,7 @@
 import { contextBridge, ipcRenderer, webFrame } from 'electron'
 
-// The complete privileged surface the renderer gets. Everything here is
-// mirrored by the LoftGcsBridge type in src/types/loftgcs.d.ts -- change
-// them together.
+// The complete privileged surface the renderer gets. It is mirrored by the
+// LoftGcsBridge type in src/types/loftgcs.d.ts; change them together.
 
 /** One candidate from Electron's select-serial-port list. */
 interface SerialPortChoice {
@@ -88,18 +87,16 @@ contextBridge.exposeInMainWorld('loftgcs', {
     fetchFirmware: (url: string) => ipcRenderer.invoke('app:fetch-firmware', url),
     setBackgroundThrottling: (allowed: boolean) =>
       ipcRenderer.send('app:background-throttling', allowed),
-    // The preference's scale, as Chromium's own page zoom: text, controls and
-    // the canvases' pixel density all follow it, which a CSS zoom does not
-    // reliably do for the map and the HUD. Bounded here because this is the
-    // privileged side, whatever the renderer asks for.
+    // Uses Chromium's page zoom rather than CSS zoom so the map and HUD
+    // canvases scale their pixel density too. Clamped here on the privileged
+    // side regardless of what the renderer asks for.
     setZoomFactor: (factor: number) => {
       if (Number.isFinite(factor)) webFrame.setZoomFactor(Math.min(2, Math.max(0.75, factor)))
     },
   },
 
-  // Video arrives here as a compressed H.264 bitstream and is decoded in the
-  // renderer: decoded frames are two orders of magnitude larger and would
-  // never survive the crossing.
+  // Video crosses IPC as compressed H.264 and is decoded in the renderer;
+  // decoded frames are about a hundred times larger.
   video: {
     open: (url: string) => ipcRenderer.invoke('video:open', url),
     close: () => ipcRenderer.invoke('video:close'),

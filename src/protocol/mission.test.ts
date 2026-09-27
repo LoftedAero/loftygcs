@@ -102,8 +102,7 @@ describe('download', () => {
   it('ignores messages for a different mission type', async () => {
     const { client, last } = harness()
     const done = client.download(0)
-    // A fence count arriving mid-download of the mission must not be taken
-    // as ours -- mistaking one for the other swaps missions and fences.
+    // A fence count arriving mid-download of the mission is not ours.
     client.handleMessage('MISSION_COUNT', { count: 5, missionType: 1 })
     expect(last().msgName).toBe('MISSION_REQUEST_LIST')
     client.handleMessage('MISSION_COUNT', { count: 1, missionType: 0 })

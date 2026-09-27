@@ -2,17 +2,13 @@
 //
 //   npm run cal-art
 //
-// Writes one sprite sheet per aircraft into src/ui/tabs/sensors/ -- six frames
-// left to right, in `ORIENTATIONS` order. The drawing itself is
-// cal-art-scene.mjs; this half bundles it, gives it an Electron window with a
-// WebGL context, and saves what comes back.
+// Writes one sprite sheet per aircraft into src/ui/tabs/sensors/, six frames
+// left to right in `ORIENTATIONS` order, plus the board orientation sheet.
+// cal-art-scene.mjs does the drawing; this bundles it, runs it in an Electron
+// window (the same renderer as the live airframe) and saves the result.
 //
-// Through Electron for the reason `npm run icon` is: the project already has
-// it, and it is the same renderer that draws the live airframe in the app, so
-// the committed picture and the live one cannot drift apart. The models are
-// handed over as strings rather than loaded from disk because a file:// image
-// taints the canvas and toDataURL then throws -- the lesson make-icon.mjs
-// records, in a different shape.
+// Models are passed as strings because a file:// image taints the canvas and
+// toDataURL then throws.
 import { app, BrowserWindow } from 'electron'
 import * as esbuild from 'esbuild'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -75,9 +71,8 @@ async function render() {
       ['cal-attitudes-f35b.png', result.f35b],
     ]) {
       const png = Buffer.from(sheet.url.slice(sheet.url.indexOf(',') + 1), 'base64')
-      // A WebGL context that failed to draw still produces a valid, empty
-      // PNG, and an empty one compresses to almost nothing -- so size is the
-      // check that catches a renderer that silently did not run.
+      // A WebGL context that failed to draw still yields a valid, nearly
+      // empty PNG, so size is the check.
       if (png.length < 4000) throw new Error(`${name} came back empty (${png.length} bytes)`)
       writeFileSync(path.join(root, OUT, name), png)
       console.log(

@@ -12,11 +12,9 @@ import {
   type GeoFix,
 } from './geo-file'
 
-// The fixtures below are shaped the way the tools that produce them shape
-// them: Google Earth writes lon,lat,alt triples on one line, a handheld
-// writes GPX with an <ele> per point, and both put the whole thing in a
-// namespace. The strongest check here is the round trip -- what this writes
-// is read back by the same parser and has to come out where it went in.
+// Fixtures follow the producing tools: Google Earth writes lon,lat,alt
+// triples on one line, a handheld writes GPX with an <ele> per point, and
+// both are namespaced. The round-trip tests read back what this writes.
 
 const kml = (body: string) =>
   `<?xml version="1.0" encoding="UTF-8"?>
@@ -26,9 +24,8 @@ const kml = (body: string) =>
 
 describe('reading KML', () => {
   it('keeps longitude and latitude the right way round', () => {
-    // KML is lon,lat and everything else in this app is lat,lon. Swapping
-    // them puts a Colorado mission in the Indian Ocean and the file still
-    // parses, so this is the assertion that earns its place.
+    // KML is lon,lat where the rest of the app is lat,lon, and a swapped
+    // pair still parses.
     const shapes = parseGeoFile(
       kml(`<Placemark><name>Leg</name><LineString><coordinates>
         -105.25,39.95,1900 -105.30,39.96,2000
@@ -65,8 +62,7 @@ describe('reading KML', () => {
           `<Placemark><gx:Track><gx:coord>-88.8 40.1 300</gx:coord><gx:coord>-88.7 40.2 310</gx:coord></gx:Track></Placemark>`,
       ),
     )
-    // gx:coord is space separated where <coordinates> is comma separated;
-    // the same file uses both and only one of them is the obvious one.
+    // gx:coord is space separated where <coordinates> is comma separated.
     expect(shapes.map((s) => s.kind)).toEqual(['points', 'track'])
     const track = shapes.find((s) => s.kind === 'track')!
     expect(track.fixes[0]).toEqual({ lat: 40.1, lon: -88.8, amslM: 300 })
@@ -159,7 +155,7 @@ describe('simplifying a path', () => {
   })
 
   it('fits a long track into a mission-sized list', () => {
-    // An hour of one-second fixes, which is what actually arrives.
+    // An hour of one-second fixes.
     const track = line(3600)
     const fitted = fitPath(track, 50)
     expect(fitted.length).toBeLessThanOrEqual(50)
@@ -168,9 +164,8 @@ describe('simplifying a path', () => {
   })
 
   it('reduces a receiver left on the bench to its two ends', () => {
-    // A thousand fixes on one spot. Loosening the tolerance bottoms out at
-    // the two ends rather than failing to converge, which is why the loop
-    // can be a loop and not a search.
+    // Loosening the tolerance bottoms out at the two ends rather than failing
+    // to converge.
     const stuck: GeoFix[] = Array.from({ length: 1000 }, () => ({
       lat: 40,
       lon: -88,
@@ -204,7 +199,7 @@ describe('writing', () => {
       expect(f.lon).toBeCloseTo(route.points[i]!.lon, 7)
       expect(f.amslM).toBeCloseTo(route.points[i]!.amslM, 1)
     })
-    // And one placemark per waypoint, so the numbers show in Google Earth.
+    // One placemark per waypoint, so the numbers show in Google Earth.
     expect(shapes.filter((s) => s.kind === 'points')).toHaveLength(3)
   })
 
@@ -216,8 +211,7 @@ describe('writing', () => {
   })
 
   it('escapes a name that would otherwise break the document', () => {
-    // "Ridge & Valley <test>" is not valid XML text; a station that writes
-    // it raw produces a file Google Earth refuses to open.
+    // Written raw, this produces a file Google Earth refuses to open.
     const [shape] = parseGeoFile(routeToGpx(route))
     expect(shape!.name).toBe('Ridge & Valley <test>')
     expect(routeToKml(route)).toContain('&amp;')
@@ -240,15 +234,13 @@ describe('writing a fence and rally points', () => {
   }
 
   it('writes an area this parser reads back as an area', () => {
-    // A closed LineString would come back as a track and re-import onto the
-    // mission rather than the fence it was exported from.
+    // A closed LineString would re-import as a mission track, not a fence.
     const [shape] = parseGeoFile(areasToKml('fence', [area]))
     expect(shape!.kind).toBe('polygon')
   })
 
   it('closes the ring, which a fence does not carry', () => {
-    // KML repeats the first vertex to close a ring; the fence stores four
-    // corners and means four, so the fifth is added on the way out.
+    // KML repeats the first vertex to close a ring; the fence does not.
     const kml = areasToKml('fence', [area])
     expect(kml.match(/-105\.25/g)).toHaveLength(3)
     const [shape] = parseGeoFile(kml)

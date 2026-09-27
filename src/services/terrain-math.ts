@@ -2,19 +2,14 @@ import { latToTileY, lonToTileX, type TileCoord } from './tile-math'
 
 // Reading ground elevation out of a raster tile.
 //
-// The source is the Terrarium scheme: an ordinary PNG where each pixel's
-// red, green and blue encode one 24-bit height in centimeter-ish steps,
-// offset so the whole range is positive. Every value is fixed by the
-// format, not chosen here -- 256, 1/256 and 32768 are the encoding.
+// The source is Terrarium: a PNG whose red, green and blue encode one 24-bit
+// height in 1/256 m steps, offset by 32768 so the range is positive.
 //
-// Terrarium at zoom 12 is about 38 m a pixel at the equator, which is the
-// resolution of the underlying SRTM data; asking for more zoom resamples
-// the same measurements into more pixels and downloads sixteen times as
-// much to do it. One tile covers roughly 10 km, so a flying field is one
-// or two tiles -- which is why terrain rides the same offline cache as the
-// map without meaningfully adding to a download.
+// Zoom 12 is about 38 m a pixel at the equator, the resolution of the
+// underlying SRTM data; more zoom only resamples it. One tile covers roughly
+// 10 km, so a flying field needs one or two.
 //
-// Pure: no fetch, no canvas, no DOM. The grids arrive already decoded.
+// Pure: no fetch, canvas or DOM. Grids arrive already decoded.
 
 export const TERRAIN_ZOOM = 12
 export const TERRAIN_TILE_PX = 256
@@ -45,9 +40,8 @@ function pixelOf(p: LatLon, z: number): { gx: number; gy: number } {
 
 function pixelValue(grids: TerrainGrids, z: number, gx: number, gy: number): number | null {
   const span = 2 ** z * TERRAIN_TILE_PX
-  // Longitude wraps, latitude does not: a mission at the antimeridian is
-  // rare but reads the tiles on both sides of it, and clamping there would
-  // silently sample the wrong side of the world.
+  // Longitude wraps so a mission at the antimeridian reads the tiles on both
+  // sides; latitude clamps.
   const x = ((gx % span) + span) % span
   const y = Math.min(span - 1, Math.max(0, gy))
   const tx = Math.floor(x / TERRAIN_TILE_PX)
@@ -60,14 +54,9 @@ function pixelValue(grids: TerrainGrids, z: number, gx: number, gy: number): num
 }
 
 /**
- * Ground elevation at a coordinate, bilinearly interpolated.
- *
- * Nearest-pixel sampling puts 38 m steps in a terrain profile, which reads
- * as a staircase of cliffs on ground that is actually a slope -- and the
- * whole point of the profile is judging whether a leg clears the ground.
- * A neighbor that is missing (the sample sits at the edge of what was
- * downloaded) falls back to the pixel the coordinate is actually in rather
- * than refusing to answer.
+ * Ground elevation at a coordinate, bilinearly interpolated so a slope does
+ * not become a staircase of 38 m steps. A missing neighbor (at the edge of
+ * the downloaded tiles) falls back to the pixel the coordinate is in.
  */
 export function sampleElevation(grids: TerrainGrids, p: LatLon, z = TERRAIN_ZOOM): number | null {
   const { gx, gy } = pixelOf(p, z)
@@ -112,15 +101,10 @@ export function terrainTilesFor(points: readonly LatLon[], z = TERRAIN_ZOOM): Ti
 }
 
 /**
- * Sea level, for ground that reads below it.
- *
- * Terrarium carries bathymetry, so an offshore leg reports the sea floor --
- * four kilometers down in the Pacific, which would draw a profile with the
- * flight path apparently clearing everything by a mile and squash the
- * scale of the part anyone cares about. Land genuinely below sea level
- * (Death Valley, the Dead Sea) is indistinguishable from ocean in the data,
- * so both are pulled up to zero: over water that is the surface, and over
- * a depression it overstates the ground, which errs toward warning.
+ * Clamp elevation at sea level. Terrarium carries bathymetry, so offshore it
+ * reports the sea floor. Land below sea level (Death Valley, the Dead Sea)
+ * cannot be told apart from ocean in the data, so it is clamped too, which
+ * overstates the ground and errs toward warning.
  */
 export function groundLevel(elevationM: number): number {
   return Math.max(0, elevationM)

@@ -2,10 +2,8 @@ import { create } from 'zustand'
 import type { ParamRecord } from '../protocol/types'
 import type { ParamMeta } from '../services/param-metadata'
 
-// The full parameter table. Edits stage locally as "dirty" until the
-// action-bar Write sends them -- the same save-explicitly idiom as the other
-// Lofted Aero apps, because every write here moves configuration on a
-// vehicle.
+// The full parameter table. Edits stage locally as dirty until an explicit
+// Write sends them, since every write changes a vehicle's configuration.
 
 export interface ParamEntry {
   value: number
@@ -21,14 +19,7 @@ interface ParamState {
   entries: Map<string, ParamEntry>
   order: string[]
   loadState: ParamLoadState
-  /**
-   * Where the set on screen came from.
-   *
-   * A file is not an aircraft. Everything that writes has to know the
-   * difference, and so does the person reading the table -- editing a saved
-   * configuration and editing the thing in front of you look identical
-   * otherwise.
-   */
+  /** Where the set on screen came from. A file is never written to a vehicle. */
   source: 'vehicle' | 'file' | null
   /** The file's name, when `source` is 'file'. */
   fileName: string | null
@@ -38,11 +29,8 @@ interface ParamState {
   writeBusy: boolean
   metadata: Record<string, ParamMeta>
   /**
-   * Which metadata is loaded -- "4.5.7" or "latest release".
-   *
-   * Worth showing: parameters that exist in one firmware and not another
-   * are the usual reason a hint is missing, and a station that quietly used
-   * the wrong version's documentation would be lying rather than silent.
+   * Which metadata is loaded, "4.5.7" or "latest release". Shown because a
+   * version mismatch is the usual reason a parameter has no documentation.
    */
   metadataSource: string | null
   lastWrite: { written: string[]; failed: string[] } | null
@@ -111,25 +99,8 @@ export const useParamStore = create<ParamState>((set, get) => ({
     })
   },
   /**
-   * A second download folded into the set already on screen.
-   *
-   * `loaded` is for the first one and rebuilds everything, which is wrong
-   * for a refresh in two ways: it flips `loadState`, blanking every curated
-   * tab while it runs, and it throws away staged edits -- a background
-   * refresh that silently discarded someone's unwritten changes would be a
-   * far worse bug than the one it was added to fix.
-   *
-   * So a dirty entry keeps the value it is staged at, and only learns what
-   * the vehicle now says it is staged *against*: if the vehicle has caught
-   * up to the staged value, the edit is no longer an edit.
-   */
-  /**
-   * A parameter file opened with nothing connected.
-   *
-   * Mission Planner has had this for years and it is the one thing its
-   * disconnected Config screen keeps: open a saved set, read it, compare it,
-   * edit it, save it again. Marked as a file so nothing offers to write it
-   * to an aircraft that is not there.
+   * A parameter file opened with nothing connected (Mission Planner's
+   * offline mode). Marked as a file so nothing offers to write it.
    */
   loadedFile: (records, fileName) => {
     const entries = new Map<string, ParamEntry>()
@@ -149,6 +120,14 @@ export const useParamStore = create<ParamState>((set, get) => ({
       fileName,
     })
   },
+  /**
+   * A later download folded into the set already on screen.
+   *
+   * Unlike `loaded`, it leaves `loadState` alone (so curated tabs do not
+   * blank) and keeps staged edits: a dirty entry keeps its staged value and
+   * only updates the vehicle value it is staged against, so an edit the
+   * vehicle has caught up with stops being dirty.
+   */
   merged: (records) => {
     const prev = get().entries
     const entries = new Map<string, ParamEntry>()
@@ -163,8 +142,8 @@ export const useParamStore = create<ParamState>((set, get) => ({
       }
       order.push(r.name)
     }
-    // Progress is cleared here as well as in `loaded`, or the app bar's
-    // parameter bar would be left running after a quiet refresh finished.
+    // Clear progress, or the app bar's indicator keeps running after a quiet
+    // refresh.
     set({ entries, order, dirtyCount: recount(entries), progress: null })
   },
   failed: (error) => set({ loadState: 'error', error }),

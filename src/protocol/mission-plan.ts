@@ -1,17 +1,14 @@
-// The plan as it is edited, as opposed to the plan as it is transferred.
+// The plan as edited, as opposed to as transferred. Two differences from the
+// wire shape:
 //
-// Two differences from the wire shape, both earned:
+//  - Items carry a stable `uid`, since inserting or dragging a row renumbers
+//    every `seq` after it.
+//  - Home is held apart from the list. ArduPilot keeps it as item 0, but the
+//    vehicle overwrites it at arming, so a plan's home is a planned one: the
+//    origin for relative altitudes and the profile.
 //
-//  - Items carry a `uid` instead of trusting `seq`. Inserting or dragging a
-//    row renumbers everything after it, and a React key or a selection that
-//    is really an index breaks the moment that happens.
-//  - Home is held apart from the list. ArduPilot keeps it as item 0, but it
-//    is not a command -- the vehicle overwrites it with its own position at
-//    arming -- so what a plan carries there is a *planned* home: the origin
-//    for relative altitudes and the reference the profile is drawn against.
-//
-// Conversion to and from MissionItem[] happens at the edges, here, so
-// nothing else has to remember that item 0 is special.
+// Conversion to and from MissionItem[] happens here, so nothing else has to
+// know that item 0 is special.
 import { frameMatters } from './mission-commands'
 import type { MissionItem } from './types'
 
@@ -75,8 +72,7 @@ export function planFromItems(items: readonly MissionItem[]): MissionPlan {
 
 /**
  * Flattens back to wire items, home first and sequences contiguous from 0.
- * Home goes out as a NAV_WAYPOINT in the global frame, which is what
- * ArduPilot stores and what every other station writes.
+ * Home goes out as a NAV_WAYPOINT in the global frame, as ArduPilot stores it.
  */
 export function planToItems(plan: MissionPlan): MissionItem[] {
   const home = plan.home ?? { x: 0, y: 0, z: 0 }
@@ -116,13 +112,9 @@ export function planToItems(plan: MissionPlan): MissionItem[] {
 }
 
 /**
- * Whether two plans differ in any way the vehicle would notice.
- *
- * Not a deep equality: `uid` is ours alone, and `frame` is ignored on
- * commands that carry no position or altitude, because ArduPilot reports 0
- * for those on read-back regardless of what was uploaded. Comparing it
- * would mark every mission dirty the instant it was read back -- which is
- * exactly what happened the first time this ran against SITL.
+ * Whether two plans differ in any way the vehicle would notice. `uid` is
+ * ignored, and so is `frame` on commands without a position or altitude,
+ * because ArduPilot reads those back as 0 whatever was uploaded.
  */
 export function plansDiffer(a: MissionPlan, b: MissionPlan): boolean {
   if (!!a.home !== !!b.home) return true
@@ -151,7 +143,7 @@ export function plansDiffer(a: MissionPlan, b: MissionPlan): boolean {
   return false
 }
 
-/** Floats round-trip through the wire as float32; exact equality is a trap. */
+/** Floats round-trip through the wire as float32, so exact equality fails. */
 function near(a: number, b: number): boolean {
   return Math.abs(a - b) < 1e-4
 }
@@ -182,8 +174,7 @@ export interface LegStat {
 
 /**
  * Distance along the route, item by item. Items without a position (takeoff,
- * a servo command) inherit the running total rather than resetting it, so
- * the profile and the table agree about where along the mission each row is.
+ * a servo command) inherit the running total.
  */
 export function legStats(plan: MissionPlan): LegStat[] {
   const out: LegStat[] = []

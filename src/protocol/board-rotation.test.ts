@@ -6,7 +6,7 @@ const deg = (r: number) => (r * 180) / Math.PI
 describe('the autopilot mounting rotation', () => {
   it('reads each fixed rotation as the firmware defines it', () => {
     // Yaw 90 turns the arrow to the right; Roll 90 stands the board on its
-    // right edge -- ArduPilot's own description of the two.
+    // right edge (ArduPilot's own description).
     const yaw90 = boardRotation(2)!
     expect(deg(yaw90.yaw)).toBeCloseTo(90)
     const roll90 = boardRotation(16)!
@@ -15,8 +15,8 @@ describe('the autopilot mounting rotation', () => {
   })
 
   it('carries the one entry whose name is not its angles', () => {
-    // ROTATION_ROLL_90_PITCH_68_YAW_293 is 68.8 and 293.3 in the firmware's
-    // test, which is the reason the table is copied rather than parsed.
+    // ROTATION_ROLL_90_PITCH_68_YAW_293 is really 68.8 and 293.3, which is
+    // why the table is copied rather than parsed from the names.
     const r = boardRotation(38)!
     expect(deg(r.pitch)).toBeCloseTo(68.8)
     expect(deg(r.yaw)).toBeCloseTo(293.3)

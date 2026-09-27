@@ -8,31 +8,22 @@ import { decodeDeviceId, describeDevice } from '../../../protocol/device-id'
 
 // Which compass the EKF believes first, and the settings that belong to each.
 //
-// **The two are indexed differently, and that is the whole difficulty here.**
-// ArduPilot declares its arrays with type-safe index types precisely so the
-// firmware cannot confuse them (AP_Compass.h):
+// The two are indexed differently. ArduPilot uses type-safe index types so
+// the firmware cannot confuse them (AP_Compass.h):
 //
 //   RestrictIDTypeArray<mag_state, .., StateIndex> _state;              // ORIENT, EXTERN, DEV_ID
 //   RestrictIDTypeArray<AP_Int8,   .., Priority>   _use_for_yaw;        // USE
 //   RestrictIDTypeArray<AP_Int32,  .., Priority>   _priority_did_stored_list; // PRIO*_ID
 //
 // So COMPASS_USE2 is "the compass in priority slot 2", while COMPASS_ORIENT2
-// and COMPASS_EXTERN2 are "the device that was detected into state slot 2".
-// They agree until somebody reorders, and then they do not -- which means a
-// row that simply lined up USE2 with ORIENT2 would be showing one compass's
-// orientation against another compass's yaw switch, silently, and only after
-// a reorder. Exactly the kind of wrong that looks fine.
+// and COMPASS_EXTERN2 belong to "the device detected into state slot 2".
+// They agree until the priorities are reordered. The firmware maps between
+// them in `_get_state_id()` by matching device ids, as `stateSlotFor` does
+// below; nothing here indexes by row number.
 //
-// The firmware bridges them in `_get_state_id()` by matching the priority
-// slot's device id against the state slot's, and that is what `stateSlotFor`
-// does below. Nothing here indexes by row number.
-//
-// Reordering is a swap of two COMPASS_PRIO*_ID values. This screen writes as
-// you go, so the swap goes to the vehicle immediately rather than staging --
-// see `swap` for why both halves have to land or neither. All three carry
-// RebootRequired in ArduPilot's metadata, and that is not a formality:
-// priority is read when the compass backends are built, so until the vehicle
-// restarts the order on screen is not the order in use.
+// Reordering swaps two COMPASS_PRIO*_ID values and writes immediately. The
+// PRIO ids are RebootRequired: priority is read when the compass backends are
+// built, so the new order applies only after a restart.
 
 /** Priority slots: the order the vehicle tries its compasses in. */
 const PRIORITY = [
@@ -70,7 +61,7 @@ export default function CompassPriority() {
   const value = (p: string) => entries.get(p)?.value
   const detected = new Set(ALL_DEV_IDS.map(value).filter((v): v is number => !!v))
 
-  /** The state slot holding this device -- the firmware's own `_get_state_id`. */
+  /** The state slot holding this device, as the firmware's `_get_state_id` finds it. */
   const stateSlotFor = (id: number) => (id ? STATE.find((s) => value(s.devId) === id) : undefined)
 
   const rows = slots.map((s) => {
@@ -81,40 +72,27 @@ export default function CompassPriority() {
       id,
       state,
       device: decodeDeviceId(id, 'compass'),
-      // A priority slot naming a device the firmware no longer reports: the
-      // compass was unplugged, or moved to another bus. The slot is still
-      // spent on it.
+      // A priority slot naming a device the firmware no longer reports
+      // (unplugged, or moved to another bus).
       missing: id !== 0 && !detected.has(id),
       // ArduPilot ignores a compass orientation unless the compass is
-      // external -- an internal one is rotated by AHRS_ORIENT with the board.
-      // Saying so is worth more than a control that does nothing.
+      // external; an internal one rotates with the board via AHRS_ORIENT.
+      // An absent parameter is not external.
       //
-      // `=== 0` rather than `!== 0`, which is not pedantry: a parameter this
-      // vehicle does not have reads as `undefined`, and `undefined !== 0` is
-      // true -- so a missing flag claimed the compass was external and
-      // offered an orientation control for it. Absent is not external.
-      //
-      // "External" is ArduPilot's word for "do not rotate this one with the
-      // board", not "on a cable". A Cube Orange's own AK09916 reports
-      // COMPASS_EXTERNAL=1 (measured, and Mission Planner shows the same
-      // tick for the same device id), because it sits on a bus the firmware
-      // treats as external.
+      // "External" means "not rotated with the board", not "on a cable": a
+      // Cube Orange's built-in AK09916 reports COMPASS_EXTERNAL=1 because it
+      // sits on a bus the firmware treats as external.
       external: state ? value(state.external) !== undefined && value(state.external) !== 0 : false,
     }
   })
 
   const filled = rows.filter((r) => r.id !== 0).length
   /**
-   * Swap two priority slots, on the vehicle.
+   * Swap two priority slots on the vehicle.
    *
-   * Both halves or neither: a swap that wrote one id and failed the other
-   * would leave the same compass in two slots, which is a configuration
-   * nobody asked for. So the second write is only attempted if the first
-   * lands, and a failure puts the pair back as staged edits -- the state the
-   * action bar exists to carry.
-   *
-   * No refresh follows: PRIO ids expose no further parameters, and the order
-   * they describe is not read again until the vehicle reboots anyway.
+   * The second write is attempted only if the first lands, so the same
+   * compass never ends up in two slots; on failure the pair is staged
+   * instead. No refresh follows, since PRIO ids gate no other parameters.
    */
   const swap = (a: number, b: number) => {
     const from = rows[a]
@@ -126,10 +104,7 @@ export default function CompassPriority() {
       .then(() => connectionService.setParamNow(to.prio, from.id))
       .then(() => {
         feedback.report({ ok: true, param: from.prio })
-        // COMPASS_PRIO*_ID carries RebootRequired in ArduPilot's metadata,
-        // and it means it: the order is read when the compass backends are
-        // built, so until the restart this table is showing an order the
-        // vehicle is not using.
+        // The new order applies only after a restart.
         feedback.needReboot('Compass priority takes effect after a restart')
       })
       .catch((err: unknown) => {
@@ -147,13 +122,9 @@ export default function CompassPriority() {
     <section className="compass-prio" aria-labelledby="compass-prio-title">
       <h3 className="compass-prio__title" id="compass-prio-title">
         Compass priority
-        {/* The arrows write too, and have no control of their own to answer
-            inside, so the table's own title does. */}
+        {/* Write feedback for the reorder arrows. */}
         <WriteFeedback prefixes={['COMPASS_PRIO']} inline />
       </h3>
-      {/* Framed, with a header band and a rule between rows: it sat on the
-          card as loose lines of text and controls, and did not read as the
-          table it is. */}
       <div className="app-table">
       <div className="app-table__row compass-prio__row app-table__head">
         <span />
@@ -188,7 +159,7 @@ export default function CompassPriority() {
             )}
           </span>
 
-          {/* State-indexed: this one belongs to the *device*, found by id. */}
+          {/* State-indexed: this one belongs to the device, found by id. */}
           <span className="compass-prio__cell">
             {r.state && entries.has(r.state.orient) && r.external ? (
               <ParamField
@@ -200,10 +171,6 @@ export default function CompassPriority() {
             ) : r.id === 0 ? (
               <span className="compass-prio__na">—</span>
             ) : (
-              // Not "AHRS_ORIENT": a parameter name on screen says nothing to
-              // the person reading the row, and that one was not even
-              // ArduPilot's spelling of it. What the cell has to say is why
-              // there is no control here.
               <span className="compass-prio__na" title="An internal compass turns with the board">
                 Follows the board
               </span>
@@ -239,8 +206,6 @@ export default function CompassPriority() {
         </div>
       ))}
       </div>
-      {/* No standing line saying the order waits for a restart: a swap raises
-          the restart prompt itself, which says so when it is true. */}
     </section>
   )
 }

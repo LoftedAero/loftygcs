@@ -1,7 +1,5 @@
-// Production build: renderer via Vite, then main + preload via esbuild.
-// Two esbuild calls instead of a Vite Electron plugin: fewer moving parts,
-// and the electron/ sources are small enough that a bundler config would be
-// bigger than the code.
+// Production build: renderer via Vite, then main + preload via esbuild
+// directly rather than through a Vite Electron plugin.
 import { build as viteBuild } from 'vite'
 import { buildSync } from 'esbuild'
 

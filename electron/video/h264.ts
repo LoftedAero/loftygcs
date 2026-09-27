@@ -1,14 +1,10 @@
 // RTP and H.264 depayloading, per RFC 3550 and RFC 6184.
 //
-// The renderer decodes video, not this process: a decoded 1080p30 frame is
-// 8 MB and 250 MB/s of them will not cross a process boundary, while the
-// compressed bitstream that produced them is a few hundred KB/s and crosses
-// it for nothing. So the job here is to turn RTP packets back into access
-// units and hand those over; Chromium's own hardware decoder does the rest.
+// The renderer decodes: decoded 1080p30 is about 250 MB/s, too much to cross
+// a process boundary, while the compressed stream is a few hundred KB/s. This
+// module turns RTP packets back into access units for Chromium's decoder.
 //
-// Pure functions and one small state machine, kept apart from the sockets so
-// the fiddly part -- reassembling a picture split across a dozen packets --
-// can be tested without a camera.
+// Kept apart from the sockets so reassembly can be tested without a camera.
 
 export interface RtpPacket {
   payloadType: number
@@ -78,17 +74,13 @@ export interface AccessUnit {
 /**
  * Turns a stream of RTP packets back into access units.
  *
- * Three packet shapes matter in practice: a whole NAL in one packet, a STAP-A
- * carrying several small ones (typically SPS and PPS together), and FU-A,
- * which splits a large one across many packets. The rest of RFC 6184 --
- * STAP-B, MTAP, FU-B -- is not produced by anything in the wild, and
- * silently dropping a packet type is better than emitting a NAL that decodes
- * to garbage.
+ * Handles a single NAL per packet, STAP-A (several small NALs, typically SPS
+ * and PPS) and FU-A (one large NAL split across packets). STAP-B, MTAP and
+ * FU-B are not seen in practice and are dropped.
  *
- * A dropped packet is detected by the sequence number and the picture being
- * assembled is thrown away: half a frame decodes into a smear that persists
- * until the next keyframe, which looks far more like a broken app than a
- * brief freeze does.
+ * A sequence gap discards the picture being assembled: a partial frame
+ * decodes to a smear that lasts until the next keyframe, which is worse than
+ * a brief freeze.
  */
 export class H264Depayloader {
   private nals: Uint8Array[] = []
@@ -114,8 +106,8 @@ export class H264Depayloader {
   push(pkt: RtpPacket): AccessUnit[] {
     const out: AccessUnit[] = []
 
-    // A gap means the picture in progress is incomplete. Note it before
-    // anything else, so the packet that follows the gap starts cleanly.
+    // A gap means the picture in progress is incomplete; drop it first so
+    // this packet starts cleanly.
     if (this.expectedSeq !== null && pkt.sequence !== this.expectedSeq) {
       this.fragments = []
       this.nals = []
@@ -180,8 +172,8 @@ export class H264Depayloader {
 
   private collect(nal: Uint8Array) {
     const t = nalType(nal)
-    // Parameter sets are kept rather than queued: they are re-emitted ahead
-    // of every keyframe, so a decoder that starts mid-stream has them.
+    // Parameter sets are kept rather than queued and re-emitted ahead of
+    // every keyframe, so a decoder can start mid-stream.
     if (t === NAL_SPS) {
       this.sps = nal.slice()
       return
@@ -200,12 +192,9 @@ export class H264Depayloader {
     const keyframe = nals.some((n) => nalType(n) === NAL_IDR)
     let parts = nals
     if (keyframe && this.sps && this.pps) {
-      // An access unit delimiter, when a sender emits one, has to stay the
-      // first NAL of the access unit -- so the parameter sets go after it,
-      // not in front of it. Getting this backwards produces a stream that
-      // libav happily decodes and Chromium rejects outright, with "a key
-      // frame is required after configure()": its parser will not accept the
-      // IDR that follows a misplaced delimiter, so the picture never appears.
+      // An access unit delimiter must stay the first NAL, so the parameter
+      // sets go after it. Chromium rejects the reverse order ("a key frame is
+      // required after configure()") even though libav accepts it.
       const lead = nals.length > 0 && nalType(nals[0]!) === NAL_AUD ? 1 : 0
       parts = [...nals.slice(0, lead), this.sps, this.pps, ...nals.slice(lead)]
     }
@@ -233,7 +222,7 @@ export function toAnnexB(nals: readonly Uint8Array[]): Uint8Array {
  * The WebCodecs codec string for an SPS, e.g. `avc1.42e01e`.
  *
  * The three bytes after the NAL header are profile_idc, the constraint set
- * flags, and level_idc -- exactly what the codec string encodes.
+ * flags and level_idc, which is what the codec string encodes.
  */
 export function codecStringFromSps(sps: Uint8Array): string | null {
   if (sps.length < 4) return null

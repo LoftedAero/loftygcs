@@ -1,17 +1,13 @@
 // The ArduPilot OSD panel catalog: one entry per OSD{screen}_{ITEM}_{EN,X,Y}
-// triplet the firmware exposes. Sixty-five of them, which is why this is a
-// data table and not markup -- the editor renders whatever is listed here and
-// silently drops anything the connected firmware lacks.
+// triplet the firmware exposes. The editor drops anything the connected
+// firmware lacks.
 //
-// `sample` is what the panel looks like on a real screen, and it is load-
-// bearing rather than decorative: the whole job of a layout editor is showing
-// that two panels will collide, and a panel's width is the width of the text
-// it draws. The strings are uppercase because the MAX7456 character set is.
+// `sample` sets a panel's width, which is what shows collisions. Uppercase
+// because the MAX7456 character set is.
 //
 // Extents are approximate for the drawn-graphic panels (horizon, sidebars,
-// compass rose). ArduPilot itself does not publish their footprints, and they
-// vary with video standard; close is enough to arrange a screen without
-// overlap, which is what this view is for.
+// compass rose): ArduPilot does not publish their footprints, and they vary
+// with video standard.
 
 export type OsdGroup = 'flight' | 'navigation' | 'power' | 'radio' | 'system'
 
@@ -29,9 +25,8 @@ export interface OsdItem {
   width?: number
   height?: number
   /**
-   * Panels ArduPilot implements only for MSP OSDs -- they exist as parameters
-   * on every build but draw nothing on an analog MAX7456, which is worth
-   * saying before someone spends an afternoon wondering why.
+   * Panels ArduPilot implements only for MSP OSDs: the parameters exist on
+   * every build but draw nothing on an analog MAX7456.
    */
   mspOnly?: boolean
 }

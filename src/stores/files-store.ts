@@ -3,10 +3,8 @@ import type { FtpDirEntry } from '../protocol/ftp/mavftp'
 
 // The vehicle's own filesystem, as the Files screen sees it.
 //
-// One directory at a time rather than a cached tree: MAVFTP has no way to
-// tell us a file changed, so anything held from a previous visit is a claim
-// about a card that a script, a log write or a format may have altered
-// since. Listing is a round trip; a stale tree is a wrong answer.
+// One directory at a time rather than a cached tree: MAVFTP cannot report
+// changes, and scripts, logging or a format can alter the card at any time.
 
 export type FilesStatus =
   | { kind: 'idle' }
@@ -45,9 +43,7 @@ export const useFilesStore = create<FilesState>((set) => ({
   selected: null,
 
   setListing(path, entries) {
-    // Sorted here rather than in the view: directories first and then by
-    // name is how every file browser presents this, and the vehicle returns
-    // them in whatever order its filesystem stored them.
+    // Directories first, then by name; the vehicle returns filesystem order.
     const sorted = [...entries].sort(
       (a, b) =>
         Number(b.kind === 'directory') - Number(a.kind === 'directory') ||

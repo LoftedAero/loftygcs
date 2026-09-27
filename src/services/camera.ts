@@ -14,15 +14,13 @@ import { useVehicleStore } from '../stores/vehicle-store'
 
 // Working the camera and the mount.
 //
-// Each of these is one ack-verified command, so the caller learns whether
-// the vehicle actually did it. That matters more here than elsewhere:
-// ArduPilot answers every one of these commands even with no camera or
-// mount configured, and the answer is the only difference between "the
-// photo was taken" and "MNT1_TYPE is still zero".
+// Each is one ack-verified command. ArduPilot answers these even with no
+// camera or mount configured, so the MAV_RESULT is the only way to tell
+// success from "MNT1_TYPE is still zero".
 
 /** MAV_RESULT_ACCEPTED. */
 const ACCEPTED = 0
-/** MAV_RESULT_UNSUPPORTED, which is a vehicle saying it has never heard of this. */
+/** MAV_RESULT_UNSUPPORTED. */
 const UNSUPPORTED = 3
 
 export class CommandRefused extends Error {
@@ -63,11 +61,9 @@ export function mountMode(mode: number): Promise<void> {
 /**
  * Take a photo, falling back to ArduPilot's own trigger.
  *
- * IMAGE_START_CAPTURE is the camera protocol's command and is what a
- * gimbal-mounted camera answers. A servo or relay shutter wired straight to
- * the autopilot predates that protocol and only answers DO_DIGICAM_CONTROL,
- * so an UNSUPPORTED is a reason to try the older one rather than to report
- * failure -- the same fallback shape as the parameter and FTP paths.
+ * IMAGE_START_CAPTURE is the camera protocol's command. A servo or relay
+ * shutter wired to the autopilot only answers DO_DIGICAM_CONTROL, so
+ * UNSUPPORTED means try that instead.
  */
 export async function photo(): Promise<void> {
   try {

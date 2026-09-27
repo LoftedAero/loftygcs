@@ -48,8 +48,8 @@ describe('fence wire round trip', () => {
     const items = fenceToItems({ shapes: [poly(true)], returnPoint: null })
     expect(items).toHaveLength(4)
     expect(items.every((i) => i.command === FENCE_CMD.inclusionVertex)).toBe(true)
-    // Every vertex repeats the total -- this is the only thing that tells a
-    // reader where one polygon ends and the next begins.
+    // Every vertex repeats the total; it is the only marker of where one
+    // polygon ends and the next begins.
     expect(items.map((i) => i.param1)).toEqual([4, 4, 4, 4])
     expect(items.map((i) => i.seq)).toEqual([0, 1, 2, 3])
   })
@@ -66,8 +66,8 @@ describe('fence wire round trip', () => {
   })
 
   it('separates two polygons of the same kind and size', () => {
-    // The hard case: same command, same vertex count, back to back. Only the
-    // running count distinguishes them.
+    // Same command, same vertex count, back to back: only the running count
+    // separates them.
     const shifted = SQUARE.map((p) => ({ x: p.x + 200000, y: p.y }))
     const plan: FencePlan = { shapes: [poly(true), poly(true, shifted)], returnPoint: null }
     const { plan: back } = fenceFromItems(fenceToItems(plan))
@@ -141,8 +141,7 @@ describe('rally points', () => {
     ]
     const items = rallyToItems(points)
     expect(items.every((i) => i.command === RALLY_CMD)).toBe(true)
-    // Relative-to-home, not AMSL: an absolute rally altitude is a good way to
-    // send an aircraft to the wrong height.
+    // Relative to home, not AMSL.
     expect(items.every((i) => i.frame === 3)).toBe(true)
     const back = rallyFromItems(items)
     expect(back.map((p) => [p.x, p.y, p.altM])).toEqual(points.map((p) => [p.x, p.y, p.altM]))

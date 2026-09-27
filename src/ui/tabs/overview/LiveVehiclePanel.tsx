@@ -16,8 +16,8 @@ function useLive(): boolean {
   return useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
 }
 
-// The live half of the Overview, in the shape of Betaflight's setup tab: the
-// airframe turning with the vehicle, instruments and vital signs beside it.
+// The live half of the Overview, laid out like Betaflight's setup tab: the
+// airframe model following the vehicle, with instruments and vitals beside it.
 export default function LiveVehiclePanel() {
   const live = useLive()
   const mavType = useVehicleStore((s) => s.vehicleType)
@@ -25,18 +25,13 @@ export default function LiveVehiclePanel() {
   return (
     <div className="live-panel">
       <LaCard title="Attitude" className="live-panel__model">
-        {/* The readout is wrapped with the well rather than placed against
-            the card, so its inset is measured from the thing it sits on. It
-            used to be positioned with a hardcoded top that guessed where
-            the title ended, and the guess drifted -- it was overhanging the
-            well's top edge by 8px. */}
+        {/* The readout is positioned inside the well, so its inset is
+            measured from the well rather than guessed from the card title. */}
         <div className="model-well">
           <AttitudeReadout />
-          {/* The instruments beside this one sit level with no data, because
-            that is what an instrument does. A *model* is not an instrument:
-            an unidentified vehicle falls back to the fixed wing, so drawing
-            it would announce an aeroplane nobody has connected -- and would
-            run a WebGL loop to say it. The well stays, empty. */}
+          {/* Unlike the instruments, the model is not drawn without a
+            vehicle: an unidentified vehicle falls back to the fixed wing,
+            which would show an aircraft nobody connected. */}
           {live ? (
             <VehicleView
               vehicle={vehicleClass(mavType)}
@@ -49,14 +44,8 @@ export default function LiveVehiclePanel() {
             />
           ) : (
             <div className="vehicle-view vehicle-view--empty">
-              {/* The one place the disconnected state is stated, because it
-                is the one place the absence is already visible. It names
-                the route out and where it is, since neither the app bar's
-                transport menu nor the SITL tray announces itself -- and it
-                names the right one: the simulator is an Electron feature
-                (it spawns a native binary), so in a browser the way to see
-                the app move is the Demo transport, which is exactly why
-                that transport still exists. */}
+              {/* Points to how to connect. SITL is desktop-only (it spawns a
+                native binary), so the browser build suggests Demo instead. */}
               <p className="vehicle-view__empty-title">No vehicle</p>
               <p className="vehicle-view__empty-hint">
                 {isElectron()
@@ -66,9 +55,7 @@ export default function LiveVehiclePanel() {
             </div>
           )}
         </div>
-        {/* Hidden with the model, not just for the F-35B: the CC-BY credit
-            is owed for *showing* the biplane, and a credit under an empty
-            well names a model that is not on screen. */}
+        {/* The CC-BY credit is shown whenever the biplane model is. */}
         <p className="la-card__note model-credit" hidden={!live || airframe === 'f35b'}>
           Aircraft model:{' '}
           <a
@@ -100,9 +87,8 @@ export default function LiveVehiclePanel() {
 /** Yaw/pitch/roll in degrees, sampled off the rings a few times a second. */
 function AttitudeReadout() {
   const live = useLive()
-  // null rather than zeros: the rings hold whatever the last vehicle left
-  // in them, so a disconnect would otherwise freeze three plausible angles
-  // on screen forever.
+  // null rather than zeros: the rings keep the last vehicle's values, which
+  // would otherwise stay on screen after a disconnect.
   const [angles, setAngles] = useState<{ yaw: number; pitch: number; roll: number } | null>(null)
   const frame = useRef(0)
   useEffect(() => {
@@ -113,8 +99,7 @@ function AttitudeReadout() {
     let last = 0
     const tick = (now: number) => {
       frame.current = requestAnimationFrame(tick)
-      // Numbers only need to be readable, not smooth; 8 Hz is plenty and
-      // keeps React out of the render loop.
+      // 8 Hz is enough for readable numbers and keeps React out of the render loop.
       if (now - last < 125) return
       last = now
       const deg = (r: number) => (r * 180) / Math.PI
@@ -148,14 +133,8 @@ function AttitudeReadout() {
 }
 
 /**
- * One reading, where `null` means nothing is saying.
- *
- * That is a different thing from a zero, and the difference is the whole
- * point of drawing this screen without a vehicle: "Satellites 0" and a
- * green "Armed: Disarmed" are claims about an aircraft, and with nothing
- * connected there is no aircraft to make them of. So a null takes the tone
- * down with the value -- otherwise the column goes green for a vehicle that
- * is not there, which is the one direction a safety readout must not fail.
+ * One reading, where `null` means no value, as distinct from zero. A null
+ * also drops the tone, so nothing shows green for a vehicle that is absent.
  */
 function Stat({
   label,
@@ -205,8 +184,7 @@ function SystemCard() {
   const live = useLive()
   const v = useVehicleStore()
   const stats = useConnectionStore((s) => s.linkStats)
-  // ArduPilot reports why it will not arm through PreArm status lines; the
-  // most recent one is the actionable thing to show.
+  // ArduPilot reports why it will not arm in PreArm status lines; show the latest.
   const prearm = [...v.statusTexts].reverse().find((s) => /^PreArm|^Arm:/i.test(s.text))
   return (
     <LaCard title="System">
@@ -243,14 +221,10 @@ function SensorCard() {
   const health = useVehicleStore((s) => s.sensorsHealth)
   const readings = decodeSensors(present, enabled, health)
   return (
-    // No footnote: the list only ever contains sensors the board reports as
-    // fitted, and the column has no vertical space to spend explaining that.
+    // Lists only the sensors the board reports as fitted.
     <LaCard title="Sensors">
-      {/* The one card that cannot show empty rows: the list is whatever the
-          board reports as fitted, so with no board there is nothing to name
-          -- and naming the usual suspects would invent them. */}
-      {/* The Fly screen's words for the same state, so waiting reads the same
-          everywhere; with no vehicle and with no report yet, it is waiting. */}
+      {/* No placeholder rows: without a board there are no sensors to name.
+          Same wording as the Fly screen for the same state. */}
       {!live || readings.length === 0 ? (
         <p className="app-placeholder">Waiting for telemetry…</p>
       ) : (

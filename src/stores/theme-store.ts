@@ -1,16 +1,13 @@
 import { create } from 'zustand'
 
-// Light, dark, or whatever the machine says.
+// Light, dark, or follow the system.
 //
-// The choice is resolved to an explicit `data-theme` on <html> here rather
-// than left to `prefers-color-scheme` in the stylesheet. One reason: the
-// palette then exists once in app.css, under one selector, instead of being
-// duplicated into a media query where the two copies drift. The other: an
-// explicit choice has to beat the OS in both directions, which in pure CSS
-// takes three blocks to express and one to get wrong.
+// The choice is resolved to an explicit `data-theme` on <html> rather than
+// left to `prefers-color-scheme`, so the dark palette exists once in app.css
+// and an explicit choice overrides the OS in either direction.
 //
-// A matching inline script in index.html applies the same attribute before
-// first paint, so the window does not flash white on the way to dark.
+// An inline script in index.html applies the same attribute before first
+// paint, so the window does not flash white.
 
 export type ThemeChoice = 'system' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
@@ -22,7 +19,7 @@ function load(): ThemeChoice {
     const v = localStorage.getItem(STORAGE_KEY)
     if (v === 'light' || v === 'dark' || v === 'system') return v
   } catch {
-    // Private mode, or storage disabled: the default is a fine answer.
+    // Storage unavailable: use the default.
   }
   return 'system'
 }
@@ -39,9 +36,8 @@ export function resolveTheme(choice: ThemeChoice): ResolvedTheme {
 }
 
 /**
- * Stamps the document. `color-scheme` is the half that is easy to forget and
- * obvious when missing: it is what makes scrollbars, select popups and other
- * browser-drawn furniture dark, none of which our stylesheet can reach.
+ * Applies the theme to the document. `color-scheme` is what darkens
+ * scrollbars, select popups and other browser-drawn controls.
  */
 function apply(resolved: ResolvedTheme) {
   if (typeof document === 'undefined') return
@@ -67,7 +63,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     try {
       localStorage.setItem(STORAGE_KEY, choice)
     } catch {
-      // Not being able to remember it is not a reason to refuse the change.
+      // Apply the change even if it cannot be persisted.
     }
     apply(resolved)
     set({ choice, resolved })

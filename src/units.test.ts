@@ -18,10 +18,8 @@ import {
   type SpeedUnit,
 } from './units'
 
-// The numbers here are the defining ones, not ones this file computed: the
-// international foot is exactly 0.3048 m and the nautical mile exactly
-// 1852 m, both by treaty. A conversion table checked against its own
-// arithmetic proves only that the arithmetic is consistent.
+// Checked against the defining values: the international foot is exactly
+// 0.3048 m and the nautical mile exactly 1852 m.
 
 describe('distance', () => {
   it('converts by the international foot, exactly', () => {
@@ -73,8 +71,8 @@ describe('vertical speed', () => {
     ({ distance, speed: 'ms', verticalSpeed }) as const
 
   it('follows distance by default, which is the aviation convention', () => {
-    // A pilot flying in knots still calls a climb "500 feet a minute", so
-    // the default follows the distance unit rather than the speed unit.
+    // Climb is read in ft/min wherever distance is in feet, whatever the
+    // speed unit, so the default follows the distance unit.
     expect(toVerticalSpeed(2.54, prefs('ft'))).toBeCloseTo(500, 6)
     expect(verticalSpeedLabel(prefs('ft'))).toBe('ft/min')
   })
@@ -85,8 +83,7 @@ describe('vertical speed', () => {
   })
 
   it('lets an explicit choice override the convention, both ways', () => {
-    // The reason the control exists: feet on the altitude tape does not
-    // oblige anyone to read climb in feet per minute, or the reverse.
+    // An explicit choice overrides the distance unit either way.
     expect(verticalSpeedLabel(prefs('ft', 'ms'))).toBe('m/s')
     expect(toVerticalSpeed(2.5, prefs('ft', 'ms'))).toBe(2.5)
     expect(verticalSpeedLabel(prefs('m', 'fpm'))).toBe('ft/min')
@@ -101,8 +98,8 @@ describe('vertical speed', () => {
 
 describe('formatting', () => {
   it('drops a decimal in the coarser unit', () => {
-    // A foot is a third of a metre: the same decimals would show finer
-    // precision than the number behind them has.
+    // A foot is about a third of a meter, so one fewer decimal keeps the
+    // same precision.
     expect(formatDistance(52.3, 'm')).toBe('52.3')
     expect(formatDistance(52.3, 'ft')).toBe('172')
     expect(formatSpeed(12.34, 'ms')).toBe('12.3')

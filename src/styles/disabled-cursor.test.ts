@@ -2,10 +2,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// No disabled control shows the not-allowed cursor -- the red no-entry sign
-// under the pointer. The design system sets it and is frozen, so app.css
-// overrides it; this reads the sheet so that a new `not-allowed` arriving
-// with the next copy of it fails here rather than quietly coming back.
+// Disabled controls never show the not-allowed cursor. The design system
+// sets it and is frozen, so app.css overrides it; this reads both sheets so a
+// new `not-allowed` in the next copy of the design system fails here.
 
 const read = (f: string) => readFileSync(join(process.cwd(), 'src/styles', f), 'utf8')
 const SHEET = read('lofted-aero.css')

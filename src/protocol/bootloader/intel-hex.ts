@@ -1,6 +1,5 @@
-// Intel HEX parser for the *_with_bl.hex images the DFU recovery path
-// flashes. Produces contiguous segments; the flasher erases and writes each
-// at its absolute address.
+// Intel HEX parser for the *_with_bl.hex images flashed over DFU. Produces
+// contiguous segments; the flasher erases and writes each at its absolute address.
 
 export interface HexSegment {
   address: number

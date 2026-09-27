@@ -2,14 +2,10 @@ import { LaButton } from '../components/La'
 import { useJoystickStore } from '../../stores/joystick-store'
 import { stop } from '../../services/joystick'
 
-// The gamepad has control, said from every screen.
-//
-// Control is no longer dropped when the Joystick pane closes or the Fly screen
-// is left (services/joystick.ts), so the one place that is always in view has
-// to say so and offer the way out. Nothing is drawn otherwise: the app bar
-// draws no indicator for a state that is not happening. It sits in the bar's
-// middle band, the one track allowed to change size, so appearing moves none
-// of the controls either side of it.
+// Shows on the app bar while the gamepad has control, with a way to release
+// it. Control persists across screens (services/joystick.ts), so this has to
+// be visible everywhere. It sits in the bar's middle track, so appearing
+// moves no other control.
 export default function JoystickChip() {
   const active = useJoystickStore((s) => s.active)
   if (!active) return null

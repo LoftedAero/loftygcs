@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { bestVersion, parsePdefXml, parseVersionIndex } from './param-metadata'
 
-// The XML below is copied from the real
-// /Parameters/versioned/Copter/stable-4.5.7/apm.pdef.xml, not invented: the
-// shapes that matter are the ones the generator actually emits, and two of
-// them are surprising (a Range is space separated, and <values> under a
-// bitmask parameter lists mask values rather than bit numbers).
+// The XML below is copied from the published
+// /Parameters/versioned/Copter/stable-4.5.7/apm.pdef.xml. Note that a Range
+// is space separated, and <values> under a bitmask parameter lists mask
+// values rather than bit numbers.
 
 const XML = `<?xml version="1.0" encoding="utf-8"?>
 <paramfile>
@@ -50,8 +49,7 @@ describe('reading the versioned XML', () => {
 
   it('drops the vehicle prefix, so names match what the vehicle sends', () => {
     // The wire calls it PILOT_THR_FILT; the file calls it
-    // ArduCopter:PILOT_THR_FILT. A lookup by the prefixed name finds
-    // nothing, silently, for every vehicle parameter.
+    // ArduCopter:PILOT_THR_FILT.
     expect(meta.PILOT_THR_FILT).toBeDefined()
     expect(meta['ArduCopter:PILOT_THR_FILT']).toBeUndefined()
     // Library parameters carry no prefix and must survive unchanged.
@@ -74,10 +72,8 @@ describe('reading the versioned XML', () => {
   })
 
   it('prefers the Bitmask field over the values beside it', () => {
-    // Both are present on a bitmask parameter, and they disagree on
-    // purpose: <values> lists 0,1,2,4 (the mask) where Bitmask lists 0,1,2
-    // (the bits). Reading the values as bits would label bit 4 wrongly and
-    // lose bit 2 entirely.
+    // Both are present on a bitmask parameter: <values> lists 0,1,2,4 (mask
+    // values) where Bitmask lists 0,1,2 (bit numbers).
     expect(meta.PILOT_TKOFF_RPT!.bitmask).toEqual({
       0: 'Feedback from mid stick',
       1: 'High throttle cancels landing',
@@ -131,8 +127,8 @@ describe('choosing which version to ask for', () => {
   })
 
   it('rounds down, never up', () => {
-    // 4.5.9 has no published metadata; 4.5.7 documents it well enough, and
-    // 4.6.0 would describe parameters this firmware does not have.
+    // 4.5.9 has no published metadata; round down to 4.5.7, not up to a
+    // newer release.
     expect(bestVersion(available, { major: 4, minor: 5, patch: 9 })).toBe('4.5.7')
     expect(bestVersion(available, { major: 4, minor: 5, patch: 3 })).toBe('4.5.0')
   })

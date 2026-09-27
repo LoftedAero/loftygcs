@@ -1,17 +1,9 @@
 import type { Direction, StickFunction } from './radio-cal'
 import { STICK_SPECS } from './radio-cal'
 
-// The transmitter, drawn so the instruction is unmistakable. QGC's radio page
-// works because it shows you the stick to move and where to push it rather
-// than describing it in a sentence you have to translate.
-//
-// Drawn for a mode-2 transmitter (throttle and yaw on the left), which is
-// what the great majority of ArduPilot users fly. It is drawn to look like one
-// -- a square gate in a round gimbal bezel, a dial at each top corner, a
-// screen between -- because a picture that reads as a transmitter at a glance
-// is one nobody has to decode before following it. Chosen from five concepts;
-// the angled switches and antenna of an earlier one read as odd at this size.
-// The gates, knobs and arrow keep the only color.
+// A transmitter drawing that shows which stick to move and which way, as
+// QGroundControl's radio page does. Mode 2 (throttle and yaw on the left),
+// which most ArduPilot users fly. Only the gates, knobs and arrow are colored.
 
 /** Half the side of a square gimbal gate. */
 const GATE = 28
@@ -30,16 +22,15 @@ export interface StickDiagramProps {
   /** Which way it is asked for; the max direction unless it says otherwise. */
   direction?: Direction
   /**
-   * Where the throttle rests while it is not the stick being asked for. Down
-   * by default, since a throttle has no spring and "centered" is not where it
-   * sits; up through the yaw steps of the calibration, which keeps them
-   * clear of the rudder-arm gesture (see IDENTIFY_STEPS).
+   * Where the throttle rests when it is not the stick being asked for. Down
+   * by default (a throttle has no spring); up during the calibration's yaw
+   * steps to avoid the rudder-arm gesture (see IDENTIFY_STEPS).
    */
   throttle?: 'up' | 'down'
   /**
-   * Live stick positions, -1 to 1 with the channel's high end positive, in
-   * place of an instruction: the gamepad pane draws where the sticks are
-   * rather than where to put them. A function left out stays centered.
+   * Live stick positions, -1 to 1 with the channel's high end positive,
+   * instead of an instruction (used by the gamepad pane). A function left out
+   * stays centered.
    */
   positions?: Partial<Record<StickFunction, number>>
 }
@@ -121,8 +112,8 @@ export default function StickDiagram({
             {/* Cross-hairs give the eye a center to judge deflection against */}
             <line x1={cx - 7} y1={CY} x2={cx + 7} y2={CY} className="stick-diagram__cross" />
             <line x1={cx} y1={CY - 7} x2={cx} y2={CY + 7} className="stick-diagram__cross" />
-            {/* Along the row or column the knob is on: yaw with the throttle
-                held up is pushed along the top of the gate, not its middle. */}
+            {/* Drawn along the knob's row or column, e.g. at the top of the
+                gate for yaw with the throttle held up. */}
             {isActive && spec && (
               <Arrow
                 cx={spec.axis === 'y' ? cx + off.x : cx}
@@ -136,8 +127,7 @@ export default function StickDiagram({
               style={{ transform: `translate(${off.x}px, ${off.y}px)` }}
             >
               <circle cx={cx} cy={CY} r={KNOB_R} />
-              {/* The stick end's rim, so the knob reads as a stick seen from
-                  above rather than a dot. */}
+              {/* The stick end's rim, so the knob reads as a stick from above. */}
               <circle cx={cx} cy={CY} r={KNOB_R - 4} className="stick-diagram__knob-top" />
             </g>
           </g>

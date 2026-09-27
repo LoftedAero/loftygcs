@@ -6,33 +6,26 @@ import CompassCalWizard from './CompassCalWizard'
 import RebootPrompt from '../../components/RebootPrompt'
 import { useParamStore } from '../../../stores/param-store'
 
-// The compass: which ones the vehicle has, in what order, and the settings
-// that apply to all of them. The calibration itself is a dialog
-// (`CompassCalWizard`), the way the accelerometer's is -- a procedure with a
-// beginning and an end does not belong in a list of settings, and a card that
-// swapped its button for attitude tiles, then progress bars, then a verdict
-// changed height four times a run under whatever somebody was reading.
+// The compasses the vehicle has, their priority, and the settings that apply
+// to all of them. Calibration runs in a dialog (`CompassCalWizard`), like the
+// accelerometer's, so the card does not change shape during a run.
 export default function CompassCalCard() {
   const entries = useParamStore((s) => s.entries)
   const [calibrating, setCalibrating] = useState(false)
 
-  // `use_for_yaw` is the precondition this screen can see. Absent parameters
-  // are not "not used" -- a vehicle that never reported COMPASS_USE is not
-  // one we can make this claim about, so the button stays live for it.
+  // ArduPilot refuses to calibrate a compass not used for yaw. Absent
+  // COMPASS_USE parameters are not "not used", so the button stays enabled.
   const useParams = ['COMPASS_USE', 'COMPASS_USE2', 'COMPASS_USE3'].filter((p) => entries.has(p))
   const anyUsed = useParams.length === 0 || useParams.some((p) => entries.get(p)?.value !== 0)
 
-  // Actions on the title row, settings in the body, as on the accelerometer
-  // card above it. One card, not two: calibration and "which compass, in what
-  // order, and is it used" are one subject.
+  // Actions on the title row, settings in the body, as on the accelerometer card.
   return (
     <LaCard
       title="Compass"
       className="compass-card"
       actions={
         <>
-          {/* On the title row with the actions: the reminder left after
-              Later, which as a block in the body grew the card. */}
+          {/* The restart reminder left after Later. */}
           <RebootPrompt inline />
           <LaButton variant="secondary" disabled={!anyUsed} onClick={() => setCalibrating(true)}>
             Calibrate compass
@@ -41,19 +34,15 @@ export default function CompassCalCard() {
       }
     >
       <CompassPriority />
-      {/* Three settings that apply to every compass, side by side with their
-          labels above: one row reads as one group, where three rows under a
-          table read as more of the table. */}
+      {/* Settings for every compass, side by side so they read as one group
+          separate from the table above. */}
       <div className="sensor-fields">
         <ParamField param="COMPASS_ENABLE" label="Enable compasses" writeNow stacked />
         <ParamField param="COMPASS_AUTODEC" label="Auto declination" writeNow stacked />
         <ParamField param="COMPASS_LEARN" label="Learn offsets in flight" writeNow stacked />
       </div>
-      {/* ArduPilot refuses to calibrate a compass it is not using --
-          `_start_calibration` returns false on `!use_for_yaw(i)`, and
-          silently: no STATUSTEXT, just MAV_RESULT_FAILED. So the one
-          precondition this screen can see, it checks, rather than offering a
-          button whose only outcome is a refusal. */}
+      {/* `_start_calibration` fails on `!use_for_yaw(i)` with only
+          MAV_RESULT_FAILED and no STATUSTEXT, so say why here. */}
       {!anyUsed && <LaHint>No compass is set to Use.</LaHint>}
 
       {calibrating && <CompassCalWizard onClose={() => setCalibrating(false)} />}

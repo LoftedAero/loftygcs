@@ -7,16 +7,13 @@ import { useConnectionStore } from '../../../stores/connection-store'
 import { useParamStore } from '../../../stores/param-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 
-// Battery monitoring: the sensor setup, its live reading, and the action the
-// vehicle takes when the pack runs down, for whichever battery the switch
-// shows. The same three cards on every vehicle and for every battery
-// -- BATT_* is one library, and Copter, Plane and a quadplane report the same
-// set (Plane adds BATT_WATT_MAX, which is left to the Parameters table rather
-// than drawn on one vehicle out of three).
+// Battery monitoring: sensor setup, live reading and failsafe action for the
+// battery the switch shows. BATT_* is one library, so Copter, Plane and a
+// quadplane report the same set (Plane's extra BATT_WATT_MAX is left to the
+// Parameters table).
 //
-// **No unit is written here.** Every BATT_* the metadata gives a unit carries
-// it, so the page is right for whatever a release says; the one without,
-// VOLT_MULT, is a ratio.
+// Units come from the parameter metadata; VOLT_MULT, the one without, is a
+// ratio.
 const REASON = 'Battery changes take effect after a restart'
 
 function card(title: string, fields: ParamFieldSpec[], exists: boolean) {
@@ -33,12 +30,10 @@ function card(title: string, fields: ParamFieldSpec[], exists: boolean) {
   )
 }
 
-// Every monitor is the same parameter group under its own prefix -- BATT_,
-// BATT2_ and on to BATT9_ -- so one declaration serves each, and a second
-// battery gets exactly what the first does rather than a short list of its
-// own. Two are offered: the switch is a fixed set, because tabs that appear as
-// monitors are switched on would move under the pointer, and past a second
-// pack the Parameters table is the honest place.
+// Every monitor is the same parameter group under its own prefix (BATT_,
+// BATT2_ through BATT9_), so one declaration serves each. The switch offers a
+// fixed two so tabs do not appear and move as monitors are enabled; further
+// packs are edited in the Parameters table.
 type Battery = '1' | '2'
 const BATTERIES = [
   { id: '1', label: 'Battery 1' },
@@ -46,14 +41,11 @@ const BATTERIES = [
 ] as const
 const prefix = (b: Battery) => (b === '1' ? 'BATT' : `BATT${b}`)
 
-// MONITOR gates the rest of the group: at 0 the vehicle reports nothing else
-// under that prefix, and setting it exposes the group live, no restart --
-// measured against SITL on BATT2_, thirteen parameters appear. So it writes on
-// change and re-reads, the way Q_ENABLE and the notch enables do. Everything
-// else is reserved, so the cards are one height whichever battery is showing
-// and whatever it is set to. The pins and scaling exist only for an analog
-// backend, and only after the restart the new type asks for: an SMBus or
-// DroneCAN monitor has none, and those rows stay greyed.
+// MONITOR gates the rest of the group: at 0 nothing else under the prefix is
+// reported, and setting it exposes the group without a restart. So it writes
+// on change and re-reads. The other rows are reserved so the cards keep one
+// height. Pins and scaling exist only for an analog backend, after a restart;
+// for SMBus or DroneCAN monitors those rows stay grayed.
 function monitorFields(b: Battery): ParamFieldSpec[] {
   const p = prefix(b)
   return [
@@ -69,12 +61,8 @@ function monitorFields(b: Battery): ParamFieldSpec[] {
   ]
 }
 
-// Low and critical are the two stages, each a voltage and a capacity, either
-// of which triggers it. Set from a real flight log rather than a bench
-// reading: a pack under load sags well below where it rests, and a threshold
-// chosen on the bench fires on the first climb. The arming minimums are the
-// same question asked before takeoff instead of during the flight, so they
-// sit with the thresholds they are measured against.
+// Low and critical stages, each triggered by either a voltage or a capacity.
+// The arming minimums sit with the thresholds they are compared against.
 function failsafeFields(b: Battery): ParamFieldSpec[] {
   const p = prefix(b)
   return [
@@ -95,16 +83,15 @@ export default function PowerTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const ready = useParamStore((s) => s.loadState === 'ready')
   const [battery, setBattery] = useState<Battery>('1')
-  // The monitor type is the one row a switched-off battery still reports, so
-  // it is what says the firmware has this battery at all.
+  // A switched-off battery still reports its monitor type, so this tells
+  // whether the firmware has the battery at all.
   const exists = useParamStore((s) => s.entries.has(`${prefix(battery)}_MONITOR`))
   if (!connected || !ready) {
     return <NeedsVehicle title="Power" />
   }
-  // The reading over the monitor settings, because that is how they are set:
-  // the multiplier is turned until the readout matches a meter. The failsafe
-  // beside them. Titles do not say which battery -- the switch does, as the
-  // quadplane's VTOL view on Tuning carries no prefix either.
+  // The live reading sits above the monitor settings because the multiplier
+  // is adjusted until the reading matches a meter. The switch, not the card
+  // titles, names the battery.
   return (
     <>
       <SubTabs tabs={BATTERIES} active={battery} onChange={setBattery} label="Battery" />
@@ -121,9 +108,8 @@ export default function PowerTab() {
   )
 }
 
-// The first battery reads SYS_STATUS, which is what the app bar and the HUD
-// show and what every vehicle sends, the demo one included. Any other comes
-// only from its own BATTERY_STATUS, by instance.
+// The first battery reads SYS_STATUS, as the app bar and HUD do. Others come
+// from their own BATTERY_STATUS instance.
 function LiveCard({ battery }: { battery: Battery }) {
   const primary = useVehicleStore((s) => s.batteryV)
   const primaryA = useVehicleStore((s) => s.batteryA)
@@ -135,8 +121,7 @@ function LiveCard({ battery }: { battery: Battery }) {
       : [other?.voltageV ?? 0, other?.currentA ?? -1, other?.remainingPct ?? -1]
   return (
     <LaCard title="Live reading">
-      {/* A dash when a reading is missing, whichever it is: the three are one
-          set. */}
+      {/* A dash for any missing reading. */}
       <LiveRow label="Voltage" unit="V" value={v > 0 ? v.toFixed(2) : undefined} />
       <LiveRow label="Current" unit="A" value={a >= 0 ? a.toFixed(1) : undefined} />
       <LiveRow label="Remaining" unit="%" value={pct >= 0 ? String(pct) : undefined} />
@@ -144,9 +129,8 @@ function LiveCard({ battery }: { battery: Battery }) {
   )
 }
 
-// The named-row shape the parameter cards beside it use, with the name column
-// left empty -- a reading is not a parameter -- so its values and units land on
-// the same lines as every control on the page.
+// The parameter cards' named-row layout with an empty name column, so values
+// and units line up with the controls on the page.
 function LiveRow({
   label,
   unit,

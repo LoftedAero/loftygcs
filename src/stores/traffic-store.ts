@@ -7,25 +7,17 @@ import {
   type AdsbTarget,
 } from '../protocol/adsb'
 
-// Re-exported rather than imported from `protocol/` by the screens: the
-// layering rule (see CLAUDE.md, and eslint's no-restricted-paths) keeps the
-// UI reaching the protocol only through the stores, and a traffic marker
-// needs the same name and emitter word the list uses.
+// Re-exported because the UI may reach the protocol only through the stores
+// (eslint's no-restricted-paths).
 export { EMITTER_LABELS, targetLabel }
 export type { AdsbTarget }
 
 // The aircraft around this one, as the flight screen sees them.
 //
-// A plain snapshot store rather than a ring buffer or a per-target
-// subscription: ADS-B updates about once a second per aircraft and the
-// engine already batches a whole picture at that rate, so one store write a
-// second moves every marker on the map. That is nothing like the attitude
-// stream this codebase keeps out of React, and treating it the same way
-// would be machinery for a problem that is not here.
-//
-// Nothing in this file decides anything about flying. ArduPilot runs its own
-// avoidance from the same reports (the AVD_* parameters); this is the picture
-// beside the map, and the distances below are for reading, not for acting.
+// A plain snapshot store: the engine flushes the whole picture about once a
+// second, so one store write per second moves every marker. Nothing here
+// decides anything about flying; ArduPilot runs its own avoidance from the
+// same reports (the AVD_* parameters).
 
 export interface TrafficState {
   /** Everything currently heard, newest picture wins. */
@@ -44,24 +36,13 @@ export const useTrafficStore = create<TrafficState>((set) => ({
   },
 }))
 
-/**
- * What counts as worth looking at first, on the map and in the list.
- *
- * A display threshold, not a collision test: it decides what the eye is
- * drawn to, and ArduPilot's own avoidance (the AVD_* parameters) is what
- * decides anything else.
- */
+/** Display thresholds for what stands out, not a collision test. */
 const CLOSE_RANGE_M = 2000
 const CLOSE_ALT_M = 300
 
 /**
- * Whether a contact should stand out.
- *
- * An unknown altitude counts as close when the range is close, rather than
- * as not-close. The first version required a known relative height, which
- * quietly made the least-known aircraft the least visible -- a contact at
- * 900 m whose altitude nobody reported was drawn calmer than one at 1.5 km
- * with a comfortable 200 m of separation. Unknown is not clear.
+ * Whether a contact should stand out. An unknown altitude counts as close
+ * when the range is close: unknown is not clear.
  */
 export function isClose(t: RelativeTarget): boolean {
   if (t.rangeM === null || t.rangeM > CLOSE_RANGE_M) return false
@@ -73,29 +54,22 @@ export interface RelativeTarget extends AdsbTarget {
   rangeM: number | null
   /** True bearing from this vehicle to it, or null without a fix. */
   bearingDeg: number | null
-  /**
-   * Meters above this vehicle, positive up -- the number that decides
-   * whether a contact matters, and null unless both altitudes are known.
-   */
+  /** Meters above this vehicle, positive up; null unless both altitudes are known. */
   relAltM: number | null
   /**
-   * Whether this vehicle knew where it was, and so whether the three fields
-   * above mean anything. Carried explicitly rather than inferred from a null
-   * range: both screens need to tell "no fix here" from "this report had no
-   * altitude", and those are different sentences to put on a screen.
+   * Whether this vehicle had a fix, so the fields above are meaningful.
+   * Explicit rather than inferred from a null range, so "no fix here" can be
+   * told apart from "this report had no altitude".
    */
   relative: boolean
 }
 
 /**
- * Traffic as it stands from here: how far, which way, how far above.
+ * Traffic relative to this vehicle: range, bearing and height difference.
  *
- * Both altitudes are AMSL, which is the one place the two sources agree.
- * A transponder reports pressure altitude against the standard datum and the
- * vehicle reports its own AMSL from GPS, so the difference is only ever
- * approximate -- good to a few hundred feet in the same air mass, which is
- * the resolution the number is read at anyway. Anyone treating it as exact
- * separation is using it for something it cannot do.
+ * Both altitudes are AMSL, but a transponder reports pressure altitude while
+ * the vehicle reports GPS altitude, so the difference is approximate (a few
+ * hundred feet in the same air mass).
  */
 export function relativeTo(
   targets: readonly AdsbTarget[],
@@ -108,9 +82,6 @@ export function relativeTo(
     relAltM: own && t.altMslM !== null ? t.altMslM - own.altMslM : null,
     relative: own !== null,
   }))
-  // Nearest first: on a traffic list the top of the screen is where the
-  // thing you care about belongs, and the thing you care about is the close
-  // one. Targets with no range at all sort last rather than first, which is
-  // where a sort on null would have put them.
+  // Nearest first; targets with no range sort last.
   return out.sort((a, b) => (a.rangeM ?? Infinity) - (b.rangeM ?? Infinity))
 }

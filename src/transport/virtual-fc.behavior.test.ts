@@ -5,12 +5,8 @@ import type { EngineOutput, ProtocolEvent } from '../protocol/types'
 
 // The ArduPilot rules the demo vehicle enforces.
 //
-// Every one of these was observed against real SITL first -- that is the
-// entry requirement, because a rule invented here would teach the app a
-// lesson ArduPilot never gives and any test written against it would bake
-// the mistake in. Two of them exist because their absence let real bugs
-// ship: the vehicle used to accept NAV_TAKEOFF in any mode, and used to
-// accept every mode change instantly.
+// Each was observed against real SITL first; a rule invented here would
+// teach the app something ArduPilot never does.
 
 const STABILIZE = 0
 const AUTO = 3
@@ -77,9 +73,7 @@ describe('the demo vehicle enforces the rules SITL enforces', () => {
   })
 
   it('refuses a takeoff commanded from Stabilize', async () => {
-    // The bug this rule exists for. The old demo vehicle accepted this, so
-    // the Takeoff button looked correct here and did nothing on a real
-    // aircraft, which then disarmed itself on the ground.
+    // A real aircraft refuses this and then disarms itself on the ground.
     await settle()
     expect(await run(ARM, [1, 0, 0, 0, 0, 0, 0])).toBe(ACCEPTED)
     expect(await run(SET_MODE, [1, STABILIZE, 0, 0, 0, 0, 0])).toBe(ACCEPTED)
@@ -100,17 +94,14 @@ describe('the demo vehicle enforces the rules SITL enforces', () => {
   })
 
   it('disarms itself after sitting armed on the ground', async () => {
-    // Past the scripted lift-off first, then back on the ground: the rule is
-    // about a vehicle sitting armed and idle, and the demo's own showreel is
-    // airborne by nine seconds.
+    // Past the demo's scripted lift-off (airborne by nine seconds), then
+    // rearmed on the ground.
     await vi.advanceTimersByTimeAsync(9000)
     expect(await run(ARM, [0, 0, 0, 0, 0, 0, 0])).toBe(ACCEPTED)
     expect(await run(ARM, [1, 0, 0, 0, 0, 0, 0])).toBe(ACCEPTED)
     events.length = 0
     await vi.advanceTimersByTimeAsync(11000)
     expect(said().join(' ')).toMatch(/Disarming motors/)
-    // Which is exactly how a takeoff that never reached Guided ended up
-    // looking like nothing happened at all.
     expect(await run(TAKEOFF, [0, 0, 0, 0, 0, 0, 20])).toBe(FAILED)
   })
 
@@ -118,8 +109,7 @@ describe('the demo vehicle enforces the rules SITL enforces', () => {
     await settle()
     await run(ARM, [1, 0, 0, 0, 0, 0, 0])
     expect(await run(SET_MODE, [1, AUTO, 0, 0, 0, 0, 0])).toBe(ACCEPTED)
-    // Accepted and going nowhere: Copter waits for a throttle raise that a
-    // ground station has no way to give it.
+    // Accepted but idle: Copter waits for a throttle raise.
     expect(said().join(' ')).toMatch(/Mission: 1 Takeoff/)
   })
 })

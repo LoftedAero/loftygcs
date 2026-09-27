@@ -1,21 +1,14 @@
 // Which serial port to reopen after a reboot.
 //
-// A flight controller is often several USB serial ports under one set of ids:
-// a Cube Orange is a MAVLink port and an SLCAN port, both 2dae:1016. Web Serial
-// gives the page nothing else to tell them apart by -- no port name, no
-// interface number -- and a reboot re-enumerates both as new port objects
-// (traced on a Cube with LOFTGCS_DEBUG_SERIAL: COM36 and COM38 removed, then
-// re-added 0.4 s later under new ids). The reconnect used to take the newest
-// match, which on that board was the SLCAN port: it opened, never sent a
-// heartbeat, and the app sat on "Rebooting" for 45 s before reporting that
-// nothing had answered.
+// A flight controller often exposes several USB serial ports with the same
+// ids: a Cube Orange has a MAVLink port and an SLCAN port, both 2dae:1016.
+// Web Serial offers no port name or interface number to tell them apart, and
+// a reboot re-enumerates both as new port objects.
 //
-// What does survive is order: the board announces its ports in the same order
-// each time it enumerates, so the port picked by hand is found again by its
-// position among its siblings. That is the first candidate; the rest follow,
-// so a stale object that can no longer open is stepped over, and a port that
-// opens but says nothing is skipped on the next try -- the backstop if some
-// platform lists siblings differently.
+// The board enumerates its ports in the same order each time, so the port
+// picked by hand is found again by its position among its siblings. The rest
+// follow as fallbacks: a stale port that will not open is skipped, and one
+// that opens but sends no heartbeat is skipped on the next try.
 
 /** Ports sharing this port's USB ids, in the order the platform lists them. */
 export function siblingsOf(ports: readonly SerialPort[], held: SerialPort): SerialPort[] {

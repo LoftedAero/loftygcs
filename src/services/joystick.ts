@@ -17,40 +17,28 @@ import {
   type PadState,
 } from '../protocol/joystick'
 
-// Flying with a gamepad.
+// Flying with a gamepad. ArduPilot treats RC_CHANNELS_OVERRIDE exactly like a
+// receiver, so:
 //
-// RC_CHANNELS_OVERRIDE is read by ArduPilot exactly as it reads a receiver,
-// which is what makes this useful and what makes every decision here a
-// safety decision. The rules, in the order they matter:
-//
-//  1. It is off at every start. Nothing persists it.
-//  2. It refuses to start unless the centered sticks are centered -- the pad
-//     is usually on a desk with something on it. The throttle is taken
-//     wherever it is, so control can be taken over in flight.
+//  1. It is off at every start and never persisted.
+//  2. It refuses to start unless the self-centering sticks are centered. The
+//     throttle is taken wherever it is, so control can be taken in flight.
 //  3. It stops itself when the pad is unplugged or changes, when the link
-//     drops, and whenever gamepad input can no longer be trusted to be live
-//     (below). Handing control back on purpose is the app's: Release, in the
-//     pane and on the app bar from every screen.
-//  4. Stopping means *sending the release*, not going quiet, and the release
-//     is a different number above channel 8 (protocol/joystick.ts).
+//     drops, and whenever gamepad input may no longer be live (below).
+//  4. Stopping means sending the release, not going quiet; the release value
+//     differs above channel 8 (protocol/joystick.ts).
 //
-// **It keeps flying when you look away.** The reading loop runs for the whole
-// session, not only while the Joystick pane is open, so switching to the Plan
-// screen or another pane does not drop the sticks; the app bar says control
-// is taken, with a Release beside it, from every screen. In the desktop app it
-// also keeps flying when the window is covered, minimized or not focused:
-// taking control turns the window's background throttling off, which is what
-// otherwise pauses gamepad input and slows timers when a window is out of
-// sight. A browser offers no such switch -- a page out of sight or out of
-// focus may get frozen gamepad data -- so there, losing focus or visibility
-// still releases, because a stick that has stopped updating is worse than no
-// stick. Either way, a page the platform reports hidden releases.
+// The reading loop runs for the whole session, not only while the Joystick
+// pane is open. In the desktop app, taking control turns off background
+// throttling so an unfocused or covered window keeps reading the pad. A
+// browser has no such switch and may freeze gamepad data, so there losing
+// focus releases. A hidden page releases in both.
 
-/** 20 Hz: what a transmitter feels like, and well inside any override timeout. */
+/** 20 Hz: comparable to a transmitter, and well inside any override timeout. */
 const SEND_INTERVAL_MS = 50
-/** How often the pad is read: fast enough to catch a button's press. */
+/** Fast enough to catch a button press. */
 const POLL_INTERVAL_MS = 33
-/** Repeats of the release, because a lost packet must not leave it held. */
+/** The release is repeated so one lost packet cannot leave the channels held. */
 const RELEASE_REPEATS = 3
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -58,38 +46,30 @@ let sendTimer: ReturnType<typeof setInterval> | null = null
 let listening = false
 let buttonState: ButtonState | null = null
 /**
- * The mapping `buttonState` was built for. A different one -- a button just
- * learned, a row added -- starts over, primed with what is held: the press
- * that taught a switch is still down on the next read, and stepping it would
- * flip the switch it had only just been assigned to. Never while flying,
- * because the mapping cannot change then.
+ * The mapping `buttonState` was built for. A new mapping starts over, primed
+ * with the buttons currently held, so the press that just taught a switch
+ * does not also step it.
  */
 let buttonsFor: JoystickConfig | null = null
 /** The device control was taken on; a different one mid-flight releases. */
 let flyingOn: string | null = null
 
-/** The desktop shell, when there is one, can keep an unfocused window live. */
+/** The desktop shell, if present, which can keep an unfocused window live. */
 const shell = () => (typeof window !== 'undefined' ? window.loftgcs : undefined)
 
-/** Every device the browser will admit to, in its own index order. */
+/** Connected devices, in the browser's index order. */
 function connectedPads(): Gamepad[] {
   if (typeof navigator === 'undefined' || !navigator.getGamepads) return []
   const out: Gamepad[] = []
-  // getGamepads() is a sparse array whose holes are meaningful: a pad's
-  // index is its slot, so the list is filtered rather than compacted.
+  // getGamepads() is sparse; each pad keeps its own `index`.
   for (const pad of navigator.getGamepads()) if (pad && pad.connected) out.push(pad)
   return out
 }
 
 /**
- * The device to read, or null when that is not decided.
- *
- * With one pad attached there is nothing to choose. With several -- a
- * wheel, a HOTAS and a gamepad all sitting on the same desk -- picking the
- * first is picking whichever the browser happened to enumerate first, and
- * on this feature that means the sticks are somewhere other than where the
- * screen says they are. So it stays null until someone says which, and
- * `enable` refuses meanwhile.
+ * The device to read, or null when undecided. With several attached, the
+ * browser's enumeration order is arbitrary, so nothing is read (and `enable`
+ * refuses) until the user chooses one.
  */
 function chosenPad(): Gamepad | null {
   const pads = connectedPads()
@@ -109,9 +89,8 @@ function readPad(): { pad: Gamepad; state: PadState } | null {
 }
 
 /**
- * One read of the pad: the live picture, the buttons' presses, and the
- * checks that can end a flight. Shared by the poll and the send so that
- * whichever runs, it sees the same pad the same way.
+ * One read of the pad: updates the live state, steps the buttons, and runs
+ * the checks that release control. Shared by the poll and the send.
  */
 function tick(): { channels: number[] } | null {
   const store = useJoystickStore.getState()
@@ -119,8 +98,6 @@ function tick(): { channels: number[] } | null {
   const found = readPad()
   store.setPads(pads, found ? { index: found.pad.index, id: found.pad.id } : null)
   if (!found) {
-    // Losing the chosen device is the unplug case whether the cable came out
-    // or the browser dropped it.
     if (store.active) stop('The gamepad was unplugged')
     return null
   }
@@ -135,38 +112,28 @@ function tick(): { channels: number[] } | null {
   }
   const stepped = stepButtons(config, found.state, buttonState)
   buttonState = stepped.state
-  // Only while the gamepad has control: a mode button is part of flying it,
-  // and a pad on a desk that is only being watched must not change modes.
+  // Mode buttons act only while the gamepad has control.
   if (stepped.modePressed && store.active) requestMode(stepped.modePressed)
   const channels = channelsFor(found.state, config, buttonState)
   store.setLive(found.state.axes as number[], found.state.buttons as boolean[], channels)
   return { channels }
 }
 
-/**
- * Start reading. Called once, when the app starts, and harmless to repeat.
- * Reading is not sending: nothing leaves the machine until `enable`.
- */
+/** Starts reading the pad (idempotent). Nothing is sent until `enable`. */
 export function startReading(): void {
   if (pollTimer) return
   attachGuards()
   pollTimer = setInterval(tick, POLL_INTERVAL_MS)
 }
 
-/** Stop reading, releasing first if control is taken. For tests and teardown. */
+/** Stops reading, releasing first if control is taken. For tests and teardown. */
 export function stopReading(): void {
   if (pollTimer) clearInterval(pollTimer)
   pollTimer = null
   if (useJoystickStore.getState().active) stop('Joystick reading stopped')
 }
 
-/**
- * Take control.
- *
- * Returns the reason it was refused, or null when it started. Refusing is
- * the common case in normal use and is not an error: a pad on a desk with a
- * book on it fails the stick check every time, which is the point.
- */
+/** Takes control. Returns the reason it was refused, or null when it started. */
 export function enable(): string | null {
   const store = useJoystickStore.getState()
   if (useConnectionStore.getState().phase !== 'connected') return 'Not connected to a vehicle'
@@ -180,7 +147,7 @@ export function enable(): string | null {
     return 'Center the sticks first'
   }
   // Switches start where the vehicle's channels are, so taking control does
-  // not move every one of them to its first position (initialButtonState).
+  // not snap them to their first position.
   const rc = useVehicleStore.getState().rcChannels
   buttonState = initialButtonState(store.config, rc)
   // A switch that was down before control was taken is not a press.
@@ -196,7 +163,7 @@ export function enable(): string | null {
   return null
 }
 
-/** Hand control back, and say why if it was not asked for. */
+/** Hands control back, recording the reason if one is given. */
 export function stop(reason?: string): void {
   if (sendTimer) clearInterval(sendTimer)
   sendTimer = null
@@ -206,18 +173,16 @@ export function stop(reason?: string): void {
   flyingOn = null
   shell()?.app.setBackgroundThrottling(true)
   if (reason) store.setMessage(reason)
-  // The release, repeated: this is the message that hands the channels back,
-  // and a lost one leaves the vehicle holding the last position.
+  // Repeated: a lost release leaves the vehicle holding the last position.
   for (let i = 0; i < RELEASE_REPEATS; i++) {
     setTimeout(() => sendChannels(RELEASE), i * 60)
   }
 }
 
 /**
- * Ask for a flight mode by name, resolved against the vehicle on the link:
- * the number is per vehicle, and a profile made on a copter may be flown on a
- * plane. A name this vehicle has no mode for is said, not guessed at; so is a
- * mode the vehicle declined, which the ack alone does not show.
+ * Requests a flight mode by name, resolved against the connected vehicle
+ * since mode numbers differ by vehicle type. Reports an unknown name or a
+ * refused change.
  */
 function requestMode(name: string): void {
   const vehicleType = useVehicleStore.getState().vehicleType
@@ -239,8 +204,7 @@ function send(): void {
     return
   }
   const read = tick()
-  // tick() has already released for an unplug or a device change; there is
-  // nothing to send.
+  // tick() has already released for an unplug or device change.
   if (!read || !useJoystickStore.getState().active) return
   sendChannels(read.channels)
 }
@@ -252,7 +216,7 @@ function sendChannels(channels: readonly number[]): void {
   connectionService.sendMessage('RC_CHANNELS_OVERRIDE', fields)
 }
 
-/** The things that must stop it, wired once. */
+/** Wires the events that release control, once. */
 function attachGuards(): void {
   if (listening || typeof window === 'undefined') return
   listening = true
@@ -261,14 +225,12 @@ function attachGuards(): void {
       stop('The gamepad was unplugged')
     }
   })
-  // Only a browser releases on losing focus: the desktop shell keeps an
-  // unfocused window's gamepad input live (see enable), a browser may not.
+  // Only a browser releases on blur; the desktop shell keeps an unfocused
+  // window's gamepad input live.
   window.addEventListener('blur', () => {
     if (!shell()) stop('The window lost focus')
   })
-  // Hidden means the platform has stopped updating the pad, in either: the
-  // shell turns throttling off so this does not happen, and if it happens
-  // anyway the sticks are frozen and must be let go.
+  // A hidden page may stop receiving gamepad updates, so release in both.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stop('The window was hidden')
   })

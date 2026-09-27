@@ -23,22 +23,12 @@ import {
   terrainTilesForArea,
 } from '../../../services/terrain'
 
-// Downloading the map before leaving for the field.
+// Downloads the current map view for offline use. It lives in Mission mode,
+// where the map already shows the area to be flown.
 //
-// It lives in Mission mode because that is where a flight is prepared, and
-// because the map here is already showing the area you are about to fly --
-// so "this view" is a boundary you have already chosen rather than another
-// one to draw.
-//
-// The estimate before the button matters more than the progress after it:
-// tile counts quadruple per zoom level, and someone who asks for six levels
-// over a whole valley on a phone hotspot should find that out before the
-// download starts, not during.
-//
-// Elevation comes along with the imagery. It is a handful of tiles for a
-// field -- one terrain tile is ten kilometers across -- and an area
-// downloaded for a trip whose terrain profile then reads "no data" would be
-// a download that did not do what it said.
+// The size estimate is shown before the download, since tile counts
+// quadruple per zoom level. Elevation is downloaded with the imagery; it is
+// only a few tiles, since one terrain tile is about ten kilometers across.
 
 /** Holds an empty slot's line open, so the box never changes height. */
 const BLANK = ' '
@@ -71,40 +61,28 @@ export default function OfflineMapsPanel({
   const abortRef = useRef<AbortController | null>(null)
 
   const [terrain, setTerrain] = useState<{ stored: number; total: number } | null>(null)
-  /**
-   * What the last thing to happen was.
-   *
-   * A download that ends by putting the button back the way it was is
-   * indistinguishable from one that never ran. The stored count does move,
-   * but nobody watches a number they were not told to look at.
-   */
+  /** The result of the last action, so a finished download says so. */
   const [outcome, setOutcome] = useState<string | null>(null)
 
-  // Everything numeric on this panel is a view of the cache, and the cache
-  // is written by panning, the download, and the terrain loader, and emptied
-  // by Clear -- none of which this component would otherwise hear about. One
-  // subscription bumps a revision; the stats and the elevation line hang off
-  // it, so what is on screen is what is in the store.
+  // The cache is written by panning, the download and the terrain loader,
+  // and emptied by Clear. One subscription bumps a revision that refreshes
+  // the stats and the elevation line.
   const [cacheRev, setCacheRev] = useState(0)
   useEffect(() => subscribeCacheChanges(() => setCacheRev((n) => n + 1)), [])
   useEffect(() => {
     void cacheStats().then(setStats)
   }, [cacheRev])
 
-  // Elevation follows the view the way imagery follows a pan: the settled
-  // bounds prefetch their own terrain, so a field looked at from home has a
-  // working profile at the no-signal field. Deduped and capped in the
-  // service; paused during a manual download, which fetches the same tiles
-  // itself, and caught up when it ends.
+  // The settled view prefetches its own terrain, so a field looked at from
+  // home has a working profile offline. Deduped and capped in the service;
+  // paused during a manual download, which fetches the same tiles.
   const downloading = progress !== null
   useEffect(() => {
     if (bounds && !downloading) void prefetchTerrainForView(bounds)
   }, [bounds, downloading])
 
-  // Terrain is a separate question from the map's own coverage: it is one
-  // zoom level of very large tiles, so an area can have every scrap of
-  // imagery and no elevation at all -- and the profile would then go quiet
-  // at the field with nothing to explain it.
+  // Terrain coverage is tracked separately: an area can have all its
+  // imagery and no elevation.
   useEffect(() => {
     if (!bounds) {
       setTerrain(null)
@@ -120,13 +98,11 @@ export default function OfflineMapsPanel({
   }, [bounds, cacheRev])
 
   const layer = layerById(loadBaseLayer())
-  // Never past what the server actually has: asking for zoom 22 of imagery
-  // that stops at 19 downloads three levels of nothing.
+  // Never past the imagery's native zoom.
   const maxZoom = Math.min(layer.maxNativeZoom, Math.floor(zoom) + extra)
   const minZoom = Math.max(1, Math.min(Math.floor(zoom), maxZoom))
   const count = bounds ? countTiles(bounds, minZoom, maxZoom) : 0
-  // What the download would actually fetch: past the area cap this is zero,
-  // and promising "plus elevation" there would be a promise it cannot keep.
+  // Zero past the terrain area cap.
   const terrainForArea = bounds ? terrainTilesForArea(bounds).length : 0
   const running = progress !== null
 
@@ -169,8 +145,7 @@ export default function OfflineMapsPanel({
           disabled={running}
           onChange={(e) => {
             setExtra(Number(e.target.value))
-            // The outcome describes a download whose parameters this just
-            // changed; keeping it would also sit on the clamp notice's line.
+            // The outcome no longer matches the settings.
             setOutcome(null)
           }}
         >
@@ -181,13 +156,11 @@ export default function OfflineMapsPanel({
           ))}
         </LaSelect>
       </LaField>
-      {/* Every optional message lives in one of three fixed slots, blank
-          when it has nothing to say, so the box never changes height as
-          state changes -- a panel pinned to the foot of the column has
-          everything above it move when it grows.
+      {/* Messages live in fixed slots, blank when empty, so the panel (pinned
+          to the column's foot) never changes height.
 
-          Slot one, under the button: the figure for the decision at hand.
-          Progress while running; the size estimate otherwise. */}
+          Slot one, under the button: progress while running, otherwise the
+          size estimate. */}
       {running ? (
         <LaButton
           variant="ghost"
@@ -224,23 +197,16 @@ export default function OfflineMapsPanel({
               (terrainForArea > 0 ? ', elevation included.' : '.')
             : BLANK}
       </LaHint>
-      {/* A tile count cannot answer "will this work when I get there" -- a
-          cache can hold five thousand tiles of the wrong valley. The map
-          can, so the switch is next to the number rather than instead of
-          it. The count shares the toggle's row: its subject is on the label,
-          so "Stored:" would say it twice. The number is the whole store,
-          every layer and area, where the overlay paints this view of this
-          base layer -- acceptable on one row because Clear below acts on the
-          same whole. */}
+      {/* A tile count cannot say whether the right area is stored; the
+          coverage overlay can. The count covers the whole store, every layer
+          and area, as Clear below does. */}
       <div className="offline-stored">
         <LaSwitch
           label="Show stored tiles"
           checked={coverage}
           onChange={(e) => {
             onCoverage(e.target.checked)
-            // Turning the overlay on hands the outcome's job to the map --
-            // the squares are the result -- and frees the line for the
-            // legend that reads them.
+            // The overlay shows the result; free the line for its legend.
             if (e.target.checked) setOutcome(null)
           }}
         />
@@ -249,15 +215,8 @@ export default function OfflineMapsPanel({
           {formatBytes(stats.bytes)}
         </span>
       </div>
-      {/* Slot two, shared by everything that is commentary rather than a
-          figure, worst first: the partial-elevation warning (a hole in prep
-          someone thinks is done), what the last download did, why the
-          resolution choices collapse near the imagery's deepest level, and
-          the overlay's legend. These can genuinely co-occur -- a stopped
-          download leaves a warning AND an outcome -- so the order is a
-          ranking, not a claim of exclusivity: the loser is always a line
-          the screen answers some other way, and the stale-outcome cases are
-          cleared at the actions that stale them (the select, the toggle). */}
+      {/* Slot two, in priority order: missing elevation, the last outcome,
+          the native-zoom limit, and the overlay legend. */}
       <LaHint
         error={!!bounds && terrain !== null && terrain.stored > 0 && terrain.stored < terrain.total}
       >
@@ -285,17 +244,14 @@ export default function OfflineMapsPanel({
 }
 
 /**
- * What the download actually did, from what it reports -- never from what it
- * was asked for. The first version printed "Stored N map tiles" from the
- * request, which on a dead network was a success message over a cache that
- * had gained nothing.
+ * What the download did, from its returned progress rather than from the
+ * request, so a dead network is not reported as success.
  */
 export function describeOutcome(map: PrefetchProgress, terrain: PrefetchProgress | null): string {
   const fresh = (p: PrefetchProgress) => p.done - p.failed - p.cached
   const stored = fresh(map) + (terrain ? fresh(terrain) : 0)
   const failed = map.failed + (terrain?.failed ?? 0)
-  // Terse on purpose: the message lives in a one-line slot, and a sentence
-  // that wraps moves the box the slots exist to hold still.
+  // Short enough for a one-line slot.
   if (stored === 0 && failed === 0) return 'Everything here is already stored.'
   if (failed === 0) return `Stored ${stored.toLocaleString()} ${stored === 1 ? 'tile' : 'tiles'}.`
   if (stored === 0) return `${failed.toLocaleString()} tiles unavailable.`

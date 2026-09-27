@@ -5,14 +5,11 @@ import { token } from '../../theme-tokens'
 
 // A live strip chart of whatever fields are selected.
 //
-// Drawn on a canvas from the field registry on requestAnimationFrame, for the
-// same reason the HUD is: the samples arrive faster than React should be
-// asked to re-render, and a chart that stutters is worse than no chart.
+// Drawn on a canvas on requestAnimationFrame, like the HUD, because samples
+// arrive faster than React should re-render.
 //
-// Each series is scaled to its own range rather than sharing one axis. Plot
-// battery voltage against motor RPM on a shared axis and the voltage is a
-// flat line at the bottom of the frame; scaled separately, both are legible,
-// and the legend carries the numbers that give the shape meaning.
+// Each series is scaled to its own range, so battery voltage and motor RPM
+// are both legible; the legend carries the numbers.
 
 /** How much history to show. The registry holds about ninety seconds. */
 const WINDOW_MS = 60_000
@@ -54,8 +51,7 @@ export default function PlotPanel({
   const legendRef = useRef<HTMLDivElement>(null)
   const fieldsRef = useRef(fields)
   fieldsRef.current = fields
-  // Which series the Y numbers are for. Every series is scaled to its own
-  // range, so exactly one of them can own the axis; the legend says which.
+  // Every series has its own scale, so only one owns the Y axis numbers.
   const axisRefName = useRef(axisField)
   axisRefName.current = axisField
 
@@ -80,10 +76,8 @@ export default function PlotPanel({
       ctx.clearRect(0, 0, w, h)
 
       const now = Date.now()
-      // The window grows to fit what there is, up to a minute. Fixed at a
-      // minute from the start, a plot opened after twenty seconds of flight
-      // draws its lines in the right-hand third and leaves the rest blank,
-      // which reads as broken rather than as "not enough history yet".
+      // The window grows with the available history, up to a minute, so a
+      // new plot is not mostly blank.
       let earliest = now
       for (const name of fieldsRef.current) {
         const s = fieldRegistry.samples(name)
@@ -92,17 +86,15 @@ export default function PlotPanel({
       const span = Math.max(5000, Math.min(WINDOW_MS, now - earliest))
       const from = now - span
 
-      // The plotting area, with gutters for the labels so no line ever runs
-      // underneath a number.
+      // The plotting area, inside the label gutters.
       const px = GUTTER_L
       const py = PAD_T
       const pw = Math.max(10, w - GUTTER_L - PAD_R)
       const ph = Math.max(10, h - PAD_T - GUTTER_B)
       const xAt = (t: number) => px + ((t - from) / span) * pw
 
-      // Grid and labels come from the theme rather than being fixed: a
-      // near-black grid line is invisible on a dark ground, and the series
-      // colors below are chosen to read on both.
+      // Grid and label colors follow the theme; the series colors read on
+      // both.
       const gridColor = token('--la-line', '#E1E2E6')
       const labelColor = token('--la-ink-3', '#82828A')
 
@@ -110,9 +102,8 @@ export default function PlotPanel({
       ctx.strokeStyle = gridColor
       ctx.lineWidth = 1
 
-      // Y grid. The labels belong to whichever series owns the axis, so its
-      // range is needed before they can be written -- found below, then the
-      // labels are drawn once it is known.
+      // Y grid. Its labels are drawn after the series, once the owning
+      // series' range is known.
       const yRows = 4
       for (let i = 0; i <= yRows; i++) {
         const y = Math.round(py + (ph / yRows) * i) + 0.5
@@ -122,8 +113,7 @@ export default function PlotPanel({
         ctx.stroke()
       }
 
-      // X grid and its time labels: seconds back from now, which is what a
-      // strip chart's horizontal axis actually means.
+      // X grid, labeled in seconds back from now.
       const step = span > 40000 ? 15 : span > 20000 ? 10 : 5
       ctx.fillStyle = labelColor
       ctx.textAlign = 'center'
@@ -145,7 +135,7 @@ export default function PlotPanel({
         if (!s || s.t.length === 0) return
 
         // Range over the visible window only, so a spike that has scrolled
-        // off no longer flattens everything that is still on screen.
+        // off no longer flattens the rest.
         let lo = Infinity
         let hi = -Infinity
         for (let k = 0; k < s.t.length; k++) {
@@ -187,9 +177,7 @@ export default function PlotPanel({
         legend.push({ name, color, value: s.v[s.t.length - 1] ?? 0, lo, hi })
       })
 
-      // Y labels last, now that the owning series' range is known. Drawn in
-      // its color, because with every series on its own scale the numbers
-      // would otherwise be anyone's guess.
+      // Y labels, in the owning series' color.
       const owner = legend.find((e) => e.name === axisRefName.current) ?? legend[0]
       if (owner) {
         ctx.textAlign = 'right'
@@ -202,8 +190,8 @@ export default function PlotPanel({
         }
       }
 
-      // The legend is DOM rather than canvas so the remove buttons are real
-      // controls; it is updated here to stay in step with the lines.
+      // The legend is DOM so its buttons are real controls; its values are
+      // updated here to stay in step with the lines.
       const box = legendRef.current
       if (box) {
         for (const entry of legend) {
@@ -232,9 +220,7 @@ export default function PlotPanel({
                 data-field={name}
                 style={{ borderLeftColor: PLOT_COLORS[i % PLOT_COLORS.length] }}
               >
-                {/* Clicking a chip hands it the Y axis. With every series on
-                    its own scale only one set of numbers can be shown, so
-                    which one has to be the reader's choice. */}
+                {/* Clicking a chip gives it the Y axis. */}
                 <button
                   type="button"
                   className="plot-chip__pick"
@@ -271,10 +257,6 @@ export default function PlotPanel({
           ×
         </button>
       </div>
-      {/* No caption under it: the time axis is labelled on the canvas, and
-          each series owning its own scale is what the colored Y numbers and
-          the chips' ranges show. An empty plot likewise says nothing -- Add
-          field is beside it. */}
       <canvas ref={canvasRef} className="plot-panel__canvas" />
     </div>
   )

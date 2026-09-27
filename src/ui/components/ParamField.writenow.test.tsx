@@ -43,7 +43,7 @@ describe('a field that writes as soon as it is chosen', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '5' } })
     await vi.waitFor(() => expect(refreshed.length).toBe(1))
     expect(sent).toEqual([['OSD_TYPE', 5]])
-    // Quiet: a refresh nobody asked for must not blank the curated tabs.
+    // Quiet, so the curated tabs do not blank.
     expect(refreshed[0]).toEqual({ quiet: true })
   })
 
@@ -59,9 +59,8 @@ describe('a field that writes as soon as it is chosen', () => {
       </>,
     )
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '5' } })
-    // A tick rather than the word, because a PWM box in a table of them cannot
-    // give up 68px of permanent room beside it -- the words stay for anything
-    // that cannot see the glyph, which is what this asserts on.
+    // The field shows a tick; the words remain for assistive technology,
+    // which is what this asserts on.
     await vi.waitFor(() =>
       expect(within(screen.getByTestId('type')).queryByText('OSD_TYPE saved.')).not.toBeNull(),
     )
@@ -70,11 +69,9 @@ describe('a field that writes as soon as it is chosen', () => {
   })
 
   it('does NOT re-read for a field that only writes', async () => {
-    // The two are separate claims. Writing immediately says "this reaches the
-    // vehicle now"; gating says "this changes which parameters exist". Most
-    // immediate writes -- every compass setting on Sensors -- are the first
-    // without the second, and a refresh after each is ~1,400 parameters read
-    // back to learn nothing, which over a telemetry radio is tens of seconds.
+    // Writing immediately and gating other parameters are separate. A
+    // refresh re-reads ~1,400 parameters, tens of seconds over a telemetry
+    // radio.
     render(<ParamField param="OSD_TYPE" label="OSD type" writeNow />)
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '5' } })
     await vi.waitFor(() => expect(sent).toEqual([['OSD_TYPE', 5]]))
@@ -82,8 +79,7 @@ describe('a field that writes as soon as it is chosen', () => {
   })
 
   it('falls back to staging when the write does not land', async () => {
-    // The value the user picked is still what they want, so it becomes a
-    // staged edit and the action bar's Write is the honest state of it.
+    // The chosen value survives as a staged edit.
     writeFails = true
     render(<ParamField param="OSD_TYPE" label="OSD type" writeNow />)
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
@@ -94,16 +90,12 @@ describe('a field that writes as soon as it is chosen', () => {
     expect(refreshed).toEqual([])
   })
 
-  // The two events a number box produces, and they mean different things.
-  // Keystrokes are `input`; `change` is the platform saying the value is
-  // committed -- which it does on Enter, on blur, and immediately on the
-  // stepper. `fireEvent.change` is therefore a commit, not a keypress, and
-  // simulating typing with it is what hid the stepper bug: Up-arrow fires
-  // input *and* change, and the field was listening to React's `onChange`,
-  // which is the input event.
+  // A number box fires `input` on each keystroke and the native `change` on
+  // commit: Enter, blur, or a stepper click (which fires both). React's
+  // `onChange` is the input event, so `fireEvent.change` here is a commit,
+  // not a keypress.
   it('does not write while a number is being typed', () => {
-    // "50" passes through 5 on the way. A field that wrote every keystroke
-    // would send a value nobody chose.
+    // "50" passes through 5 on the way.
     render(<ParamField param="OSD_MSG_TIME" label="Message time" writeNow />)
     const box = screen.getByRole('spinbutton')
     fireEvent.input(box, { target: { value: '5' } })
@@ -123,9 +115,7 @@ describe('a field that writes as soon as it is chosen', () => {
   })
 
   it('sends a step from the stepper, without leaving the box', async () => {
-    // The bug this was written for: nudging a servo trim with the arrows
-    // staged the value and never sent it, so nothing moved until you clicked
-    // away -- on the one screen where the point is to nudge and watch.
+    // Nudging a servo trim with the arrows must send each step.
     render(<ParamField param="OSD_MSG_TIME" label="Message time" writeNow />)
     const box = screen.getByRole('spinbutton')
     fireEvent.input(box, { target: { value: '11' } })

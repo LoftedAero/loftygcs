@@ -25,28 +25,20 @@ type LevelStatus = { text: string; tone: 'busy' | 'ok' | 'bad' }
 // Inertial and magnetic calibration.
 export default function SensorsTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
-  // Drawn once the parameters are in, as every other Setup tab is: drawn
-  // before, Hardware ID needed a "waiting for the parameters" line of its own
-  // and the calibration cards filled in under the reader.
+  // Drawn once the parameters are in, like every other Setup tab.
   const ready = useParamStore((s) => s.loadState === 'ready')
   if (!connected || !ready) {
     return <NeedsVehicle title="Sensors" />
   }
   return (
     <div className="sensors-screen">
-      {/* The two calibrations are the work, so they stack in one column and
-          are read top to bottom. */}
+      {/* The two calibrations stack in one column. */}
       <div className="sensors-screen__stack">
         <AccelCard />
         <CompassCalCard />
       </div>
-      {/* What the firmware actually found, beside the calibrations that fail
-          when it found nothing. It was a view inside the Inspector, three
-          groups away in the rail: a compass that will not calibrate is
-          usually a compass that was never detected, and nothing about that
-          suggests going to look at a message list. Beside *both* of them
-          rather than under whichever card happened to be shorter, which is
-          where the card grid put it. */}
+      {/* What the firmware detected, beside the calibrations: a compass that
+          will not calibrate is usually one that was never detected. */}
       <LaCard title="Hardware ID">
         <HardwareId />
       </LaCard>
@@ -55,15 +47,11 @@ export default function SensorsTab() {
 }
 
 /**
- * The orientation setting, drawn: the autopilot board as mounted, over an
- * airplane silhouette pointing the vehicle's way forward. A pre-rendered frame per
- * rotation (`npm run cal-art`), in the same visual language as the attitude
- * tiles, because a live airframe with the board inside it was two busy things
- * competing at card size.
+ * The orientation setting, drawn: the board as mounted over an airplane
+ * silhouette, one pre-rendered frame per rotation (`npm run cal-art`).
  *
- * The slot stays when there is nothing to draw -- a custom rotation, or a
- * vehicle that has not reported the parameter -- so the field beside it does
- * not jump sideways when the picture comes and goes.
+ * The slot stays when there is nothing to draw (a custom rotation, or no
+ * parameter yet) so the field beside it does not shift.
  */
 function OrientationView() {
   const value = useParamStore((s) => s.entries.get('AHRS_ORIENTATION')?.value)
@@ -76,8 +64,7 @@ function OrientationView() {
   return (
     <span
       className="orient-board"
-      // The dropdown beside it already says which rotation; this is the same
-      // fact as a picture.
+      // The dropdown beside it already names the rotation.
       aria-hidden="true"
       style={{
         backgroundImage: `url(${boardSheet})`,
@@ -92,8 +79,7 @@ function AccelCard() {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [level, setLevel] = useState<LevelStatus | null>(null)
 
-  // A result says what happened and then gets out of the way. The busy line
-  // stays until there is a result to replace it.
+  // A result clears after a few seconds; the busy line stays until replaced.
   useEffect(() => {
     if (!level || level.tone === 'busy') return
     const t = setTimeout(() => setLevel(null), LEVEL_STATUS_MS)
@@ -120,17 +106,15 @@ function AccelCard() {
     }
   }
 
-  // Actions on the title row, settings in the body -- the same shape on both
-  // calibration cards. Orientation is written straight through rather than
-  // staged, because it has to be right on the vehicle before a calibration
-  // starts, and a pending edit in the Write queue would not be.
+  // Orientation writes immediately rather than staging, because it must be
+  // correct on the vehicle before a calibration starts.
   return (
     <LaCard
       title="Accelerometer"
       actions={
         <>
-          {/* Right beside the button that produced it. The full text is the
-              hover text, because a long failure shortens to fit the row. */}
+          {/* The full text is also the tooltip, since a long failure is
+              truncated to fit the row. */}
           {level && (
             <span
               className={`card-status card-status--${level.tone}`}

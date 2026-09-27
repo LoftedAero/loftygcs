@@ -7,16 +7,13 @@ import { polygonAreaM2, surveyGrid } from '../../../protocol/survey'
 
 // Drawing a survey area, and turning it into passes.
 //
-// The polygon is not the mission -- it is the input. Generate turns it into
-// ordinary waypoints in the item list, where they can be edited, reordered
-// and deleted like any others, and the polygon is then discarded. That is a
-// deliberate choice against the alternative: QGroundControl keeps a survey as
-// a live object in the plan and regenerates it, which is tidier right up
-// until you want to nudge one waypoint and find you cannot.
+// The polygon is only input. Generate turns it into ordinary waypoints that
+// can be edited like any others, and the polygon is discarded. (QGroundControl
+// instead keeps a survey as a live object and regenerates it, which prevents
+// editing individual waypoints.)
 //
-// The cost is that a generated grid cannot be re-cut afterwards. The area is
-// kept while the panel is open precisely so the spacing and angle can be
-// tried against a live preview before committing to the waypoints.
+// A generated grid cannot be re-cut afterwards, so the area is kept while the
+// panel is open to try spacing and angle against a live preview.
 
 export default function SurveyPanel() {
   const units = useUnits()
@@ -29,9 +26,7 @@ export default function SurveyPanel() {
   const frame = useMissionStore((s) => s.defaults.frame)
   const ref = useRef<HTMLElement>(null)
 
-  // The column is taller than the window, and the panel opens below the fold
-  // -- so starting a survey would look like nothing happened until you
-  // scrolled. Bring it into view instead.
+  // The panel opens below the fold of a tall column; scroll it into view.
   const active = survey !== null
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })

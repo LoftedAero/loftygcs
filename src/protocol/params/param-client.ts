@@ -1,8 +1,8 @@
 // Parameter transfer over the classic message path: the fallback that works
 // on every ArduPilot ever shipped. PARAM_REQUEST_LIST streams PARAM_VALUEs;
 // gaps are refetched by index; writes are PARAM_SET verified by the echoed
-// PARAM_VALUE. The MAVFTP fast path (param-ftp) is an optimization layered
-// in front of this -- this path must always work.
+// PARAM_VALUE. The MAVFTP fast path (param-ftp) is layered in front of
+// this, so this path must always work.
 import type { FieldValue } from '../types'
 
 export interface ParamRecord {

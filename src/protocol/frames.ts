@@ -6,8 +6,8 @@
 //   v2: FD len incompat compat seq sysid compid msgid[3] payload crc[2] [sig 13]
 //   v1: FE len seq sysid compid msgid payload crc[2]
 // The CRC is X.25 over everything after the magic byte, with the message's
-// CRC_EXTRA ("magic number") digested last -- so an unknown msgid cannot be
-// CRC-checked at all and must be dropped, not trusted.
+// CRC_EXTRA ("magic number") digested last, so an unknown msgid cannot be
+// CRC-checked and is dropped.
 import { x25crc } from 'mavlink-mappings'
 import { messageById, messageByName, encodePayload } from './serializer'
 import type { FieldValue, MavFrame } from './types'
@@ -50,8 +50,7 @@ export class MavFramer {
       const parsed = this.tryParseAt(pos)
       if (parsed === 'incomplete') break
       if (parsed === 'invalid') {
-        // A magic byte that did not pan out is just payload data that happened
-        // to look like one -- advance a single byte and keep hunting.
+        // Payload data that looked like a magic byte: advance one byte and resync.
         pos++
         this.stats.droppedBytes++
         this.stats.badFrames++
@@ -92,7 +91,7 @@ export class MavFramer {
     if (!cls) return 'invalid'
 
     const crcRegion = b.subarray(pos, pos + headerLen + len + 2)
-    // x25crc's signature says Buffer but it only indexes -- any Uint8Array works.
+    // x25crc is typed for Buffer but only indexes, so any Uint8Array works.
     const computed = x25crc(crcRegion as unknown as Buffer, 1, 2, cls.MAGIC_NUMBER)
     const received = b[pos + headerLen + len]! | (b[pos + headerLen + len + 1]! << 8)
     if (computed !== received) return 'invalid'
@@ -113,7 +112,7 @@ export class MavFramer {
   }
 }
 
-/** Build a MAVLink v2 frame (unsigned; signing arrives with the signing UI). */
+/** Builds an unsigned MAVLink v2 frame. */
 export function encodeFrame(
   msgName: string,
   fields: Record<string, FieldValue>,

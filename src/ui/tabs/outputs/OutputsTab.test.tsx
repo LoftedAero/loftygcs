@@ -5,10 +5,9 @@ import { useParamStore } from '../../../stores/param-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 
-// Which cards the Outputs screen offers, per vehicle. The one that matters is
-// the motor test: ArduPlane's lives entirely inside `#if HAL_QUADPLANE_ENABLED`
-// and its entry point answers MAV_RESULT_FAILED when Q_ENABLE is 0, so on a
-// fixed wing every button on it is a refusal.
+// Which cards the Outputs screen offers, per vehicle. ArduPlane's motor test
+// is inside `#if HAL_QUADPLANE_ENABLED` and answers MAV_RESULT_FAILED when
+// Q_ENABLE is 0.
 
 const setParamNow = vi.fn<(name: string, value: number) => Promise<number>>()
 const runCommand = vi.fn<(cmd: number, params: number[]) => Promise<number>>(() =>
@@ -20,10 +19,6 @@ vi.mock('../../../services/connection', () => ({
     runCommand: (cmd: number, params: number[]) => runCommand(cmd, params),
     refreshParams: () => Promise.resolve(),
   },
-}))
-
-vi.mock('../../../stores/guide-store', () => ({
-  useProfileLabels: () => ({ outputLabels: {}, channelLabels: {} }),
 }))
 
 const entry = (value: number) => ({ value, origValue: value, mavType: 4, dirty: false })
@@ -58,8 +53,7 @@ describe('the Outputs screen, per vehicle', () => {
     seed({ ...OUTPUTS, Q_ENABLE: 0, SERVO_RATE: 50 })
     render(<OutputsTab />)
     expect(screen.queryByText('Motor test')).toBeNull()
-    // The rest of the screen is still its own: a plane has servo outputs and
-    // an output protocol, it just has no motors to spin.
+    // A plane still has servo outputs and an output protocol.
     expect(screen.getByText('Servo outputs')).toBeTruthy()
     expect(screen.getByText('Output options')).toBeTruthy()
   })
@@ -71,8 +65,7 @@ describe('the Outputs screen, per vehicle', () => {
   })
 
   it('leaves it alone for a vehicle that never mentions Q_ENABLE', () => {
-    // Rover ships its own motor test, and reports no Q_ENABLE at all -- a gate
-    // on "has multirotor motors" would have taken it away.
+    // Rover has its own motor test and no Q_ENABLE.
     seed({ ...OUTPUTS, SERVO_RATE: 50 })
     render(<OutputsTab />)
     expect(screen.getByText('Motor test')).toBeTruthy()
@@ -81,9 +74,8 @@ describe('the Outputs screen, per vehicle', () => {
 
 describe('while the parameters are still arriving', () => {
   it('shows one placeholder, not a placeholder beside half a screen', () => {
-    // The reported bug: the link comes back after a reboot, the download runs,
-    // and the screen drew the Motor test and Output protocol cards next to a
-    // "waiting for parameters" card. Three answers to one question.
+    // After a reboot, during the parameter download, no cards may render
+    // beside the "waiting for parameters" placeholder.
     useConnectionStore.setState({ phase: 'connected' } as never)
     useParamStore.setState({
       entries: new Map(),
@@ -120,8 +112,7 @@ describe('the Position column', () => {
   })
 
   it('is a reading, not a field', () => {
-    // The row's other numbers are inputs; this one must not look like one,
-    // and must not be one either.
+    // Unlike the row's other numbers, this one is not an input.
     seed(OUTPUTS)
     useVehicleStore.setState({ servoOutputsUs: [1500] } as never)
     render(<OutputsTab />)
@@ -216,8 +207,7 @@ describe('Output options: what chooses the protocol, and what only refines it', 
   })
 
   it('draws a plane\u2019s two rows greyed where the firmware has no AP_BLHeli, as SITL does not', () => {
-    // Without them a fixed wing cannot choose DShot, so its two refinements set
-    // nothing -- and nothing offers them.
+    // Without them a fixed wing cannot choose DShot, so these rows do nothing.
     seed({ ...OUTPUTS, Q_ENABLE: 0, SERVO_RATE: 50, ...DSHOT })
     useVehicleStore.setState({ vehicleType: 1 } as never)
     render(<OutputsTab />)
@@ -319,7 +309,7 @@ describe('Motor test', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enable motor test' }))
     fireEvent.click(screen.getByRole('button', { name: /Props are off/ }))
   }
-  /** Every DO_MOTOR_TEST sent at 0% for 0 s -- the stop. */
+  /** Every DO_MOTOR_TEST sent at 0% for 0 s, i.e. the stop. */
   const stops = () =>
     runCommand.mock.calls.filter(([cmd, p]) => cmd === 209 && p[2] === 0 && p[3] === 0)
 

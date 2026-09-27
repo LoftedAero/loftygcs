@@ -1,14 +1,8 @@
 // Parameter files, and comparing one against a vehicle.
 //
 // The format is Mission Planner's `.param`: one `NAME,VALUE` per line, `#`
-// for comments. Tabs and spaces appear as separators in the wild too, since
-// the format is really "whatever a decade of tools have written", so all
-// three are accepted on the way in and commas written on the way out.
-//
-// Kept here rather than in the component because comparing a file against a
-// vehicle is the part with judgement in it -- what counts as a difference,
-// what to do about a parameter the vehicle has never heard of -- and that
-// deserves tests rather than a reading.
+// for comments. Files in the wild also use tabs and spaces as separators, so
+// all three are accepted on read; commas are written.
 
 export interface ParamFileEntry {
   name: string
@@ -36,8 +30,7 @@ export function parseParamFile(text: string): ParamFileParse {
       skipped.push({ line: i + 1, text: line.slice(0, 80) })
       return
     }
-    // A later line wins, which is what every other tool does with a file
-    // that lists the same parameter twice.
+    // A later duplicate wins, as in other tools.
     if (seen.has(name)) {
       const at = entries.findIndex((e) => e.name === name)
       if (at >= 0) entries[at] = { name, value }
@@ -71,13 +64,9 @@ export interface CompareRow {
 }
 
 /**
- * What a file would change about a vehicle.
- *
- * `missing` is a real category, not an error: parameter sets move between
- * firmware versions and vehicle types, and a Copter file loaded onto a Plane
- * is mostly parameters that do not exist here. Dropping them silently would
- * hide the fact that most of the file did not apply -- which is exactly the
- * moment somebody assumes a configuration transferred when it did not.
+ * What a file would change about a vehicle. `missing` rows are kept rather
+ * than dropped so it is visible when much of a file does not apply (a Copter
+ * file on a Plane, or a different firmware version).
  */
 export function compareParams(
   file: readonly ParamFileEntry[],
@@ -90,9 +79,7 @@ export function compareParams(
       name: e.name,
       fileValue: e.value,
       currentValue: entry.value,
-      // float32 round-tripping means an unchanged parameter can differ in
-      // the twelfth decimal; treating that as a change would offer a list of
-      // edits that do nothing.
+      // float32 round-tripping leaves tiny differences in unchanged values.
       status: sameValue(e.value, entry.value) ? ('same' as const) : ('changed' as const),
     }
   })

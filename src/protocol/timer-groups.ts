@@ -647,8 +647,8 @@ const BY_ID = new Map<number, string>([
  * Null covers three real cases and does not distinguish them, because the
  * screen's answer is the same for all three: a board added to ArduPilot since
  * this table was generated, a board whose id is shared by several layouts and
- * which did not name itself, and a vehicle that reports neither -- SITL among
- * them, since the id is a ChibiOS build constant.
+ * which did not name itself, and a vehicle that reports neither (SITL among
+ * them, since the id is a ChibiOS build constant).
  */
 export function timerGroups(boardName: string | null, boardId: number): Board | null {
   if (boardName) {

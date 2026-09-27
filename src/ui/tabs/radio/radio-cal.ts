@@ -1,30 +1,21 @@
 // Radio calibration logic, QGroundControl's way: the wizard walks the sticks
-// one at a time and *derives* the channel mapping and the reversals, instead
-// of capturing endpoints and leaving the user to work out RCMAP_* and
-// RCn_REVERSED for themselves the way Mission Planner does.
-//
-// No React here -- the sign conventions below are the part that has to be
-// right, so they are the part that is unit-tested.
+// one at a time and derives the channel mapping (RCMAP_*) and reversals
+// (RCn_REVERSED) rather than leaving them to the user. Kept free of React so
+// the sign conventions can be unit-tested.
 
 /**
  * Which physical stick direction ArduPilot treats as a channel's maximum.
  *
- * Taken from the firmware rather than from folklore. In AP_Math's
- * rc_input_to_roll_pitch_rad the horizontal thrust is
+ * In AP_Math's rc_input_to_roll_pitch_rad,
  *   thrust.x = -tan(angle_max * pitch_in);  pitch_out = -atan(thrust.x)
- * so pitch_out carries the same sign as the stick input, and a positive Euler
- * pitch is nose *up*. Roll comes through with its sign unchanged too, and a
- * positive Euler roll is to the right. Yaw rate and throttle are positive for
- * right and up respectively.
- *
- * So a fully deflected stick reads as the channel maximum when it is pushed:
+ * so pitch_out has the stick input's sign, and positive Euler pitch is nose
+ * up. Positive roll is right; yaw rate and throttle are positive for right
+ * and up. So the channel maximum is:
  *   roll  -> right      pitch -> back (nose up)
  *   yaw   -> right      throttle -> up
  *
- * The pitch case is the one worth stating out loud: plenty of transmitters
- * raise the elevator PWM when the stick goes *forward*, and those need
- * RCn_REVERSED set. That is exactly the detail a calibration should settle
- * for the user rather than leave them to discover in the air.
+ * Many transmitters raise the elevator PWM when the stick goes forward; those
+ * need RCn_REVERSED set, which the calibration works out.
  */
 export type StickFunction = 'roll' | 'pitch' | 'throttle' | 'yaw'
 
@@ -46,11 +37,9 @@ export interface StickSpec {
   stick: 'left' | 'right'
   axis: 'x' | 'y'
   /**
-   * Where the knob is drawn for the max direction, in a frame where up the
-   * screen means away from the pilot. Throttle up is a push away, so it
-   * draws up; pitch back is a pull toward, so it draws down. Presentation
-   * only -- the reversal is decided by the measured pulse width, never by
-   * this.
+   * Where the knob is drawn for the max direction, with up the screen meaning
+   * away from the pilot. Presentation only; reversal is decided by the
+   * measured pulse width.
    */
   sense: 1 | -1
   rcmapParam: string
@@ -113,20 +102,15 @@ export interface IdentifyStep {
 }
 
 /**
- * Every stick both ways, QGroundControl's walk: the max direction identifies
- * the channel and its reversal, the min direction confirms it -- the same
- * channel has to go the other way -- and between them they capture the
- * stick's endpoints, so the sweep afterwards is only for switches and dials.
+ * Every stick both ways: the max direction identifies the channel and its
+ * reversal, the min direction confirms it, and together they capture the
+ * endpoints, so the later sweep is only for switches and dials.
  *
- * **The order keeps the throttle up for yaw.** Throttle down with yaw right is
- * ArduPilot's rudder-arm gesture -- measured against SITL: both Copter and
- * Plane armed from it in a few seconds, calibration or no calibration, since
- * the wizard tells the vehicle nothing. So the throttle goes up first and
- * stays up through both yaw steps, then comes down before roll and pitch,
- * which are no part of the gesture. Only for the mapping the vehicle holds,
- * though: the firmware reads the gesture through its current RCMAP_* and
- * endpoints, so on a radio miswired badly enough some other pair of sticks
- * is the one that arms. The props-off checklist is what covers that.
+ * The throttle stays up through both yaw steps because throttle down with yaw
+ * right is ArduPilot's rudder-arm gesture, and both Copter and Plane will arm
+ * from it during calibration. This only protects the vehicle's current
+ * mapping; on a badly miswired radio another stick pair may arm it, which the
+ * props-off checklist covers.
  */
 export const IDENTIFY_STEPS: readonly IdentifyStep[] = [
   { fn: 'throttle', direction: 'max' },
@@ -145,11 +129,10 @@ export const RETURN_FRACTION = 0.8
 /**
  * Whether the stick a max step identified has now gone the other way.
  *
- * A centered stick must cross its center by the same margin a max step needs,
- * the opposite way. The throttle has no center -- it began at the bottom -- so
- * it must come most of the way back down from the top it reached. Only the
- * expected channel is read: moving some other stick leaves this false, which
- * is how a max step that caught the wrong stick shows itself.
+ * A centered stick must cross its center by the same margin a max step needs.
+ * The throttle has no center, so it must come most of the way back down from
+ * its top. Only the expected channel is read, so a max step that caught the
+ * wrong stick never completes.
  */
 export function reachedMin(
   spec: StickSpec,
@@ -190,14 +173,11 @@ export interface Deflection {
 /**
  * Which channel the user just moved, relative to a centered reference.
  *
- * Returns null while nothing is clearly deflected -- the wizard uses that to
- * keep its Next button disabled rather than guessing from noise.
+ * Returns null while nothing is clearly deflected, so the wizard keeps Next
+ * disabled rather than guessing from noise.
  *
- * Channels already claimed by an earlier step are skipped. Without that, a
- * throttle left sitting at the top still reads as the largest deflection when
- * the next stick is asked for, and wins every remaining step: the throttle
- * has no spring to return it, so this is the normal way to hold a
- * transmitter rather than an unusual mistake.
+ * Channels claimed by an earlier step are skipped; otherwise a throttle left
+ * at the top (it has no spring) would win every remaining step.
  */
 export function detectDeflection(
   reference: readonly number[],
@@ -273,7 +253,7 @@ export function claimedChannels(mapping: Partial<Record<StickFunction, Mapping>>
   return out
 }
 
-/** Functions that ended up sharing a channel -- the user moved the wrong stick. */
+/** Functions that ended up sharing a channel (the user moved the wrong stick). */
 export function conflictingFunctions(
   mapping: Partial<Record<StickFunction, Mapping>>,
 ): StickFunction[] {
@@ -303,10 +283,8 @@ export interface ParamWrite {
 }
 
 /**
- * The parameters this calibration would write, in the order they should go.
- *
- * Endpoints first, then the mapping: RCMAP_* needs a reboot to take effect,
- * so it reads better as the last thing that changed.
+ * The parameters this calibration would write: endpoints first, then the
+ * mapping, since RCMAP_* needs a reboot to take effect.
  */
 export function buildWrites(result: CalibrationResult): ParamWrite[] {
   const writes: ParamWrite[] = []
@@ -317,9 +295,8 @@ export function buildWrites(result: CalibrationResult): ParamWrite[] {
     if (!t) continue
     writes.push({ param: `RC${channel}_MIN`, value: Math.round(t.min) })
     writes.push({ param: `RC${channel}_MAX`, value: Math.round(t.max) })
-    // Throttle has no neutral -- ArduPilot reads it as a range from MIN to
-    // MAX -- so its trim goes to the bottom of that range rather than to
-    // wherever the stick happened to be resting.
+    // Throttle has no neutral (ArduPilot reads it as MIN to MAX), so its
+    // trim goes to the bottom of the range.
     const center = result.centers[channel - 1]
     const trim = channel === throttleChannel ? t.min : center
     if (trim && trim > 0) writes.push({ param: `RC${channel}_TRIM`, value: Math.round(trim) })

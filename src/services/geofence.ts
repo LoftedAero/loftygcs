@@ -1,16 +1,9 @@
 // Reading and writing fences and rally points.
 //
-// The same four-step dance as the mission, over the same client, keyed by
-// mission_type -- so this file is short by design. What it adds is the two
-// things a fence needs that a mission does not:
-//
-//  - Validation before upload. The vehicle answers a bad fence with one
-//    MAV_MISSION_ERROR and no clue which shape was wrong, so the check that
-//    can name the shape has to happen here.
-//  - Removing a fence is not done here. Write always sends what is on the
-//    screen; emptying the vehicle is MISSION_CLEAR_ALL, in `plan-clear.ts`,
-//    shared with the other two plans -- and it is a deliberate choice a
-//    person makes, not something inferred from an empty editor.
+// Same transfer protocol and client as the mission, keyed by mission_type.
+// The fence is validated before upload because the vehicle rejects a bad one
+// with a single MAV_MISSION_ERROR that does not say which shape was wrong.
+// Clearing the vehicle is MISSION_CLEAR_ALL, in `plan-clear.ts`.
 
 import { connectionService } from './connection'
 import { useMissionStore } from '../stores/mission-store'

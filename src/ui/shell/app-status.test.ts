@@ -26,24 +26,20 @@ const at = (p: Partial<VehicleStatusInput>) => barStatus({ ...base, ...p })
 
 describe('the app bar status word', () => {
   it('says nothing at all when there is nothing to say', () => {
-    // The state where the Connect button is the whole story. Both
-    // references remove their status rather than render a placeholder,
-    // which is the behavior this null drives.
+    // No placeholder when disconnected; QGroundControl and Betaflight do
+    // the same.
     expect(at({ phase: 'idle' })).toBeNull()
   })
 
   it('does not paint a reboot we asked for as a fault', () => {
-    // The bug this fixes: rebooting after a compass calibration -- which the
-    // app itself tells people to do -- put a red "Link closed: The device
-    // has been lost" on the bar. The link is down because we asked, and it
-    // is coming back, so the tone is the same one "Opening link" gets.
+    // The link is down because we asked and is coming back, so it gets the
+    // same tone as "Opening link".
     expect(at({ phase: 'rebooting' })).toEqual({ text: 'Rebooting', tone: 'idle' })
   })
 
   it('keeps a failed connection on screen', () => {
-    // The one thing the readout this replaced was genuinely good for:
-    // "connection refused" separates a simulator that is not running from a
-    // port typed wrong, and nothing else in the window would say it.
+    // "Connection refused" separates a simulator that is not running from a
+    // mistyped port.
     expect(at({ phase: 'error', error: 'connect ECONNREFUSED 127.0.0.1:5760' })).toEqual({
       text: 'connect ECONNREFUSED 127.0.0.1:5760',
       tone: 'bad',
@@ -57,8 +53,7 @@ describe('the app bar status word', () => {
   it('reports the link before anything about the vehicle', () => {
     expect(at({ phase: 'opening' })).toEqual({ text: 'Opening link', tone: 'idle' })
     expect(at({ phase: 'handshaking' })).toEqual({ text: 'Waiting for heartbeat', tone: 'idle' })
-    // Armed and in a failsafe, but the link is gone -- so the link is what
-    // it says. Anything else would be reporting a stale reading as live.
+    // Armed and in a failsafe, but with the link gone those are stale.
     expect(at({ phase: 'linkLost', armed: true, systemStatus: MAV_STATE_CRITICAL })).toEqual({
       text: 'Link lost',
       tone: 'bad',
@@ -79,9 +74,7 @@ describe('the app bar status word', () => {
   })
 
   it('will not claim readiness a vehicle never reported', () => {
-    // No prearm bit in the present mask. Saying "Ready" here would be this
-    // app's opinion rather than the vehicle's, and saying "Not ready" would
-    // train the pilot to ignore the line that matters.
+    // No prearm bit in the present mask, so neither Ready nor Not ready.
     expect(at({ sensorsPresent: 0, sensorsHealth: 0 })).toEqual({
       text: 'Connected',
       tone: 'idle',
@@ -103,8 +96,7 @@ describe('gating an indicator on what the vehicle found', () => {
 
 describe('drawing a reading as a picture of itself', () => {
   it('leaves the battery empty when the vehicle has no estimate', () => {
-    // MAVLink's -1. An empty cell and a flat one look alike and are not, so
-    // null is carried through rather than collapsed to zero.
+    // MAVLink's -1 means unknown, which is not the same as empty.
     expect(batteryFill(-1)).toBeNull()
     expect(batteryFill(0)).toBe(0)
     expect(batteryFill(78)).toBeCloseTo(0.78)
@@ -118,17 +110,15 @@ describe('drawing a reading as a picture of itself', () => {
     expect(signalBars(0)).toBe(0)
     expect(signalBars(254)).toBe(4)
     expect(signalBars(127)).toBe(2)
-    // Anything at all lights one bar: a weak link and no link are different
-    // things and must not draw the same.
+    // Any signal lights one bar, so a weak link differs from none.
     expect(signalBars(1)).toBe(1)
   })
 })
 
 describe('coloring the battery by the vehicle own thresholds', () => {
   it('says nothing when the aircraft has not configured one', () => {
-    // The reason the battery carried no color at all before these were
-    // wired in: a percentage is only low against a threshold, and inventing
-    // one puts this app opinion on the bar in the vehicle voice.
+    // A reading is only low against a threshold, and the app does not
+    // invent one.
     expect(batteryTone(10.2, undefined, undefined)).toBeUndefined()
     expect(batteryTone(10.2, 0, 0)).toBeUndefined()
   })
@@ -151,9 +141,7 @@ describe('the firmware readout', () => {
   })
 
   it('says so when the build is not a release, and stays quiet when it is', () => {
-    // "You are not on stable" is the one thing about FIRMWARE_VERSION_TYPE
-    // worth a pilot's attention; spelling out "official" on every ordinary
-    // vehicle would be noise on a 52px bar.
+    // Only a non-release build is worth flagging on the bar.
     expect(barFirmware('Plane', { major: 4, minor: 8, patch: 0, type: 128 })).toBe(
       'Plane 4.8.0-beta',
     )

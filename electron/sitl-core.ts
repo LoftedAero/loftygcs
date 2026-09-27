@@ -1,14 +1,10 @@
-// Managing a local ArduPilot SITL install: where it lives, what to fetch,
-// and how to launch it. Kept free of Electron imports so the whole flow is
-// testable in plain Node -- the same reason src/protocol is.
+// Managing a local ArduPilot SITL install: where it lives, what to fetch, and
+// how to launch it. Free of Electron imports so it is testable in plain Node.
 //
-// Only Windows has official prebuilt SITL binaries (the cygwin builds
-// Mission Planner ships). Everywhere else, users run their own
-// sim_vehicle.py and the app connects to it over TCP like any other link.
+// Only Windows has official prebuilt SITL binaries (the cygwin builds Mission
+// Planner ships). Elsewhere, users run sim_vehicle.py and connect over TCP.
 import { spawn, type ChildProcess } from 'node:child_process'
-// Shared with the renderer, which cannot import from electron/: the parser
-// has to run on both sides -- in the settings field that accepts the text,
-// and here where the argument is built.
+// Lives in src/ because the renderer parses the same text.
 import { formatHome, type SimHome } from '../src/sim-home'
 import {
   copyFileSync,
@@ -28,12 +24,9 @@ const AUTOTEST_BASE = 'https://raw.githubusercontent.com/ArduPilot/ardupilot/mas
 /** SITL's serial0 TCP server, the port a GCS attaches to. */
 export const SITL_PORT = 5760
 
-// Rover is deliberately absent: whether this app supports ground vehicles
-// at all is undecided, and a simulator for one nothing else in the app has
-// been tested against is a feature that only looks supported. Its entry is
-// four lines when that decision is made -- `default_params/rover.parm`, the
-// `rover` physics model, the `ArduRover` binary -- and `readBuildInfo`
-// already refuses to launch a build it has no entry for.
+// Rover is not offered until the app supports ground vehicles. Adding it
+// means `default_params/rover.parm`, the `rover` physics model and the
+// `ArduRover` binary; `readBuildInfo` refuses builds with no entry here.
 export type SimVehicle = 'copter' | 'plane'
 
 interface VehicleSpec {
@@ -45,9 +38,8 @@ interface VehicleSpec {
   /** Bench defaults file; without it a wiped vehicle never passes prearm. */
   defaults: string
   /**
-   * Where that file lives in the ArduPilot tree. Most frames keep theirs in
-   * default_params/, but plane's is under models/ -- the mapping
-   * Tools/autotest/pysim/vehicleinfo.json records.
+   * Path in the ArduPilot tree. Most are in default_params/, but plane's is
+   * under models/ (see Tools/autotest/pysim/vehicleinfo.json).
    */
   source: string
 }
@@ -83,7 +75,7 @@ const SUPPORT_DLLS = [
   'cygwin1.dll',
 ]
 
-/** CMAC, the field sim_vehicle.py defaults to -- familiar to ArduPilot users. */
+/** CMAC, the field sim_vehicle.py defaults to. */
 export const SIM_HOME = '-35.363262,149.165237,584,270'
 
 export function simSupported(platform: string = process.platform): boolean {
@@ -112,16 +104,11 @@ export function installedVehicles(baseDir: string): SimVehicle[] {
 /**
  * Where a running SITL keeps its state.
  *
- * ArduPilot writes eeprom.bin -- the whole stored parameter set -- into its
- * working directory, so the working directory *is* the vehicle's identity
- * between runs. One per model, which is Mission Planner's convention and
- * worth matching exactly: a build shipped as "here is my aircraft" is a
- * folder holding the executable beside a `<model>/eeprom.bin`, and pointing
- * at the executable then finds the parameters with no further instruction.
- *
- * The host is deliberately dropped from the name. `flightaxis:192.168.1.5`
- * cannot be a directory on Windows, and a RealFlight aircraft is the same
- * aircraft whichever machine is drawing it.
+ * ArduPilot writes eeprom.bin (the stored parameter set) into its working
+ * directory. One directory per model, matching Mission Planner, so an
+ * aircraft shipped as an executable beside `<model>/eeprom.bin` is found from
+ * the executable alone. Any `:host` suffix is dropped, since a colon cannot
+ * appear in a Windows directory name.
  */
 export function simWorkDir(baseDir: string, launch: SimLaunch): string {
   const root = launch.exe ? path.dirname(launch.exe) : baseDir
@@ -132,14 +119,8 @@ export function simWorkDir(baseDir: string, launch: SimLaunch): string {
 export type SimPhysics = { kind: 'builtin' } | { kind: 'flightaxis' }
 
 /**
- * What the vehicle boots with.
- *
- * Three real choices, because "start clean" and "carry on from last time"
- * are both right depending on what you are doing -- tuning wants the
- * parameters it left behind, reproducing a bug wants them gone. The file
- * kinds are separate rather than one "load from disk" because they are not
- * the same act: a .parm is a list of values applied over defaults, an
- * eeprom.bin *is* the stored set and replaces it whole.
+ * What the vehicle boots with. A .parm is a list of values applied over
+ * defaults; an eeprom.bin is the stored set itself and replaces it whole.
  */
 export type SimParams =
   | { kind: 'keep' }
@@ -165,32 +146,24 @@ export function classifyParamFile(file: string): SimParams {
 export function modelName(launch: SimLaunch): string {
   const physics = launch.physics ?? { kind: 'builtin' }
   if (physics.kind === 'builtin') return SIM_VEHICLES[launch.vehicle].model
-  // Bare, which FlightAxis reads as the copy of RealFlight on this machine.
-  // ArduPilot also accepts `flightaxis:<host>` to drive one across a
-  // network, and this app deliberately does not offer it: it cost every
-  // user a field to look at for a case almost nobody has, and RealFlight on
-  // another machine is a thing to add back on request rather than to keep
-  // on screen forever.
+  // Bare means RealFlight on this machine. ArduPilot also accepts
+  // `flightaxis:<host>`; it is not offered because almost nobody needs it.
   return 'flightaxis'
 }
 
-/** RealFlight's SOAP port, and the machine it now always runs on. */
+/** RealFlight's SOAP port and host. */
 export const FLIGHTAXIS_PORT = 18083
 export const FLIGHTAXIS_HOST = '127.0.0.1'
 
 /**
  * Launch arguments.
  *
- * Two choices worth their comments: no `--rate` override is passed --
- * forcing a rate drops the gyro sample rate below the arming check's
- * 1.8x-loop-rate threshold and the vehicle then refuses to arm forever --
- * and the defaults file is given as an absolute path, because the working
- * directory is now a subdirectory and a relative name would miss it.
+ * No `--rate` override: forcing a rate drops the gyro sample rate below the
+ * arming check's 1.8x-loop-rate threshold and the vehicle never arms. The
+ * defaults path is absolute because the working directory is a subdirectory.
  *
- * The stock defaults ride along for a managed build and not a custom one.
- * They are the bench configuration that gets a downloaded vehicle through
- * prearm; a build someone assembled themselves already carries its own, and
- * layering ours over it would quietly change an aircraft they tuned.
+ * Stock defaults are passed only for a managed build. A custom build carries
+ * its own configuration, and layering ours over it would change it.
  */
 export function simArgs(baseDir: string, launch: SimLaunch): string[] {
   const home = launch.home ? formatHome(launch.home) : SIM_HOME
@@ -200,8 +173,8 @@ export function simArgs(baseDir: string, launch: SimLaunch): string[] {
   if (params.kind === 'file') defaults.push(params.path)
 
   const args = ['--model', modelName(launch)]
-  // A parameter file is only a default, so stored values outrank it -- it
-  // has to arrive with a wipe or it silently does nothing.
+  // A parameter file only sets defaults and stored values outrank it, so it
+  // needs a wipe or it is silently ignored.
   if (params.kind === 'wipe' || params.kind === 'file') args.push('-w')
   if (defaults.length > 0) args.push('--defaults', defaults.join(','))
   args.push('--home', home)
@@ -211,17 +184,10 @@ export function simArgs(baseDir: string, launch: SimLaunch): string[] {
 /**
  * Process names a leftover simulator could be running under.
  *
- * SITL binds TCP 5760, and a second one cannot -- so a simulator this app
- * did not start (an orphan from a session that crashed or reloaded, or one
- * launched from the command line) makes every launch fail with a banner
- * that never arrives. Killing it is the right answer and needs no question
- * asked: nobody starts a simulator meaning to keep the previous one.
- *
- * Named rather than found by port on purpose. "Whatever holds 5760" could
- * be anything on a developer's machine, and this app has no business
- * killing a process it cannot identify -- so the set is exactly the
- * binaries it knows how to launch, plus whatever custom build is about to
- * be launched, and nothing else is ever a candidate.
+ * A second SITL cannot bind TCP 5760, so a leftover one (from a crashed
+ * session or the command line) makes every launch fail. Candidates are
+ * identified by name, never by "whatever holds 5760": only the binaries this
+ * app launches, plus the custom build about to be launched.
  */
 export function simProcessNames(exe?: string, platform: string = process.platform): string[] {
   const suffix = platform === 'win32' ? '.exe' : ''
@@ -240,13 +206,8 @@ export interface BuildInfo {
 }
 
 /**
- * Read what a build actually is, out of the build itself.
- *
- * Worth the read: the alternative is asking which vehicle an executable is,
- * and the answer is already inside it. Getting it wrong launches ArduPlane
- * against copter defaults, which fails in a way that looks like a broken
- * simulator rather than a wrong answer to a question nobody should have
- * been asked.
+ * Identify a build from the version banner compiled into it. Launching one
+ * vehicle against another's defaults fails like a broken simulator.
  */
 export function readBuildInfo(exe: string): BuildInfo | null {
   let text: string
@@ -260,11 +221,9 @@ export function readBuildInfo(exe: string): BuildInfo | null {
   const vehicle = m[1]!.toLowerCase()
   if (vehicle === 'copter') return { vehicle: 'copter', version: m[2]! }
   if (vehicle === 'plane') return { vehicle: 'plane', version: m[2]! }
-  // ArduRover and ArduSub have no entry in SIM_VEHICLES, so there is
-  // nothing to launch them as -- saying so beats guessing copter. The
-  // banner still matches all four on purpose: "this is an ArduRover build
-  // and this app cannot run it" is a better answer than "not an ArduPilot
-  // binary", which is what a narrower pattern would produce.
+  // ArduRover and ArduSub have no SIM_VEHICLES entry. The pattern still
+  // matches them so they are recognized as ArduPilot builds rather than
+  // rejected as unknown binaries.
   return null
 }
 
@@ -283,8 +242,8 @@ function download(url: string, dest: string): Promise<void> {
       out.on('error', reject)
       out.on('finish', () => {
         out.close(() => {
-          // Rename only on success, so an interrupted download never leaves
-          // a half file that looks installed.
+          // Rename only on success, so a partial download never looks
+          // installed.
           renameSync(tmp, dest)
           resolve()
         })
@@ -337,19 +296,15 @@ export async function installVehicle(
 /**
  * Put the vehicle's stored parameters in place before it boots.
  *
- * A supplied eeprom.bin is copied over the one in the working directory
- * rather than pointed at, because ArduPilot has no option to read storage
- * from elsewhere -- it opens eeprom.bin in the directory it was started in,
- * and writes back to it. Copying also keeps the user's file out of the
- * simulator's way: the aircraft they distributed stays as they shipped it,
- * and the running copy is the one that accumulates changes.
+ * ArduPilot can only read eeprom.bin from its working directory, so a
+ * supplied one is copied in. The original stays untouched while the working
+ * copy accumulates changes.
  */
 export function prepareWorkDir(workDir: string, params: SimParams): void {
   mkdirSync(workDir, { recursive: true })
   if (params.kind !== 'eeprom') return
   const dest = path.join(workDir, 'eeprom.bin')
-  // Copying a file onto itself truncates it on some platforms, and the
-  // obvious way to reach this is to pick the eeprom already in place.
+  // Copying a file onto itself truncates it on some platforms.
   if (path.resolve(params.path) === path.resolve(dest)) return
   copyFileSync(params.path, dest)
 }
@@ -373,16 +328,11 @@ export function spawnSim(baseDir: string, launch: SimLaunch): ChildProcess {
 /**
  * PATH with the cygwin runtime on it.
  *
- * The published SITL binaries are cygwin builds that link against ten DLLs
- * shipped beside them, and Windows resolves those from the executable's own
- * directory and then PATH. A custom build living anywhere else therefore
- * finds nothing -- and it does not say so: the process exits immediately
- * with status 0 and no output, which reads as "the simulator started and
- * stopped" rather than "a DLL is missing". Mission Planner does the same
- * thing for the same reason.
- *
- * The build's own directory goes first, so a self-contained build uses the
- * runtime it shipped with rather than ours.
+ * The published SITL binaries need ten cygwin DLLs, which Windows looks for
+ * beside the executable and then on PATH. Without them a custom build exits
+ * immediately with status 0 and no output. Mission Planner does the same.
+ * The build's own directory goes first so a self-contained build uses its
+ * own runtime.
  */
 export function simEnv(baseDir: string, exe: string): NodeJS.ProcessEnv {
   const parts = [path.dirname(exe), baseDir, process.env.PATH ?? '']
@@ -390,16 +340,12 @@ export function simEnv(baseDir: string, exe: string): NodeJS.ProcessEnv {
 }
 
 /**
- * Is RealFlight actually listening?
+ * Whether anything is listening on RealFlight's port.
  *
- * Worth asking before launching, because the failure otherwise is silent
- * and slow: SITL retries the SOAP connection forever without printing its
- * readiness banner, so what the user sees is the simulator hanging for
- * thirty seconds and then a timeout that says nothing about RealFlight.
- *
- * A plain TCP connect, not a SOAP call: this answers "is something there",
- * and if something is there but is not RealFlight, SITL's own error is the
- * better one to show.
+ * SITL retries the SOAP connection indefinitely and sends no MAVLink until
+ * FlightAxis is exchanging data, so without this check the user just sees a
+ * timeout. A plain TCP connect is enough; if the listener is not RealFlight,
+ * SITL's own error is the better one to show.
  */
 export function flightAxisReachable(host = FLIGHTAXIS_HOST, timeoutMs = 1500): Promise<boolean> {
   return new Promise((resolve) => {
@@ -421,9 +367,8 @@ export const READY_PATTERN = /Waiting for connection|SERIAL0 on TCP port/
 /**
  * Resolve when SITL is ready for the GCS to attach.
  *
- * Deliberately reads stdout rather than probing the port: SITL accepts
- * exactly one client and exits the moment that client disconnects, so a
- * connect-and-drop readiness check kills the very process it is waiting for.
+ * Reads stdout rather than probing the port: SITL accepts one client and
+ * exits when it disconnects, so a probe would kill it.
  */
 export function waitForReady(child: ChildProcess, timeoutMs = 30000): Promise<void> {
   return new Promise((resolve, reject) => {

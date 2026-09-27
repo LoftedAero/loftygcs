@@ -1,8 +1,7 @@
 // Flash orchestration: owns the bootloader-mode serial connection (separate
 // from the MAVLink link) and the WebUSB DFU device, drives the protocol
-// clients, and narrates into the flash store. The safety contract from the
-// plan (R5): identify before erase, verify before reboot, and a wrong-board
-// image is refused outright.
+// clients, and reports into the flash store. Identify before erase, verify
+// before reboot, and refuse a wrong-board image outright.
 import {
   PortCancelledError,
   WebSerialTransport,
@@ -34,11 +33,8 @@ export async function rebootToBootloader(): Promise<void> {
   }
   // param1 = 3: reboot autopilot and hold in bootloader.
   //
-  // The ack almost never comes -- the vehicle obeys before it answers -- and
-  // `runCommand` retries twice, so at the default timeout this sat on
-  // "Rebooting…" for fifteen seconds waiting for a reply from a board that
-  // was already in its bootloader. A short timeout costs two harmless
-  // repeats of a command the board has already acted on.
+  // The ack rarely arrives because the vehicle reboots first, and
+  // `runCommand` retries twice, so a short timeout keeps this from stalling.
   const result = await connectionService
     .runCommand(MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, [3, 0, 0, 0, 0, 0, 0], 400)
     .catch(() => -1)
@@ -49,20 +45,12 @@ export async function rebootToBootloader(): Promise<void> {
 }
 
 /**
- * Put a board into its bootloader over a port we are not connected to.
+ * Put a board into its bootloader over a port the app is not connected to,
+ * as a board plugged in to be flashed usually is.
  *
- * `rebootToBootloader` above goes through `connectionService` and so needs
- * the app to be flying the thing already. On the Firmware tab it usually is
- * not -- a board plugged in to be flashed is a board nobody connected to --
- * and the flash path skipped the reboot entirely in that case, then reported
- * that the board would not identify itself. It was running its firmware
- * perfectly well; nothing had asked it to stop.
- *
- * So this writes the same MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN straight down an
- * open port and does not wait for an ack: the vehicle reboots when it obeys,
- * which means the ack usually never arrives, and ArduPilot's own
- * `uploader.py` sends it blind for the same reason. Broadcast ids (0/0) so
- * it lands whatever the vehicle numbered itself.
+ * Writes MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN directly and does not wait for an
+ * ack, as ArduPilot's `uploader.py` does. Broadcast ids (0/0) so it reaches
+ * the vehicle whatever its system id.
  */
 async function sendRebootOn(transport: WebSerialTransport): Promise<void> {
   const frame = encodeFrame(
@@ -90,45 +78,24 @@ async function sendRebootOn(transport: WebSerialTransport): Promise<void> {
 /**
  * Ask the board in bootloader mode what it is, and let go of the port.
  *
- * This is the whole of Mission Planner's board detection: `GET_DEVICE` with
- * `BOARD_ID`, which is the *only* authoritative identifier either app has.
- * Two things it deliberately does not use, both checked against the live
- * manifest rather than assumed:
+ * Uses `GET_DEVICE`/`BOARD_ID`, as Mission Planner does; it is the only
+ * authoritative identifier. USB ids cannot stand in for it (the generic
+ * ArduPilot pair `0x1209/0x5741` covers most boards), and the live link
+ * cannot answer it because flashing is bootloader-only and the port
+ * re-enumerates as a different device.
  *
- *  - **AUTOPILOT_VERSION.** A running vehicle reports vendor and product
- *    ids, and Mission Planner never consults them for this. Nor could it
- *    usefully: there are 44 distinct USBIDs in the manifest against 317
- *    board ids, and the generic ArduPilot pair `0x1209/0x5741` alone covers
- *    18,551 rows. A board resolved from USB ids is not resolved.
- *  - **The live link.** ArduPilot's flash path is bootloader-only, so the
- *    board has to be rebooted into it first (`rebootToBootloader`) and the
- *    port re-enumerates as a different device on the way -- which is why
- *    this asks for a port rather than reusing one.
+ * `askForPort: false` is for background probes: `requestPort()` needs a user
+ * gesture and shows a chooser, so without it only an already-granted port
+ * (exactly one) is used. Only a user-initiated flash passes `true`.
  *
- * **`askForPort` separates work the screen starts by itself from work
- * somebody asked for.** Opening a serial port needs `requestPort()`, which
- * needs a user gesture *and* shows a chooser; the one exception is a port
- * already granted, which `getPorts()` hands over with neither. So the probe
- * behind the vehicle click passes `false` and gives up unless exactly one
- * port is already granted, and the flash -- which somebody pressed -- passes
- * `true`. Measured rather than reasoned about: driven headless, an earlier
- * version popped the chooser on every click of a vehicle symbol and sat on
- * "Checking the board..." until it was answered.
+ * `reboot` handles a board running its firmware, which answers the
+ * bootloader handshake with silence. Only the flash sets it; a background
+ * probe must not reboot an aircraft.
  *
- * **`reboot` is what makes the flash path work on a board nobody connected
- * to.** A flight controller plugged in to be flashed is normally running its
- * firmware, and a running autopilot answers the bootloader handshake with
- * silence -- so without this, a perfectly healthy Cube reported that it
- * would not identify itself. Only the flash sets it: a probe running behind
- * the screen must not reboot somebody's aircraft to satisfy its curiosity.
+ * `attempts` defaults to 4 (about 2 s at 500 ms each) because a probe behind
+ * the UI has to give up quickly, where the flash path keeps trying.
  *
- * `attempts` is 4 rather than the flash path's 10 because the two want
- * opposite things from a silent port: a flash should keep knocking through
- * a board still printing its banner, where a probe behind a UI has to give
- * up. At 500 ms a knock that is 2 seconds, not 5.
- *
- * The port is released before returning: the flash that follows opens its
- * own, and holding this one would make the board unreachable to it.
+ * The port is released before returning so the flash can open it.
  */
 export async function identifyBoard({
   askForPort = true,
@@ -146,31 +113,20 @@ export async function identifyBoard({
   onStep?: (step: string) => void
 } = {}): Promise<BootloaderInfo & { port: SerialPort }> {
   const already = await grantedSerialPorts()
-  // Exactly one, or there is nothing to pick between without guessing.
+  // Exactly one, or there is no way to choose without guessing.
   const chosen = already.length === 1 ? already[0] : undefined
   if (!chosen && !askForPort) throw new Error('no port to read without asking')
 
-  // Acquired **once**, before anything opens it. The probe and the reboot
-  // want the same device, and letting each transport ask for its own put the
-  // same chooser up twice for the same board.
-  // Before the first ask too: a board already sitting in its bootloader --
-  // a fresh plug-in, or a flash that was cancelled at the confirm -- is the
-  // one port on the machine that says so, and the shell can take it without
-  // showing anybody a list. No hold here: if it is not obvious the chooser
-  // should appear at once, not after a pause.
-  //
-  // Unless a reboot has just gone out over the live link -- then the board
-  // is mid-way back as its bootloader, and this ask needs the same short
-  // hold the post-reboot ask gets. Measured: without it the chooser flashed
-  // up for a second and a half and closed itself when the bootloader landed.
+  // Acquired once and shared by the probe and the reboot, so the chooser
+  // appears at most once. Arming the shell's auto-pick first lets a board
+  // already in its bootloader be taken without a chooser. It only waits if a
+  // reboot just went out over the live link and the bootloader is still on
+  // its way.
   if (!chosen) window.loftgcs?.serialPicker.autoPickNew({ wait: rebooted })
   const port = chosen ?? (await requestSerialPort())
 
-  // The "before" set is taken *after* the chooser, on purpose. Taken before
-  // it, the port just picked was the newest grant on the machine and so the
-  // first thing `waitForNewPort` returned -- the running autopilot, handed
-  // back as if it were the bootloader, which then failed the handshake and
-  // read as a board that could not be identified.
+  // Taken after the chooser, or the port just picked would look new to
+  // `waitForNewPort` and be mistaken for the bootloader.
   const granted = await grantedSerialPorts()
 
   const readOnce = async (p: SerialPort | undefined, tries: number) => {
@@ -180,12 +136,11 @@ export async function identifyBoard({
       const link = new ByteQueue((b) => transport.write(b))
       transport.onData((b) => link.push(b))
       transport.onClose(() => link.push(new Uint8Array(0)))
-      // No `onLog`: this can run on its own behind the screen, and narrating
-      // it into the flash log would open the progress panel unbidden.
+      // No `onLog`: this can run in the background, and logging would open
+      // the flash progress panel.
       const uploader = new PxUploader(link, {})
       await uploader.sync(tries)
-      // The port goes back with the id: the flash that follows must use this
-      // same port, not ask for one -- see flashSerial.
+      // Return the port so the flash reuses it instead of asking again.
       const used = transport.openedPort
       const info = await uploader.identify()
       if (!used) throw new Error('bootloader port was not open')
@@ -196,21 +151,17 @@ export async function identifyBoard({
   }
 
   try {
-    // A short knock when a reboot can follow: a running autopilot answers
-    // this with silence, and every attempt spent waiting for it comes out of
-    // the gesture budget below.
+    // Few attempts when a reboot can follow: a running autopilot stays
+    // silent, and time spent here comes out of the gesture budget below.
     onStep?.('Looking for the bootloader…')
     return await readOnce(port, reboot ? 2 : attempts)
   } catch (err) {
-    // The ordinary case, not a fault: the port answered but it is a running
-    // autopilot rather than a bootloader. Ask it to reboot into one.
+    // Usually a running autopilot rather than a bootloader: reboot it.
     if (!reboot) throw err
   }
 
-  // Tell the desktop shell that the next port request is for the bootloader
-  // this reboot is about to create, so it can answer from the list Chromium
-  // hands it instead of putting a chooser up. A no-op in the browser, where
-  // the page never sees that list.
+  // Tell the desktop shell the next port request is for the bootloader this
+  // reboot creates, so it can answer without a chooser. No-op in the browser.
   window.loftgcs?.serialPicker.autoPickNew({ wait: true })
 
   onStep?.('Rebooting the board into its bootloader…')
@@ -219,43 +170,27 @@ export async function identifyBoard({
     await nudge.open({ kind: 'serial', baudRate: 115200 })
     await sendRebootOn(nudge)
   } catch {
-    // If the port will not even open there is nothing to reboot; fall
-    // through and let the retry below produce the real error.
+    // If the port will not open, let the retry below report the error.
   } finally {
     await nudge.close().catch(() => {})
   }
 
-  // The board re-enumerates as its bootloader, which is a *different* USB
-  // device -- so the port opened above is gone, and a port granted for the
-  // autopilot does not cover the bootloader.
+  // The bootloader is a different USB device, so the autopilot's port and
+  // grant do not carry over.
   //
-  // **All of this is a race against the click.** Falling back to
-  // `requestPort()` needs the press of Flash to still count as a user
-  // gesture, and browsers stop counting it after about five seconds. So this
-  // polls rather than sleeping a fixed time -- it leaves the moment the port
-  // appears -- and the knock above it is short for the same reason.
-  // Betaflight caps the equivalent wait at four seconds and its source says
-  // why, in those words.
-  //
-  // The desktop shell is different, and better: its main process owns the
-  // chooser and is told by Chromium the moment a port appears, so it can
-  // hold the request open and answer it with the bootloader itself
-  // (electron/main.ts). There, the right move is to ask at once, while the
-  // gesture is fresh, and let the shell wait.
+  // In the browser, a fallback `requestPort()` needs the click to still
+  // count as a user gesture, which lapses after about five seconds, so this
+  // polls and returns as soon as the port appears (Betaflight caps the same
+  // wait at four seconds). The desktop shell owns the chooser and can hold
+  // the request open until the bootloader appears (electron/main.ts), so
+  // there it asks at once.
   onStep?.('Waiting for the bootloader to appear…')
   const fresh = window.loftgcs ? undefined : await waitForNewPort(granted, 2500)
 
-  // In the browser there is no shell to answer for us, so a bootloader that
-  // never turned up leaves nothing to open -- and `readOnce(undefined)` would
-  // then put a **second** chooser in front of someone who has already picked
-  // a port. That dialog is doubly misleading: the board has rebooted by the
-  // time it appears, so its MAVLINK and SLCAN ports are genuinely gone from
-  // the list, and dismissing it raises `PortCancelledError`, which the screen
-  // reads as "chose not to continue" and so says nothing at all. A wrong port
-  // therefore failed in silence. The reboot did go out, so this is
-  // `RebootedError`'s case, and its advice -- unplug, plug back in, press
-  // Detect board -- is the advice that works, for the wrong port as much as
-  // for a slow one.
+  // In the browser, a bootloader that never appeared would make
+  // `readOnce(undefined)` show a second chooser, and cancelling it would be
+  // silent. The reboot did go out, so report `RebootedError`, whose advice
+  // (replug, then Detect board) works.
   if (!window.loftgcs && !fresh) throw new RebootedError()
 
   try {
@@ -263,21 +198,16 @@ export async function identifyBoard({
     return await readOnce(fresh, attempts)
   } catch (err) {
     if (err instanceof PortCancelledError) throw err
-    // Out of gesture, or nothing there to pick. Mission Planner's advice is
-    // the right advice here and worth passing on: a replug puts the board
-    // back in its bootloader for a few seconds *and* gives the next press a
-    // fresh gesture to open the chooser with.
+    // Out of gesture, or nothing to pick. A replug puts the board back in its
+    // bootloader briefly and the next press gets a fresh gesture.
     if (!fresh) throw new RebootedError()
     throw err
   }
 }
 
 /**
- * The board was rebooted and its bootloader could not be reached in time.
- *
- * Its own type because the screen has something specific and useful to say
- * about it, and because it is *not* a failure of the board -- the reboot
- * almost certainly worked.
+ * The board was rebooted but its bootloader could not be reached in time.
+ * Not a board failure: the reboot almost certainly worked.
  */
 export class RebootedError extends Error {
   constructor() {
@@ -289,21 +219,13 @@ export class RebootedError extends Error {
 /**
  * Wait for the bootloader's port to turn up, without asking for it.
  *
- * Two ways it can arrive, and both are needed.
+ * A `connect` event covers a device already granted to this origin that
+ * re-enumerates (every flash after the first). `getPorts()` lists granted
+ * ports whether or not they are present, so polling alone never sees it as
+ * new. Polling covers a port newly granted elsewhere.
  *
- * **A `connect` event** fires when a device this origin has *already* been
- * granted is plugged in or re-enumerates -- which is what happens on every
- * flash after the first, because the grant persists. Polling `getPorts()`
- * alone misses this case entirely: that call lists granted ports whether or
- * not the device is currently present, so the bootloader is in the "before"
- * list too and never looks new. Without this listener the second flash of a
- * board prompts exactly as often as the first.
- *
- * **A newly granted port**, for the first time, when the user has just
- * answered a chooser elsewhere.
- *
- * Neither fires for a device this origin has never been granted -- that is
- * the browser's privacy line, and the caller falls back to a chooser.
+ * Neither sees a device never granted to this origin; the caller then falls
+ * back to a chooser.
  */
 async function waitForNewPort(before: SerialPort[], ms: number): Promise<SerialPort | undefined> {
   const serial = typeof navigator !== 'undefined' ? navigator.serial : undefined
@@ -340,11 +262,8 @@ export async function flashSerial(
 ): Promise<void> {
   const store = useFlashStore.getState()
   store.begin('serial')
-  // On the port `identifyBoard` found, when there is one. Opening a fresh
-  // transport with no port was a third chooser on every flash: the trace
-  // showed the bootloader found and the request answered automatically,
-  // then this line asking again. With no port given -- a file flashed
-  // with nothing identified first -- it asks, which is right.
+  // Reuse the port `identifyBoard` found. With none (a file flashed with no
+  // board identified first), the transport asks for one.
   const transport = new WebSerialTransport(port)
   try {
     await transport.open({ kind: 'serial', baudRate: 115200 })
@@ -374,11 +293,8 @@ export async function flashSerial(
       )
     }
     if (!(await confirm(info))) {
-      // Cancel means "as you were": the board was rebooted into its
-      // bootloader to get here, and left there it sits with no firmware
-      // running until somebody power-cycles it -- which is what happened on
-      // the bench. REBOOT makes the bootloader jump to the app it already
-      // has. Nothing was erased, so there is one to jump to.
+      // Left in its bootloader the board runs nothing until power-cycled.
+      // Nothing was erased, so REBOOT jumps back to its current firmware.
       uploader.reboot()
       useFlashStore.getState().setPhase('idle')
       useFlashStore
@@ -408,18 +324,9 @@ function wrapUsbDevice(
   layout: string,
   transferSize: number | null,
 ): DfuDevice {
-  // A stalled control transfer reaches the screen as "Failed to execute
-  // 'controlTransferOut' on 'USBDevice': A transfer error has occurred",
-  // which names the API rather than the situation. What has happened is that
-  // the board stopped answering: an STM32 that stalls once latches into
-  // dfuERROR and refuses everything after it, CLRSTATUS included, until its
-  // power is cycled -- measured on the bench. So the only useful instruction
-  // is the physical one.
-  //
-  // The browser's own wording goes to the flash log rather than on screen.
-  // It is the first thing worth having when this needs diagnosing again --
-  // controlTransferIn and Out fail at different points in the sequence --
-  // and it is nothing to the person who just has to re-plug the board.
+  // An STM32 that stalls once latches into dfuERROR and refuses everything,
+  // CLRSTATUS included, until power-cycled, so the message says to replug.
+  // The browser's own error text goes to the flash log for diagnosis.
   const stalled = (err: unknown) => {
     useFlashStore
       .getState()
@@ -464,57 +371,26 @@ export interface DfuBoardInfo {
   totalBytes: number
   sectors: number
   /**
-   * Runs of equal-sized sectors, which is how the descriptor itself is
-   * written and how STM32CubeProgrammer prints it -- one row per group
-   * rather than one per sector, so an H743's 16 sectors are a line and a
-   * board with 998 of them is still readable.
+   * Runs of equal-sized sectors, as the descriptor writes them and
+   * STM32CubeProgrammer prints them.
    */
   groups: { index: number; start: number; sectorSize: number; count: number }[]
 }
 
 /**
- * Ask a board in DFU mode what it is, and let go of it.
+ * The DfuSe layout string for every alternate on a DFU interface, plus the
+ * device's wTransferSize.
  *
- * **None of this identifies the board**, and the screen has to say so. Every
- * STM32 in ROM DFU is 0483:DF11 whatever it is soldered to, and the serial
- * number is the chip's unique id, not a model. What the device does report is
- * its flash geometry, which narrows the *MCU* -- enough to catch an F4 image
- * aimed at an H7 board, and nowhere near enough to tell a MatekH743 from a
- * CubeOrange. The ArduPilot serial bootloader's board-id handshake has no
- * equivalent here; picking the right target is the user's assertion.
- *
- * `askForPort` splits the same way the serial probe does: `getDevices()`
- * returns what this origin was already granted and prompts for nothing, so
- * the automatic check is silent, and only the button someone pressed is
- * allowed to raise Chrome's device chooser.
- */
-/**
- * The DfuSe layout string for every alternate on a DFU interface.
- *
- * ST encodes the memory map in the *interface name* -- "@Internal Flash
- * /0x08000000/16*128Kg" -- and it is the only way to know which region an
- * alternate writes and what its sectors are. `USBAlternateInterface.
- * interfaceName` is supposed to carry it, and on the bench **it is null**:
- * measured in this app's own renderer against an H7 in ROM DFU, WinUSB-bound
- * and otherwise perfectly healthy, both alternates came back
- * `{name: null, cls: 254}`. Every DFU feature reads that string, so the whole
- * path failed on a board that was sitting right there.
- *
- * So the strings are read the way dfu-util reads them, which needs no help
- * from the browser: fetch the configuration descriptor, walk it for each
- * interface descriptor's `iInterface` index, and ask for those string
- * descriptors. Same device, same two alternates, names in hand:
+ * ST encodes the memory map in the interface name, e.g. "@Internal Flash
+ * /0x08000000/16*128Kg". `USBAlternateInterface.interfaceName` should carry
+ * it, but Chromium on Windows returns null for a WinUSB-bound device. So,
+ * like dfu-util, this reads the configuration descriptor, finds each
+ * interface's `iInterface` index, and fetches those string descriptors:
  *
  *     alt 0  ->  "@Internal Flash   /0x08000000/16*128Kg"
  *     alt 1  ->  "@Option Bytes     /0x5200201C/01*128 e"
  *
- * -- which is also the sharpest possible argument for selecting the alternate
- * by name rather than taking the one the device came up on: the neighbour of
- * the flash region is the register that decides whether the chip boots.
- *
- * `interfaceName` is still preferred when the browser does fill it in; this
- * runs only when it does not, and a device that answers neither is reported
- * rather than guessed at.
+ * `interfaceName` is used when the browser provides it.
  */
 async function dfuDescriptors(
   device: USBDevice,
@@ -582,6 +458,17 @@ async function dfuDescriptors(
   return { names: named, transferSize }
 }
 
+/**
+ * Ask a board in DFU mode what it is, and let go of it.
+ *
+ * This does not identify the board: every STM32 in ROM DFU is 0483:DF11, and
+ * the serial number is the chip's unique id. The flash geometry narrows the
+ * MCU (enough to catch an F4 image aimed at an H7), not the board, so the
+ * target is the user's choice.
+ *
+ * `askForPort: false` uses only devices already granted (`getDevices()`), so
+ * a background check never raises the device chooser.
+ */
 export async function identifyDfu({
   askForPort = true,
 }: { askForPort?: boolean } = {}): Promise<DfuBoardInfo> {
@@ -632,13 +519,9 @@ export async function identifyDfu({
 }
 
 /**
- * Send a board that is waiting in its bootloader back to its firmware.
- *
- * A board identified over serial is left sitting in its bootloader, running
- * nothing, until it is flashed or told to boot. "Change board" and leaving
- * the Firmware screen both call this so that the board someone walked away
- * from is a board running its firmware, not one waiting for a power cycle.
- * The bootloader's REBOOT jumps to the application it still has.
+ * Send a board waiting in its bootloader back to its firmware. A board
+ * identified over serial is otherwise left running nothing. The bootloader's
+ * REBOOT jumps to the application it still has.
  */
 export async function bootBoard(port: SerialPort): Promise<void> {
   const transport = new WebSerialTransport(port)
@@ -679,15 +562,10 @@ export async function flashDfu(segments: HexSegment[]): Promise<void> {
     if (!iface) throw new Error('DFU device exposes no interface')
     await device.claimInterface(iface.interfaceNumber)
 
-    // Pick the program-flash alternate *explicitly*, and never write to
-    // whichever one the device happened to come up on. An STM32 in ROM DFU
-    // exposes several -- ArduPilot's own `dfu-util --list` output shows
-    // `@Internal Flash`, `@Option Bytes`, `@OTP Memory` and
-    // `@Device Feature` on one board -- and two of them are worse than a
-    // wrong firmware: OTP is one-time programmable, and the option bytes
-    // decide whether the chip boots at all. This used to read
-    // `iface.alternate` and never call `selectAlternateInterface`, which
-    // left the region being written up to the device.
+    // Select the flash alternate explicitly rather than using whichever the
+    // device came up on. An STM32 in ROM DFU also exposes `@Option Bytes`,
+    // `@OTP Memory` and `@Device Feature`; OTP is one-time programmable and
+    // the option bytes decide whether the chip boots.
     const { names, transferSize } = await dfuDescriptors(device, iface)
     const flash = [...names].find(([, n]) => n.startsWith('@Internal Flash'))
     if (!flash) {
@@ -705,12 +583,8 @@ export async function flashDfu(segments: HexSegment[]): Promise<void> {
     }
     useFlashStore.getState().appendLog(`DFU layout: ${layout}`)
 
-    // The one automatic check this path can make. DFU offers no board id --
-    // every STM32 in ROM DFU is 0483:DF11 whatever board it is soldered to --
-    // so the target is the user's assertion and nothing here can confirm it.
-    // What the device *does* report is how much flash it has, and an image
-    // running off the end of it is a wrong-MCU image caught before anything
-    // is erased.
+    // DFU offers no board id, so the only automatic check is that the image
+    // fits the reported flash. One that does not is for a different MCU.
     const limit = parseDfuseLayout(layout).reduce((end, s) => Math.max(end, s.end), 0)
     const top = segments.reduce((end, s) => Math.max(end, s.address + s.data.length), 0)
     if (top > limit) {

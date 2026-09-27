@@ -1,13 +1,9 @@
 // Short names for ArduPilot's dropdown values, where its own are sentences.
 //
-// Keyed by ArduPilot's text, not by the number: the same number means
-// different things on different vehicles -- FENCE_ACTION 1 is "RTL or Land" on
-// Copter and "RTL" on Plane -- and the text is what the metadata for the
-// firmware on the other end actually says. A value not listed here keeps its
-// own name, so a new release's new option is never hidden, only unshortened.
-//
-// Each short name keeps the part that tells an option from its neighbours.
-// The full sentence stays the control's hover text (ParamField).
+// Keyed by ArduPilot's text rather than the number, since numbers differ per
+// vehicle (FENCE_ACTION 1 is "RTL or Land" on Copter, "RTL" on Plane). An
+// unlisted value keeps its own name. The full text stays as hover text
+// (ParamField).
 
 const SHORT: Record<string, string> = {
   // Copter radio and GCS failsafe, dead reckoning.

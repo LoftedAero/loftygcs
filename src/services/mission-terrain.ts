@@ -4,17 +4,13 @@ import { groundLevel, sampleElevation, type LatLon, type TerrainGrids } from './
 
 // A mission seen against the ground it flies over.
 //
-// The arithmetic that matters is the datum. ArduPilot carries three
-// altitude frames and a profile has to draw them on one axis: 3 is meters
-// above *home*, 0 is above mean sea level, and 10 is above the terrain
-// directly below the waypoint. Mixing them up is not a cosmetic bug -- a
-// mission that clears a ridge in one frame flies into it in another -- so
-// everything here is converted to AMSL first and the drawing subtracts the
-// home elevation at the end.
+// ArduPilot has three altitude frames: 3 is meters above home, 0 is above
+// mean sea level, and 10 is above the terrain below the waypoint. Everything
+// here is converted to AMSL first; the drawing subtracts home elevation at
+// the end.
 //
-// Clearance is checked *between* waypoints, not at them. Two waypoints at
-// 100 m with a 140 m hill between them are both individually fine, and
-// that is exactly the mission this is here to catch.
+// Clearance is checked between waypoints, not only at them: two waypoints at
+// 100 m with a 140 m hill between them are each fine on their own.
 
 /** Enough to resolve a hill between waypoints without resampling forever. */
 export const PROFILE_SAMPLES = 200
@@ -42,11 +38,9 @@ export function routeCorners(plan: MissionPlan): RouteSample[] {
 }
 
 /**
- * Evenly spaced points along the track.
- *
- * Interpolated linearly in latitude and longitude rather than along a great
- * circle: a mission leg is kilometers, where the two differ by centimeters,
- * and the sample only has to land in the right 38 m terrain pixel.
+ * Evenly spaced points along the track, interpolated linearly in lat/lon.
+ * Over a mission leg that differs from a great circle by centimeters, well
+ * inside a 38 m terrain pixel.
  */
 export function routeSamples(plan: MissionPlan, count = PROFILE_SAMPLES): RouteSample[] {
   const corners = routeCorners(plan)
@@ -90,17 +84,11 @@ export interface HomeElevation {
 }
 
 /**
- * What "zero relative altitude" is worth in meters above the sea.
+ * What zero relative altitude means in meters AMSL.
  *
- * The vehicle's own home elevation wins when there is one: it is surveyed
- * by the GPS at arming, where the terrain data is a 38 m sample of a public
- * dataset. Terrain under home fills in for a plan drawn before connecting.
- *
- * With no home at all -- a mission sketched at the kitchen table, where
- * home is wherever the vehicle ends up on the day -- the ground under the
- * first waypoint stands in, because that is within a few meters of where
- * home will be and because the alternative is a profile that draws nothing
- * on exactly the evening someone is checking a route over a ridge.
+ * The vehicle's own home elevation (surveyed by GPS) wins when there is one;
+ * otherwise the terrain under home. With no home at all, the ground under the
+ * first waypoint stands in, since home is usually close to it.
  */
 export function homeElevation(plan: MissionPlan, grids: TerrainGrids): HomeElevation {
   // A plan loaded from a file, or a home dropped on the map, carries zero
@@ -127,13 +115,8 @@ export interface ItemAltitude {
 }
 
 /**
- * Every altitude-bearing item, in one frame.
- *
- * `homeAmslM` is what a relative altitude of zero means. It is the vehicle's
- * home elevation when there is one and the terrain under home otherwise --
- * a plan drawn before connecting has no surveyed home, and refusing to
- * draw a profile until one exists would make the feature useless in the
- * one place it is most wanted, at the kitchen table the night before.
+ * Every altitude-bearing item, converted to AMSL. `homeAmslM` is what a
+ * relative altitude of zero means (see `homeElevation`).
  */
 export function itemAltitudes(
   plan: MissionPlan,
@@ -158,9 +141,8 @@ export function itemAltitudes(
     if (it.frame === 0) amslM = it.z
     else if (it.frame === 10) {
       const raw = located ? sampleElevation(grids, toLatLon(it)) : null
-      // No terrain under a terrain-frame waypoint: the honest fallback is
-      // home's ground, which is what ArduPilot itself falls back to when
-      // it has no terrain data for a point.
+      // No terrain under a terrain-frame waypoint: fall back to home's
+      // ground, as ArduPilot does when it has no terrain data for a point.
       amslM = (raw === null ? homeAmslM : groundLevel(raw)) + it.z
     } else amslM = homeAmslM + it.z
     out.push({ uid: it.uid, amslM, d })
@@ -194,18 +176,10 @@ export interface LegSlope {
 }
 
 /**
- * How steeply each leg climbs or descends, by item uid.
- *
- * Planning an automatic landing is the reason this exists: an approach is
- * specified as an angle (three degrees is the usual one) or as a gradient,
- * and both are otherwise a calculator job with numbers taken off two rows.
- *
- * Computed from the AMSL altitudes rather than the raw `z`, so a leg
- * between a relative-frame waypoint and an AMSL one is still right.
- * Undefined where it would be meaningless: the first item, an item with no
- * altitude, and a leg with no horizontal distance -- a vertical climb has
- * no gradient, and reporting ninety degrees for a takeoff would be a
- * number that looks like a slope and is not one.
+ * How steeply each leg climbs or descends, by item uid, for planning landing
+ * approaches. Computed from AMSL altitudes so mixed frames are handled.
+ * Omitted for the first item, items with no altitude, and legs with no
+ * horizontal distance (a vertical climb has no gradient).
  */
 export function legSlopes(items: readonly ItemAltitude[]): Map<string, LegSlope> {
   const out = new Map<string, LegSlope>()
@@ -229,13 +203,9 @@ const LANDINGS = new Set([21, 85])
 /**
  * Leg slopes for the whole route, including the descent onto a landing.
  *
- * `itemAltitudes` leaves landing commands out, and rightly: ArduPilot
- * ignores their altitude, so drawing one on the profile would invent a
- * height. But a landing point is not at an *unknown* height -- it is on
- * the ground -- and the leg onto it is exactly the one an approach is
- * planned around. So it is put back here, at ground level, and nowhere
- * else: feeding it to the clearance check would report every mission with
- * a landing in it as flying into terrain.
+ * `itemAltitudes` leaves landings out because ArduPilot ignores their
+ * altitude. For slopes they are put back at ground level, but only here: the
+ * clearance check would otherwise flag every landing as flying into terrain.
  */
 export function approachSlopes(
   plan: MissionPlan,
@@ -268,12 +238,9 @@ export interface Clearance {
 }
 
 /**
- * The tightest the mission comes to the ground.
- *
- * Only over the stretch the profile actually draws -- from the first
- * altitude-bearing item to the last. Before the first one the vehicle is
- * climbing out and after the last it is landing or looping, neither of
- * which this can say anything useful about.
+ * The tightest the mission comes to the ground, between the first and last
+ * altitude-bearing items. Outside that the vehicle is climbing out or
+ * landing, which this cannot judge.
  */
 export function minClearance(
   ground: readonly GroundPoint[],
@@ -293,12 +260,7 @@ export function minClearance(
   return best
 }
 
-/**
- * Which two items a point on the route falls between.
- *
- * "Between 3 and 4" is what a planner can act on; the same place given as
- * 17,375 m along the route has to be counted out on the map first.
- */
+/** Which two items a point on the route falls between. */
 function legAt(
   items: readonly ItemAltitude[],
   d: number,

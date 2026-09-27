@@ -1,32 +1,19 @@
 import { useParamStore } from '../../../stores/param-store'
 import { DEVICE_SLOTS, decodeDeviceId, describeDevice } from '../../../protocol/device-id'
 
-// What is actually plugged into this board.
+// The sensors this board detected, decoded from the packed device IDs
+// ArduPilot stores in parameters (COMPASS_DEV_ID, INS_ACC_ID and so on). It
+// shows whether an external compass was found at all, which part each IMU
+// is, and which bus each device is on.
 //
-// ArduPilot stores a packed device ID for every sensor it detects, and the
-// numbers are already on screen -- in the parameter table, as eight-digit
-// integers nobody can read. Unpacked they answer the questions a bench
-// session asks out loud: is the external compass being seen at all, is that
-// IMU the one this board is supposed to have, did the second barometer come
-// up on the bus it should be on.
-//
-// It sits in the Inspector rather than under Sensors because it is the same
-// kind of thing as the message list beside it: not a step in a bring-up, but
-// the X-ray you reach for when a step goes wrong. A compass that will not
-// calibrate is usually a compass that was never found, and this is the
-// screen that says so.
-//
-// Read from the parameters already downloaded, so it costs no traffic and
-// works on a vehicle that has gone quiet.
+// Read from the downloaded parameters, so it needs no extra traffic.
 
 export default function HardwareId() {
-  // The Sensors tab draws this only once the parameters are in, so there is
-  // no connecting or loading state to describe here.
+  // The Sensors tab renders this only once parameters are loaded.
   const entries = useParamStore((s) => s.entries)
 
-  // Present means the parameter exists: a vehicle with one compass has no
-  // COMPASS_DEV_ID2 at all, and an empty row for it would suggest a slot
-  // that could be filled.
+  // Only slots whose parameter exists; a vehicle with one compass has no
+  // COMPASS_DEV_ID2.
   const found = DEVICE_SLOTS.map((slot) => ({
     slot,
     value: entries.get(slot.param)?.value,
@@ -53,8 +40,7 @@ export default function HardwareId() {
               <tr key={slot.param}>
                 <td>
                   {slot.label}
-                  {/* The parameter name, because the next thing anyone does
-                      with a surprising row is go and look it up. */}
+                  {/* The parameter name, for looking it up. */}
                   <span className="hwid__param">{slot.param}</span>
                 </td>
                 <td className={d.name ? undefined : 'hwid__unknown'}>
@@ -83,10 +69,6 @@ export default function HardwareId() {
           means the sensors are on a bus the board has not been told about.
         </p>
       )}
-
-      {/* A device type this build cannot name keeps its number in the Part
-          column. That used to be explained in a line under the table; the
-          number standing where a name would is the explanation. */}
     </div>
   )
 }

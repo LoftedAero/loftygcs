@@ -1,18 +1,11 @@
 import { create } from 'zustand'
 
-// Did that change reach the vehicle?
+// Did that change reach the vehicle? Parameter writes are acked, and screens
+// that write immediately show the result here.
 //
-// A screen that writes immediately owes an answer to that question, and
-// Mission Planner's equivalent screens do not give one: you change a value
-// and nothing tells you whether it landed. A parameter write is acked, so the
-// answer exists -- it was simply never shown.
-//
-// Deliberately one slot rather than a queue. These writes come from a person
-// changing one control at a time, and a stack of "Saved" notes for edits they
-// have already moved past is noise; the latest outcome is the one that
-// matters. A failure is the exception and does not clear itself: a success
-// that fades is fine, a failure that fades is a value someone believes they
-// set.
+// One slot rather than a queue: edits happen one control at a time and only
+// the latest outcome matters. A success fades; a failure stays until cleared,
+// or someone would believe they had set a value they had not.
 
 export interface WriteFeedback {
   ok: boolean
@@ -29,28 +22,17 @@ interface WriteFeedbackStore {
   clear: () => void
 
   /**
-   * Something has been changed that the vehicle only reads at boot.
-   *
-   * ArduPilot marks those parameters `RebootRequired` in its own metadata --
-   * COMPASS_PRIO1_ID and friends carry it -- and a compass calibration is the
-   * same shape of fact: the offsets are saved, and the running firmware is
-   * still flying on the old ones. Until the vehicle restarts, the screen and
-   * the aircraft disagree, which is worth saying rather than leaving for
-   * somebody to discover in the air.
-   *
-   * One reason string, not a list: the prompt is "restart to apply", and
-   * enumerating everything that contributed to it helps nobody.
+   * Something changed that the vehicle only reads at boot: a parameter
+   * ArduPilot's metadata marks `RebootRequired` (COMPASS_PRIO1_ID, for
+   * example), or a compass calibration whose offsets are saved but not yet in
+   * use. One reason string, since the prompt is just "restart to apply".
    */
   rebootPending: string | null
   needReboot: (reason: string) => void
   rebootDone: () => void
   /**
-   * The dialog was answered with Later.
-   *
-   * The need does not go away, so the reminder does not either -- it steps
-   * back to a line on the card. Asking again in a dialog for the same change
-   * would be nagging, and the second dialog is the one people learn to
-   * dismiss without reading.
+   * The dialog was answered with Later. The reminder stays as a line on the
+   * card rather than asking again in a dialog.
    */
   rebootDeferred: boolean
   deferReboot: () => void
@@ -62,7 +44,7 @@ export const useWriteFeedbackStore = create<WriteFeedbackStore>((set) => ({
   clear: () => set({ latest: null }),
 
   rebootPending: null,
-  // A new reason re-opens the dialog: it is news again.
+  // A new reason re-opens the dialog.
   needReboot: (reason) => set({ rebootPending: reason, rebootDeferred: false }),
   rebootDone: () => set({ rebootPending: null, rebootDeferred: false }),
   rebootDeferred: false,

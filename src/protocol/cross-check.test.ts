@@ -1,7 +1,5 @@
-// Cross-check: frames produced by our encoder must parse in node-mavlink,
-// the ArduPilot-org reference JS implementation. This is the guard against
-// quietly diverging from the wire format -- the failure mode that killed the
-// original ArduConfigurator.
+// Frames from our encoder must parse in node-mavlink, the reference JS
+// implementation, as a guard against quietly diverging from the wire format.
 import { describe, expect, it } from 'vitest'
 import { PassThrough } from 'node:stream'
 import { MavLinkPacketSplitter, MavLinkPacketParser, type MavLinkPacket } from 'node-mavlink'

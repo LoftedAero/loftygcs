@@ -2,11 +2,9 @@
 // declared in advance. The status list reads the latest value of each; the
 // plots read the history.
 //
-// Deliberately not a React store. Fields arrive ten times a second and there
-// can be a couple of hundred of them; pushing that through React state would
-// spend the whole frame budget on reconciliation for a panel nobody is
-// looking at half the time. Components poll this at whatever rate suits
-// them -- a few Hz for a list of numbers, rAF for a plot.
+// Not a React store: a couple of hundred fields at 10 Hz would spend the
+// frame budget on reconciliation. Components poll at whatever rate suits
+// them (a few Hz for a list, rAF for a plot).
 
 /** ~90 seconds of history at the 10 Hz the engine samples at. */
 const CAPACITY = 900

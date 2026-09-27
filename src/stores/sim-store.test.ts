@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { currentHomeText, homeSlot } from './sim-store'
 
-// Where a simulator boots is remembered per physics, and the two slots are
-// the whole point: a location measured against RealFlight's scenery means
-// nothing to SITL's own model.
+// Home is remembered per physics: a location measured against RealFlight's
+// scenery means nothing to SITL's own model.
 //
-// The reads below re-import the module rather than poking a setter, because
-// storage is only read at module load -- a setter would assert the value it
-// had just set and pass whatever was on disk, which is a test that cannot
-// fail.
+// The reads below re-import the module rather than calling a setter, because
+// storage is only read at module load.
 
 const HOME_KEY = 'loftgcs.sim.home'
 const RIG_KEY = 'loftgcs.sim.rig'
@@ -25,8 +22,7 @@ describe('which slot a physics choice uses', () => {
   it('separates RealFlight from everything else', () => {
     expect(homeSlot('flightaxis')).toBe('flightaxis')
     expect(homeSlot('builtin')).toBe('builtin')
-    // A kind this build has never heard of is not RealFlight, and guessing
-    // that it is would hand it scenery coordinates.
+    // An unknown kind is not RealFlight.
     expect(homeSlot('something-new')).toBe('builtin')
   })
 
@@ -38,9 +34,8 @@ describe('which slot a physics choice uses', () => {
 })
 
 describe('reading homes stored by an older build', () => {
-  // Those builds kept one bare string for the single home they had. Which
-  // slot it belongs in is not a guess: the rig records the physics that was
-  // selected when it was chosen.
+  // Older builds stored one bare string. The rig records which physics was
+  // selected, which decides the slot it migrates into.
   it('puts a RealFlight user’s home in the RealFlight slot', async () => {
     localStorage.setItem(HOME_KEY, '40.059422,-88.551405,206,43')
     localStorage.setItem(
@@ -64,8 +59,7 @@ describe('reading homes stored by an older build', () => {
   })
 
   it('starts empty on anything it cannot read', async () => {
-    // Both slots empty means both defaults, which is a safe answer; a
-    // half-parsed one would boot somewhere nobody chose.
+    // Unparseable storage leaves both slots empty, meaning both defaults.
     localStorage.setItem(HOME_KEY, '{not json')
     const s = await freshStore()
     expect(s.homes).toEqual({ builtin: '', flightaxis: '' })

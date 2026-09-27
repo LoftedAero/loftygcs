@@ -2,15 +2,12 @@ import { cleanMessage, describeCode } from './link-error'
 
 // What to say when the HUD video stream fails, and whether to try again.
 //
-// The desktop side forwards whatever Node threw, so a camera that was not
-// running read "connect ECONNREFUSED 127.0.0.1:8554" and a dropped stream
-// "read ECONNRESET". The codes are matched the way a vehicle link's are
-// (link-error.ts), naming the host the user typed.
+// The desktop side forwards whatever Node threw ("connect ECONNREFUSED
+// 127.0.0.1:8554"). Codes are matched as for a vehicle link (link-error.ts),
+// naming the host the user typed.
 //
-// Most failures are worth another go: a camera still booting, a radio link
-// that blinked, a companion computer restarting its streamer. A few are
-// about the request itself, and repeating it can only fail the same way --
-// those stop and say so.
+// Most failures are retried: a camera still booting, a radio link dropping
+// out, a streamer restarting. Failures about the request itself are not.
 
 /** Failures that are about what was asked for, not about the network. */
 const PERMANENT = [
@@ -40,12 +37,10 @@ export function videoTarget(url: string): string {
 /** One sentence for a failure, in the user's terms. */
 export function describeVideoError(raw: string, url: string): string {
   const message = cleanMessage(raw)
-  // The desktop side quotes the URL back, which the field already shows;
-  // what is worth saying is what the field takes.
+  // The field already shows the URL; say what it accepts instead.
   if (/^Not an RTSP URL/i.test(message)) return 'The address must start with rtsp:// or udp://.'
   const sentence = describeCode(message, videoTarget(url)) ?? message
   if (!sentence) return 'The video stream failed.'
-  // Sentences from the desktop side come without a full stop; the code
-  // sentences come with one. One line reads as one voice either way.
+  // Desktop-side messages lack a final period; the code sentences have one.
   return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`
 }

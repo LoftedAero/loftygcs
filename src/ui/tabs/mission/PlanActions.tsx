@@ -13,15 +13,9 @@ import { readFence, readRally, writeFence, writeRally } from '../../../services/
 import { clearPlanHere, clearPlanOnVehicle, PLAN_NOUN } from '../../../services/plan-clear'
 import { validateFence } from '../../../protocol/geofence'
 
-// Read, write, clear -- for whichever of the three plans is being edited.
-//
-// One component rather than a copy in each panel. The three had grown their
-// own: the mission put Clear below the file buttons and the other two put it
-// straight under Write, one reported a failed transfer in a hint and another
-// in a note, and only the mission showed progress while a transfer ran. None
-// of that was a decision, and the actions column exists to stop exactly this
-// kind of drift (see CLAUDE.md). What differs between the plans is data --
-// the noun, which selector says it is modified, and what counts as empty.
+// Read, write and clear for whichever of the three plans is being edited.
+// One shared component so the plans behave identically; what differs between
+// them (the noun, the modified selector, what counts as empty) is data.
 
 const PLANS: Record<
   PlanKind,
@@ -37,8 +31,8 @@ export default function PlanActions() {
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const transfer = useMissionStore((s) => s.transfer)
 
-  // Every plan's state is read unconditionally -- hooks cannot be chosen by
-  // which one is on screen -- and the one being edited is picked afterwards.
+  // Hooks cannot be conditional, so every plan's state is read and the
+  // edited one picked afterward.
   const missionDirty = useMissionStore(isDirty)
   const fenceIsDirty = useMissionStore(fenceDirty)
   const rallyIsDirty = useMissionStore(rallyDirty)
@@ -62,9 +56,8 @@ export default function PlanActions() {
       : editing === 'fence'
         ? fence.shapes.length === 0 && !fence.returnPoint
         : rally === 0
-  // Only a fence can be internally wrong, and the vehicle's rejection names
-  // nothing -- so it is caught here rather than sent. The shape it names is
-  // listed in the panel below.
+  // The vehicle rejects a bad fence without saying why, so it is validated
+  // here, naming the offending shape.
   const problems = editing === 'fence' ? validateFence(fence) : []
 
   const working = busy || transfer.kind === 'busy'
@@ -144,13 +137,9 @@ export default function PlanActions() {
 }
 
 /**
- * Clearing the screen and clearing the aircraft are different things.
- *
- * Neither is the safe default. Emptying only the screen leaves a fence the
- * vehicle still enforces and a mission Auto will still fly; emptying the
- * vehicle throws away a plan that may be the only copy of it. So both are
- * offered by name, and the one that reaches the aircraft is marked as the
- * destructive one it is.
+ * Asks whether to clear the screen or the vehicle. Neither is a safe default:
+ * clearing only the screen leaves a fence the vehicle still enforces, and
+ * clearing the vehicle may discard the only copy of a plan.
  */
 function ClearPrompt({
   open,

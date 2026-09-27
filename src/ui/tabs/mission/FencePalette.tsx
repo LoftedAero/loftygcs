@@ -2,17 +2,11 @@ import { useMissionStore, type FenceTool } from '../../../stores/mission-store'
 
 // The fence drawing tools, as a strip down the left edge of the map.
 //
-// Same strip, same classes and same behavior as the mission item palette:
-// a button arms a tool and the next map click answers it, and clicking an
-// armed button disarms it. They were a column of full-width text buttons
-// before, which put the thing you draw with on the far side of the window
-// from the thing you draw on, and made the fence screen look like a
-// different app from the mission screen.
+// Same strip, classes and behavior as the mission item palette: a button arms
+// a tool, the next map click uses it, and clicking an armed button disarms it.
 //
-// Finishing an area belongs here for the same reason. It only appears while
-// one is being drawn, and it counts the corners -- three is the minimum the
-// vehicle will accept, and a two-corner "area" refused on upload is a much
-// worse way to learn that.
+// Finish appears while an area is being drawn and counts its corners; the
+// vehicle needs at least three.
 
 const TOOLS: { id: FenceTool; label: string; title: string }[] = [
   { id: 'inclusionPolygon', label: 'Inclusion area', title: 'Keep the vehicle inside this' },
@@ -85,12 +79,10 @@ const stroke = {
   strokeLinejoin: 'round',
 } as const
 
-// Two readings, and both have to survive 22 pixels. Area against circle is
-// the silhouette, so the polygon carries its corners: mitered rather than
-// rounded, because rounded joins at this size turned the pentagon into a
-// circle and made "exclusion area" and "exclusion circle" the same picture.
-// Inclusion against exclusion is what is inside: the vehicle held in, or the
-// boundary struck through.
+// Area vs. circle reads from the silhouette, so the polygon's joins are
+// mitered (rounded joins at 22 px make the pentagon look like a circle).
+// Inclusion vs. exclusion reads from what is inside: the vehicle held in, or
+// the boundary struck through.
 const AREA = 'M12 3.5 20.5 9.7 17.2 19.8H6.8L3.5 9.7Z'
 const corners = { ...stroke, strokeLinejoin: 'miter' } as const
 

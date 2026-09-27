@@ -1,10 +1,8 @@
 // Getting a .bin off the user's disk and into the review screen.
 //
-// An input element and a FileReader rather than a native dialog, for the
-// same reason mission files use one: the identical code runs in the browser
-// build and in Electron, and the privileged preload surface stays as small
-// as it is. A log never leaves the machine either way -- everything below
-// happens in the page.
+// An input element and a FileReader rather than a native dialog, so the same
+// code runs in the browser and in Electron without widening the preload
+// surface.
 
 import { useLogStore } from '../stores/log-store'
 
@@ -14,8 +12,8 @@ export function openLogFile(): Promise<void> {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.bin,.BIN,.log'
-    // Attached rather than floating: a detached input's click is ignored by
-    // some browsers, and nothing can reach it from a test either.
+    // Attached to the document: some browsers ignore a detached input's
+    // click, and tests cannot reach one.
     input.style.display = 'none'
     document.body.appendChild(input)
 
@@ -26,8 +24,7 @@ export function openLogFile(): Promise<void> {
       input.remove()
       resolve()
     }
-    // Dismissing the picker fires cancel, not change. Without this the
-    // promise never settles and the button stays disabled for good.
+    // Dismissing the picker fires cancel, not change.
     input.oncancel = done
 
     input.onchange = () => {
@@ -54,9 +51,8 @@ export function openLogFile(): Promise<void> {
           useLogStore.getState().setStatus({ kind: 'error', text: 'That file came back empty.' })
           return done()
         }
-        // Parsing blocks for about 150 ms per ten megabytes. Yielding first
-        // lets the "Parsing…" state actually paint, rather than the window
-        // freezing on the old one and then jumping to the result.
+        // Parsing blocks for about 150 ms per ten megabytes; yield first so
+        // the "Parsing…" state paints.
         useLogStore.getState().setStatus({ kind: 'parsing', name: file.name })
         setTimeout(() => {
           useLogStore.getState().loadBytes(file.name, new Uint8Array(buffer))

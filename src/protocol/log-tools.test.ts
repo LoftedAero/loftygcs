@@ -27,7 +27,7 @@ const tool = (log: ParsedLog, id: string) => webToolsFor(log).find((t) => t.id =
 describe('matching a log to the WebTools that can read it', () => {
   it('judges the SITL fixture the way the tools would', () => {
     // The fixture logs MAG, position and the rate PIDs, but no batch IMU
-    // sampling -- so three tools work and Filter Review honestly does not.
+    // sampling, so three tools work and Filter Review does not.
     expect(tool(real, 'hardware').missing).toBeNull()
     expect(tool(real, 'magfit').missing).toBeNull()
     expect(tool(real, 'pid').missing).toBeNull()
@@ -42,8 +42,7 @@ describe('matching a log to the WebTools that can read it', () => {
     expect(tool(logWith('MAG', 'GPS'), 'magfit').missing).toBeNull()
     expect(tool(logWith('MAG', 'POS'), 'magfit').missing).toBeNull()
     expect(tool(logWith('GPS'), 'magfit').missing).toMatch(/compass/)
-    // A bench log with a compass but no fix: the tool would accept the file
-    // and produce nothing, so the reason names the position, not the MAG.
+    // A compass but no fix: the reason names the position, not the MAG.
     expect(tool(logWith('MAG'), 'magfit').missing).toMatch(/position/)
   })
 
@@ -65,10 +64,8 @@ describe('matching a log to the WebTools that can read it', () => {
   })
 })
 
-// The F-35B corpus includes flights with batch logging on, the case the
-// fixture cannot cover: a real log where every tool applies. Named files
-// rather than a scan, because a first draft of this test named a log from
-// memory and the corpus said otherwise.
+// Real logs with batch logging on, where every tool applies, which the
+// fixture cannot cover.
 describe.runIf(process.env.F35B_LOGS !== undefined)('against real F-35B logs', () => {
   it('accepts 00000009.BIN for every tool', () => {
     const log = parseDataflash(

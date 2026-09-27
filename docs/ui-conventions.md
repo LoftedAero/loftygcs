@@ -1,792 +1,415 @@
-# House conventions for this app's screens
+# UI conventions
 
-`lofted-aero.css` and its DESIGN.md govern the *components* — what a button
-looks like, which color means what. This is the layer above: how screens in
-**this** app are put together.
+`src/styles/lofted-aero.css` governs the components: what a button looks
+like and which color means what. This document is the layer above it: how
+screens in this app are put together, and which classes and tokens implement
+each convention. The general principles behind them are in
+[ux-rules.md](ux-rules.md).
 
-Every rule here came out of a specific piece of feedback on a specific
-screen, and the origin is kept with it. That is the point of the file — a
-rule with its case attached can be argued with, and a rule that turns out to
-be wrong can be found and removed. Nothing here is a guess about what might
-look good.
-
-Add to it when a review produces a preference that will apply again. If it
-only applies to one screen, it is not a convention; leave it in a code
-comment there.
-
----
+Add a convention here when a review produces a preference that will apply
+again. If it applies to one screen only, leave it in a code comment on that
+screen.
 
 ## Space
 
 ### Fill the window
 
-Screens are used full-screen. A layout that leaves two thirds of a 1920
+Screens are used full-screen. A layout that leaves two thirds of a 1920px
 window empty is wrong even if each part of it is well made.
-
-> *"I don't like how tiles tend to be small and biased to one side of the
-> screen, since this app will mostly be used full-screen."*
 
 ### Cap the column count, never the grid's width
 
-The moment a `max-width` stops the tracks growing, the slack becomes side
-padding — on the very screens the layout exists to fill. Cap how many
-columns there are and let each keep its share of the width.
-
-> *"Whatever you did created padding on standard 16:9 monitors too. Please
-> revert that particular bit."*
+A `max-width` stops the tracks growing and turns the slack into side padding,
+on exactly the screens the layout exists to fill. Cap how many columns there
+are and let each keep its share of the width.
 
 ### Three columns, not four
 
-Betaflight's configurator authors one or two columns per tab and reaches
-three only on its busiest screen. Four columns of settings is a row nobody
-reads across.
+Four columns of settings make a row nobody reads across. Betaflight's
+configurator uses one or two columns per tab and reaches three only on its
+busiest screen.
 
----
+## Empty and disconnected states
 
-## What a screen says when it has nothing to say
+### The navigation offers what can be done now
 
-### A navigation list offers what can be done now
-
-With nothing connected, a screen that needs a live aircraft leaves the rail
-rather than sitting there describing itself. Eleven Setup tabs each rendered a
-card naming the screen and listing its contents; none of QGroundControl,
-Mission Planner or Betaflight does that, and Mission Planner's wiki states the
-rule outright — *"You will only see this menu item if the autopilot is
-connected."*
-
-> *"I'm starting to think about what we should and should not show when a
-> vehicle is not connected at all."*
-
-The line is not planning-vs-setup. It is **does this need a live exchange with
-this aircraft**: a screen whose subject is a *document* — a mission, a
-parameter file, a firmware image, the app's own settings — works offline; one
-whose subject is *live vehicle state* does not.
-
-Two things that follow. Somebody on a screen that disappears has to be taken
-somewhere, not left staring at it. And a screen kept for offline use has to
-say what it is working on: a parameter file opened with nothing connected must
-not offer to write itself to an aircraft, even after one connects.
+With nothing connected, a screen that needs a live aircraft leaves the rail,
+as in QGroundControl, Mission Planner and Betaflight. A screen whose subject
+is a document (a mission, a parameter file, a firmware image) stays; one
+whose subject is live vehicle state goes. Someone on a screen that disappears
+is taken to another. A screen kept for offline use makes clear what it is
+working on: a parameter file opened offline never offers to write itself to
+an aircraft, even after one connects.
 
 ### A screen renders itself, never a description of itself
 
-Disabled, not absent. If a screen cannot be used yet, draw it and switch its
-controls off — replacing it with a card explaining what it would have shown
-is how a state comes to hide its own fix. The OSD page returned one card
-while `OSD_TYPE` was 0, and that card replaced the whole workspace including
-the column holding the Display card, which is where `OSD_TYPE` is edited; the
-only way out was the Parameters table.
+If a screen cannot be used yet, draw it and disable its controls. A card
+describing the screen can hide the control that fixes the state: replacing
+the OSD workspace while `OSD_TYPE` is 0 would also remove the Display card
+where `OSD_TYPE` is set. When changing an empty state, check what it takes
+away as well as what it says.
 
-> *"the OSD page doesn't render unless OSD is enabled. I think it should -
-> just with inputs disabled until the OSD is enabled."*
+### A panel with nothing to say is not drawn, but absence is a reading
 
-Check what the empty state takes away with it, not just what it says.
+With no vehicle, a vehicle panel draws nothing at all, not a greyed or zeroed
+placeholder; the app bar's status row renders nothing without a connection.
+Once a vehicle is connected, the set of readings is fixed: a flight
+controller with no GPS still shows "No GPS", because that decides whether the
+position modes can be flown, and a fixed set keeps the row one shape on every
+aircraft.
 
-If there is no vehicle, draw the screen empty. Do not replace it with a card
-explaining what would have been there. Both Fly and Overview did this and
-both stopped.
-
-> *"the description on the Overview page is a bit out of place… render this
-> page's elements with some sort of null or placeholders when nothing is
-> connected."*
-
-### A panel with nothing to say is not drawn — but absence is a reading
-
-Two halves, and the second was learned by getting the first too enthusiastic.
-
-**The panel.** With no vehicle, draw nothing: not greyed, not zeroed, not a
-box holding a placeholder. The app bar's status row renders nothing at all
-without a connection. Both references landed here independently —
-QGroundControl instantiates no vehicle indicators when there is no vehicle,
-Betaflight sets its whole status cluster to `display: none` — and neither has
-an element reading "not connected", which is what this app's inherited
-`.la-readout` showed, in a box measured at 691px in a 1600px window and
-1651px at 2560 against a longest-ever string of 203px.
-
-**The readings inside it.** Once there *is* a vehicle, the set is fixed. The
-three readings were first gated on the SYS_STATUS present mask, so a flight
-controller with no GPS had no GPS reading — which tells a pilot nothing,
-reads as a layout fault, and hides the one fact that decides whether the
-position modes can be flown. "No GPS" is a reading. Betaflight draws all six
-of its sensor cells for exactly this reason.
-
-> *"This flight controller doesn't have a GPS plugged in right now, but I'd
-> still like to see what the GPS display would look like in that case even if
-> it says 0 satellites or no fix"*
-
-A fixed set also means the row is one shape across every aircraft rather than
-one per sensor fit.
-
-**Still never draw a value the vehicle did not give.** `0.0V` is both "no
-monitor fitted" and "a monitor reading a dead pack"; the slot stays, the
-number becomes a dash. Same for a battery whose charge estimate is MAVLink's
--1: an empty cell, not a flat one.
+Never draw a value the vehicle did not give. `0.0V` means both "no monitor
+fitted" and "a dead pack", so the slot stays and the number becomes a dash. A
+battery charge estimate of -1 draws an empty cell, not a flat one.
 
 ### Color a reading with the vehicle's thresholds, or not at all
 
-A percentage is only low against a threshold, and a threshold invented here
-puts this app's opinion on the bar in the aircraft's voice. The battery
-carried no color at all until `BATT_LOW_VOLT` and `BATT_CRT_VOLT` were read
-from the vehicle; GPS turns amber below a 3D fix because 3 is what ArduPilot
-itself refuses Loiter, Auto and RTL on. Where the vehicle has configured
-nothing, show no opinion.
-
-A *level* is not a judgement, so it needs no threshold: a battery drawn 22%
-full and one lit signal bar are pictures of the numbers beside them.
-
-> *"It would be great if the battery and RSSI bars reflected the state"*
+A threshold invented here would present this app's opinion as the
+aircraft's. The battery is colored from the vehicle's `BATT_LOW_VOLT` and
+`BATT_CRT_VOLT`; GPS turns amber below a 3D fix, where ArduPilot itself
+refuses Loiter, Auto and RTL. With no threshold configured, show no color. A
+level (a battery's fill, lit signal bars) needs no threshold, since it only
+pictures the number beside it.
 
 ### Empty is null, not zero
 
-A dash, not a `0`. And a value with nothing behind it carries no status
-color — a green `Disarmed` for an absent aircraft is a claim, not a
-placeholder.
+Show a dash, not `0`. A value with nothing behind it carries no status color:
+a green "Disarmed" for an absent aircraft is a claim, not a placeholder.
 
-### Say it once, in the place it is already visible
+### Say it once, where it is already visible
 
 If the empty state is legible from the screen itself, do not add a banner
-saying so. Put whatever prompt is needed where the absence already shows.
-
-> *"No need for the notice bar — the 'No vehicle' on the visualization is
-> enough."*
+saying so. Put any prompt where the absence already shows.
 
 ### A screen is controls, not prose
 
-Do not narrate. A card is a set of controls with their labels; it does not
-need a sentence explaining what the control is for, what the procedure
-involves, or why the setting matters. Those belong in a code comment, where
-they cost the reader nothing. The exceptions are narrow and each earns its
-place: a `.la-hint` saying why a control is **disabled** or why a value was
-**refused**, and the shaded state line on Firmware, which narrates a flash
-because that is the one operation somebody watches a bar through.
+See [ux-rules.md](ux-rules.md#controls-not-prose). The only exceptions here
+are a `.la-hint` saying why a control is disabled or a value was refused, and
+the shaded status line on Firmware, which narrates a flash step by step.
 
-Descriptions accumulate one reasonable-looking sentence at a time, and the
-result is a screen people learn to skim. If a control needs explaining, the
-label is wrong.
-
-> *"Getting a little irritated at how frequently random text and
-> descriptions are being placed throughout the app."*
+## Actions and writes
 
 ### A card's actions live on its title row
 
-A card that does something puts its buttons on the title row, right-aligned,
-and its body holds only settings. Every action on a screen is then found in
-the same place, and a set of dropdowns is not broken up by buttons of another
-width. Settings that belong together sit in one row, each label above its
-control. (The *actions column* on the full-height screens is a different shape
-for a different job — vehicle actions, then files, then settings — because a
-column is scanned from the top for something to press.)
-
-This replaced "settings first, action last", which put Calibrate at the foot
-of each card: laid out that way the buttons were stacked among the fields and
-the two cards read as unevenly arranged.
-
-> *"I like actions in the header, but I like the horizontal layout of the
-> compass controls"*
+Buttons go on the title row, right-aligned, and the body holds only
+settings, so actions are always in the same place and dropdowns are not
+broken up by buttons of another width. Settings that belong together sit in
+one row, each label above its control. The actions column on full-height
+screens is different: it is scanned from the top, so it runs vehicle actions,
+then files, then settings.
 
 ### A write answers inside the control that made it
 
-"Saved" belongs in the box that was just changed, not on the card. A card-wide
-answer leaves the reader to work out which of several fields it meant, and on a
-screen with two writing cards both of them said it.
-
-> *"Make the 'Saved' text appear close to (or even inline with) the input that
-> actually triggers it"*
-
-**Reserve the room, never paint over the value.** The word needs somewhere to
-go that is not on top of what it is confirming: while it shows, the control's
-text area shortens and a value too long for what is left is cut with a fade.
-Overlaying it hid the tail of the very setting being confirmed —
-`Yaw293Pitch68Roll180` ends a pixel short of where the word starts.
-
-> *"What do we do when the input box doesn't contain enough whitespace for
-> 'Saved'?"*
-
-The corollary is that the box itself never changes size. A control sized by its
-own content grows by the reserved width the moment the answer appears, which is
-how one dropdown in a table came to be 68px wider than its neighbour for two
-seconds at a time: give it the width of its column instead.
+"Saved" appears in the control that was just changed, not on the card, so
+there is no doubt which field it means. While it shows, the control's text
+area shortens and a long value is cut with a fade; the word never paints over
+the value. The control itself never changes size, so give it its column's
+width rather than its content's.
 
 ### A reboot is not a disconnect
 
-The app asks for the restart and reconnects from it by itself, so the screen
-that asked is the screen to come back to. Dropping to the top of the offline
-tabs meant finding your place again after every calibration that ends in a
-reboot. The placeholder those tabs draw says what is happening rather than
-asking for a vehicle — nobody has anything to do.
-
-> *"When a reboot is triggered, can we make the app land back on the same page
-> after reconnecting?"*
+The app asks for the restart and reconnects on its own, so it returns to the
+screen that asked. The placeholder shown meanwhile says what is happening
+rather than asking for a vehicle.
 
 ### Red is status, except for destructive actions
 
-The design system says green and red are status and never actions. The one
-standing exception is a control whose whole point is that it is destructive —
-Stop all on the motor test, the confirms on MAVFTP and the joystick. Written
-down because the rule and the code had disagreed for some time, and the code
-was right.
+Green and red are status colors, never actions. The one exception is a
+control whose purpose is destructive, such as Stop all on the motor test and
+the confirm buttons on MAVFTP and the joystick.
 
-> *"Keep red for destructive actions"*
+### A setting that gates other settings writes itself
 
----
+Other edits stage until Write. A parameter that decides whether other
+parameters exist is written immediately, followed by a background parameter
+refresh, because until it is written the screen has nothing to show. It never
+writes on a keystroke (a dropdown commits on change, a number field on Enter
+or blur), and a failed write falls back to a staged edit.
+
+### One prompt per thing to fix
+
+A control that carries a setting, with a hint saying what "off" means, is
+already the prompt. Do not add an emphasized panel offering the same change.
 
 ## Alignment and rhythm
 
-### A control sits beside its label, not at the far edge of the row
+### A control sits beside its label
 
-The system sheet's `.la-field` is `1fr auto`, which in a wide card puts
-hundreds of pixels between a label and its value and stops the pair reading
-as one thing. Scoped overrides pin the label column instead.
+The design system's `.la-field` is `1fr auto`, which in a wide card puts
+hundreds of pixels between a label and its value. Scoped overrides in
+`app.css` pin the label column instead, so the pair reads as one thing and
+the controls in a card line up.
 
 ### One width for a column of controls
 
 Every dropdown in a dialog is the same width, and the action row under them
-matches. Let each size to its own longest option and the dialog grows a
-ragged right-hand edge.
+matches. Derive both from one token rather than copying a measured number,
+or a reworded label silently breaks the alignment.
 
-> *"make the drop-downs all the same width"* · *"Can you make the width of
-> the drop-downs equal to the combined width of these buttons below?"*
-
-Derive the two from **one** token rather than measuring one and copying the
-number into the other, or a reworded label silently breaks the alignment.
-
-The same holds for a screen's actions column once it carries settings:
+The same applies to an actions column that carries settings:
 `.app-col--fields` gives every control there `--app-col-control-w`, and
-labels are shortened to fit beside it rather than wrapping (OSD's "PWM min",
-"Battery V" under a Warnings heading).
+labels are shortened to fit beside it rather than wrapping.
 
 ### Nothing in a bar absorbs the window's slack
 
-A status element sized `flex: 1 1 auto` grows to whatever is spare, which on
-the full-screen windows this app is used in means a short sentence in a very
-long box — 64% of the bar at 2560px, 88% of it empty. Give a bar's contents
-their own size and let the spacer take the slack.
-
-The corollary is that room is made by *dropping whole items* at a
-breakpoint, never by letting them squeeze: a clipped `15.9V 24.1A 61%` is not
-a shorter reading, it is a wrong one. Set the breakpoint against the longest
-string a real vehicle produces, not the one a bench copter happens to show.
-
-> *"we inherited this from the other Lofted Aero apps, but it arguably
-> doesn't serve the same purpose here"*
+An element sized `flex: 1 1 auto` in a bar turns spare width into a short
+string in a very long box. Give a bar's contents their own size, and make
+room by dropping whole items at a breakpoint rather than squeezing them: a
+clipped `15.9V 24.1A 61%` is a wrong reading. Set each breakpoint against the
+longest string a real vehicle produces.
 
 ### A control never moves because a reading changed
 
 Anchor a bar's fixed groups to its edges and let only the live part float
-between them, so nothing you are reaching for slides out from under the
-cursor. The app bar is three bands for exactly this: what the app is on the
-left, what the vehicle is in the middle, the link on the right.
+between them. The app bar has three bands: the app on the left, vehicle
+status in the middle, the link on the right. It is a three-track grid
+(`1fr auto 1fr`), not a row with two spacers, which would center the status
+between unequal groups rather than on the window. Each reading gets a slot as
+wide as its longest string, noted beside the width in the CSS, so a changing
+value never pushes its neighbors.
 
-Use three grid tracks, not two spacers. Spacers center the middle band
-between the groups, which is only the window's midline when the groups happen
-to be the same width — ours differ by 230px, and it showed.
+### One width for a row of gauges
 
-Inside the live part, the same rule applies one level down: give each reading
-a slot as wide as the longest string it can hold, so a value changing does
-not drag its neighbours. Measure the slot against the worst case and write
-the string it was measured against beside the number.
+Repeated readings in a row share one slot width, so their icons land on a
+constant pitch and the strip reads as a set. Make the equal slot fit by
+cutting what the row does not need rather than widening it: where an icon
+already pictures the level, secondary numbers such as pack current or packet
+rate go in the tooltip.
 
-> *"I'd prefer the connect UI remain on the right side of the screen in a
-> manner that doesn't shift around if the new elements that appear change
-> size"* · *"For that matter, try and keep that from happening in general"*
+### A filled shape is read by its edge
 
-### One dialog asking three questions keeps one shape
+When an item in a row has a background (a pill, chip or badge), the eye
+measures spacing from its edge, not from its text. Measure gaps the same way.
 
-Where a dialog changes its fields by what it is being used for, everything
-around the fields stays put: same card width, same rows, same box width
-whatever a box holds. Sizing each variant to its own content is what pulls
-them apart — the Connect dialog put a 170px host box above a 71px port box,
-showed that same 71px box alone at the right of a 560px card for UDP, and
-made the WebSocket URL a full-width stacked field. Three layouts for one
-question with three answers.
+### One dialog with variants keeps one shape
 
-> *"let's make sure the TCP, UDP, and websocket connect pop-ups are visually
-> consistent with uniform padding, reasonable width, and matched-width input
-> fields"*
+Where a dialog changes its fields by mode (the Connect dialog for TCP, UDP
+and WebSocket), everything around the fields stays put: same card width, same
+rows, same box width whatever the box holds. A port number and a URL are both
+"the value" and get the same box. Size the card to that column rather than
+leaving it at the design system's default.
 
-A port number and a URL are both *the value*, so they get the same box. The
-card is then sized to that column rather than left at the sheet's default,
-or the narrowest variant is mostly empty.
+### A panel is framed one way, in one place
 
-### A panel is framed one way, and the frame lives in one place
-
-A hairline border, the small radius, the surface background: that trio is what
-makes a panel in this app, and CSS cannot say "the same as that one", so it
-gets pasted. Every paste is a screen quietly opting out of the next change to
-what a panel looks like.
-
-The right-hand actions column is `.app-col-shell` around `.app-col` — the
-shell owns the frame, the background and the scrolling, the inner column owns
-the padding and the rhythm. Reach for it rather than writing the trio again,
-and if a genuinely new *kind* of surface needs it, add the selector to the
-list in `src/styles/panel-frame.test.ts` so the next person sees the choice
-being made.
-
-> *"the one in the Parameters page looks like it lives inside a frame /
-> document, the one in Logs and MAVFTP doesn't, and the one in Mission is
-> somewhere in between"*
-
-The shared class existed the whole time and nothing used it. Writing the
-class is not the convention; adopting it is — and a comment claiming things
-"cannot drift" is worth checking before relying on it.
+A hairline border, the small radius and the surface background together make
+a panel. The actions column is `.app-col-shell` around `.app-col`: the shell
+owns the frame, background and scrolling; the inner column owns the padding
+and spacing between groups. Use these classes instead of repeating the frame
+styles. If a new kind of surface genuinely needs its own frame, add its
+selector to `src/styles/panel-frame.test.ts`, which lists every selector
+allowed to draw the frame and fails on a bare `.app-col` without a shell.
 
 ### A screen with a column fills the window; only its panes scroll
 
-The column has to stay beside the thing it acts on, so nothing above it may
-scroll: the screen takes the window's height and the *panes inside it* scroll
-within their own frames. Anything else and the buttons ride away with the
-list.
+The screen takes the window's height and its panes scroll inside their own
+frames, so the actions column stays beside what it acts on without sticky
+positioning. Set `fills: true` on the tab: the content area is a grid with
+`align-items: start`, where `flex: 1` on a screen's root does nothing, so
+without `fills` the page scrolls instead.
 
-> *"The parameters list is a long scroll. Should we make the right-side bar
-> with the buttons always keep the buttons in view?"*
+### A column is as tall as the pane beside it
 
-This needs no sticky positioning — get the container right and the column
-simply cannot move. What it does need is that `fills` is set on the tab, and
-the trap is that a screen asking to fill with `flex: 1` gets nothing on a
-grid whose `align-items` is `start`: `flex` is inert there, and the screen
-sizes to its content in silence.
+Place the actions column in the pane's grid row, so the two framed panels
+start and end on the same lines. A pane's toolbar and caption (search, path
+bar, row count) go in that pane's track; only something that changes the
+whole screen, like the Inspector's view switcher, spans both tracks.
 
-> *"the description on the Overview page…"* — the same `fills` flag, for the
-> same reason, two screens earlier.
-
-### A column is exactly as tall as the pane it sits beside
-
-Two framed panels that nearly line up read as a mistake; two that line up
-exactly read as a pair. So a pane's own toolbar and its caption go in that
-pane's track, and the column is placed in the pane's *row* — not beside all
-three. Wrapped in a flex column instead, the actions column spanned the
-search bar, the table and the note, and finished 58px taller than the table.
-
-> *"the parameter table is a bit shorter than the menu frame. Might also have
-> something to do with the note at the bottom."*
-
-Which side a control belongs to is the same question in a different form: the
-search filters the list, the path bar names the listing, the count describes
-the table — all of them belong to the pane and sit in its track. Something
-that changes what the *whole screen* shows, like the Inspector's view
-switcher, spans both.
-
-One gap between pane and column, from `--app-col-gap`. It had been four
-values across five screens for one relationship.
+The gap between pane and column is always `--app-col-gap`.
 
 ### A panel inside a panel is one panel
 
-Two surfaces of the same color, one inset a few pixels inside the other, read
-as a single box with a line through it — not as two things. Parameters wrapped
-its table and its actions column in a card, which put a white bordered column
-17px inside a white bordered card; the column's own frame did nothing except
-look like a division. It is now a full-height screen, so both panels sit on
-the page ground with the background between them, which is what makes them
-read as separate on Logs and MAVFTP.
-
-> *"the one in Parameter List still looks to be part of the broader parameter
-> list frame"*
-
-So: a screen either is a card, or contains framed panels. Not both. MAVFTP is
-the pattern to copy — a card while there is nothing to show, its own layout
-once there is.
+Two surfaces of the same color, one inset inside the other, read as one box
+with a line through it. A screen either is a card or contains framed panels,
+never both. MAVFTP is the pattern: a card while there is nothing to show, its
+own full-height layout once there is.
 
 ### Sibling screens share a shape
 
-Screens that do the same job in different modes get the same elements in the
-same places, so switching between them moves nothing.
+Screens that do the same job in different modes (the mission, fence and
+rally plans) put the same elements in the same places, so switching between
+them moves nothing.
 
-> *"make sure the placement and format of the elements on the mission,
-> fence, and rally tabs are consistent"*
+### A card keeps its name and place on every airframe
 
-### A card keeps its name and place whatever the airframe
-
-A card that does one job is the same card on every vehicle: the same title,
-in the same position. Only a card with no counterpart -- the VTOL motors'
-gains on a quadplane -- appears or goes. Balancing a layout by merging or
-renaming cards for one airframe makes the same settings live somewhere else
-depending on what is connected. Fit the difference inside the card instead:
-a quadplane's VTOL rate filters are rows of the one Rate filters card.
-
-> *"I don't like the idea of renaming and rearranging tiles that have
-> essentially the same function between configurations"*
+A card that does one job has the same title and position on every vehicle.
+Only a card with no counterpart, such as the VTOL motor gains on a quadplane,
+appears or disappears. Fit airframe differences inside the card: a
+quadplane's VTOL rate filters are rows in the one Rate filters card.
 
 ### The same card twice is one height
 
-Two cards that are the same thing for different instances -- the first and
-second harmonic notch, a quadplane's fixed-wing and VTOL rate filters -- sit
-side by side in a row, so the grid gives them one height. In stacked columns
-the second takes whatever slack its column has, and two identical cards
-drawn at different sizes read as a fault. Columns are still right for cards
-that are not twins; balance them against measured heights rather than by eye.
-
-> *"I don't like that the first and second harmonic notch tiles are
-> different heights."*
+Two cards that are instances of the same thing (the first and second harmonic
+notch, fixed-wing and VTOL rate filters) sit side by side in one grid row so
+they share a height. Stacked columns suit cards that are not twins; balance
+them against measured heights.
 
 ### Anything that grows goes last
 
-A list that gains rows pushes everything under it down the column. Put it at
-the bottom so nothing else moves.
-
-> *"Put the shapes list (fence) and rally points list (rally) below the
-> FILES interface on each"*
-
----
+A list that gains rows goes at the bottom of its column, so nothing under it
+moves.
 
 ## Where a control lives
 
 ### Tools belong on the thing they act on
 
-Drawing tools go on the map as a palette, not in a column of full-width text
-buttons. The column is for what persists — vehicle actions, files, settings.
+Drawing tools go on the map as a palette, not in the column as full-width text
+buttons. The column is for what persists: vehicle actions, files and
+settings.
 
-> *"Put the fence inclusion, exclusion, circle, etc. buttons on something
-> that looks like the mission item graphical menu instead of buttons in the
-> column"*
+### Judge an icon at the size it is drawn
 
-### A filled shape is read by its edge, not by its text
-
-When something in a row has a background — a pill, a chip, a badge — the eye
-measures the gap from its *edge*. The app bar's state pill sat 20px from the
-next icon while the readings were 37px apart, so it looked crowded against
-them even though the distance from its text was the widest gap in the row.
-Measure what the eye measures.
-
-> *"The failsafe looks closer to the other elements than the other elements
-> are to each other"*
-
-### One width for a row of gauges too
-
-The column rule has a row form: give repeated readings one slot width and
-their icons land on a constant pitch, which is what makes a strip read as a
-set rather than as things scattered at uneven distances. Sized to their own
-worst cases they came out 152, 116 and 170px, and the whitespace between them
-ran 49, 57 and 41.
-
-Buy the equal slot by cutting what the row does not need rather than by
-widening it: a bar with an icon showing the level does not also need the
-number the icon is a picture of, so pack current and packet rate moved to the
-tooltip and every slot fits in 116px.
-
-### Judge an icon at the size it will be drawn
-
-Three attempts at a satellite for the GPS reading all read correctly at 96px
-and turned to mush at 16px, which is the only size the app bar ever draws
-them. A globe survives the size and cannot be mistaken for the signal bars
-beside it, so a legible non-convention beat an illegible convention.
-
-> *"Can you use iconography of some sort?"*
+An icon that reads well at 96px can be illegible at the 16 to 20px the app
+bar uses. Check it at its real size. A legible unconventional icon (the GPS
+globe) beats an illegible conventional one.
 
 ### An icon matches its siblings exactly
 
-A control that joins an existing set takes that set's size, shape and
-styling. A near-match reads as a different application.
-
-> *"Make it the same size and shape and styling as the icon in the palette"*
+A control joining an existing set takes that set's size, shape and styling.
+A near-match looks like a different application.
 
 ### Replace a text field with the gesture that produces the value
 
-Where a value can only come from somewhere else and cannot be checked by
-reading it, the input box is the wrong control — a transposed digit in a
-latitude still parses and boots a vehicle a hundred kilometers away looking
-perfectly healthy. Point at the thing instead, and let the field become a
-line that *shows* what was chosen.
+Where a value comes from somewhere else and cannot be checked by reading it,
+a text box is the wrong control: a transposed digit in a latitude still
+parses and puts the vehicle a hundred kilometers away. Let the user point at
+the thing (a location on a map), and show the chosen value as a readout.
 
-> *"We need to be able to pick the flying field from the map rather than
-> entering lat/long — that'd be much more intuitive."* · *"Replace the entire
-> lat/long/whatever input field with the pick on map button. The user will
-> probably never interact with those values directly."*
+### An action in a dropdown needs its own entry
 
-Keep the readout. Showing the current value was the one thing the box was
-good at, and it is still needed.
-
-### An action in a dropdown needs an entry of its own
-
-A select entry that *opens something* — a file picker, a dialog — cannot
-double as the entry showing what is currently chosen. Re-selecting an option
-that is already selected fires no change event, so the action becomes
-unreachable the moment it succeeds once. Keep "Select from file…" as a
-separate row beside the current choice.
-
-And put the control back before the picker opens: cancelling changes
-nothing, so nothing re-renders, and the select is left displaying an action
-it did not carry out.
-
-> *"We do need to keep the Custom build … and Select from file … options in
-> the drop-down in this new configuration so that the user can re-select."*
+A select entry that opens something (a file picker, a dialog) cannot also be
+the entry showing the current choice. Re-selecting an already selected option
+fires no change event, so the action becomes unreachable once it has
+succeeded. Keep "Select from file" as a separate entry beside the current
+choice, and reset the control before the picker opens, since a canceled
+picker triggers no re-render.
 
 ### A file dialog opens where the last one left off
 
-One remembered folder, shared by every picker on a screen, persisted. Files
-that get chosen together live together — a SITL build and its parameters are
-in the same folder — so the second dialog should not start at the top of the
-disk.
+Use one remembered folder, shared by every picker on a screen and persisted.
+Files chosen together usually live together.
 
 ### Prefer a revealed control to a permanent one
 
-A rarely-used action that belongs to an object opens from that object,
-rather than occupying a row of its own forever.
-
-> *"Can the 'from vehicle' button be something that appears when the user
-> clicks on the home icon and not a dedicated one below it?"*
+A rarely used action that belongs to an object opens from that object rather
+than occupying a row of its own.
 
 ### Work the screen starts by itself may not prompt
 
-A screen that can answer a question for you should try, and the attempt has
-to be silent. The Firmware tab probes the attached bootloader the moment a
-vehicle is picked, because that click is the user gesture opening a serial
-port requires — but `requestPort()` also puts the browser's port chooser on
-screen, so the first version asked which port to use every time somebody
-clicked a vehicle symbol and then sat on "Checking the board…" until it was
-answered. A prompt raised by work nobody asked for is worse than not doing
-the work.
+A background probe uses only what it already has (such as a serial port
+already granted) and gives up otherwise; only an action the user pressed may
+raise a chooser. Where the answer can be determined, don't ask: the desktop
+app picks the bootloader port itself when exactly one new port appears. Show
+that background work is running, or its result appearing a second later looks
+like the app changing its mind.
 
-> *"Run the board detection in the background after the user chooses, only
-> prompting the user to specify the target if it fails."*
+### Order questions so each answer narrows the next
 
-So the automatic probe reads only a port already granted and gives up
-otherwise; the flash, which somebody pressed, is allowed to ask. The same
-split applies to anything speculative: it may use what it has and must not
-go looking.
+Put first the question whose answer constrains the rest. On Firmware the
+board is detected first, and the vehicle tiles, release list and file picker
+are then limited to what that board can take; a vehicle with no build for it
+is disabled rather than hidden. A question the app has answered outright is
+not asked, but the readout of the answer stays visible.
 
-And when the app *can* answer, it should not ask at all. The bootloader's
-port is a fact -- the one that appeared while the board rebooted -- so the
-desktop shell answers that request itself and only shows a chooser when the
-difference is not exactly one port.
+### A setting that applies to the next item goes on that item's header
 
-> *"can we make it automatically detect the bootloader port? Especially
-> since we know the list of available ports from the choice right before?"*
-
-Say that it is running, though. A field appearing by itself a second after a
-click reads as the app changing its mind.
-
-### Ask first for the thing that cannot be derived
-
-Order the questions on a screen by which ones the screen can answer itself.
-A board says which hardware it is and never which airframe it should run, so
-Firmware asks for the vehicle first — as symbols, since there are eight of
-them and a picture is faster to find than a line in a dropdown — and derives
-the board, the version and everything below it from that one answer.
-
-> *"Mission Planner seems to be able to tell which build target is
-> appropriate for a connected board without asking. It only prompts if
-> that's somehow ambiguous."* · *"I would like to use symbols for the various
-> ArduPilot firmware vehicle choices, just like Mission Planner."*
-
-A question the screen has answered outright is then not asked: the board
-field is drawn only when detection found several builds, or none. Keep the
-readout either way, so what was chosen is still visible.
-
-### A setting that stamps the next thing goes on that thing's header
-
-Default altitude and altitude frame sit on the item list's title bar,
-because that is what they act on.
-
----
+Default altitude and altitude frame sit on the mission item list's title bar,
+because they apply to the next item placed.
 
 ## Words
 
 ### Use the vocabulary people already have
 
-Mission Planner's terms beat invented ones for anyone arriving from it —
-but only where they are true. Its Mandatory/Optional split was deliberately
-not carried over: that distinction belongs to the airframe, not the screen,
-and a label that is wrong half the time teaches people to stop reading
-labels.
+Mission Planner's terms beat invented ones for users coming from it, but only
+where they are accurate. Its Mandatory/Optional split is not used here: that
+distinction depends on the airframe, not the screen, and a label that is
+wrong half the time teaches people to stop reading labels.
 
-> *"Let's try 'Initial Setup'… like Mission Planner uses"* · *"This will be
-> familiar to Mission Planner users."*
+### No trailing "…" on a control
 
-### No trailing “…” on a control, ever
+Not on buttons, menu items, or the option that opens a picker. An ellipsis
+meaning "asks for more first" goes stale silently when behavior changes, and
+"never" is easier to apply consistently. Progress text (`Writing…`) keeps it,
+as does elision inside a value (`[1, 2, 3, … 40]`).
 
-Not on buttons, not on menu items, not on the option that opens a picker.
-The old convention — an ellipsis meaning "this asks for something before it
-acts" — is real and widely used, and it is not worth keeping here.
+### An error names what the user did
 
-Two reasons. It **decays silently**: `HUD video…` was correct for as long as
-it opened a dialog and became wrong the moment that dialog became a pane,
-because nothing about the label changed. And "never" is a cheaper rule to
-hold than "when the control asks for more", which needs a judgement at every
-control and was already applied unevenly across eleven of them.
+Say which thing failed, in the terms the user entered, and what state it is
+in: "Nothing is listening at 127.0.0.1:5760", not `Error invoking remote
+method 'link:open': Error: connect ECONNREFUSED 127.0.0.1:5760`. Match on the
+error code, which is stable, rather than the message text, which is not.
+Where there is no code, repeat the message plainly instead of guessing at a
+cause.
 
-> *"I think we should remove the ..."* · *"Just never use them"*
-
-**Progress text is not this.** `Writing…`, `Listing /APM…`, `Waiting for
-telemetry…` keep theirs: the ellipsis is what separates a thing happening
-from a thing finished, and `Writing` alone reads as done. So does elision in
-the middle of a value — `[1, 2, 3, … 40]`.
-
-### An error names what the user did, not what the code was doing
-
-Machine text is for the log. On screen, say which thing failed in the words
-the user typed and what state it is in: "Nothing is listening at
-127.0.0.1:5760", not `Error invoking remote method 'link:open': Error:
-connect ECONNREFUSED 127.0.0.1:5760`. Match the error *code*, which is stable,
-rather than the sentence around it, which is not — and where there is no code
-to match, repeat the message plainly instead of guessing at a cause.
-
-> *"I noticed this when I tried to connect to an existing SITL that wasn't
-> actually running. Looks like we'll need to handle this sort of thing."*
-
-**Cancelling is not failing.** Closing a picker, dismissing a prompt, choosing
-not to connect: none of them get an error state.
+Canceling is not failing. Closing a picker, dismissing a prompt or choosing
+not to connect never produces an error state.
 
 ### Work that is not about one screen is reported on the app bar
 
-A parameter download starts from a connect, a reboot, or a write, and while
-it runs every curated tab is showing an incomplete vehicle. A note on the
-Parameters tab tells whoever is already there; the app bar tells everyone
-else.
-
-> *"We should have a global indicator that parameters are loading. In QGC, a
-> thin green bar moves across the header and disappears when complete."*
-
-Two things such an indicator has to get right. It must not move anything —
-it comes and goes while someone is reading the bar, so it is placed out of
-the layout's flow entirely. And before there is a fraction to draw it should
-sweep, not sit at 0%, which reads as stalled.
-
-Progress is blue here, not green: activity, not a verdict. Green would say
-"good".
-
-### A setting that gates other settings writes itself
-
-Everything else stages and goes to the vehicle when Write is pressed. A
-parameter that decides whether *other* parameters exist cannot: until it is
-written the screen has nothing to show, so staging it looks like the control
-does not work. Write it on the spot and re-read in the background.
-
-> *"Let's make the OSD type selection automatically write, then trigger a
-> background parameter refresh."*
-
-Two things to keep honest about it. Writing on a *keystroke* is never the
-gesture — a dropdown commits when it changes, a number field when you press
-Enter or leave it. And a write that fails goes back to being a staged edit,
-so nothing the user chose is lost.
-
-### One prompt per thing to fix
-
-A control that already carries a setting, and a hint beside it saying what
-the setting being off means, is the prompt. A second emphasized panel offering
-the same change is a louder copy of a control that is already there.
-
-> *"We don't need the emphasis panel with the OSD buttons because we already
-> have the display menu that prompts for OSD type."*
+While a parameter download runs, every curated screen shows an incomplete
+vehicle, so its progress goes on the app bar, as in QGroundControl. The
+indicator sits outside the layout flow so it moves nothing, sweeps until the
+first fraction arrives rather than sitting at 0%, and is blue rather than
+green, because progress is activity, not a verdict.
 
 ### A value that cannot fit its box is shortened, not clipped
 
-Where a control is too narrow for ArduPilot's own text, show the compact
-form rather than let it be cut: a bitmask as "2 selected" (or "none"), and a
-sentence-length dropdown value by a short name that keeps the part telling it
-from its neighbours ("Yes(minimum PWM when disarmed)" as "Yes, min PWM"). The
-full text stays the hover text. Short names live in one table keyed by
-ArduPilot's text (`option-names.ts`), because the same number means different
-things on different vehicles; a card opts in with `compact`.
-
-> *"For options or drop-down fields, adopt the "n selected" or shortened
-> string approach for clarity"*
-
-### A label must not be ambiguous
-
-If a word could mean two things in context, it is the wrong word, even when
-it is the shortest one.
-
-> *"'Vehicle' is an ambiguous label. What else fits there?"*
+Where a control is too narrow for ArduPilot's text, show a compact form: a
+bitmask as "2 selected" (or "none"), and a long option by a short name that
+keeps what distinguishes it ("Yes(minimum PWM when disarmed)" becomes "Yes,
+min PWM"). The full text stays in the hover text. Short names live in one
+table keyed by ArduPilot's text (`option-names.ts`), because the same number
+means different things on different vehicles; a card opts in with `compact`.
 
 ### Merge rows that never appear together
 
-Two lines that are never both true are one line.
+Two lines that are never both shown are one line.
 
-> *"Does 'Imagery ends at zoom n' and 'X of Y tiles missing' ever appear at
-> the same time? If not, we can merge that row"*
+### Don't explain what the app is about to do
 
-### Never explain what the app is about to do
+See [ux-rules.md](ux-rules.md#dont-explain-what-the-app-is-about-to-do);
+prefer an empty slot to a filled one. Reassurance ("this is recoverable",
+"nothing is erased") goes in the confirm dialog for that action, where it is
+read. That applies to safety text most of all, because standing warnings are
+the ones people learn to skip, and standing text goes stale when behavior
+changes. Domain knowledge is different: "set them from a real flight log, not
+a bench reading" changes the number someone types, so it stays.
 
-A line describing behavior before it happens is a line nobody needs. *"The
-board is identified when you flash, and asked for if it cannot be"* is true,
-and it still went: if the app can work it out, it should do so silently, and
-if it cannot, the question it asks at that moment explains itself.
+### Keep hints short
 
-> *"technically true - but the user doesn't have to know this in advance"*
-
-The test is what the reader does differently for having read it, **right
-now**. No answer means cut it, and prefer an empty slot to a filled one.
-
-Two corollaries. Reassurance about something that has not happened — *"this
-is recoverable"*, *"nothing is erased until…"* — belongs in the confirm
-dialog for that action, where it is actually read, not as standing text on
-the screen beside it; safety copy is not exempt, it is the strongest case,
-because standing warnings are the ones people learn to skip. And pre-emptive
-copy rots: the same card carried *"press Detect board"* for a while after
-that button was deleted, because nothing about the sentence knew.
-
-This does not mean deleting domain knowledge. *"Set them from a real flight
-log, not a bench reading"* changes the number someone types and earns its
-place. The rule is about describing **the app's own machinery**, not about
-telling somebody something true about their aircraft.
-
-### Trim the explanation once the mechanism is settled
-
-Text written while working something out reads as debug output afterwards.
-Go back and cut it.
-
-> *"make that section less verbose now that we've worked out the details. It
-> reads like debug messaging."*
-
-Hints are short. A `.la-hint` says the one thing needed at the moment it is
-read; the reasoning goes in a code comment, where it costs the reader
-nothing.
-
----
+Once a mechanism is settled, cut the text written while working it out. A
+`.la-hint` says the one thing needed at the moment it is read; the reasoning
+goes in a code comment.
 
 ## Structure
 
-### Split a screen when it holds two sittings, not when it is long
+### Split a screen by sitting, not by length
 
 The test is whether anyone would change something in both halves in one
-session. Filters is its own screen, ahead of Tuning, because the notches are
-set once per airframe from a batch-sampler log before any gain is touched,
-and gains are revisited. Tuning's attitude and navigation halves share one
-screen as its two columns instead: they are the same sitting, and as
-sub-tabs they were the one Setup screen that was not cards. Length is not
-the test -- three columns was the alternative, and at the shared 1600px cap
-it would have ellipsized every named row.
-
-> *"There are quite a lot of things on the tuning page now. Should we
-> consider three columns? Or a separate page for filters?"* · *"Ok, do the
-> separate filters page."*
+session. Filters is its own screen ahead of Tuning because notches are set
+once per airframe from a batch-sampler log before any gain is touched, while
+gains are revisited. Tuning's attitude and navigation halves share one screen
+as two columns because they are tuned in the same sitting.
 
 ### Draw a two-axis set as a matrix
 
-Roll/pitch/yaw against P/I/D is a grid. As three separate cards, the one
-comparison anyone makes is a comparison across three headings.
+Roll, pitch and yaw against P, I and D is a grid. As three separate cards, the
+one comparison anyone makes spans three headings.
 
-### Group a long menu, using headings that are true
+### Group a long menu with accurate headings
 
-Fifteen rail items need groups. See the vocabulary rule above for which
-headings.
+The Setup rail is grouped (Initial Setup, Config/Tuning, Data). See the
+vocabulary rule above for how headings are chosen.
 
 ### A table is one treatment; only its columns are its own
 
-> "We have tables for various purposes in a few of our setup pages. I want to
-> make sure these tables and their fonts, labels, and general styles are
-> consistent."
-
-Seven of them — serial ports, the initial tune, the mode slots, the servo
-outputs, the auxiliary channels, a gain matrix, the compass priority list —
-had drifted into four treatments, none of them chosen. Three were framed and
-four were loose lines on a card; the framed ones ruled between rows from the
-top and the loose ones from the bottom, so the last row of each carried a
-rule under nothing; row padding came in three values; two set a font size and
-five inherited one a step larger; and the header band was tracked at 0.04em in
-five places and 0.09em in the sixth. Each one was reasonable when it was
-written and the set was not.
-
-`.app-table` in `app.css` is the whole of it — frame, header band, row rule,
-row metric, and the monospace identifier column — and a table declares only
-`grid-template-columns`, because the columns are what the table is *about*.
-The header takes `.la-card__subtitle`'s numbers rather than a sixth opinion:
-where the design system already has a small uppercase label, use its.
-
----
+Every settings table uses `.app-table` in `app.css`, which supplies the
+frame, header band, row rule, row metrics and monospace identifier column. A
+table declares only its `grid-template-columns`. The header reuses
+`.la-card__subtitle`'s type settings rather than defining its own.
 
 ## See also
 
-- `CLAUDE.md` — the design-system rules that keep the shared stylesheet
-  intact, and the traps dark mode exposed
-- `docs/screen-review.md` — the per-screen approval gate these conventions
-  are checked against
+- [architecture.md](architecture.md): the design-system rules for
+  `lofted-aero.css` and `app.css`, including dark mode
+- [screen-review.md](screen-review.md): the checklist these conventions are
+  checked against

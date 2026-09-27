@@ -5,26 +5,18 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 import { MOUNT_MODES, hasGimbalManager } from '../../../protocol/gimbal'
 import { mountMode, photo, point, record, zoomCamera } from '../../../services/camera'
 
-// Pointing the camera while flying: two dials, one per axis, the shape chosen
-// from a set of concepts (the "twin dials" protractor).
+// Camera control: two dials, one per axis. Pitch is a quarter dial seen from
+// the side (Forward at the top, Down at the bottom); yaw is a half dial seen
+// from above. Blue shows where the mount reports it is, the orange ring where
+// it was last told to go. ArduPilot acks these commands even with no mount
+// configured, so the reported position is the only proof it moved.
 //
-// Pitch is a quarter dial seen from the side -- Forward at its top end, Down
-// at its bottom -- and yaw a half dial seen from above, nose up the middle.
-// Each draws two things: in blue, where the mount *says* it is, and as an
-// orange ring, where it was last told to go. The gap between them is the
-// mount catching up, or not; ArduPilot answers every one of these commands
-// even with no mount configured, so the blue is the only proof it moved.
-//
-// Click or drag on a dial to aim, and the command goes on release: a mount
-// told a new angle on every pointer event is a queue of commands the vehicle
-// works through long after the hand has stopped. Angles snap to 5 degrees,
-// which is finer than anyone aims a camera with a mouse and makes the three
-// that get used -- forward, forty-five, down -- easy to land on. Arrow keys
+// Click or drag to aim; the command is sent on release so the vehicle does
+// not queue one per pointer event. Angles snap to 5 degrees, and arrow keys
 // step the focused dial by the same amount.
 //
-// Everything here is ack-verified, and the reply is reported rather than
-// assumed: the answer is the only difference between "the photo was taken"
-// and "MNT1_TYPE is still zero".
+// Every command's ack is reported, since it is the only way to tell a
+// successful photo from an unconfigured mount (MNT1_TYPE 0).
 
 /** How long a result stays in its slot, as a card's does on Sensors. */
 const STATUS_MS = 4000
@@ -47,8 +39,8 @@ export default function CameraPanel() {
   // Where it was last told to go, which is what the orange rings draw.
   const [target, setTarget] = useState<{ pitch: number; yaw: number } | null>(null)
 
-  // A result says what happened and then gets out of the way. The busy line
-  // stays until there is a result to replace it.
+  // A result clears after a moment; the busy line stays until a result
+  // replaces it.
   useEffect(() => {
     if (!status || status.tone === 'busy') return
     const t = setTimeout(() => setStatus(null), STATUS_MS)
@@ -67,8 +59,8 @@ export default function CameraPanel() {
     )
   }
 
-  // One axis moves; the other keeps what it was last told, or failing that
-  // where the mount says it is, so aiming pitch does not swing the yaw back.
+  // The other axis keeps its last target, or failing that the mount's
+  // reported angle, so aiming pitch does not swing the yaw back.
   const aim = (next: { pitch?: number; yaw?: number }) => {
     const pitch = next.pitch ?? target?.pitch ?? gimbal?.pitchDeg ?? 0
     const yaw = next.yaw ?? target?.yaw ?? gimbal?.yawDeg ?? 0
@@ -76,16 +68,15 @@ export default function CameraPanel() {
     run(`Point ${pitch}° / ${yaw}°`, () => point(pitch, yaw, lockYaw))
   }
 
-  // Only the gimbal manager can be told to hold an earth heading; the older
-  // command has no flag for it. Drawn and disabled rather than removed, so
-  // the yaw column is one shape on every firmware.
+  // Only the gimbal manager command can hold an earth heading; the older
+  // command has no flag for it. Disabled rather than hidden so the layout is
+  // the same on every firmware.
   const canLock = hasGimbalManager(firmware)
 
   return (
-    // The pane is the size container; the grid inside it sizes its two dial
-    // columns from it, which is why they are two elements -- a container
-    // cannot measure itself. The dials' proportions are the geometry below,
-    // handed to the CSS rather than copied into it.
+    // The pane is the size container and the inner grid sizes the dial
+    // columns from it (a container cannot measure itself). The dials'
+    // proportions come from the geometry below via CSS variables.
     <div
       className="camera-panel"
       style={
@@ -116,8 +107,7 @@ export default function CameraPanel() {
             disabled={!connected}
             onAim={(yaw) => aim({ yaw })}
           />
-          {/* Under the dial it changes, not in the settings column: it is a
-            property of how the yaw is held. */}
+          {/* Under the yaw dial, since it is about how yaw is held. */}
           <LaSwitch
             label="Lock yaw"
             checked={lockYaw}
@@ -148,8 +138,6 @@ export default function CameraPanel() {
 
           <h4 className="camera-panel__head">Camera</h4>
           <div className="camera-panel__shoot">
-            {/* The two that take a picture are the largest things here, each
-              with its word beside its glyph: they are what the pane is for. */}
             <button
               type="button"
               className="cam-btn"
@@ -181,15 +169,12 @@ export default function CameraPanel() {
                   <circle cx="12" cy="12" r="6.5" className="cam-btn__rec" />
                 )}
               </svg>
-              {/* "Stop", not "Stop recording": the button is half a column wide
-                at the pane's smallest, and its square glyph and red edge
-                already say what it stops. Its accessible name is in full. */}
+              {/* Short label for a narrow button; the accessible name is in
+                full. */}
               {recording ? 'Stop' : 'Record'}
             </button>
-            {/* Continuous zoom: press to start, release to stop, which is what the
-              camera protocol's type 1 means. A rocker beside the shutter, the
-              way a camera has one: a row of its own under the two buttons made
-              the column taller than the dials and the pane scrolled. */}
+            {/* Continuous zoom (camera protocol type 1): press to start,
+              release to stop. */}
             <div className="camera-panel__zoom" role="group" aria-label="Zoom">
               <button
                 type="button"
@@ -217,7 +202,7 @@ export default function CameraPanel() {
               </button>
             </div>
           </div>
-          {/* A slot that is always there, so a result appearing moves nothing. */}
+          {/* Always rendered, so a result appearing does not shift the layout. */}
           <p
             className={`camera-panel__status${status ? ` camera-panel__status--${status.tone}` : ''}`}
             role="status"
@@ -231,10 +216,7 @@ export default function CameraPanel() {
   )
 }
 
-/**
- * An angle as the dial prints it: whole degrees, a sign on the positive side,
- * and no "-0" -- a mount resting at a hair under zero rounds to that.
- */
+/** Whole degrees with an explicit sign, never "-0". */
 function formatAngle(v: number | null): string {
   if (v === null) return '—'
   const r = Math.round(v) || 0
@@ -282,16 +264,13 @@ interface DialProps {
 
 /**
  * A dial as one interactive SVG: pointer to aim, arrows to step, the command
- * on release.
- *
- * The drag is followed on the window rather than with pointer capture: this
- * pane re-renders at telemetry rate, and a captured pointer re-bound on every
- * render is what wedged the input pipeline on the demo transmitter's pads.
+ * sent on release. The drag is tracked on the window rather than with pointer
+ * capture, because the pane re-renders at telemetry rate and re-binding a
+ * captured pointer every render can wedge input.
  */
 function Dial({ g, live, target, disabled, onAim }: { g: DialGeometry } & DialProps) {
   const svg = useRef<SVGSVGElement | null>(null)
-  // Where the pointer has the dial while it is down; the ring follows it, and
-  // the command goes out with whatever it holds on release.
+  // The dragged value; the ring follows it and it is sent on release.
   const [dragging, setDragging] = useState<number | null>(null)
   const latest = useRef<number | null>(null)
   const aimRef = useRef(onAim)
@@ -371,8 +350,7 @@ function Dial({ g, live, target, disabled, onAim }: { g: DialGeometry } & DialPr
         setDragging(v)
       }}
     >
-      {/* A wide invisible stroke over the arc, so the band is the target
-          rather than a four-pixel line. */}
+      {/* A wide invisible stroke to enlarge the hit target. */}
       <path d={arcPath(g.cx, g.cy, g.r, g.a0, g.a1)} className="cam-dial__hit" />
       <path d={arcPath(g.cx, g.cy, g.r, g.a0, g.a1)} className="cam-dial__track" />
       {g.ticks.map((v) => {
@@ -404,7 +382,7 @@ function Dial({ g, live, target, disabled, onAim }: { g: DialGeometry } & DialPr
           className="cam-dial__target"
         />
       )}
-      {/* Where it is, not where it was told: the orange ring says that. */}
+      {/* The reported angle; the orange ring shows the target. */}
       <text x={g.valueAt[0]} y={g.valueAt[1]} textAnchor={g.valueAt[2]} className="cam-dial__value">
         {formatAngle(live)}
       </text>
@@ -434,8 +412,7 @@ const PITCH: DialGeometry = {
 const YAW: DialGeometry = {
   label: 'Camera yaw',
   width: 224,
-  // Measured to fit: at 116 the yaw column, with Lock yaw under it, was the
-  // one that made the pane scroll at 1920x1100.
+  // Kept low so the yaw column with Lock yaw under it fits without scrolling.
   height: 110,
   cx: 112,
   cy: 102,

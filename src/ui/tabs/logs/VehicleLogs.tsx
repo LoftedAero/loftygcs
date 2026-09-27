@@ -10,10 +10,9 @@ import {
 
 // The logs on the vehicle's card: list them, pick one, watch it come across.
 //
-// Size is shown next to every entry because it is the only thing that tells
-// you what you are about to wait for. The same ten-megabyte log is a minute
-// over USB and the better part of an hour over a 57600-baud radio, and a
-// pilot deciding which log to pull deserves to know that before starting.
+// Size is shown next to every entry because download time depends on it: a
+// ten-megabyte log is a minute over USB and most of an hour over a
+// 57600-baud radio.
 
 export default function VehicleLogs() {
   const connected = useConnectionStore((s) => s.phase === 'connected')
@@ -36,9 +35,7 @@ export default function VehicleLogs() {
     <section className="app-col__group">
       <h3 className="app-col__head">On the vehicle</h3>
 
-      {/* During a download this button is its Cancel: the list cannot be
-          refreshed mid-transfer anyway, and a Cancel of its own would add a
-          row to the column for as long as the download ran. */}
+      {/* During a download this button becomes Cancel. */}
       {status.kind === 'downloading' ? (
         <LaButton variant="ghost" size="block" onClick={cancelVehicleLogDownload}>
           Cancel download
@@ -55,10 +52,7 @@ export default function VehicleLogs() {
       )}
       {!connected && <LaHint>Connect a vehicle to read its logs.</LaHint>}
 
-      {/* A download shows in its own row -- filling from the left, its size
-          turned into how far it has got -- rather than on a line of its own
-          above the list, which pushed every row down 37px for as long as the
-          transfer ran and read "— — of 553 kB" before the first bytes. */}
+      {/* A download shows progress in its own row, so the list does not shift. */}
       {logs.length > 0 && (
         <div className="log-list">
           {logs.map((l) => {
@@ -85,8 +79,7 @@ export default function VehicleLogs() {
           })}
         </div>
       )}
-      {/* Under the list, not above it: a line that comes and goes goes last,
-          where nothing below it can be moved. */}
+      {/* Last, so it moves nothing when it appears. */}
       {status.kind === 'error' && <LaHint error>{status.text}</LaHint>}
     </section>
   )

@@ -1,7 +1,6 @@
-// COMMAND_LONG with COMMAND_ACK tracking: every command a wizard sends gets
-// a definitive answer -- accepted, rejected with a result code, or "the
-// vehicle never answered". Silent failure here is what made the original
-// ArduConfigurator look finished while its commands did nothing.
+// COMMAND_LONG with COMMAND_ACK tracking: every command gets a definite
+// answer (accepted, rejected with a result code, or no reply), so a command
+// can never fail silently.
 import type { FieldValue } from './types'
 
 /** MAV_RESULT names for the codes wizards care about. */
@@ -47,9 +46,8 @@ export class CommandClient {
   }
 
   /**
-   * Send a command and resolve with the MAV_RESULT. Resolving with a
-   * non-zero result is not an exception -- "Denied" is an answer the UI
-   * must show, not a crash.
+   * Send a command and resolve with the MAV_RESULT. A non-zero result
+   * resolves rather than rejects; only a missing ack rejects.
    */
   run(command: number, params: number[] = [], opts?: { timeoutMs?: number }): Promise<number> {
     const timeoutMs = opts?.timeoutMs ?? ACK_TIMEOUT_MS

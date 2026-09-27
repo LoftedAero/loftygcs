@@ -10,19 +10,13 @@ import { evaluateExpression, expressionError } from '../protocol/log-expression'
 
 // The log being reviewed, and what is being looked at in it.
 //
-// One log at a time, held whole in memory: a ten-megabyte flight parses in
-// about 150 ms and the columnar tables are smaller than the file was, so
-// there is nothing to gain from streaming it and a great deal of complexity
-// to lose. A log large enough to be a problem should move the parse into a
-// worker before it moves it out of memory.
+// One log at a time, held whole in memory: a 10 MB flight parses in about
+// 150 ms and the columnar tables are smaller than the file, so streaming is
+// not worth the complexity.
 
 /**
- * What occupies the upper half of the screen.
- *
- * The replay is always there. 'none' gives it the whole window, which is
- * the state a log opens in: until you have asked for a number, a flight is
- * a thing you watch. Plotting a field opens the plot above it, and the
- * table takes the same space when you want records instead of curves.
+ * What occupies the upper half of the screen. The replay is always shown;
+ * 'none' gives it the whole window, which is how a log opens.
  */
 export type UpperPane = 'none' | 'plot' | 'table'
 
@@ -32,11 +26,8 @@ const SPLIT_KEY = 'loftgcs.logs.split'
 const PRESETS_KEY = 'loftgcs.logs.presets'
 
 /**
- * Saved plot setups.
- *
- * Kept per browser rather than beside the log: the interesting ones are
- * "the six fields I always check first", which belong to the person doing
- * the checking and not to any one flight.
+ * Saved plot setups, kept per browser rather than per log, since they
+ * belong to the person reviewing rather than to one flight.
  */
 function loadPresets(): Record<string, SelectedField[]> {
   try {
@@ -52,7 +43,7 @@ function savePresets(presets: Record<string, SelectedField[]>): void {
   try {
     localStorage.setItem(PRESETS_KEY, JSON.stringify(presets))
   } catch {
-    // Not remembering a preset is a nuisance, never a failure.
+    // Storage unavailable; presets just are not remembered.
   }
 }
 
@@ -61,7 +52,7 @@ function loadSplit(): number {
     const v = Number(localStorage.getItem(SPLIT_KEY))
     if (Number.isFinite(v) && v > 0.15 && v < 0.85) return v
   } catch {
-    // Storage blocked; the default is a reasonable answer.
+    // Storage blocked; use the default.
   }
   return 0.45
 }
@@ -70,10 +61,8 @@ function loadSplit(): number {
 export const MAX_AXES = 4
 
 /**
- * One trace on the plot: either a field, or an expression over fields.
- *
- * An expression carries its source text and shows it as its name -- there
- * is no better label for "ATT.DesRoll - ATT.Roll" than itself.
+ * One trace on the plot: either a field, or an expression over fields. An
+ * expression's source text doubles as its label.
  */
 export interface SelectedField {
   message: string
@@ -89,10 +78,8 @@ export interface SelectedField {
 /**
  * Default trace colors, in order.
  *
- * The house palette's working colors first, then enough distinct hues to
- * tell eight traces apart. A field keeps whichever it was given until the
- * user says otherwise -- so removing a trace does not recolor the rest,
- * which would make a plot you were reading rearrange itself.
+ * The design system's working colors first, then enough distinct hues to
+ * tell eight traces apart.
  */
 export const TRACE_COLORS = [
   '#F7941D',
@@ -113,12 +100,9 @@ export function traceColor(field: SelectedField, index: number): string {
 /**
  * Which axis a newly plotted field should land on.
  *
- * Fields measured in the same unit share an axis, because that is nearly
- * always what was meant: adding Pitch after Roll means comparing them, and
- * putting them on separate scales would make two different pictures of the
- * same wobble. A new unit takes the next free axis until they run out, and
- * after that it joins the axis that already has the most company -- crowded
- * beats invisible, and the field can be moved.
+ * Fields in the same unit share an axis, so Pitch added after Roll is
+ * compared on one scale. A new unit takes the next free axis; once they run
+ * out it joins the most crowded one, and the user can move it.
  */
 export function defaultAxis(
   existing: readonly { axis: number; unit: string }[],
@@ -166,12 +150,9 @@ export type LogStatus =
 interface LogState {
   log: ParsedLog | null
   /**
-   * The file exactly as it arrived.
-   *
-   * Kept so a log pulled off the vehicle can be saved without fetching it
-   * twice -- the parsed tables are lossy and cannot be turned back into a
-   * .bin. It is a second copy of a few megabytes, which is the cheaper half
-   * of that trade.
+   * The file exactly as it arrived, so a log pulled off the vehicle can be
+   * saved without fetching it again. The parsed tables cannot be turned back
+   * into a .bin.
    */
   rawBytes: Uint8Array | null
   status: LogStatus
@@ -211,31 +192,22 @@ interface LogState {
   setFieldColor(field: { message: string; field: string }, color: string): void
 
   /**
-   * The visible time window, or null for the whole log.
-   *
-   * In the store rather than in the plot because the statistics beside each
-   * field are for what is on screen, and they are drawn somewhere else.
+   * The visible time window, or null for the whole log. In the store because
+   * the per-field statistics, drawn elsewhere, cover what is on screen.
    */
   timeWindow: { t0: number; t1: number } | null
   setTimeWindow(window: { t0: number; t1: number } | null): void
 
   /**
-   * Where the replay has got to, in seconds since boot, or null when it is
-   * not running.
-   *
-   * Shared so the plot can mark the same instant: watching the aircraft fly
-   * and reading what its sensors said at that moment is the point of having
-   * both views in one tool rather than two.
+   * Replay position in seconds since boot, or null when it is not running.
+   * Shared so the plot can mark the same instant.
    */
   playhead: number | null
   setPlayhead(t: number | null): void
   /**
-   * Where the playhead was put from outside the replay -- a click on the
-   * plot, mostly.
-   *
-   * Kept apart from `playhead` so the replay can tell a request to seek
-   * from the value it published itself a frame ago. Sharing one field makes
-   * the two views chase each other in a loop.
+   * A seek requested from outside the replay (usually a click on the plot).
+   * Separate from `playhead` so the replay can tell a seek request from the
+   * value it published itself; one shared field makes the views loop.
    */
   seekTo: number | null
   requestSeek(t: number): void
@@ -256,10 +228,8 @@ const key = (f: { message: string; field: string }) => `${f.message}.${f.field}`
 /**
  * The samples behind one trace, whether it was read or computed.
  *
- * Expressions are evaluated on demand rather than stored: the result is a
- * pure function of the log and the text, and caching it would mean deciding
- * when it goes stale. Logs are already in memory, so the arithmetic costs
- * a few milliseconds.
+ * Expressions are evaluated on demand rather than cached; with the log in
+ * memory that costs a few milliseconds.
  */
 export function traceSeries(log: ParsedLog, f: SelectedField): Series | null {
   if (!f.expression) return getSeries(log, f.message, f.field)
@@ -267,8 +237,7 @@ export function traceSeries(log: ParsedLog, f: SelectedField): Series | null {
     const r = evaluateExpression(log, f.expression)
     return { message: '', field: f.expression, unit: '', time: r.time, values: r.values }
   } catch {
-    // A log that lacks a field the expression names -- the trace simply
-    // is not there, and PlottedFields says so beside its name.
+    // The log lacks a field the expression names; PlottedFields shows that.
     return null
   }
 }
@@ -322,9 +291,6 @@ export const useLogStore = create<LogState>((set, get) => ({
         log,
         rawBytes: bytes,
         status: { kind: 'ready', name },
-        // Nothing plotted to begin with. Opening on an altitude trace was
-        // a guess at what the reader came for, and a wrong guess is a field
-        // to remove before starting rather than a head start.
         selected: [],
         upper: 'none',
         timeWindow: null,
@@ -344,8 +310,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   },
 
   clear() {
-    // The vehicle's listing survives: after looking at one log the next
-    // thing anyone does is open another from the same aircraft.
+    // Keep the vehicle's log listing so another can be opened from it.
     set({
       log: null,
       rawBytes: null,
@@ -362,8 +327,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   },
 
   setUpper(upper) {
-    // Opening a pane for the first time splits the window evenly; after
-    // that the divider is wherever the user last put it.
+    // Opening a pane from 'none' splits the window evenly.
     set((s) => (s.upper === 'none' && upper !== 'none' ? { upper, split: 0.5 } : { upper }))
   },
 
@@ -376,7 +340,6 @@ export const useLogStore = create<LogState>((set, get) => ({
       if (without.length === 0 && get().upper === 'plot') set({ upper: 'none' })
       return
     }
-    // Asking for a field is asking to see it, so the plot opens itself.
     if (get().upper !== 'plot') get().setUpper('plot')
     const unit = log ? fieldUnit(log, field.message, field.field) : ''
     const existing = selected.map((f) => ({
@@ -395,9 +358,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     const problem = expressionError(log, text)
     if (problem) return problem
     if (!referencesIn(log, text)) return 'That has no fields in it, so there is nothing to plot.'
-    // Expressions carry no unit -- the arithmetic could have produced
-    // anything -- so they take the next free axis rather than joining one
-    // by a unit they do not have.
+    // Expressions have no unit, so they take the next free axis.
     const existing = selected.map((f) => ({
       axis: f.axis,
       unit: f.expression ? '' : fieldUnit(log, f.message, f.field),
@@ -455,7 +416,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     try {
       localStorage.setItem(SPLIT_KEY, String(clamped))
     } catch {
-      // Not remembering the split is a nuisance, never a failure.
+      // Storage unavailable; the split just is not remembered.
     }
   },
 

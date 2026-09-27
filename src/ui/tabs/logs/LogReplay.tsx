@@ -8,28 +8,17 @@ import quadModelUrl from '../../../models/quad_x.gltf?url'
 import planeModelUrl from '../../../models/airplane.gltf?url'
 import f35bModelUrl from '../../../models/f35b.glb?url'
 
-// The 3D replay: fly the log back, on a globe you can orbit.
+// The 3D log replay on an orbitable globe. The vehicle follows the track
+// with its recorded attitude, and the plot marks the same instant.
 //
-// A vehicle moves along the track at a speed you choose, carrying the
-// attitude the log recorded, and the plot marks the same instant --
-// watching the aircraft and reading what its sensors said at that moment is
-// the point of having both views in one tool rather than two.
+// CesiumJS is loaded lazily so it never reaches the main bundle.
 //
-// CesiumJS, loaded lazily. It is a large library and most sessions never
-// open this tab, so nothing about it may reach the main bundle; that is the
-// whole reason for the dynamic import below.
+// No Cesium ion (which needs an account and token): the base layer is the
+// Natural Earth imagery bundled with Cesium, so the globe draws offline, with
+// the same Esri imagery as the 2D maps layered over it. If Esri fails, the
+// globe still renders.
 //
-// Keyless on purpose. Cesium's defaults reach for Cesium ion -- an account,
-// a token, and requests attributable to it. The base layer here is the
-// Natural Earth imagery that ships inside the Cesium package, so the globe
-// draws with no network at all, and the same Esri imagery the Mission and
-// Fly maps already use is layered over it for detail. That ordering is also
-// a diagnosis: the first version used a remote provider as the *only*
-// layer, and when it silently produced nothing the result was a black void
-// with no way to tell a broken provider from a broken globe.
-//
-// The log itself never leaves the machine. Map tiles for the region do get
-// requested, which is a different statement, and the screen says so.
+// The log never leaves the machine; map tiles for the region are fetched.
 
 /** Where the Cesium runtime finds its workers and assets. */
 const CESIUM_BASE = './cesium/'
@@ -39,20 +28,14 @@ const IMAGERY_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
 /**
- * How the glTF models sit relative to Cesium's heading/pitch/roll.
+ * How the glTF models sit relative to Cesium's heading/pitch/roll. At raw
+ * heading zero they point west, and their pitch and roll run opposite to
+ * ArduPilot's, so ArduPilot's yaw/pitch/roll maps to
+ * HeadingPitchRoll(yaw + 90, -pitch, -roll).
  *
- * Both models come from Betaflight Configurator and share a convention that
- * is not Cesium's: a raw heading of zero points them west rather than
- * north, and their pitch and roll axes run the opposite way to ArduPilot's.
- * So ArduPilot's yaw/pitch/roll maps to HeadingPitchRoll(yaw + 90, -pitch,
- * -roll).
- *
- * Measured, not derived -- by drawing the models at known attitudes and
- * looking: overhead to read heading, from behind to read roll, side-on with
- * the aircraft facing east to read pitch. Reasoning about the conventions
- * got this wrong twice, in opposite directions, before the pictures settled
- * it. If a model is ever replaced, re-measure the same three ways rather
- * than assuming these numbers carry over.
+ * Determined empirically by rendering known attitudes (overhead for heading,
+ * from behind for roll, side-on facing east for pitch). Re-check the same way
+ * if a model is replaced.
  */
 const MODEL_HEADING_OFFSET_DEG = 90
 const MODEL_PITCH_SIGN = -1
@@ -83,27 +66,17 @@ interface Live {
 type CesiumModule = typeof import('cesium')
 
 /**
- * Load the prebuilt CesiumJS bundle, once.
- *
- * A script tag rather than `import('cesium')`, and the reason is not
- * convenience. Cesium's ESM source does not survive bundling: put through
- * Vite it produced a viewer that drew its skybox, its points and its
- * models, and no globe at all -- silently, with no error and no failed
- * request. The globe's surface shaders are composed at runtime from pieces
- * a tree-shaker cannot see referenced, and it drops them. The same scene,
- * same browser and same assets renders correctly from Build/Cesium.js,
- * which is what this loads.
- *
- * It also means Cesium never enters the bundle at all, which is a better
- * outcome than the code-split chunk it used to be.
+ * Loads the prebuilt CesiumJS bundle once, via a script tag rather than
+ * `import('cesium')`. Bundled through Vite, Cesium's ESM source renders no
+ * globe and reports no error: the globe's shaders are assembled at runtime
+ * from pieces the tree-shaker drops.
  */
 function loadCesium(): Promise<CesiumModule> {
   const existing = (window as unknown as { Cesium?: CesiumModule }).Cesium
   if (existing) return Promise.resolve(existing)
   if (!pending) {
     pending = new Promise<CesiumModule>((resolve, reject) => {
-      // Cesium reads this as it initializes, so it must be set before the
-      // script runs -- not after it loads.
+      // Cesium reads this during initialization, so set it before the script runs.
       ;(window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = CESIUM_BASE
 
       const css = document.createElement('link')
@@ -138,11 +111,10 @@ export default function LogReplay() {
   const [error, setError] = useState<string | null>(null)
   const [diagnostic, setDiagnostic] = useState('')
   const [path, setPath] = useState<FlightPath | null>(null)
-  // Which airframe flew, from the log's own firmware banner -- a plane
-  // replayed as a quadcopter is a small lie that undermines the rest.
+  // Which vehicle flew, from the log's firmware banner.
   const isPlane = log ? vehicleClassFromLog(log) === 'plane' : false
-  // ArduPilot names the airframe in its boot banner, so a log flown by an
-  // aircraft we have a model for gets drawn as itself.
+  // ArduPilot names the frame in its boot banner, so an airframe with its
+  // own model is drawn as itself.
   const airframe = log ? airframeFromLog(log) : null
   const modelUrl = airframe === 'f35b' ? f35bModelUrl : isPlane ? planeModelUrl : quadModelUrl
   const [playing, setPlaying] = useState(false)
@@ -198,9 +170,7 @@ export default function LogReplay() {
           new Cesium.UrlTemplateImageryProvider({
             url: IMAGERY_URL,
             // Esri serves Web Mercator; Cesium's template provider defaults
-            // to a geographic scheme, and the mismatch asks for tiles at
-            // coordinates that do not exist -- silently, with no failed
-            // request to show for it.
+            // to a geographic scheme and would silently request wrong tiles.
             tilingScheme: new Cesium.WebMercatorTilingScheme(),
             maximumLevel: 19,
             credit: new Cesium.Credit(
@@ -209,10 +179,8 @@ export default function LogReplay() {
           }),
         )
 
-        // Cesium stamps an ion logo into its credit container by default.
-        // Nothing here uses ion, so that badge would claim a relationship
-        // this app does not have; Esri's attribution, which its terms do
-        // require, is rendered under the scene instead.
+        // Hide Cesium's default ion logo, since ion is not used. Esri's
+        // required attribution is rendered under the scene instead.
         ;(viewer.cesiumWidget.creditContainer as HTMLElement).style.display = 'none'
 
         const timeOf = (t: number) =>
@@ -224,9 +192,9 @@ export default function LogReplay() {
         for (let i = 0; i < path.samples.length; i++) {
           const s = path.samples[i]!
           const when = timeOf(s.time)
-          // altAboveHome, not the AMSL altitude: with no terrain the
-          // rendered ground is the ellipsoid at height zero, so an AMSL
-          // track at a field 584 m up floats 584 m over it.
+          // altAboveHome, not AMSL: with no terrain the ground is the
+          // ellipsoid at height zero, so an AMSL track would float above it
+          // by the field's elevation.
           const where = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.altAboveHome)
           position.addSample(when, where)
           track.push(where)
@@ -261,9 +229,7 @@ export default function LogReplay() {
             positions: track,
             width: 3,
             material: Cesium.Color.fromCssColorString('#F7941D'),
-            // At its real altitude rather than clamped to the ground: the
-            // height is the point, and a path that hugs the terrain is just
-            // the 2D map again.
+            // At its recorded height rather than clamped to the ground.
             clampToGround: false,
           },
         })
@@ -279,24 +245,15 @@ export default function LogReplay() {
         viewer.entities.add({
           position,
           orientation,
-          // No point marker alongside the model. It was here so that a glTF
-          // that failed to load still left something visibly flying, but it
-          // rides along inside the aircraft and reads as a wart -- and the
-          // track is drawn anyway, so a missing model is obvious without it.
-          //
-          // minimumPixelSize is what makes the aircraft readable at all: at
-          // the distances a flight is framed from, an 8 m model is a few
-          // pixels, so this is the size it is actually seen at rather than
-          // its size in the world.
+          // At the distances a flight is framed from, a true-scale model is
+          // a few pixels; minimumPixelSize keeps it readable.
           model: { uri: modelUrl, minimumPixelSize: 110, maximumScale: 200 },
         })
 
         const sphere = Cesium.BoundingSphere.fromPoints(track)
         viewer.camera.flyToBoundingSphere(sphere, {
           duration: 0,
-          // From the side and above rather than straight down: overhead
-          // makes a climb invisible, which is the one thing this view is
-          // for.
+          // Oblique rather than overhead, where climbs would be invisible.
           offset: new Cesium.HeadingPitchRange(
             Cesium.Math.toRadians(-45),
             Cesium.Math.toRadians(-30),
@@ -314,9 +271,7 @@ export default function LogReplay() {
 
         setAt(first.time)
         setStatus('ready')
-        // Enough state to tell a broken provider from a broken globe
-        // without a debugger: this is the one screen whose failure mode is
-        // a plausible-looking empty sky.
+        // Enough to tell a broken imagery provider from a broken globe.
         setDiagnostic(
           `${viewer.imageryLayers.length} layers · ${viewer.entities.values.length} entities`,
         )
@@ -335,8 +290,8 @@ export default function LogReplay() {
       setPlayhead(null)
       if (live && !live.viewer.isDestroyed()) live.viewer.destroy()
     }
-    // Deliberately not depending on `speed`: it is applied to the clock by
-    // the effect below, rather than by rebuilding the whole scene.
+    // Not dependent on `speed`, which the effect below applies to the clock
+    // without rebuilding the scene.
   }, [path, modelUrl, setPlayhead])
 
   useEffect(() => {
@@ -346,9 +301,8 @@ export default function LogReplay() {
     live.viewer.clock.shouldAnimate = playing
   }, [playing, speed, status])
 
-  // A seek asked for elsewhere -- a click on the plot. Kept on its own
-  // store field rather than reading `playhead`, which this component writes
-  // every frame: the two would otherwise chase each other forever.
+  // A seek requested elsewhere (a click on the plot). A separate store field
+  // from `playhead`, which this component writes every frame, to avoid a loop.
   useEffect(() => {
     if (seekTo === null || status !== 'ready') return
     setPlaying(false)
@@ -427,8 +381,8 @@ export default function LogReplay() {
           {!path.hasAttitude && ' · no attitude in this log'}
           {path.groundAlt !== null &&
             ` · heights above launch (${path.groundAlt.toFixed(0)} m AMSL)`}
-          {/* CC-BY requires the credit to travel with the model, not to sit
-              on one other screen. See src/models/ATTRIBUTION.md. */}
+          {/* CC-BY requires the credit wherever the model is shown. See
+              src/models/ATTRIBUTION.md. */}
           {isPlane && airframe !== 'f35b' && (
             <>
               {' · biplane by '}

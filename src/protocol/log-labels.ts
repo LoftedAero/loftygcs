@@ -1,24 +1,11 @@
-// What RCOU.C3 and RCIN.C1 actually *are* on the aircraft that flew.
-//
-// A dataflash log names its servo and RC channels by number and stops there,
-// so every plotting tool shows you "RCOU.C3" and leaves you to remember
-// which motor that was. Mission Planner does better: it reads the vehicle's
-// own SERVOn_FUNCTION and RCMAP_* parameters and labels the channel. This
-// does the same, and can do it offline because the log carries a full
-// parameter dump in its PARM records -- the configuration the aircraft was
-// flying under, not whatever it has been changed to since.
-//
-// That last point is the reason to prefer the log's parameters over a
-// connected vehicle's, even when one is connected: a log is a record of a
-// flight that already happened, and labelling it with today's config would
-// quietly mislabel yesterday's crash.
+// Labels for RCOU and RCIN channels from the log's own SERVOn_FUNCTION,
+// RCn_OPTION and RCMAP_* parameters (its PARM records), as Mission Planner
+// does. The log's parameters are used rather than a connected vehicle's,
+// since they describe the configuration the flight was flown under.
 
 /**
- * SERVOn_FUNCTION values, from ArduPilot's Aux_servo_function_t.
- *
- * Not exhaustive -- it runs past 130 and grows every release -- and it does
- * not need to be: an unrecognized number is reported as itself rather than
- * guessed at, which is honest and still better than a bare channel number.
+ * SERVOn_FUNCTION values, from ArduPilot's Aux_servo_function_t. Not
+ * exhaustive; an unrecognized number is shown as itself.
  */
 const SERVO_FUNCTIONS: Record<number, string> = {
   0: 'Disabled',
@@ -165,9 +152,7 @@ export function rcOptionName(option: number): string {
 /**
  * Channel labels for one message, keyed by field name ('C1', 'C2', ...).
  *
- * Empty when the log carries no parameters, which is the honest outcome for
- * a log slice that never reached the PARM dump -- a wrong guess would be
- * worse than the bare channel number the caller already has.
+ * Empty when the log carries no parameters.
  */
 export function channelLabels(
   params: Map<string, number>,
@@ -177,8 +162,7 @@ export function channelLabels(
   if (message === 'RCOU') {
     for (let ch = 1; ch <= 32; ch++) {
       const fn = params.get(`SERVO${ch}_FUNCTION`)
-      // A disabled output is left unlabelled rather than labelled
-      // "Disabled": the channel number alone reads better on a plot legend.
+      // Disabled outputs stay unlabeled; the bare channel reads better.
       if (fn === undefined || fn === 0) continue
       out.set(`C${ch}`, servoFunctionName(fn))
     }
@@ -202,9 +186,6 @@ export function channelLabels(
 
 /**
  * A display name for any field, or null if the bare name is already best.
- *
- * The one call the UI needs: hand it a message and a field and it either
- * knows something the field name does not say, or it says so.
  */
 export function fieldLabel(
   params: Map<string, number>,

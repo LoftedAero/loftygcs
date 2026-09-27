@@ -8,9 +8,8 @@ import {
   posePrompt,
 } from './accel-cal'
 
-// The wizard follows the vehicle's prompts, so this parser is the whole
-// contract: read the wrong side out of a message and the user is told to
-// turn the airframe the wrong way.
+// The wizard follows the vehicle's prompts, so a misparsed side tells the
+// user to turn the airframe the wrong way.
 describe('parseAccelPrompt', () => {
   it("reads every side out of AP_AccelCal's own wording", () => {
     const cases: [string, number][] = [
@@ -56,8 +55,7 @@ describe('the pose half of the vehicle prompt', () => {
   })
 
   it('leaves wording it does not recognize alone', () => {
-    // A firmware that rephrases this should still put its own words on
-    // screen rather than have half of them cut off.
+    // A rephrased prompt is shown whole rather than truncated.
     expect(posePrompt('Put the aircraft on its nose')).toBe('Put the aircraft on its nose')
   })
 })

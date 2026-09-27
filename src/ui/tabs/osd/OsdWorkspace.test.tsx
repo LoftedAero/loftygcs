@@ -12,12 +12,8 @@ vi.mock('../../../services/connection', () => ({
   },
 }))
 
-// The OSD page draws itself with the OSD switched off.
-//
-// It used to return one card reading "This firmware exposes no panel
-// parameters", which replaced the entire workspace -- including the column
-// holding the Display card, where OSD_TYPE is edited. The state hid its own
-// fix, and the only way out was the Parameters table.
+// The OSD page renders with the OSD switched off, keeping the Display card
+// (where OSD_TYPE is edited) reachable.
 
 const entry = (value: number) => ({ value, origValue: value, mavType: 4, dirty: false })
 
@@ -34,8 +30,7 @@ afterEach(() => {
 
 describe('the OSD page with the OSD off', () => {
   it('still renders the workspace', () => {
-    // A vehicle reporting OSD_TYPE and nothing else: no panel positions at
-    // all, which is the case that used to blank the page.
+    // A vehicle reporting OSD_TYPE and no panel positions at all.
     seed({ OSD_TYPE: 0 })
     const { container } = render(<OsdWorkspace />)
     expect(container.querySelector('.osd-workspace')).toBeTruthy()
@@ -44,9 +39,7 @@ describe('the OSD page with the OSD off', () => {
   })
 
   it('keeps the control that turns the OSD on reachable', () => {
-    // The point of the whole change. OSD_TYPE is edited from the Display
-    // card, which lives in the workspace's own column -- so blanking the
-    // workspace took the only way out of this state with it.
+    // OSD_TYPE is edited from the Display card in the workspace's column.
     seed({ OSD_TYPE: 0 })
     render(<OsdWorkspace />)
     expect(screen.getByText('OSD type')).toBeTruthy()
@@ -54,8 +47,7 @@ describe('the OSD page with the OSD off', () => {
 
   it('disables what cannot be edited yet', () => {
     // Panel positions exist but the backend is off, so the layout is
-    // readable and not editable -- staging a move would write a parameter
-    // the vehicle is not drawing from.
+    // read-only.
     seed({
       OSD_TYPE: 0,
       OSD1_ENABLE: 1,
@@ -85,9 +77,9 @@ describe('the OSD page with the OSD off', () => {
 })
 
 describe('a screen that is off', () => {
-  // What ArduPlane 4.7.1 reports for a screen with OSD2_ENABLE at 0, measured:
-  // no panel parameters but Link quality's, which sits outside the table the
-  // enable hides.
+  // What ArduPlane 4.7.1 reports for a screen with OSD2_ENABLE at 0: no panel
+  // parameters except Link quality's, which sits outside the table the enable
+  // hides.
   const OFF_SCREEN = {
     OSD_TYPE: 1,
     OSD1_ENABLE: 0,
@@ -128,7 +120,7 @@ describe("a screen's own settings", () => {
       OSD1_FONT: 0,
     })
     render(<OsdWorkspace />)
-    // Not in the column any more.
+    // In the dialog, not the column.
     expect(screen.queryByText('OSD1_CHAN_MIN')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Configure' }))
     // The column row and the dialog's title say the same thing.
@@ -146,8 +138,7 @@ describe("a screen's own settings", () => {
 })
 
 describe('the grid', () => {
-  // ArduPilot draws the HD grids over MSP DisplayPort alone. Offered on any
-  // other backend, a choice was stored and the preview rightly ignored it.
+  // ArduPilot draws the HD grids only over MSP DisplayPort.
   const LAYOUT = {
     OSD1_ENABLE: 1,
     OSD1_TXT_RES: 0,

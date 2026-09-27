@@ -2,28 +2,18 @@ import { coaxialRank, type FrameMotor } from '../../../protocol/frame-layout'
 
 // The frame, drawn from ArduPilot's own motor table (protocol/frame-layout).
 //
-// An SVG rather than a picture: it takes the theme's colours in both modes,
-// stays sharp at any size, and carries no licence of its own -- ArduPilot's
-// diagrams are CC BY-SA 3.0, which does not sit inside a GPL-3.0 app without
-// dragging its ShareAlike terms along.
+// Drawn as SVG so it follows the theme and scales, and because ArduPilot's
+// own diagrams are CC BY-SA 3.0, which does not fit a GPL-3.0 app.
 //
-// What a reader checks against this is which way each propeller turns and
-// which motor the test spins, so those are the two things drawn plainly.
-// **Direction is carried by the arrow, and by a colour that survives dark
-// mode.** It was a pale fill before -- `--la-blue-soft` is #17293a on a
-// #1c1d21 surface, which is no difference at all -- so the arc takes the blue
-// and the ink ramp, both legible against either ground.
+// Spin direction is shown by the arrow and by colors legible in both themes
+// (`--la-blue-soft` is nearly invisible on the dark surface).
 
 /** How far out the motors sit. */
 const R = 82
 
 /**
- * Motors are sized to the frame, not to a constant.
- *
- * A deca puts ten motors on one circle and a dodecahexa stacks twelve onto
- * six arms, so a radius that suits a quad has their arrows running through
- * their neighbours. Measuring the closest pair and sizing from that keeps the
- * busy frames legible without shrinking the simple ones to nothing.
+ * Motors are sized from the closest pair, so busy frames (a deca, a
+ * dodecahexa) do not overlap and simple ones stay large.
  */
 function sizeFor(points: readonly { x: number; y: number }[]) {
   let gap = Infinity
@@ -41,7 +31,7 @@ function sizeFor(points: readonly { x: number; y: number }[]) {
 /** Where a motor sits, scaled to the drawing and offset if it is a stacked pair. */
 function place(m: FrameMotor, rank: number) {
   // A coaxial pair shares a position; the lower motor is drawn slightly in
-  // toward the centre so both numbers are readable.
+  // toward the center so both numbers are readable.
   const pull = rank === 0 ? 1 : 0.58
   return { x: m.x * R * pull, y: -m.y * R * pull }
 }
@@ -75,12 +65,8 @@ function SpinArc({ cw, r, span }: { cw: boolean; r: number; span: number }) {
 }
 
 /**
- * A servo, drawn as one: a plain body with a mounting lug under it.
- *
- * No flanges and no horn. At tile size those read as three stray pips around
- * a box rather than as a servo, and the lug alone -- offset, the way a real
- * one is -- is enough to say this is bolted to the airframe and is not a
- * propeller.
+ * A servo: a plain body with an offset mounting lug. Flanges and a horn are
+ * illegible at tile size.
  */
 function Servo({ s }: { s: number }) {
   const w = s * 1.55
@@ -112,12 +98,9 @@ export default function FrameDiagram({
   /**
    * Which of a motor's two numbers to draw.
    *
-   * `motor` is ArduPilot's own numbering -- what `SERVOn_FUNCTION` calls
-   * Motor1..12 and what every wiring diagram uses -- and is what a picture of
-   * a frame is for. `test` is where it falls in the motor test sequence, drawn
-   * as a letter so it cannot be mistaken for the other one; that is Mission
-   * Planner's convention, and it is only right on a screen that is *running*
-   * the test.
+   * `motor` is ArduPilot's numbering (Motor1..12 in `SERVOn_FUNCTION`, and
+   * on wiring diagrams). `test` is the position in the motor test sequence,
+   * drawn as a letter as Mission Planner does, for the motor test screen.
    */
   labels?: 'motor' | 'test'
 }) {
@@ -141,9 +124,7 @@ export default function FrameDiagram({
         ))}
       </g>
 
-      {/* Forward is the shape of the middle, not a separate marker: the hub is
-          the arrowhead, so the drawing has one orientation cue and it is where
-          the eye already starts. */}
+      {/* The hub is an arrowhead pointing forward. */}
       <polygon className="frame-diagram__hub" points="0,-26 16,17 0,7 -16,17" />
 
       {motors.map((m, i) => {

@@ -58,22 +58,20 @@ describe('one axis', () => {
     })
 
     it('does not lose the travel outside it', () => {
-      // The naive version subtracts the deadzone and leaves the stick short
-      // of its stops; this one still reaches them.
+      // Rescaled past the deadzone, so the stick still reaches its stops.
       expect(axisToPwm(1, centered, 0.2)).toBe(PWM_MAX)
       expect(axisToPwm(-1, centered, 0.2)).toBe(PWM_MIN)
     })
 
     it('leaves the edge of the deadzone continuous', () => {
-      // A jump here is a stick that snaps to a tenth of full authority the
-      // moment it moves.
+      // No jump at the deadzone edge.
       const just = axisToPwm(0.101, centered, 0.1)
       expect(Math.abs(just - PWM_MID)).toBeLessThan(5)
     })
 
     it('is not applied to an axis that rests at one end', () => {
-      // A throttle has no center to be dead around, and a deadzone there is
-      // a dead patch in the middle of the useful travel.
+      // A throttle has no center, so a deadzone would be a dead patch
+      // mid-travel.
       expect(axisToPwm(0, throttle, 0.2)).toBe(PWM_MID)
       expect(axisToPwm(-1, throttle, 0.2)).toBe(PWM_MAX)
       expect(axisToPwm(1, throttle, 0.2)).toBe(PWM_MIN)
@@ -108,8 +106,8 @@ describe('one axis', () => {
 })
 
 describe('the special values', () => {
-  // Measured against SITL: below channel 9, 65535 is "no change" and 0 hands
-  // the channel back; from 9 up, 0 is "no change" and 65534 hands it back.
+  // ArduPilot: below channel 9, 65535 is "no change" and 0 releases the
+  // channel; from 9 up, 0 is "no change" and 65534 releases it.
   it('differ either side of channel 8', () => {
     expect(ignoreValue(1)).toBe(65535)
     expect(ignoreValue(8)).toBe(65535)
@@ -134,8 +132,8 @@ describe('the special values', () => {
 
 describe('the whole message', () => {
   it('leaves unmapped channels alone rather than centering them', () => {
-    // Sending 1500 on an unmapped channel would drive a flight-mode switch
-    // to its middle position -- a mode change nobody asked for.
+    // 1500 on an unmapped channel would move a flight-mode switch to its
+    // middle position.
     const out = channelsFor(pad([0, 0, 0, 0]), DEFAULT_CONFIG)
     expect(out).toHaveLength(OVERRIDE_FIELDS)
     expect(out[4]).toBe(65535)
@@ -228,7 +226,7 @@ describe('buttons', () => {
   })
 
   it('does not flip a switch that was held when control was taken', () => {
-    // Priming by stepping did exactly this: the held button read as a press.
+    // A button held at takeover must not read as a press.
     const config = button('toggle', [1100, 1900])
     const held = pad([0, 1, 0, 0], [true])
     const primed = primeButtons(config, held, initialButtonState(config))
@@ -340,8 +338,8 @@ describe('flight mode buttons', () => {
 
 describe('before taking control', () => {
   it('takes the throttle wherever it is', () => {
-    // Control taken over from a transmitter in flight is taken at hover
-    // throttle; demanding it be down could only be met by cutting the motors.
+    // Taking over in flight happens at hover throttle; requiring it down
+    // would mean cutting the motors.
     expect(sticksAreSafe(pad([0, -1, 0, 0]), DEFAULT_CONFIG)).toBe(true)
     expect(sticksAreSafe(pad([0, 0, 0, 0]), DEFAULT_CONFIG)).toBe(true)
   })
@@ -355,7 +353,7 @@ describe('before taking control', () => {
 
   it('accepts centered sticks', () => {
     expect(sticksAreSafe(pad([0, 1, 0, 0]), DEFAULT_CONFIG)).toBe(true)
-    // A little slop is fine; a pad that reads exactly zero does not exist.
+    // A little slop is fine; no pad reads exactly zero.
     expect(sticksAreSafe(pad([0.05, 0.95, -0.05, 0.05]), DEFAULT_CONFIG)).toBe(true)
   })
 
@@ -390,8 +388,8 @@ describe('a config read from storage or a file', () => {
       buttons: [{ channel: 0, button: 3, mode: 'toggle', values: [100, 5000, 1500] }],
       deadzone: 3,
     })
-    // Not a boolean, and no older `rest` to read it from: centered, the
-    // common case and the one whose check refuses rather than permits.
+    // Not a boolean and no legacy `rest`: default to centered, whose safety
+    // check refuses rather than permits.
     expect(cfg.axes[0]).toEqual({ channel: 16, axis: -1, reverse: false, centered: true, expo: 1 })
     expect(cfg.buttons[0]).toEqual({
       channel: 1,
@@ -403,8 +401,7 @@ describe('a config read from storage or a file', () => {
   })
 
   it('reads the three-way rest an earlier build kept as centered or not', () => {
-    // Only `center` sprang back; `low` and `free` differed only in a
-    // throttle-down check that no longer exists.
+    // Only `center` sprang back.
     const cfg = sanitizeConfig({
       axes: [
         { channel: 1, axis: 2, rest: 'center' },
@@ -417,7 +414,7 @@ describe('a config read from storage or a file', () => {
   })
 
   it('drops the release button an earlier build kept', () => {
-    // Releasing is the app's; a mapping no longer carries one.
+    // Release is handled by the app, not the mapping.
     const cfg = sanitizeConfig({ ...DEFAULT_CONFIG, releaseButton: 8 })
     expect('releaseButton' in cfg).toBe(false)
   })

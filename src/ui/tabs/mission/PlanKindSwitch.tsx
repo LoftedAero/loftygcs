@@ -1,12 +1,8 @@
 import { useMissionStore, type PlanKind } from '../../../stores/mission-store'
 
-// Which of the three plans the map clicks belong to.
-//
-// A switch rather than three screens: a fence is only useful in relation to
-// the mission inside it, and a rally point is only useful in relation to
-// both. All three stay drawn on the map whichever is selected -- this
-// chooses what you are *editing*, and the map dims the other two so it is
-// obvious which one that is.
+// Which of the three plans map clicks edit. All three stay drawn, since each
+// only makes sense relative to the others; the map dims the two not being
+// edited.
 
 const KINDS: { id: PlanKind; label: string }[] = [
   { id: 'mission', label: 'Mission' },

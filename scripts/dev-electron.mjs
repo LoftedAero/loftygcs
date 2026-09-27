@@ -1,7 +1,6 @@
 // Development loop for the Electron shell: Vite dev server for the renderer
-// (full HMR), esbuild for main + preload, then Electron pointed at the dev
-// URL. Changes under electron/ need a rerun of this script -- they change
-// the privileged surface, which deserves a restart rather than a hot patch.
+// (with HMR), esbuild for main and preload, then Electron pointed at the dev
+// URL. Changes under electron/ need a rerun of this script.
 import { createServer } from 'vite'
 import { buildSync } from 'esbuild'
 import { spawn } from 'node:child_process'

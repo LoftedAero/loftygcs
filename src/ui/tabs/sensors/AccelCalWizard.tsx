@@ -20,12 +20,9 @@ const MAV_CMD_PREFLIGHT_CALIBRATION = 241
 const MAV_CMD_ACCELCAL_VEHICLE_POS = 42429
 
 /**
- * Which picture each side is.
- *
- * The two calibrations name the same six attitudes differently -- ArduPilot's
- * accel positions are LEVEL/LEFT/RIGHT/NOSEDOWN/NOSEUP/BACK -- so the mapping
- * is written out rather than left to the two lists happening to be in the
- * same order, which they are today and need not stay.
+ * Which picture each side is. The accel and compass calibrations name the
+ * same six attitudes differently, so the mapping is explicit rather than
+ * relying on list order.
  */
 const FRAME: Record<AccelPositionId, OrientationId> = {
   LEVEL: 'level',
@@ -40,19 +37,9 @@ type Stage = 'running' | 'done' | 'failed' | 'refused'
 
 /**
  * Accelerometer calibration, following QGroundControl's shape: the vehicle
- * says which side it wants, we show that instruction with the airframe
- * drawn in that attitude, and one button captures the position.
- *
- * The sequence is the vehicle's to decide -- we react to its STATUSTEXT
- * prompts rather than marching through a list of our own, so a retried or
- * reordered side still tracks correctly.
- *
- * **It starts on open.** There was a preamble stage first, and everything on
- * it belonged somewhere else: the autopilot rotation is a setting, so it is
- * on the card with the button that opens this; and what the run involves is
- * worth reading *before* deciding to start one, which is the card's note. A
- * dialog whose first screen is a paragraph and a Start button is a click
- * spent on being told what you already chose.
+ * says which side it wants, we show it, and one button captures the position.
+ * The vehicle decides the sequence, so a retried side still tracks correctly.
+ * The run starts as soon as the dialog opens.
  */
 export default function AccelCalWizard({
   onClose,
@@ -78,31 +65,9 @@ export default function AccelCalWizard({
   const startedAt = useRef(0)
 
   /**
-   * Which side the vehicle wants, from the vehicle's own repeated request.
-   *
-   * ArduPilot re-sends this every second for as long as it is waiting
-   * (`send_accelcal_vehicle_position`), where the matching "Place vehicle…"
-   * text is printed **once**. Following the text alone meant a wizard that
-   * opened onto a calibration already in progress -- the state the vehicle is
-   * left in every time one of these dialogs is closed part-way, because
-   * ArduPilot has no MAVLink cancel and `start()` returns immediately while
-   * one is running -- sat on "Waiting for the vehicle…" for ever.
-   *
-   * Only the six sides are read here. The same message carries a terminal
-   * SUCCESS/FAILED, and the vehicle goes on repeating *that* long after a run
-   * has finished, so a wizard that trusted it would show the last run's
-   * verdict a second after starting a new one. Those come from the status
-   * text, which is said once and means now.
-   */
-  /**
-   * Show a side, from whichever source said so first.
-   *
-   * The side lives in a ref as well as in state because two things report it
-   * -- the vehicle's repeated request and its printed line -- and they arrive
-   * in either order. Reading the previous side from a ref keeps this to plain
-   * state updates; setting state inside another setState's updater ran the
-   * two in the wrong order and the words came out belonging to the side
-   * before.
+   * Show a side, from whichever source reports it first: the vehicle's
+   * repeated request or its printed line, which arrive in either order. The
+   * previous side is read from a ref so this stays plain state updates.
    */
   const goTo = (position: AccelPosition, text: string) => {
     if (sideRef.current === position.id) {
@@ -114,27 +79,27 @@ export default function AccelCalWizard({
     setCapturing(false)
     setCurrent(position)
     setPrompt(text)
-    // Everything before it is captured. ArduPilot walks the six in order --
-    // `_step` only ever counts up -- so the side being asked for says how far
-    // the run has got, which is the only thing that can fill the tiles in
-    // when this dialog joins a calibration that started before it.
+    // ArduPilot walks the sides in order (`_step` only counts up), so every
+    // side before this one is captured. That is how the tiles fill in when
+    // rejoining a run already in progress.
     setCompleted(ACCEL_POSITIONS.filter((p) => p.value < position.value).map((p) => p.id))
   }
 
   useEffect(() => {
-    // `at` guards the rejoin: the vehicle repeats the request every second,
-    // so a value from before this dialog started is the last run talking and
-    // the one after it is the truth. Without that, opening onto a finished
-    // run replays its last side.
+    // ArduPilot repeats MAV_CMD_ACCELCAL_VEHICLE_POS every second while it
+    // waits, whereas the "Place vehicle..." text is printed once; following
+    // the command lets this dialog rejoin a run it did not start (ArduPilot
+    // has no MAVLink cancel). Only the six sides are read: the terminal
+    // SUCCESS/FAILED values keep repeating after a run ends, so the verdict
+    // comes from the status text instead. Requests older than this dialog's
+    // start are ignored.
     if (stage !== 'running' || !asked || asked.at < startedAt.current) return
     const position = ACCEL_POSITIONS.find((p) => p.value === asked.position)
     if (position) goTo(position, '')
-    // The request is what this watches; `goTo` is recreated every render and
-    // deliberately not a dependency.
+    // `goTo` is recreated every render and deliberately not a dependency.
   }, [stage, asked])
 
-  // Follow the vehicle's own words too: the verdict is only ever said here,
-  // and the prompt line is the firmware's phrasing of the pose.
+  // The status text carries the verdict and the firmware's wording of the pose.
   useEffect(() => {
     if (stage !== 'running') return
     const fresh = statusTexts.slice(seenUpTo.current)
@@ -157,10 +122,8 @@ export default function AccelCalWizard({
       }
       const said = parseAccelPrompt(line.text)
       if (said) {
-        // Belt and braces with the request above: a firmware that stops
-        // repeating the command, or a link that loses it, still moves the
-        // wizard on -- this is the path that worked before the request was
-        // read at all.
+        // Fallback for a firmware that does not repeat the command, or a
+        // link that loses it.
         goTo(said, line.text)
       }
     }
@@ -192,14 +155,12 @@ export default function AccelCalWizard({
     }
   }
 
-  // Opening the dialog is the decision; there is nothing else to ask.
   useEffect(() => {
     if (started.current) return
     started.current = true
     void start()
-    // Once, on open. `start` is recreated every render, so it is deliberately
-    // not a dependency -- the ref above is what makes that safe, and it is
-    // also what stops StrictMode's double mount commanding the vehicle twice.
+    // Once, on open. The ref guards against StrictMode's double mount, so
+    // `start` is deliberately not a dependency.
   }, [])
 
   const capture = async () => {
@@ -214,9 +175,8 @@ export default function AccelCalWizard({
     }
   }
 
-  // Captured sides go green, the one being asked for goes blue. No turn
-  // arrow and no bar: the accelerometer wants the vehicle held still, and
-  // the vehicle decides when it has enough of each side.
+  // No turn arrow or progress bar: each side is held still, and the vehicle
+  // decides when it has enough.
   const tiles: AttitudeTile[] = ACCEL_POSITIONS.map((p) => ({
     id: FRAME[p.id],
     label: p.label,
@@ -227,14 +187,10 @@ export default function AccelCalWizard({
   }))
 
   const cancel = () => {
-    // There is nothing to send: ArduPilot has **no MAVLink cancel** for an
-    // accelerometer calibration. `AP_AccelCal::cancel()` exists and is called
-    // from exactly one place -- arming the vehicle -- so a run left part-way
-    // sits waiting for a side indefinitely, and the next PREFLIGHT_CALIBRATION
-    // is ignored (`start()` returns early while `_started`). What makes that
-    // harmless is the effect above: reopening this dialog rejoins the run
-    // already in progress rather than waiting for a prompt that was printed
-    // once, minutes ago.
+    // Nothing to send: ArduPilot has no MAVLink cancel for an accelerometer
+    // calibration (`AP_AccelCal::cancel()` is only called on arming). A run
+    // left part-way keeps waiting and ignores the next PREFLIGHT_CALIBRATION;
+    // reopening this dialog rejoins it.
     onClose()
   }
 
@@ -276,18 +232,11 @@ export default function AccelCalWizard({
     >
       {stage !== 'refused' && (
         <>
-          {/* The same six pictures the compass calibration uses, because they
-              are the same six attitudes. A live 3D airframe turned to the
-              requested side here before; it was the better picture and the
-              worse screen -- two ways of drawing one idea, and it could not
-              show which sides were already captured. */}
+          {/* The same six pictures the compass calibration uses. */}
           <AttitudeTiles tiles={tiles} />
 
-          {/* One line, and the vehicle's own words for the pose where it has
-              said them -- the wizard's own sentence said the same thing in
-              different words directly above it. What to press is ours,
-              because the firmware still says "press any key" from a console
-              it has not had in years. */}
+          {/* The vehicle's own words for the pose, with our instruction for
+              what to press (the firmware says "press any key"). */}
           {stage === 'running' && current && (
             <p className="app-placeholder">
               {`${prompt ? posePrompt(prompt) : current.instruction.replace(/\.$/, '')}. Hold it still, then press Next.`}

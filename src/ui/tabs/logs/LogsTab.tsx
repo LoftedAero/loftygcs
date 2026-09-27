@@ -23,23 +23,14 @@ import Divider from '../../components/Divider'
 //   │         │ 3D replay          │ view     │
 //   └─────────┴────────────────────┴──────────┘
 //
-// Three columns, the shape the OSD screen uses: the long list of things you
-// can pick from on the left, the thing you are working on in the middle, and
-// the actions column on the right where every other screen keeps it. The
-// field list went left because it is a list to hunt through rather than a
-// setting to adjust, and six hundred fields squeezed into the actions
-// column left no room for the actions.
+// Three columns, like the OSD screen: the field list (often hundreds of
+// fields) on the left, the work in the middle, and the actions column on the
+// right.
 //
-// The replay owns the middle column and a log opens straight into it, full
-// height: before you have asked for a number, a flight is a thing you
-// watch. Plotting a field splits the space and puts the plot above it; the
-// table takes that same upper half when you want records instead of curves.
-// So the view follows what you asked for rather than being a mode to
-// remember to switch.
+// A log opens into the 3D replay at full height. Plotting a field splits the
+// middle column with the plot above; the table takes the same upper half.
 //
-// Everything happens in the page: a log is never uploaded anywhere, which is
-// worth saying out loud since the browser tools people currently use for
-// this make a point of the same promise.
+// Logs are parsed in the page and never uploaded anywhere.
 
 export default function LogsTab() {
   const log = useLogStore((s) => s.log)
@@ -67,9 +58,8 @@ export default function LogsTab() {
   return (
     <div className="log-screen">
       <div className={log ? 'log-body log-body--fields' : 'log-body'}>
-        {/* Always beside an open log, whichever pane is up: picking a
-            field is how the plot gets opened in the first place, so hiding
-            the list until there is a plot leaves no way in. */}
+        {/* Shown whenever a log is open, since picking a field is how the
+            plot opens. */}
         {log && (
           <aside className="log-fields">
             <h3 className="app-col__head">Fields</h3>
@@ -118,9 +108,8 @@ export default function LogsTab() {
               {log && (
                 <>
                   <p className="app-col__note">{describe(status)}</p>
-                  {/* Saving is offered only once a log is open: a download
-                    goes straight into the viewer, so this is how a log you
-                    pulled off the vehicle gets kept. */}
+                  {/* A download goes straight into the viewer, so this is how
+                    a log pulled off the vehicle gets kept. */}
                   <LaButton
                     variant="secondary"
                     size="block"
@@ -149,10 +138,9 @@ export default function LogsTab() {
 
             {log && (
               <>
-                {/* Link-outs to ArduPilot WebTools. There is no upload API to
-                  hand the log across -- each opens in the browser and the
-                  user drops the .bin in -- so the useful work here is saying
-                  in advance whether this log has what each tool reads. */}
+                {/* Links to ArduPilot WebTools. There is no API to hand the
+                  log over (the user drops the .bin in), so this says whether
+                  the log has what each tool reads. */}
                 <section className="app-col__group">
                   <h3 className="app-col__head">Analyze (WebTools)</h3>
                   {webToolsFor(log).map((t) => (
@@ -223,23 +211,13 @@ export default function LogsTab() {
 }
 
 /**
- * The empty pane, before a log is open.
- *
- * No Open button: the actions column beside it already has one, and two
- * copies of a control are two things to keep in step. What is left here is
- * the one line saying what the screen is for, and the progress of a file
- * being read -- which is not a control and appears nowhere else, the column
- * showing only a log's name once there is one.
+ * The empty pane before a log is open: one line, plus progress while a file
+ * is read. Open lives in the actions column only.
  */
 function Welcome({ status }: { status: ReturnType<typeof useLogStore.getState>['status'] }) {
   return (
     <div className="log-welcome">
-      {/* One line, and no heading: the rail already says which screen this
-          is, and what was here described the screen to someone standing on
-          it. What the two paragraphs said -- that parsing happens in this
-          window, and that channels are named from the log's own parameters
-          -- is true of every log opened here and needs saying no more than
-          any other implementation detail does. */}
+      {/* No heading: the rail already names the screen. */}
       <p className="app-placeholder">
         Open a dataflash <code>.bin</code> to plot and review a log.
       </p>

@@ -9,12 +9,8 @@ import { connectionService } from '../../services/connection'
 // Defaults are the ArduPilot conventions: SITL listens on TCP 5760, GCSes
 // listen on UDP 14550.
 //
-// The three are one dialog wearing three faces, so they are built to look
-// like it: same card width, same label-beside-control row, and every box the
-// same width whether it holds a port number or a URL (see `.connect-form` in
-// app.css). Each had drifted to its own shape -- TCP's host box was 170px
-// against its port's 71px, and the URL was a full-width stacked field in a
-// card the other two left mostly empty.
+// All three share one layout: same card width, label-beside-control rows,
+// and equal-width inputs (see `.connect-form` in app.css).
 const TITLES: Record<string, string> = {
   tcp: 'Connect over TCP',
   udp: 'Listen on UDP',
@@ -58,8 +54,7 @@ export default function ConnectModal() {
     setOpen(false)
   }
 
-  // Mount only while open: React idiom in place of the vanilla apps'
-  // .hidden toggling, and it keeps duplicate buttons out of the DOM.
+  // Mount only while open, which keeps duplicate buttons out of the DOM.
   if (!open) return null
 
   return (

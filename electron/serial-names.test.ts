@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { parseFriendlyName, stripPortSuffix, withDriverNames } from './serial-names'
 
-// The strings here are real: taken from a CubeOrange+ on Windows, which is
-// the board the problem was found on. Both its interfaces report the same
-// vendor id, product id and USB product string ("CubeOrange+"), so the
-// chooser had two identical rows and no way to say which one speaks MAVLink.
+// Real registry output from a CubeOrange+ on Windows. Both its interfaces
+// report the same vendor id, product id and USB product string, so only the
+// driver name says which one speaks MAVLink.
 
 const MAVLINK = [
   '',
@@ -31,8 +30,7 @@ describe('reading the driver name', () => {
     expect(stripPortSuffix('Standard Serial over Bluetooth link (COM3)')).toBe(
       'Standard Serial over Bluetooth link',
     )
-    // Only a trailing one, and only a port: a name that is *about* a COM
-    // port keeps its words.
+    // Only a trailing port suffix is removed.
     expect(stripPortSuffix('USB to COM1 adapter')).toBe('USB to COM1 adapter')
   })
 
@@ -51,16 +49,14 @@ describe('enriching a port list', () => {
   })
 
   it('keeps a port that has no device id to look up', async () => {
-    // Bluetooth serial and anything Chromium enumerates without one. The
-    // chooser must still list them, with whatever name they came with.
+    // Bluetooth serial, and anything else Chromium enumerates without one.
     const ports = [{ displayName: 'Bluetooth Peripheral Device' }]
     expect(await withDriverNames(ports, 'win32')).toEqual(ports)
   })
 
   it('keeps the original name when the lookup finds nothing', async () => {
-    // A device with no FriendlyName in the registry. `reg` exits non-zero,
-    // which must degrade to the name we already had rather than to a blank
-    // row -- a chooser that lists an unnamed port is still usable.
+    // No FriendlyName in the registry: `reg` exits non-zero, and the port
+    // keeps the name it already had.
     const ports = [{ displayName: 'CubeOrange+', deviceInstanceId: 'USB\\NOT_A_REAL_DEVICE\\0000' }]
     expect(await withDriverNames(ports, 'win32')).toEqual(ports)
   })

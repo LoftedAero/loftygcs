@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react'
 import { telemetryRings } from '../../services/telemetry-ring'
 import { token } from '../theme-tokens'
 
-// Two round instruments, drawn on canvas and driven straight from the
-// telemetry rings on requestAnimationFrame -- the same reason the flight
-// HUD does: attitude arrives faster than React should re-render.
+// Two round instruments, drawn on canvas from the telemetry rings on
+// requestAnimationFrame, since attitude arrives faster than React should
+// re-render.
 
 function useCanvas(draw: (ctx: CanvasRenderingContext2D, size: number) => void) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -54,9 +54,8 @@ export function AttitudeIndicator() {
     // 1.7 px per degree keeps roughly +-35 degrees of pitch in the dial.
     ctx.translate(0, ((pitch * 180) / Math.PI) * 1.7)
 
-    // Sky and ground keep their colors in both themes: an attitude
-    // indicator that went dark would stop reading as one. Only the face,
-    // bezel and lettering follow the window.
+    // Sky and ground keep their colors in both themes; only the face, bezel
+    // and lettering follow the theme.
     ctx.fillStyle = '#7FB2E5'
     ctx.fillRect(-size, -size * 2, size * 2, size * 2)
     ctx.fillStyle = '#9B7B4F'
@@ -143,8 +142,7 @@ export function HeadingDial() {
     }
     ctx.restore()
 
-    // Lubber line and the numeric heading, because a dial alone is hard to
-    // read to the degree.
+    // Lubber line and numeric heading.
     ctx.fillStyle = '#F7941D'
     ctx.beginPath()
     ctx.moveTo(r, 4)
@@ -153,8 +151,7 @@ export function HeadingDial() {
     ctx.closePath()
     ctx.fill()
 
-    // The number goes in the middle, the one part of the face the rotating
-    // card leaves empty -- at the bottom it collided with the S and W marks.
+    // Centered, the only part of the face the rotating card leaves clear.
     ctx.fillStyle = token('--la-ink', '#2D2D2F')
     ctx.font = `600 ${Math.round(size * 0.19)}px "Roboto Mono", monospace`
     ctx.textAlign = 'center'

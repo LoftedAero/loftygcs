@@ -36,8 +36,8 @@ describe('parseParamFile', () => {
   })
 
   it('reports junk lines rather than dropping them quietly', () => {
-    // A file that is half garbage should say so: silently importing the good
-    // half is how a partial configuration gets mistaken for a whole one.
+    // Silently importing the good half would pass off a partial configuration
+    // as a whole one.
     const { entries, skipped } = parseParamFile('ANGLE_MAX,4500\nnonsense\nBAD,notanumber\n')
     expect(entries).toHaveLength(1)
     expect(skipped.map((s) => s.line)).toEqual([2, 3])
@@ -71,8 +71,7 @@ describe('compareParams', () => {
   })
 
   it('does not call float32 noise a change', () => {
-    // 4.5 through a float32 comes back as 4.5000001. Offering that as an
-    // edit would fill the list with writes that change nothing.
+    // A float32 round trip turns 4.5 into 4.5000001, which is not an edit.
     const rows = compareParams([{ name: 'ATC_ANG_PIT_P', value: 4.5000001 }], current)
     expect(rows[0]!.status).toBe('same')
   })
@@ -83,8 +82,7 @@ describe('compareParams', () => {
   })
 
   it('compares zero against a tiny value correctly', () => {
-    // The relative test has to hold when one side is 0, or every parameter
-    // being switched off reads as unchanged.
+    // The relative comparison must still work when one side is 0.
     expect(sameValue(0, 0)).toBe(true)
     expect(sameValue(0, 0.001)).toBe(false)
     expect(sameValue(0, 0)).toBe(true)

@@ -1,6 +1,6 @@
 // The text half of RTSP: parsing responses, reading an SDP, and answering an
 // authentication challenge. Kept apart from the socket so it can be tested
-// against captured strings from real cameras rather than against a camera.
+// against captured strings.
 
 import { createHash } from 'node:crypto'
 
@@ -43,10 +43,9 @@ export interface VideoTrack {
 /**
  * Pulls the video track out of an SDP.
  *
- * Only H.264 is understood. The parameter sets in `sprop-parameter-sets` are
- * worth having even though they usually also arrive in-band: with them the
- * decoder can be configured before the first packet, so the first keyframe
- * is displayed rather than discarded for want of an SPS.
+ * Only H.264 is understood. The parameter sets in `sprop-parameter-sets`
+ * usually also arrive in-band, but reading them here lets the decoder be
+ * configured before the first packet, so the first keyframe is not dropped.
  */
 export function parseSdp(sdp: string): VideoTrack | null {
   const lines = sdp.split(/\r?\n/)
@@ -101,9 +100,8 @@ function decodeBase64(s: string): Uint8Array | null {
 /**
  * Resolves a track's control URL against the stream's.
  *
- * `a=control:*` means "the stream URL itself", a relative value hangs off it,
- * and an absolute one replaces it -- which cameras use inconsistently enough
- * that all three have to be handled.
+ * `a=control:*` means the stream URL itself, a relative value is appended to
+ * it, and an absolute one replaces it. Cameras use all three.
  */
 export function resolveControl(base: string, control: string): string {
   if (!control || control === '*') return base
@@ -165,9 +163,9 @@ export interface ParsedUrl {
 /**
  * Splits an rtsp:// URL into what the socket and the requests each need.
  *
- * Credentials in the URL are common for cameras and must not be sent as part
- * of the request line -- they belong in an Authorization header, and leaving
- * them in the URL leaks the password into the camera's logs.
+ * Credentials in the URL are stripped from the request line and sent in an
+ * Authorization header instead, so the password does not end up in the
+ * camera's logs.
  */
 export function parseRtspUrl(input: string): ParsedUrl | null {
   let u: URL

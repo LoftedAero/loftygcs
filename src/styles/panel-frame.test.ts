@@ -2,28 +2,14 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// The panel frame is copied, not shared, and this is the brake on that.
+// The panel frame (hairline border, small radius, surface color) has to be
+// repeated in CSS, and a class that pastes it opts out of later changes to
+// how panels look. This pins the list of selectors allowed to draw it, so
+// adding one is a deliberate edit.
 //
-// Three lines make a panel in this app -- a hairline border, the small
-// radius, and the surface color -- and CSS has no way to say "the same as
-// that one". So they get pasted, and a screen that pastes them into its own
-// class has quietly opted out of every later change to what a panel looks
-// like. That is not hypothetical: the actions column had `.app-col-shell`
-// written for exactly this job and *nothing used it*, because Parameters and
-// Mission had the three lines in `.params-aside, .mission-side`, OSD had
-// them again in `.osd-actions`, and Logs and MAVFTP had no frame at all --
-// so on Logs the left field list was framed and the right column was not, on
-// one screen.
-//
-// This test does not forbid the copy. It pins the list, so adding one is a
-// deliberate edit here rather than something that happens by paste, and
-// whoever makes that edit reads this comment first.
-//
-// **Before adding a selector: is it an actions column?** Then it wants
-// `.app-col-shell` around an `.app-col` and belongs in neither this list nor
-// a class of its own. Is it a main pane -- the thing a column sits beside?
-// Then it is one of the panes below and the list grows by one. Is it a card?
-// `.la-card` already exists.
+// Before adding a selector: an actions column should use `.app-col-shell`
+// around an `.app-col` instead. A main pane (what a column sits beside)
+// belongs in the list. A card should use `.la-card`.
 
 const CSS = readFileSync(join(process.cwd(), 'src/styles/app.css'), 'utf8')
 
@@ -35,23 +21,18 @@ const ALLOWED = [
   '.files__pane',
   '.inspector__pane',
   '.log-main',
-  // The parameters pane, not its scroll box: the search and the count sit
-  // inside the frame with the table so the panel is the full height of the
-  // screen and matches the actions column beside it.
+  // The pane, not its scroll box: the search and count sit inside the frame
+  // so it spans the screen's full height beside the actions column.
   '.params-pane',
   // Panes that are not beside a column but are the same kind of surface.
-  '.app-doc',
   '.flight-controls',
   '.log-fields',
   '.log-pane',
   '.mission-lower',
   '.plot-panel',
-  // Repeated items *inside* a panel, which are framed to separate them from
-  // it rather than to be one.
+  // Repeated items inside a panel, framed to separate them from it.
   '.fence-item',
-  // One frame class in the picker on Configuration: a tile is framed to
-  // separate it from its neighbours and from the card holding them, and the
-  // chosen one is marked by its border colour rather than by a second frame.
+  // Configuration's frame picker; the chosen tile is marked by border color.
   '.frame-tile',
   '.fw-vehicle',
   '.plotted',
@@ -83,27 +64,22 @@ describe('the panel frame', () => {
   })
 
   it('is not drawn by a class that should be composing the shell', () => {
-    // The three that had it and no longer do. Each is now `.app-col-shell`
-    // in the markup; a regression here means someone re-pasted the frame.
+    // These use `.app-col-shell` in the markup instead.
     for (const sel of ['.params-aside', '.mission-side', '.osd-actions']) {
       expect(framedSelectors(CSS)).not.toContain(sel)
     }
   })
 
   it('finds the frame at all', () => {
-    // Guards the matcher itself: if the trio is ever reworded, every
-    // assertion above passes over an empty list and proves nothing.
+    // Guards the matcher: if the CSS is reworded, the assertions above would
+    // pass over an empty list.
     expect(framedSelectors(CSS).length).toBeGreaterThan(5)
     expect(framedSelectors(CSS)).toContain('.app-col-shell')
   })
 })
 
-// The other half of the same rule, checked from the markup side.
-//
-// The frame allowlist above stops a screen pasting the trio into a class of
-// its own. It cannot stop the opposite mistake -- rendering a bare `.app-col`
-// and getting no frame at all -- which is how the Inspector's detail column
-// and, before them, Logs and MAVFTP ended up unframed next to framed panes.
+// The markup side of the same rule: a bare `.app-col` without its shell
+// renders with no frame at all.
 
 const UI = join(process.cwd(), 'src/ui')
 

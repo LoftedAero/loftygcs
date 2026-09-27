@@ -3,11 +3,9 @@ import { useMenuPlacement } from '../../components/menu-placement'
 import { LaButton, LaHint } from '../../components/La'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 
-// The right-click menu. Only actions that mean something *at the point you
-// clicked* live here -- flying there, aiming the camera there, moving home
-// there. Triggering the camera happens wherever the vehicle is, so it sits in
-// the actions bar instead, and the guided altitude is set inline on "Fly
-// here" rather than as a separate mode you have to remember you are in.
+// The map's right-click menu, for actions tied to the clicked point: fly
+// there, aim the camera there, move home there. The guided altitude is set
+// inline on "Fly here".
 
 export interface MapMenuPoint {
   lat: number
@@ -37,7 +35,7 @@ export default function MapContextMenu({
   const boxRef = useRef<HTMLDivElement>(null)
   const [alt, setAlt] = useState(() => Math.max(Math.round(relAltM), 5))
 
-  // Dismiss on anything that is not this menu, the way a menu should.
+  // Dismiss on any click outside the menu.
   useEffect(() => {
     const away = (e: PointerEvent) => {
       if (!boxRef.current?.contains(e.target as Node)) onClose()

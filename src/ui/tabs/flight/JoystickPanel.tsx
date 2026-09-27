@@ -8,22 +8,13 @@ import StickDiagram from '../radio/StickDiagram'
 import type { StickFunction } from '../radio/radio-cal'
 import JoystickSetup from './JoystickSetup'
 
-// Flying with a gamepad.
+// Flying with a gamepad. The pane shows what is being sent: the sticks on the
+// Radio screen's transmitter drawing, and a bar per mapped channel. Mapping is
+// edited only in the Configure dialog.
 //
-// The pane shows what is being sent and nothing else: the sticks drawn on the
-// same transmitter the Radio screen uses, because "where is the throttle" is
-// answered at a glance by a picture and not by a number, and a bar for every
-// mapped channel beside it. What drives each channel is changed in one place
-// only, the Configure dialog -- the pane briefly carried its own copy of the
-// mapping and two places to do one thing was worse than one more click.
-//
-// Taking control is one button, it is off every time the app starts, and the
-// failure this feature has is a control that is not where the pilot thinks it
-// is -- which is what the picture is for.
-//
-// The pane does not own the gamepad: it is read for the whole session
-// (services/joystick.ts), so closing this pane or leaving the Fly screen does
-// not drop control. The app bar says so from every screen, with a Release.
+// Control is off at every start. The gamepad is read for the whole session
+// (services/joystick.ts), so closing this pane or leaving Fly does not drop
+// control; the app bar shows it, with a Release, on every screen.
 
 /** Mode 2 and ArduPilot's default RCMAP: the channel each stick drives. */
 const STICK_CHANNELS: Record<StickFunction, number> = { roll: 1, pitch: 2, throttle: 3, yaw: 4 }
@@ -47,8 +38,8 @@ export default function JoystickPanel() {
     setConfirming(false)
   }
 
-  // Every channel something drives, in channel order: the sticks and
-  // whatever sliders and switches were added in Configure.
+  // Every driven channel in order: the sticks plus any sliders and switches
+  // added in Configure.
   const mapped = [
     ...new Set([
       ...config.axes.filter((a) => a.axis >= 0).map((a) => a.channel),
@@ -57,8 +48,7 @@ export default function JoystickPanel() {
     ]),
   ].sort((a, b) => a - b)
 
-  // A stick is drawn where its channel is, and only when the channel is being
-  // driven; an undriven one stays centered and unlit.
+  // An undriven stick stays centered and unlit.
   const positions: Partial<Record<StickFunction, number>> = {}
   if (pad) {
     for (const [fn, ch] of Object.entries(STICK_CHANNELS) as [StickFunction, number][]) {
@@ -70,22 +60,13 @@ export default function JoystickPanel() {
   return (
     <div className="joystick-panel">
       <div className="joystick-panel__row">
-        {/* No "Sending" word: Release control and the app bar's pill already
-            say the gamepad has control. */}
-        {/* Not "Joystick": the tab above already says that, and the row
-            is about which device. */}
         <span className="joystick-panel__label">Device</span>
 
-        {/* Always a list, even of one or none, so the row keeps its shape as
-            devices appear. Several need choosing -- choosing for someone is
-            choosing which sticks they are holding -- and the list is by the
-            id the browser reports, because indices shuffle between sessions.
-
-            Empty is the usual state at launch, not a fault: Chromium hides
-            every gamepad from a page until a button is pressed on one of
-            them after it starts (measured -- an Xbox pad and a 3Dconnexion
-            joystick attached, getGamepads() all nulls until then), and it
-            reports four at most. The one line says what to do. */}
+        {/* Always a select so the row keeps its shape. With several devices
+            the user must choose; entries are keyed by the browser's id
+            because indices shuffle between sessions. Chromium hides all
+            gamepads until a button is pressed after startup, so empty is
+            normal at launch. */}
         <LaSelect
           aria-label="Which device to fly with"
           className="joystick-panel__pick"
@@ -99,8 +80,8 @@ export default function JoystickPanel() {
           ) : (
             pads.length > 1 && <option value="">Choose a device</option>
           )}
-          {/* A remembered device that is not attached stays named, so the
-              list does not quietly show some other one as chosen. */}
+          {/* Keep a remembered but detached device listed, so another is not
+              shown as chosen. */}
           {deviceId && !pads.some((p) => p.id === deviceId) && pads.length > 0 && (
             <option value={deviceId}>{padName(deviceId)}</option>
           )}
@@ -118,8 +99,6 @@ export default function JoystickPanel() {
         >
           {active ? 'Release control' : 'Take control'}
         </LaButton>
-        {/* "Configure", as the other buttons that open a dialog of settings
-            are named (OSD screen settings, ESC settings). */}
         <LaButton variant="secondary" disabled={active} onClick={() => setSetup(true)}>
           Configure
         </LaButton>
@@ -137,8 +116,7 @@ export default function JoystickPanel() {
             ))}
           </div>
 
-          {/* The list says "Choose a device" by itself; this is the case it
-              cannot show. */}
+          {/* The select cannot show that the chosen device is detached. */}
           {deviceId && !pad && pads.length > 0 && (
             <LaHint>That device is no longer attached.</LaHint>
           )}
@@ -161,9 +139,6 @@ export default function JoystickPanel() {
           </div>
         }
       >
-        {/* One sentence of what happens and one of what to keep to hand. The
-            conditions that hand control back -- pad unplugged, link dropped --
-            are what the code does, not a thing to read before pressing. */}
         <p>The vehicle will fly on this gamepad's controls. Keep a transmitter to hand.</p>
       </LaModal>
 
@@ -178,10 +153,9 @@ function positionOf(pwm: number | undefined): number | null {
 }
 
 /**
- * A device's name without the browser's decoration. Chromium appends
+ * A device's name without the browser's decoration: Chromium appends
  * "(STANDARD GAMEPAD Vendor: 045e Product: 02fd)" and Firefox prefixes
- * "045e-02fd-"; neither says anything a person picking a device needs. The
- * full id is still the key everything is stored under.
+ * "045e-02fd-". The full id remains the storage key.
  */
 export function padName(id: string): string {
   const name = id

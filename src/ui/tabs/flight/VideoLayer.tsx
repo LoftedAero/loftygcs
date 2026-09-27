@@ -3,14 +3,11 @@ import { videoService, type VideoStatus } from '../../../services/video'
 
 // The HUD's background layer, drawing decoded frames.
 //
-// A canvas rather than a <video> element: the frames arrive as VideoFrame
-// objects from WebCodecs, with no container or MediaStream to hand an
-// element. Drawing them is one call, and it keeps the aspect handling here
-// rather than fighting an element's own letterboxing.
+// A canvas rather than a <video> element, because frames arrive as WebCodecs
+// VideoFrame objects with no MediaStream.
 //
-// Frames are drawn as they arrive rather than on requestAnimationFrame: they
-// come at the camera's rate, and waiting for the next frame callback would
-// add up to a frame of latency to a picture someone is flying on.
+// Frames are drawn on arrival rather than on requestAnimationFrame, which
+// would add up to a frame of latency.
 
 export default function VideoLayer() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -33,9 +30,8 @@ export default function VideoLayer() {
         canvas.width = Math.round(w * dpr)
         canvas.height = Math.round(h * dpr)
       }
-      // Letterboxed to the frame's own aspect: stretching a 16:9 feed into a
-      // 4:3 panel makes the horizon in the picture disagree with the one
-      // drawn over it, which is worse than bars.
+      // Letterboxed to the frame's aspect, so the picture's horizon matches
+      // the one drawn over it.
       const fw = frame.displayWidth
       const fh = frame.displayHeight
       const scale = Math.min(canvas.width / fw, canvas.height / fh)

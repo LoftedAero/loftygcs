@@ -1,7 +1,6 @@
 // The full mission loop over real MAVLink bytes: engine wired to the virtual
-// FC, both using the real encoder and framer. This is the test that catches
-// a wrong field name in a MISSION_* message -- the scripted unit tests hand
-// the client already-decoded fields, so they cannot.
+// FC, both using the real encoder and framer. This catches wrong field names
+// in MISSION_* messages, which unit tests with decoded fields cannot.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ProtocolEngine } from './engine'
 import { VirtualFcTransport } from '../transport/virtual-fc'
@@ -64,10 +63,8 @@ describe('mission round trip against the virtual FC', () => {
   })
 
   it('keeps the three plans apart, as mission_type says it should', async () => {
-    // The demo vehicle used to answer anything but mission_type 0 with
-    // "unsupported", which left the fence and rally screens with nothing to
-    // talk to in the browser build. It stores all three now, and the point
-    // of this test is that they do not leak into each other.
+    // The demo vehicle stores all three plan types; they must not leak into
+    // each other.
     const fence = [
       wire(0, { command: 5001, param1: 3, x: 1, y: 1 }),
       wire(1, { command: 5001, param1: 3, x: 2, y: 1 }),

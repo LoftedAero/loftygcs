@@ -10,11 +10,9 @@ import {
   frameTypeSupported,
 } from './frame-layout'
 
-// The table is transcribed from ArduPilot's AP_MotorsMatrix.cpp, so these
-// tests pin the geometry that transcription is supposed to produce: where a
-// motor sits, which way it turns, and how many there are. A picture of the
-// wrong motor order is worse than no picture, because somebody checks their
-// propellers against it.
+// The table is transcribed from ArduPilot's AP_MotorsMatrix.cpp. These tests
+// pin the resulting geometry (position, direction, motor count), since people
+// check their propellers against the diagram.
 
 const at = (cls: number, type: number) => frameLayout(cls, type)!
 /** Round-trip a motor's position back to degrees clockwise from the nose. */
@@ -71,18 +69,15 @@ describe('motor counts match the class', () => {
     ] as const) {
       const motors = at(cls, type)
       const seq = motors.map((_, i) => i + 1)
-      // Both numberings are a permutation of 1..N, and on most frames they are
-      // *different* permutations -- which is the whole reason they are two
-      // fields. The table is written in test order, so `test` comes out
-      // sorted and `n` does not.
+      // Both numberings are permutations of 1..N, usually different ones. The
+      // table is written in test order, so `test` is sorted and `n` is not.
       expect([...motors.map((m) => m.n)].sort((a, b) => a - b)).toEqual(seq)
       expect(motors.map((m) => m.test)).toEqual(seq)
     }
   })
 
-  // The numbers on ArduPilot's own published quad diagrams. If this ever
-  // disagrees with the wiki, the table is wrong, not the wiki: these come from
-  // `AP_MotorsMatrix::setup_quad_matrix`, which is what the wiki draws.
+  // The numbers on ArduPilot's published quad diagrams, which are drawn from
+  // `AP_MotorsMatrix::setup_quad_matrix`.
   it('puts ArduPilot motor numbers where ArduPilot puts them', () => {
     const x = at(FRAME_CLASS.QUAD, FRAME_TYPE.X)
     const at_ = (n: number) => x.find((m) => m.n === n)!
@@ -128,19 +123,15 @@ describe('stacked frames', () => {
 describe('frames with no picture', () => {
   it('returns null rather than inventing one', () => {
     // Helicopters, single and coax copters, bicopters and the scripting
-    // matrices: a swashplate or a Lua script, not a motor layout. The
-    // tricopter used to be in this list and now draws -- its positions are in
-    // AP_MotorsTri's own roll and pitch factors.
+    // matrices: a swashplate or a Lua script, not a motor layout.
     expect(frameLayout(6, FRAME_TYPE.X)).toBeNull()
     expect(frameLayout(8, FRAME_TYPE.X)).toBeNull()
     expect(frameLayout(9, FRAME_TYPE.X)).toBeNull()
     expect(frameLayout(10, FRAME_TYPE.X)).toBeNull()
     expect(frameLayout(15, FRAME_TYPE.X)).toBeNull()
-    // Supported by the firmware and deliberately not drawn: the quad's
-    // yaw-less variants. Their case bodies are not transcribed here, and a
-    // picture copied from the plus would claim a yaw torque they do not have.
-    // This is the distinction the screen rests on -- a gap in the drawing is
-    // not a gap in what the vehicle accepts.
+    // Supported by the firmware but not drawn: the quad's yaw-less variants.
+    // Their case bodies are not transcribed, and a picture copied from the
+    // plus would show yaw torque they do not have.
     expect(frameLayout(FRAME_CLASS.QUAD, FRAME_TYPE.NYT_PLUS)).toBeNull()
     expect(frameLayout(FRAME_CLASS.QUAD, FRAME_TYPE.NYT_X)).toBeNull()
     expect(frameTypeSupported(FRAME_CLASS.QUAD, FRAME_TYPE.NYT_X)).toBe(true)
@@ -168,10 +159,9 @@ describe('the class table follows the frame type', () => {
   })
 
   it('drops the classes a type does not reach', () => {
-    // A V layout exists for the quad, the octa and the octaquad -- not the
-    // hexa, the deca or the dodecahexa, which would otherwise be drawn as
-    // something they are not. Y6 is always in: its firmware falls back to one
-    // layout for any type it does not name.
+    // A V layout exists for the quad, octa and octaquad, not the hexa, deca or
+    // dodecahexa. Y6 always qualifies: its firmware uses one layout for any
+    // type it does not name.
     const v = classesForType(FRAME_TYPE.V)
     expect(v).toContain(FRAME_CLASS.QUAD)
     expect(v).toContain(FRAME_CLASS.OCTA)
@@ -214,7 +204,7 @@ describe('what the firmware will actually accept', () => {
       FRAME_TYPE.BF_X, FRAME_TYPE.BF_X_REV, FRAME_TYPE.DJI_X, FRAME_TYPE.CW_X]) {
       expect(frameTypeSupported(FRAME_CLASS.QUAD, t)).toBe(true)
     }
-    // Deca takes CW_X as well as plus and X -- the firmware shares one body.
+    // Deca takes CW_X as well as plus and X; the firmware shares one body.
     expect(frameTypeSupported(FRAME_CLASS.DECA, FRAME_TYPE.CW_X)).toBe(true)
     expect(frameLayout(FRAME_CLASS.DECA, FRAME_TYPE.CW_X)).toHaveLength(10)
   })
@@ -226,8 +216,8 @@ describe('what the firmware will actually accept', () => {
   })
 
   it('never calls an unknown class unsupported', () => {
-    // A helicopter, a tricopter or a scripting matrix never reaches the motor
-    // matrix, and a class a newer firmware added is not one to argue with.
+    // Helicopters, tricopters and scripting matrices never reach the motor
+    // matrix, and an unknown class may be one newer firmware added.
     expect(frameTypeSupported(6, FRAME_TYPE.X)).toBe(true)
     expect(frameTypeSupported(7, FRAME_TYPE.V)).toBe(true)
     expect(frameTypeSupported(99, FRAME_TYPE.I)).toBe(true)
@@ -238,8 +228,8 @@ describe('what the firmware will actually accept', () => {
     const vtail = at(FRAME_CLASS.QUAD, FRAME_TYPE.VTAIL)
     expect(vtail).toHaveLength(4)
     expect(vtail.filter((m) => m.spin === 'none')).toHaveLength(2)
-    // Both tail motors sit on the centreline -- their roll factors are 0 --
-    // so they coincide and the second is drawn offset.
+    // Both tail motors sit on the centerline (roll factor 0), so they coincide
+    // and the second is drawn offset.
     expect(coaxialRank(vtail)).toEqual([0, 0, 1, 0])
     // A-tail is the same geometry with the tail pair reversed.
     const atail = at(FRAME_CLASS.QUAD, FRAME_TYPE.ATAIL)
@@ -287,8 +277,8 @@ describe('the table holds still while the type changes', () => {
   })
 
   it('falls back to a recognisable shape where it does not', () => {
-    // The case that prompted this: a quad cannot be a Y6B, and showing the
-    // quad blank beside a drawn Y6 reads as the wrong one being valid.
+    // A quad cannot be a Y6B; a blank quad beside a drawn Y6 would read as the
+    // wrong one being valid.
     const tiles = frameTiles(FRAME_TYPE.Y6B)
     const quad = tiles.find((t) => t.frameClass === FRAME_CLASS.QUAD)!
     expect(quad.supported).toBe(false)
@@ -315,8 +305,7 @@ describe('the table holds still while the type changes', () => {
 
 describe('the tricopter', () => {
   it('draws the same aircraft whatever the frame type', () => {
-    // AP_MotorsTri is its own class and never reads FRAME_TYPE, so there is
-    // one tricopter and the tile holds still while the dropdown moves.
+    // AP_MotorsTri never reads FRAME_TYPE, so there is one tricopter layout.
     const plus = frameLayout(FRAME_CLASS.TRI, FRAME_TYPE.PLUS)
     for (const t of [FRAME_TYPE.X, FRAME_TYPE.V, FRAME_TYPE.Y6B, FRAME_TYPE.I]) {
       expect(frameLayout(FRAME_CLASS.TRI, t)).toEqual(plus)
@@ -326,9 +315,8 @@ describe('the tricopter', () => {
   it('places the arms from the source factors', () => {
     const tri = at(FRAME_CLASS.TRI, FRAME_TYPE.PLUS)
     // Front pair: roll factors -1 and +1 with pitch 0.5; rear: pitch -1.
-    // `AP_MotorsTri` drives MOT_1 right, MOT_2 left and MOT_4 rear -- there
-    // is no motor 3 on a tricopter -- while the test sequence is right, rear,
-    // servo, left.
+    // `AP_MotorsTri` drives MOT_1 right, MOT_2 left and MOT_4 rear (there is
+    // no motor 3), while the test sequence is right, rear, servo, left.
     expect(tri.find((m) => m.n === 1)).toMatchObject({ x: 1, y: 0.5, test: 1 })
     expect(tri.find((m) => m.n === 2)).toMatchObject({ x: -1, y: 0.5, test: 4 })
     expect(tri.find((m) => m.n === 4)).toMatchObject({ x: 0, y: -1, test: 2 })
@@ -338,9 +326,8 @@ describe('the tricopter', () => {
   it('labels the tail servo with its output channel', () => {
     const tri = at(FRAME_CLASS.TRI, FRAME_TYPE.PLUS)
     const servo = tri.find((m) => m.servo)!
-    // `AP_MotorsTri.h`: "tail servo uses channel 7", CH_7. The motor test
-    // reaches it as step 3, but 7 is the number somebody wires to, and a bare
-    // 3 beside motors numbered 1, 2 and 4 reads as a fourth motor.
+    // `AP_MotorsTri.h`: "tail servo uses channel 7". The motor test reaches it
+    // as step 3, but 7 is the output it is wired to.
     expect(servo.n).toBe(7)
     // It sits on the rear arm, so it is offset rather than hidden under the
     // back motor.
@@ -349,10 +336,8 @@ describe('the tricopter', () => {
   })
 
   it('shows a counter-rotating front pair, by convention not by source', () => {
-    // AP_MotorsTri states no directions -- yaw is the tail servo pivoting,
-    // not differential torque -- so these are the conventional build, drawn
-    // because a frame of blank motors beside seven frames of arrows reads as
-    // a rendering fault. The servo itself never gets one.
+    // AP_MotorsTri states no directions (yaw comes from the tail servo), so
+    // these are the conventional build. The servo gets no direction.
     const tri = at(FRAME_CLASS.TRI, FRAME_TYPE.PLUS)
     const front = tri.filter((m) => m.y > 0)
     expect(front.map((m) => m.spin).sort()).toEqual(['ccw', 'cw'])

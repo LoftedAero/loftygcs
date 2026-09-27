@@ -1,15 +1,12 @@
 // What each mission command means, as data.
 //
-// MAVLink gives every mission item the same seven anonymous numbers, so a
-// table of them is unreadable without knowing which command is in the row --
-// param1 is a hold time in a waypoint, a turn count in a loiter, and a servo
-// number in DO_SET_SERVO. This catalog is what turns those columns into
-// labelled fields, and it is the single place a new command is added: the
-// table, the item editor and the palette all read it.
+// Every mission item carries the same seven anonymous numbers: param1 is a
+// hold time in a waypoint, a turn count in a loiter and a servo number in
+// DO_SET_SERVO. This catalog labels them, and it is the one place a command
+// is added; the table, the item editor and the palette all read it.
 //
-// Semantics follow ArduPilot's mission command reference rather than the
-// generic MAVLink spec where the two differ -- this is an ArduPilot station,
-// and the firmware's interpretation is the one the aircraft flies.
+// Semantics follow ArduPilot's mission command reference where it differs
+// from the generic MAVLink spec.
 
 import type { VehicleClass } from './modes'
 
@@ -34,18 +31,12 @@ export interface MissionCommandSpec {
   mavName: string
   /**
    * nav commands move the vehicle and take time; do and condition commands
-   * run instantly between them. ArduPilot executes at most one nav command
-   * at a time, which is why the distinction is worth showing.
+   * run between them. ArduPilot executes one nav command at a time.
    */
   category: 'nav' | 'condition' | 'do'
   /**
-   * Copter (and heli) only. ArduPlane and Rover refuse these on upload, so
-   * offering them anywhere else is a menu entry that can only ever fail.
-   *
-   * This lived in `mission-commands.integration.test.ts` as a bare set of
-   * ids, which meant the test knew something the app did not: the palette
-   * offered spline waypoints to a fixed wing whether or not one was
-   * connected. The test now reads this field, so the two cannot drift.
+   * Copter (and heli) only; ArduPlane and Rover refuse these on upload.
+   * `mission-commands.integration.test.ts` reads this field too.
    */
   copterOnly?: true
   /** Uses x/y as a position on the map. */
@@ -742,14 +733,9 @@ export const MISSION_COMMANDS: readonly MissionCommandSpec[] = [
 const BY_ID = new Map(MISSION_COMMANDS.map((c) => [c.id, c]))
 
 /**
- * The commands worth offering for one kind of aircraft.
- *
- * Verified against the firmware rather than the spec -- see
- * `mission-commands.integration.test.ts`, which uploads every command this
- * returns to whichever vehicle SITL is serving and fails on any refusal.
- * `other` (an unrecognized MAV_TYPE) gets everything: unknown is not the
- * same as absent, and hiding commands from a vehicle that simply has not
- * said what it is would be this app guessing on its behalf.
+ * The commands to offer for one kind of aircraft, verified against the
+ * firmware by `mission-commands.integration.test.ts`. `other` (an
+ * unrecognized MAV_TYPE) gets everything, since unknown is not absent.
  */
 export function commandsFor(cls: VehicleClass): readonly MissionCommandSpec[] {
   if (cls === 'copter' || cls === 'other') return MISSION_COMMANDS
@@ -761,9 +747,8 @@ export function commandSpec(id: number): MissionCommandSpec | undefined {
 }
 
 /**
- * A name for any command, catalogued or not. A mission downloaded from a
- * vehicle can contain commands this build has never heard of, and showing
- * the number beats showing a blank row.
+ * A name for any command, catalogued or not. A downloaded mission can hold
+ * commands this build does not know; those show their number.
  */
 export function commandLabel(id: number): string {
   return BY_ID.get(id)?.name ?? `Command ${id}`
@@ -775,10 +760,9 @@ export function hasLocation(id: number): boolean {
 }
 
 /**
- * Whether `frame` is meaningful for a command. ArduPilot stores commands
- * that carry no coordinates without a frame and reports 0 for them on
- * read-back, whatever was uploaded -- so comparing frames on those items
- * makes an unchanged mission look modified. Found against SITL, not guessed.
+ * Whether `frame` is meaningful for a command. ArduPilot reports frame 0 on
+ * read-back for commands without coordinates, whatever was uploaded, so
+ * comparing their frames would make an unchanged mission look modified.
  */
 export function frameMatters(id: number): boolean {
   const spec = BY_ID.get(id)

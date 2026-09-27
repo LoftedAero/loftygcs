@@ -2,22 +2,11 @@ import { Fragment } from 'react'
 import { holdsVehicleTabs, useUiStore, visibleTabs } from '../../stores/ui-store'
 import { useConnectionStore } from '../../stores/connection-store'
 
-// The Setup rail. Shown only in Setup mode -- Fly and Mission take the whole
-// window. App-specific styling (app.css), built from the system tokens, with
-// the brand-orange accent marking the active item.
+// The Setup rail, shown only in Setup mode.
 //
-// Headings come from the tab list rather than from a second structure here:
-// one array stays one array, and a tab cannot end up in a group the rail
-// does not draw. The heading is emitted where the group changes, so adding a
-// tab needs nothing of this file -- including the group vanishing when the
-// last tab in it does, which is why the heading is emitted from the filtered
-// list rather than from `TABS`.
-//
-// With nothing connected the rail lists only what can be done now. Mission
-// Planner does the same and says so in its wiki; the alternative this
-// replaced was a card on each vehicle-only tab describing the screen you
-// could not use, which is a thing none of QGC, Mission Planner or Betaflight
-// does.
+// Group headings are emitted wherever the group changes in the filtered tab
+// list, so a group disappears when none of its tabs are visible. With nothing
+// connected, only offline-capable tabs are listed.
 export default function NavRail() {
   const activeTab = useUiStore((s) => s.activeTab)
   const setTab = useUiStore((s) => s.setTab)
@@ -28,9 +17,7 @@ export default function NavRail() {
       {tabs.map((tab, i) => (
         <Fragment key={tab.id}>
           {tab.group !== tabs[i - 1]?.group && (
-            // Presentational: the buttons already carry the accessible names
-            // and `aria-current`, and a heading between them would only add
-            // a landmark to step through.
+            // Presentational: the buttons carry the accessible names.
             <p className="app-nav__group" aria-hidden="true">
               {tab.group}
             </p>

@@ -91,7 +91,7 @@ describe('MAVLink framing', () => {
     stream.set(a)
     stream.set(b, a.length)
 
-    // Feed one byte at a time -- the cruelest chunking a serial port can do.
+    // One byte at a time, the worst chunking a serial port can produce.
     const framer = new MavFramer()
     const frames = []
     for (const byte of stream) frames.push(...framer.push(new Uint8Array([byte])))
@@ -102,9 +102,8 @@ describe('MAVLink framing', () => {
   })
 
   it('parses MAVLink v1 frames too', () => {
-    // Hand-build a v1 HEARTBEAT: FE len seq sys comp msgid payload crc.
-    // Reuse the v2 encoder's payload+CRC math via a known-good v2 frame is
-    // not possible (different header), so construct directly.
+    // Hand-built v1 HEARTBEAT: FE len seq sys comp msgid payload crc. The
+    // payload comes from a v2 frame; the header and CRC are built here.
     const v2 = encodeFrame('HEARTBEAT', HEARTBEAT_FIELDS, 0, 1, 1)
     const payload = v2.subarray(10, v2.length - 2)
     const frame = new Uint8Array(6 + 9 + 2)
@@ -114,7 +113,7 @@ describe('MAVLink framing', () => {
     frame[3] = 1
     frame[4] = 1
     frame[5] = 0 // HEARTBEAT
-    // v1 payload is never truncated
+    // v1 payloads are never truncated.
     const full = new Uint8Array(9)
     full.set(payload)
     frame.set(full, 6)

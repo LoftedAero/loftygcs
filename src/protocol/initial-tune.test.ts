@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { gyroFilterHz, hasTunableMotors, initialTuneParams } from './initial-tune'
 
-// The published anchors, pinned. This file exists so that a change to the
-// arithmetic cannot quietly move a number ArduPilot actually specifies: every
-// case below is a value quoted on "Setting the Aircraft Up for Tuning", not a
-// value this app chose.
+// Pins the values quoted on ArduPilot's "Setting the Aircraft Up for Tuning",
+// so a change to the arithmetic cannot move a number ArduPilot specifies.
 
 const at = (propInches: number, cells: number) => {
   const map = new Map(initialTuneParams({ propInches, cells }).map((v) => [v.param, v.value]))
@@ -34,9 +32,7 @@ describe('the published anchors', () => {
   })
 
   it('offers the quadplane spelling of the same set', () => {
-    // Measured on a quadplane SITL: the VTOL side is Q_M_* and Q_A_*, one for
-    // one with a multirotor's MOT_* and ATC_*, and the screen keeps whichever
-    // family the vehicle reports.
+    // A quadplane's VTOL side is Q_M_* and Q_A_*, one for one with MOT_* and ATC_*.
     const v = at(10, 6)
     expect(v('Q_M_BAT_VOLT_MAX')).toBe(v('MOT_BAT_VOLT_MAX'))
     expect(v('Q_M_THST_EXPO')).toBe(v('MOT_THST_EXPO'))
@@ -57,10 +53,7 @@ describe('the published anchors', () => {
   })
 
   it('offers both spellings, so either firmware gets the value', () => {
-    // Copter 4.7.1 reports ATC_ACC_*_MAX and nothing matching ATC_ACCEL;
-    // older builds are the other way round. The screen keeps whichever the
-    // vehicle actually has, so emitting both costs nothing and missing one
-    // silently drops three limits.
+    // Copter 4.7.1 reports ATC_ACC_*_MAX; older builds use ATC_ACCEL_*_MAX.
     const v = at(10, 4)
     expect(v('ATC_ACCEL_R_MAX')).toBe(v('ATC_ACC_R_MAX'))
     expect(v('ATC_ACCEL_P_MAX')).toBe(v('ATC_ACC_P_MAX'))
@@ -108,8 +101,7 @@ describe('between and beyond the anchors', () => {
   })
 
   it('holds the end values rather than running off the table', () => {
-    // Extrapolating a straight line past 30in reaches zero and then goes
-    // negative, which is a limit no aircraft should be given.
+    // Extrapolating past 30in would reach zero and then go negative.
     expect(at(40, 4)('ATC_ACCEL_R_MAX')).toBe(200)
     expect(at(3, 4)('MOT_THST_EXPO')).toBe(0.55)
     expect(at(3, 4)('ATC_ACCEL_R_MAX')).toBe(1100)

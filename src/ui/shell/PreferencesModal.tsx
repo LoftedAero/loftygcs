@@ -10,13 +10,9 @@ import {
 } from '../../units'
 import type { DistanceUnit, SpeedUnit, VerticalSpeedUnit } from '../../units'
 
-// Everything about the person rather than the aircraft.
-//
-// A dialog and not a rail tab on purpose: the rail is the bring-up sequence
-// for a vehicle, and these settings outlive any vehicle and apply from every
-// mode. It is sectioned rather than a flat list of controls because the next
-// things to land here -- language, and whatever follows -- are sections too,
-// and a list that grows into groups later reorganizes under the user.
+// Settings about the user rather than the aircraft. A dialog rather than a
+// rail tab because they apply in every mode and outlive any vehicle.
+// Sectioned so later additions (language, for one) slot in as sections.
 
 const THEME_CHOICES: { id: ThemeChoice; label: string }[] = [
   { id: 'system', label: 'Match the system' },
@@ -90,8 +86,7 @@ export default function PreferencesModal() {
           >
             {VERTICAL_SPEED_CHOICES.map((c) => (
               <option key={c.id} value={c.id}>
-                {/* The default says what it currently resolves to, so
-                    "Follow distance" is not a thing to work out. */}
+                {/* The default shows the unit it currently resolves to. */}
                 {c.id === 'follow' ? `${c.label} (${verticalSpeedLabel(units)})` : c.label}
               </option>
             ))}

@@ -7,12 +7,9 @@ import { validateFence } from '../../../protocol/geofence'
 
 // The shapes a fence is made of.
 //
-// Only the list. Read, write and clear are identical for all three plans and
-// live in PlanActions; the tools that draw are on the map, in FencePalette.
-// It sits at the foot of the column, below the file buttons, because it is
-// the one part that grows -- a list that pushes everything under it down the
-// column every time a shape is added is a column whose buttons move while
-// you work.
+// Only the list: read, write and clear live in PlanActions, and the drawing
+// tools in FencePalette on the map. It sits at the foot of the column because
+// it grows, and the buttons above it should not move as shapes are added.
 export default function FencePanel() {
   const units = useUnits()
   const fence = useMissionStore((s) => s.fence)
@@ -98,8 +95,8 @@ export default function FencePanel() {
         </div>
       )}
 
-      {/* Named before upload, because the vehicle's rejection is a single
-            error code that does not say which shape it disliked. */}
+      {/* Checked before upload: the vehicle rejects a bad fence with one
+            error code that does not name the shape. */}
       {problems.map((p) => (
         <LaHint key={p} error>
           {p}

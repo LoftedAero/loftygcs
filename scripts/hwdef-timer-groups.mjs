@@ -4,38 +4,33 @@
 //
 // A flight controller's outputs are wired to hardware timers in groups, and
 // every channel in a group must share one protocol: choosing DShot on output 5
-// takes 6, 7 and 8 with it. **That grouping is in no parameter and in no
-// MAVLink message.** The boot banner looks like it carries it and does not --
-// `RCOutput::get_output_mode_banner` merges adjacent channels by *mode*, so two
-// separate timer groups both left on PWM come back as one run and a board's
-// real boundaries never appear.
+// takes 6, 7 and 8 with it. That grouping is in no parameter and no MAVLink
+// message. The boot banner does not carry it either:
+// `RCOutput::get_output_mode_banner` merges adjacent channels by mode, so two
+// timer groups both on PWM are reported as one run.
 //
-// The grouping is stated once, in the board's hwdef, as the timer named on each
-// output's pin line:
+// The grouping is in the board's hwdef, as the timer named on each output's
+// pin line:
 //
 //   PB0  TIM8_CH2N TIM8  PWM(1)  GPIO(50)
 //   PA0  TIM5_CH1  TIM5  PWM(3)  GPIO(52)
 //
-// So a group is "same TIMx", read from the source of truth rather than from
-// anything remembered. Three things it has to handle:
+// so a group is a run of outputs on the same TIMx. The parser handles:
 //
 //   - `include` chains. Most boards are a stub including a shared `.inc`, and
 //     some go two deep (a variant including its base).
-//   - `IOMCU_UART`. A board with an IO co-processor drives outputs 1-8 from it,
-//     on a fixed layout of its own, and the FMU's own `PWM(1)` is output 9.
-//     ArduPilot calls that shift `chan_offset`.
-//   - `NODMA`. A channel without DMA cannot do DShot whatever its group allows,
-//     which is worth carrying beside the group.
+//   - `IOMCU_UART`. A board with an IO co-processor drives outputs 1-8 from it
+//     on a fixed layout, and the FMU's own `PWM(1)` becomes output 9
+//     (ArduPilot's `chan_offset`).
+//   - `NODMA`. A channel without DMA cannot do DShot whatever its group allows.
 //
-// **Keyed by board name, not by board id.** The id is what a vehicle reports
-// most readily -- AUTOPILOT_VERSION's `board_version` carries it shifted up
-// sixteen bits -- but it does not identify a pinout: measured on this tree, 44
-// ids are claimed by more than one layout, and id 9 alone covers CubeBlack,
-// Pixhawk1, fmuv2, fmuv3 and the skyviper boards, which are not the same
-// hardware. Keying by id would have shown a Pixhawk1 owner skyviper's timer
-// groups. So the name leads -- ArduPilot's `CHIBIOS_SHORT_BOARD_NAME`, which it
-// prints in the boot banner's system-id line -- and the id is a fallback
-// emitted only for ids whose every board agrees on one layout.
+// The table is keyed by board name, not board id. AUTOPILOT_VERSION's
+// `board_version` carries the id (shifted up 16 bits), but an id does not
+// identify a pinout: 44 ids are shared by more than one layout, and id 9 alone
+// covers CubeBlack, Pixhawk1, fmuv2, fmuv3 and the skyviper boards. The name is
+// ArduPilot's `CHIBIOS_SHORT_BOARD_NAME`, printed in the boot banner's
+// system-id line. The id is a fallback, emitted only for ids whose boards all
+// share one layout.
 
 import { writeFileSync } from 'node:fs'
 
@@ -60,8 +55,7 @@ async function boardTypes() {
   const txt = await fetchText(`${RAW}/Tools/AP_Bootloader/board_types.txt`)
   const map = new Map()
   for (const line of (txt ?? '').split('\n')) {
-    // Hyphens are ordinary in these symbols (`AP_HW_AET-H743-Basic`), and a
-    // word-character class silently dropped every board that had one.
+    // Symbols can contain hyphens (`AP_HW_AET-H743-Basic`), so \w is not enough.
     const m = /^\s*([A-Za-z0-9_-]+)\s+(\d+)/.exec(line)
     if (m) map.set(m[1], Number(m[2]))
   }
@@ -72,7 +66,7 @@ async function boardTypes() {
  * Flatten a board's hwdef, following `include` relative to the including file.
  *
  * Depth-limited rather than cycle-detected: the tree is two or three deep, and a
- * cycle would be a bug upstream rather than something to paper over here.
+ * cycle would be an upstream bug.
  */
 async function flatten(dir, file = 'hwdef.dat', depth = 0) {
   if (depth > 4) return []
@@ -97,16 +91,15 @@ async function flatten(dir, file = 'hwdef.dat', depth = 0) {
  * The output pins, after `undef`.
  *
  * A variant overrides its base by undefining pins and redefining them, and the
- * `-bdshot` boards move outputs to entirely different timers while doing it:
+ * `-bdshot` boards move outputs to different timers while doing it:
  *
  *   include ../MatekH743/hwdef.dat
  *   undef PC7 PC6 PB0 PB1 ...
  *   PB0  TIM3_CH3 TIM3  PWM(1)  GPIO(50) BIDIR   # was TIM8 in the base
  *
- * Read as a flat list that produces two pins claiming output 1 on different
- * timers, and the groups come out shredded -- MatekH743-bdshot parsed to a
- * group of one where the board has a pair. So pins are kept by name, an
- * `undef` removes them, and a later definition replaces an earlier one.
+ * Read as a flat list, that gives two pins claiming output 1 on different
+ * timers. So pins are kept by name, `undef` removes them, and a later
+ * definition replaces an earlier one.
  */
 function parsePins(lines) {
   const byPin = new Map()
@@ -162,8 +155,7 @@ async function main() {
     .filter((e) => e.type === 'dir' && !/^(iomcu|scripts|common|STM32|.*-bl)$/i.test(e.name))
     .map((e) => e.name)
 
-  // The IO co-processor's own fixed layout, read from its hwdef rather than
-  // written down here.
+  // The IO co-processor's fixed layout, read from its own hwdef.
   const iomcu = groupsFrom(parsePins(await flatten('iomcu')), 0)
 
   const boards = []
@@ -195,9 +187,9 @@ async function main() {
   const byName = new Map()
   for (const b of boards) if (!byName.has(b.name)) byName.set(b.name, b)
 
-  // An id is usable on its own only where every board carrying it agrees on one
-  // layout -- a board and its `-bdshot` sibling usually do, CubeBlack and
-  // skyviper emphatically do not.
+  // An id is usable on its own only where every board carrying it has one
+  // layout. A board and its `-bdshot` sibling usually do; CubeBlack and
+  // skyviper do not.
   const layouts = new Map()
   for (const b of byName.values()) {
     if (!layouts.has(b.id)) layouts.set(b.id, new Set())
@@ -249,8 +241,8 @@ ${idRows}
  * Null covers three real cases and does not distinguish them, because the
  * screen's answer is the same for all three: a board added to ArduPilot since
  * this table was generated, a board whose id is shared by several layouts and
- * which did not name itself, and a vehicle that reports neither -- SITL among
- * them, since the id is a ChibiOS build constant.
+ * which did not name itself, and a vehicle that reports neither (SITL among
+ * them, since the id is a ChibiOS build constant).
  */
 export function timerGroups(boardName: string | null, boardId: number): Board | null {
   if (boardName) {

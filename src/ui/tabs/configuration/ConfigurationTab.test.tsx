@@ -13,12 +13,10 @@ vi.mock('../../../services/connection', () => ({
   },
 }))
 
-// Configuration draws itself from what the aircraft reports, because the two
-// vehicles have almost nothing in common here: a multirotor has FRAME_CLASS,
-// MOT_* and ATC_*; ArduPlane has none of those, carries Q_ENABLE, and grows
-// Q_M_*/Q_A_* for its VTOL motors only once that is on. Every name below was
-// measured against SITL -- Copter 4.7.1, ArduPlane 4.7.1, and the same plane
-// launched as a quadplane.
+// Configuration draws from what the aircraft reports: a multirotor has
+// FRAME_CLASS, MOT_* and ATC_*; ArduPlane has none of those, carries Q_ENABLE,
+// and gains Q_M_*/Q_A_* only once that is on. Every name below was read from
+// SITL (Copter 4.7.1, ArduPlane 4.7.1, and the same plane as a quadplane).
 
 const entry = (value: number) => ({ value, origValue: value, mavType: 4, dirty: false })
 
@@ -48,8 +46,7 @@ describe('Configuration, per vehicle', () => {
   })
 
   it('shows VTOL rather than Frame for a plane, and no tune without motors', () => {
-    // A pure fixed wing: Q_ENABLE present and off, so no VTOL motors exist
-    // and there is nothing to compute from a propeller size.
+    // A pure fixed wing: Q_ENABLE present and off, so no VTOL motors.
     seed({ Q_ENABLE: 0, INS_GYRO_FILTER: 20, INS_ACCEL_FILTER: 20, RLL_RATE_P: 0.08 })
     render(<ConfigurationTab />)
     expect(screen.getByText('VTOL')).toBeTruthy()
@@ -57,10 +54,9 @@ describe('Configuration, per vehicle', () => {
     expect(screen.queryByText('Initial tune')).toBeNull()
   })
 
-  // The spellings are the point of this one. ArduPlane 4.4 renamed the whole
-  // envelope off its centi-unit names, and a card built on the old ones is a
-  // card of no rows: measured on 4.7.1, TRIM_ARSPD_CM, ARSPD_FBW_MIN/MAX,
-  // LIM_ROLL_CD and LIM_PITCH_MAX/MIN all come back absent.
+  // ArduPlane 4.4 renamed the envelope off its centi-unit names; on 4.7.1
+  // TRIM_ARSPD_CM, ARSPD_FBW_MIN/MAX, LIM_ROLL_CD and LIM_PITCH_MAX/MIN are
+  // absent, so a card built on them has no rows.
   it('carries the airspeed and envelope a fixed wing actually reports', () => {
     seed({
       Q_ENABLE: 0,
@@ -82,11 +78,9 @@ describe('Configuration, per vehicle', () => {
     // The attitude limits moved to Tuning's Attitude card.
     expect(screen.queryByText('Flight envelope')).toBeNull()
     expect(screen.queryByText('ROLL_LIMIT_DEG')).toBeNull()
-    // The names go on the labels, because this is where somebody carries an
-    // answer between the wiki, the forums and the Parameters tab.
+    // Parameter names are shown on the labels.
     expect(screen.getByText('AIRSPEED_CRUISE')).toBeTruthy()
-    // The throttle that holds the cruise speed reads with the speeds, not with
-    // the attitude limits.
+    // Cruise throttle sits with the speeds.
     expect(screen.getByText('TRIM_THROTTLE')).toBeTruthy()
     expect(screen.queryByText('STALL_PREVENTION')).toBeNull()
   })
@@ -106,14 +100,13 @@ describe('Configuration, per vehicle', () => {
     expect(screen.getByText('Initial tune')).toBeTruthy()
     expect(screen.getByText('Q_M_THST_EXPO')).toBeTruthy()
     expect(screen.getByText('Q_A_ACC_R_MAX')).toBeTruthy()
-    // The multirotor family is offered by the calculation and dropped here,
-    // because this aircraft does not report it.
+    // Computed by the calculation but dropped: this aircraft does not report it.
     expect(screen.queryByText('MOT_THST_EXPO')).toBeNull()
   })
 
   it('writes Q_ENABLE when chosen and re-reads, which is where the VTOL set comes from', async () => {
-    // Measured on ArduPlane 4.7.1: Q_ENABLE=1 exposes ~200 Q_ parameters with
-    // no restart -- but only to a GCS that reads the list again.
+    // On ArduPlane 4.7.1, Q_ENABLE=1 exposes ~200 Q_ parameters without a
+    // restart, but only to a GCS that reads the list again.
     useConnectionStore.setState({ phase: 'connected' } as never)
     seed({ Q_ENABLE: 0, AIRSPEED_CRUISE: 22 })
     useParamStore.setState({
@@ -127,11 +120,9 @@ describe('Configuration, per vehicle', () => {
     useConnectionStore.setState({ phase: 'idle' } as never)
   })
 
-  // A card's Revert and Write are absent until it has something to send, not
-  // present and greyed: a screenful of permanently disabled buttons made the
-  // one card carrying staged edits no easier to find than the rest. The card
-  // does not change height for it -- the title's own min-height holds the row
-  // open -- which is what makes appearing and disappearing safe here.
+  // Revert and Write are absent, not grayed, until the card has staged edits,
+  // so the card with edits stands out. The title's min-height keeps the card
+  // from changing height.
   it('shows no card actions until something is staged', () => {
     seed({ Q_ENABLE: 0, AIRSPEED_CRUISE: 22, ROLL_LIMIT_DEG: 65 })
     const { rerender } = render(<ConfigurationTab />)

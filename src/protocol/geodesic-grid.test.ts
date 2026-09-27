@@ -2,17 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { ICOSAHEDRON, SECTIONS, coverage, sectionCovered } from './geodesic-grid'
 
 // The grid is transcribed from ArduPilot's AP_GeodesicGrid.h, and a wrong
-// transcription does not look wrong: it draws a sphere with patches lit in
-// the wrong places. So these check properties that follow from the
-// specification rather than from the code above -- if the table were mistyped
-// or the sub-triangle order swapped, at least one of them fails.
+// transcription still draws a plausible sphere. These check properties that
+// follow from the specification, so a mistyped table or swapped sub-triangle
+// order fails at least one.
 
 describe('the geodesic grid ArduPilot reports coverage in', () => {
   it('is an icosahedron tessellated by two: 20 triangles, 80 sections', () => {
     expect(ICOSAHEDRON).toHaveLength(20)
     expect(SECTIONS).toHaveLength(80)
-    // Eighty is also what the ten-byte mask can address, which is the whole
-    // reason the number matters.
+    // Eighty is what the ten-byte completion mask addresses.
     expect(SECTIONS.length).toBe(10 * 8)
   })
 
@@ -26,8 +24,7 @@ describe('the geodesic grid ArduPilot reports coverage in', () => {
   })
 
   it('has twelve distinct icosahedron vertices', () => {
-    // A wrong golden-ratio term, or a mistyped sign, shows up here: the
-    // twenty triangles must share exactly twelve corners between them.
+    // Catches a wrong golden-ratio term or a mistyped sign.
     const seen = new Set(
       ICOSAHEDRON.flat().map((v) => v.map((n) => n.toFixed(4)).join(',')),
     )
@@ -48,9 +45,8 @@ describe('the geodesic grid ArduPilot reports coverage in', () => {
   })
 
   it('covers the whole sphere once, with no overlap', () => {
-    // Solid angles of 80 equal-ish spherical triangles must sum to 4π. This
-    // is the strongest check available without porting `section()`: it fails
-    // if any triangle is degenerate, duplicated or missing.
+    // Solid angles must sum to 4π; fails if any triangle is degenerate,
+    // duplicated or missing.
     const solidAngle = (t: readonly (readonly number[])[]) => {
       const [a, b, c] = t as [number[], number[], number[]]
       const dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!
@@ -80,8 +76,7 @@ describe('the geodesic grid ArduPilot reports coverage in', () => {
   })
 
   it('survives a short or empty mask rather than throwing', () => {
-    // A vehicle that sends nothing useful is the normal state before the
-    // first sample, and this draws every frame.
+    // The normal state before the first sample; this runs every frame.
     expect(sectionCovered([], 0)).toBe(false)
     expect(coverage([])).toBe(0)
     expect(coverage(new Array(10).fill(0xff))).toBe(1)

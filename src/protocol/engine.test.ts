@@ -180,9 +180,8 @@ describe('the inspector', () => {
   it('keeps senders apart, echoes included', () => {
     engine.setInspecting(true)
     engine.pushBytes(vehicleHeartbeat(0))
-    // Our own heartbeat coming back at us -- a UDP loop. The vehicle logic
-    // ignores it; the inspector must show it, because seeing your own echo
-    // is exactly how a loop is diagnosed.
+    // Our own heartbeat echoed back (a UDP loop). The vehicle logic ignores
+    // it, but the inspector shows it so the loop can be diagnosed.
     engine.pushBytes(
       encodeFrame(
         'HEARTBEAT',

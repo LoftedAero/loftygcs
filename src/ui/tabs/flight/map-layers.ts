@@ -1,10 +1,7 @@
-// Base map choices. Satellite is the default because that is what you are
-// actually looking at when you fly -- a street map tells you nothing about
-// the field you are standing in.
+// Base map choices. Satellite is the default because it shows the field.
 //
-// Esri World Imagery is used keyless. Its terms require the attribution
-// below to stay visible, which is why the string travels with the layer
-// definition rather than living in a component someone might tidy away.
+// Esri World Imagery is used without a key; its terms require the
+// attribution to stay visible, so it is kept with the layer definition.
 
 export interface BaseLayer {
   id: 'satellite' | 'street'
@@ -15,7 +12,7 @@ export interface BaseLayer {
   maxNativeZoom: number
   /** Leaflet keeps zooming past that by upscaling, rather than going blank. */
   maxZoom: number
-  /** Esri's imagery service numbers tiles {z}/{y}/{x}, not {z}/{x}/{y}. */
+  /** Tile server subdomains, if any. */
   subdomains?: string
 }
 
@@ -56,7 +53,7 @@ export function saveBaseLayer(id: BaseLayerId) {
   try {
     localStorage.setItem(STORAGE_KEY, id)
   } catch {
-    // Not worth surfacing: the choice just won't persist.
+    // The choice just won't persist.
   }
 }
 

@@ -1,25 +1,19 @@
 // Official ArduPilot parameter metadata (descriptions, ranges, bitmasks,
 // units), generated from the firmware's own source by param_parse.py.
 //
-// Matched to the vehicle's firmware version where it can be. This is not
-// pedantry: parameters are added, renamed and re-scaled between releases,
-// and documentation from a different one is worse than none -- it is a
-// range or a bitmask that looks authoritative and is wrong. When the
-// version is unknown or has no published metadata, the current release's is
-// used and the screen says which.
+// Matched to the vehicle's firmware version where possible, since parameters
+// are added, renamed and rescaled between releases. When the version is
+// unknown or unpublished, the current release's metadata is used and the
+// screen says so.
 //
-// Two shapes, both from autotest.ardupilot.org, because the server only
-// publishes one of them per path (checked, not assumed):
+// autotest.ardupilot.org publishes one format per path, with the vehicle
+// spelled differently in each tree, so both readers live here:
 //
 //   /Parameters/<ArduCopter>/apm.pdef.json          the current release
 //   /Parameters/versioned/<Copter>/stable-4.5.7/apm.pdef.xml   a release
 //
-// Note the vehicle is spelled differently in the two trees. So both a JSON
-// and an XML reader live here.
-//
-// Metadata is decoration: every load failure degrades to "params editable,
-// no hints", never to a blocked UI. Responses are cached with the Cache API
-// so the app works offline at the field after one successful fetch.
+// Every load failure degrades to editable parameters without hints. Responses
+// are cached with the Cache API so the app works offline after one fetch.
 
 import type { FirmwareVersion } from '../protocol/types'
 
@@ -113,12 +107,8 @@ async function cachedFetch(url: string): Promise<Response> {
 }
 
 /**
- * Which published version to ask for.
- *
- * The newest release that is not newer than the vehicle's own: a 4.5.9 that
- * has no published metadata is documented well enough by 4.5.7, and 4.6.0's
- * would describe parameters this firmware does not have. Newer is the wrong
- * direction to round.
+ * Which published version to ask for: the newest release not newer than the
+ * vehicle's. A newer one would describe parameters this firmware lacks.
  */
 export function bestVersion(
   available: readonly string[],
@@ -144,9 +134,7 @@ export function bestVersion(
 
 /** The stable versions the server publishes metadata for, newest last. */
 export function parseVersionIndex(html: string): string[] {
-  // Harvesting version strings out of an Apache listing rather than parsing
-  // it: the only thing depended on is that the directory names appear in
-  // the page, which is true of every index format anyone serves.
+  // Scrapes directory names from the index page rather than parsing its format.
   const out = new Set<string>()
   for (const m of html.matchAll(/stable-(\d+\.\d+\.\d+)\//g)) out.add(m[1]!)
   return [...out]
@@ -171,12 +159,9 @@ async function versionedUrl(
 }
 
 /**
- * Read the XML form.
- *
- * Same information as the JSON, arranged differently: one <param> per
- * parameter carrying <field> children, and enumerations in a <values>
- * block. Vehicle parameters are named "ArduCopter:SYSID_THISMAV" where
- * library ones are plain, so the prefix comes off.
+ * Reads the XML form: one <param> per parameter with <field> children and a
+ * <values> block. Vehicle parameters are prefixed ("ArduCopter:SYSID_THISMAV")
+ * and library ones are not, so the prefix is stripped.
  */
 export function parsePdefXml(text: string): Record<string, ParamMeta> {
   const doc = new DOMParser().parseFromString(text, 'application/xml')
@@ -214,9 +199,8 @@ export function parsePdefXml(text: string): Record<string, ParamMeta> {
     const bitmask = parseKeyedList(fields.get('Bitmask'))
     if (bitmask) meta.bitmask = bitmask
 
-    // <values> serves both kinds: for a bitmask parameter it lists the mask
-    // values rather than the bit numbers, so it is only read as an
-    // enumeration when there is no Bitmask field to prefer.
+    // For a bitmask parameter <values> lists mask values, not bit numbers,
+    // so it is read only when there is no Bitmask field.
     if (!bitmask) {
       const values: Record<number, string> = {}
       for (const v of el.getElementsByTagName('value')) {
@@ -264,8 +248,7 @@ export async function fetchParamMetadata(
         const res = await cachedFetch(match.url)
         return { params: parsePdefXml(await res.text()), source: match.label }
       } catch {
-        // Published but unfetchable: fall through to the current release
-        // rather than leaving the table with no hints at all.
+        // Published but unfetchable: fall back to the current release.
       }
     }
   }

@@ -3,14 +3,8 @@ import { useMenuPlacement } from '../../components/menu-placement'
 import { LaButton, LaSwitch } from '../../components/La'
 import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 
-// Right-click on the HUD. The map's menu acts on the point you clicked; this
-// one acts on the HUD itself -- what is drawn on it and what is behind it.
-//
-// These switches also live in the View menu, which is where you go to arrange
-// the window. They are repeated here because that is not how they get used in
-// flight: wanting the video without the horizon over it is a thought you have
-// while looking at the HUD, and hunting for a menu on the far side of the
-// screen to act on it is the wrong shape.
+// Right-click on the HUD: toggles for what is drawn on it and behind it.
+// These duplicate the View menu so they can be reached from the HUD itself.
 
 export interface HudMenuPoint {
   x: number

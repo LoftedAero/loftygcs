@@ -1,15 +1,12 @@
 // How the autopilot board is mounted, as roll/pitch/yaw.
 //
-// AHRS_ORIENTATION is ArduPilot's `enum Rotation`, and every name is a set of
-// Euler angles in its own 3-2-1 convention. The table is copied from the
-// firmware's own test (`AP_Math/tests/test_rotations.cpp`, `TestEulers`),
-// which checks each name against `from_euler(roll, pitch, yaw)` -- so it is the
-// firmware's definition rather than a reading of the names. That matters for
-// one entry in particular: ROTATION_ROLL_90_PITCH_68_YAW_293 is actually
-// 68.8 and 293.3, which no amount of reading the name would give you.
+// AHRS_ORIENTATION is ArduPilot's `enum Rotation`, each name a set of Euler
+// angles in its 3-2-1 convention. The table is copied from the firmware's own
+// test (`AP_Math/tests/test_rotations.cpp`, `TestEulers`) rather than read off
+// the names: ROTATION_ROLL_90_PITCH_68_YAW_293 is actually 68.8 and 293.3.
 //
-// Values 0..43 are consecutive and are the frame order of the pre-rendered
-// board sheet (`npm run cal-art`), which is why a value doubles as its frame.
+// Values 0..43 are consecutive and double as frame indices in the
+// pre-rendered board sheet (`npm run cal-art`).
 
 /** Degrees: [roll, pitch, yaw], indexed by the enum value. */
 const EULER: readonly (readonly [number, number, number])[] = [
@@ -72,10 +69,9 @@ export interface BoardRotation {
 const rad = (d: number) => (d * Math.PI) / 180
 
 /**
- * The mounting rotation for an AHRS_ORIENTATION value, or null for one that
- * has no fixed angles -- the custom rotations (100-102) take theirs from
- * parameters, and a pre-rendered picture cannot show an arbitrary angle, so
- * drawing one level would be a confident picture of a mounting nobody chose.
+ * The mounting rotation for an AHRS_ORIENTATION value, or null for one with
+ * no fixed angles. The custom rotations (100-102) take theirs from
+ * parameters, which a pre-rendered picture cannot show.
  */
 export function boardRotation(value: number): BoardRotation | null {
   const e = Number.isInteger(value) ? EULER[value] : undefined

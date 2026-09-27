@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { modeSlotForPwm } from './FlightModesTab'
 
-// The PWM bands ArduPilot uses to pick one of six mode slots. Getting a
-// boundary wrong would highlight the wrong row while the vehicle flies
-// another mode -- exactly the confusion this display exists to prevent.
+// The PWM bands ArduPilot uses to pick one of six mode slots. A wrong
+// boundary highlights a different row from the mode the vehicle is flying.
 describe('modeSlotForPwm', () => {
   it('maps each band to its slot', () => {
     expect(modeSlotForPwm(1000)).toBe(1)

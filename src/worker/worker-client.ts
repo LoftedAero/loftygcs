@@ -1,10 +1,9 @@
 // Typed wrapper around the protocol worker: the only way the rest of the
-// renderer talks MAVLink. Owning the Worker here means connection teardown
-// has exactly one thing to terminate.
-// ?worker&inline bundles the worker into the main chunk (base64 -> blob).
-// Costs some bundle size, but one build then runs everywhere the app has to
-// live: http, file:// inside Electron, and the single-file artifact/demo
-// build where a separate worker chunk has no URL to load from.
+// renderer talks MAVLink, and the one thing connection teardown terminates.
+//
+// ?worker&inline bundles the worker into the main chunk, so the same build
+// works over http, from file:// in Electron, and in the single-file demo,
+// where a separate worker chunk would have no URL.
 import ProtocolWorker from './protocol.worker?worker&inline'
 import type {
   EngineCommand,
@@ -85,8 +84,8 @@ export class WorkerClient {
   }
 
   /**
-   * Read a file off the vehicle. Progress arrives as `fileProgress` events
-   * rather than a callback, which cannot cross the worker boundary.
+   * Read a file off the vehicle. Progress arrives as `fileProgress` events,
+   * since a callback cannot cross the worker boundary.
    */
   downloadFile(path: string): Promise<Uint8Array> {
     return this.request({ op: 'downloadFile', path }) as Promise<Uint8Array>

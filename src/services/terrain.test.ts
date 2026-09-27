@@ -3,9 +3,9 @@ import { prefetchTerrainForView, terrainTilesForArea } from './terrain'
 import { tileUrl } from './tile-math'
 import { TERRAIN_URL } from './terrain'
 
-// The view prefetcher, on the degraded no-IndexedDB path jsdom provides:
-// nothing is stored, so every wanted tile becomes a fetch -- which makes the
-// fetch list a faithful record of what the prefetcher decided to want.
+// The view prefetcher, on jsdom's no-IndexedDB path: nothing is stored, so
+// every wanted tile becomes a fetch and the fetch list records what the
+// prefetcher asked for.
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -31,9 +31,7 @@ describe('elevation following the view', () => {
   })
 
   it('fetches nothing for a continent', async () => {
-    // The same cap as everything else that touches terrain: there is no
-    // useful elevation answer for a world view, and speculative traffic is
-    // only defensible while it stays tiny.
+    // The same area cap as all terrain code: a world view gets nothing.
     const f = vi.fn(ok)
     vi.stubGlobal('fetch', f)
     await prefetchTerrainForView({ north: 60, south: -60, east: 170, west: -170 })
@@ -41,9 +39,8 @@ describe('elevation following the view', () => {
   })
 
   it('coalesces pans to the newest view', async () => {
-    // Three settles arrive while the first fetch is still in flight. The
-    // middle one is ground nobody stopped on; only the first and the last
-    // views may be fetched.
+    // Three settles arrive while the first fetch is in flight; only the
+    // first and last views are fetched.
     const a = FIELD
     const b = { north: 40.0, south: 39.98, east: -105.2, west: -105.22 }
     const c = { north: 51.5, south: 51.48, east: -0.1, west: -0.12 }

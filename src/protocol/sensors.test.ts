@@ -6,14 +6,12 @@ const ACCEL = SENSOR_BITS.accel
 const MAG = SENSOR_BITS.mag
 const GPS = SENSOR_BITS.gps
 
-// Telling "not fitted" apart from "fitted and failing" is the whole point:
-// one is normal for the airframe, the other grounds it.
+// "Not fitted" is normal for an airframe; "fitted and failing" grounds it.
 describe('decodeSensors', () => {
   it('lists only sensors the board says are fitted', () => {
     const readings = decodeSensors(GYRO | ACCEL, GYRO | ACCEL, GYRO | ACCEL)
     expect(readings.map((r) => r.id)).toEqual(['gyro', 'accel'])
-    // No airspeed sensor on this board, so it is absent from the list
-    // rather than reported as broken.
+    // No airspeed sensor, so it is absent rather than reported as broken.
     expect(readings.some((r) => r.id === 'airspeed')).toBe(false)
   })
 
@@ -47,13 +45,11 @@ describe('decodeSensors', () => {
   })
 
   it('never lists the prearm flag as a sensor', () => {
-    // MAV_SYS_STATUS_PREARM_CHECK is ArduPilot reporting whether its arming
-    // checks pass, not a device. It appeared under "Unhealthy sensors" the
-    // moment a vehicle was not ready to arm -- which is normal, and reads as
-    // broken hardware. The readiness line above it already says it properly.
+    // MAV_SYS_STATUS_PREARM_CHECK reports whether arming checks pass; it is
+    // not a device, and listing it as unhealthy reads as broken hardware.
     const all = Object.values(SENSOR_BITS).reduce((a, b) => a | b, 0)
     expect(decodeSensors(all, all, all).map((r) => r.id)).not.toContain('prearm')
-    // Including when it is the failing one, which is the case that showed.
+    // Including when it is failing.
     const healthy = all & ~SENSOR_BITS.prearm
     const readings = decodeSensors(all, all, healthy)
     expect(readings.filter((r) => r.state === 'unhealthy')).toEqual([])

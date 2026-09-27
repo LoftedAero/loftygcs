@@ -1,6 +1,5 @@
-// Thin typed wrappers over the Lofted Aero design system. Each one emits
-// exactly the markup shape DESIGN.md documents -- the wrapper exists so a
-// React component cannot drift from that shape, not to add behavior.
+// Thin typed wrappers over the Lofted Aero design system. Each emits exactly
+// the markup DESIGN.md documents, so components cannot drift from it.
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
 
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -34,9 +33,8 @@ export function LaCard({
   subtitle?: string
   note?: string
   /**
-   * What the card does, on its title row. The system sheet has no header row,
-   * only a title carrying the orange rule, so the row is app-local
-   * (`.la-card__head` in app.css) and takes the rule across its full width.
+   * Actions on the card's title row. The row is app-local (`.la-card__head`
+   * in app.css) because the system sheet has no header row.
    */
   actions?: ReactNode
   children?: ReactNode
@@ -150,9 +148,8 @@ export function LaReadout({
 }
 
 export function LaHint({ error, children }: { error?: boolean; children?: ReactNode }) {
-  // Left in the markup even when empty -- an empty hint collapses, and
-  // keeping the element means a message never reflows the card when it
-  // appears.
+  // Rendered even when empty, so a message appearing does not reflow the
+  // card.
   return <p className={error ? 'la-hint la-hint--error' : 'la-hint'}>{children}</p>
 }
 
@@ -170,8 +167,8 @@ export function LaModal({
   /** The wider card DESIGN.md defines, for dialogs with a diagram or a table. */
   wide?: boolean
   /**
-   * The other end of the same axis, for a dialog that is only a question and
-   * its answers. The system sheet has no such modifier -- see app.css.
+   * A narrower card, for a dialog that is only a question and its answers.
+   * App-local; see app.css.
    */
   narrow?: boolean
   title: string

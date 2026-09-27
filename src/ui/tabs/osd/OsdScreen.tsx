@@ -4,15 +4,12 @@ import { NTSC_VISIBLE_ROWS, type Grid, type Placement } from './osd-layout'
 
 // The screen preview: a character grid you drag panels around on.
 //
-// Built from DOM elements rather than a canvas on purpose. Every panel is a
-// real focusable control, so dragging is not the only way to move one --
-// arrow keys nudge the selection, which matters because a pointer-only
-// editor is unusable to anyone driving the app from the keyboard, and this
-// screen is otherwise the one place in the app with no keyboard path.
+// Built from DOM elements rather than a canvas so every panel is a focusable
+// control and arrow keys can move it, not only dragging.
 //
-// Panels render one character per grid cell instead of relying on the font's
-// natural advance width. It costs a span per character (a few hundred at
-// worst) and buys an honest preview: what looks like it fits, fits.
+// Panels render one character per grid cell rather than relying on the
+// font's advance width, so what looks like it fits does fit. It costs a span
+// per character, a few hundred at worst.
 
 export interface OsdScreenProps {
   grid: Grid
@@ -22,15 +19,13 @@ export interface OsdScreenProps {
   /** Panels the current grid is too small for; clipped rather than drawn. */
   offGrid: ReadonlySet<string>
   /**
-   * The OSD is off, so the layout is readable but not editable. Dragging a
-   * panel would stage a parameter the vehicle is not drawing from -- and
-   * with no backend there is nothing to lay out yet.
+   * The OSD is off, so the layout is readable but not editable.
    */
   disabled?: boolean | undefined
   /**
-   * What an empty screen says. Left out, it points at the panel list; `null`
-   * says nothing, for when the list has nothing to turn on either -- the OSD
-   * off, or this screen off -- and the Panels card already says why.
+   * What an empty screen says. Omitted, it points at the panel list; `null`
+   * shows nothing, for when the Panels card already explains why (the OSD or
+   * this screen is off).
    */
   emptyText?: string | null
   /** Highlight the rows an NTSC frame cuts off. Analog grids only. */
@@ -81,8 +76,7 @@ export default function OsdScreen({
   }
 
   const beginDrag = (e: ReactPointerEvent<HTMLButtonElement>, p: Placement) => {
-    // Let the browser handle anything that is not a plain primary press, so
-    // right-click and modifier-click keep their usual meanings.
+    // Primary button only, so other clicks keep their usual meanings.
     if (e.button !== 0) return
     const at = cellAt(e.clientX, e.clientY)
     if (!at) return
@@ -98,8 +92,8 @@ export default function OsdScreen({
     setDrag({ ...drag, x: at.x - drag.grabX, y: at.y - drag.grabY })
   }
 
-  // The store only hears the final position: committing every pointermove
-  // would copy the whole parameter map dozens of times a second to no end.
+  // Only the final position is committed; each commit copies the parameter
+  // map.
   const endDrag = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (!drag) return
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -109,11 +103,10 @@ export default function OsdScreen({
     setDrag(null)
   }
 
-  // MAX7456 character cells are 12x18 px, so a cell is two units wide by
-  // three tall: a 30x16 screen comes out 5:4, as analog video actually is,
-  // and the HD grids land near 16:9. Handed to CSS as a bare number so the
-  // stylesheet can derive a width from a capped height and keep the cells
-  // square-ish -- clamping height alone would squash the grid.
+  // MAX7456 character cells are 12x18 px, so a cell is 2:3: a 30x16 screen
+  // comes out 5:4 like analog video, and HD grids near 16:9. Passed to CSS as
+  // a bare number so the stylesheet can derive width from a capped height
+  // without squashing the grid.
   const stageStyle = {
     '--osd-cols': grid.cols,
     '--osd-rows': grid.rows,
@@ -133,9 +126,8 @@ export default function OsdScreen({
           </div>
         )}
 
-        {/* An OSD screen with nothing on it is a legitimate state (three of
-            the four ship that way), so say so rather than showing what looks
-            like a failed render. */}
+        {/* An empty OSD screen is normal (three of the four ship that way),
+            so say so rather than look like a failed render. */}
         {emptyText !== null && !placements.some((p) => p.enabled) && (
           <p className="osd-screen__empty">{emptyText}</p>
         )}
@@ -144,8 +136,8 @@ export default function OsdScreen({
           .filter((p) => p.enabled)
           .map((p) => {
             const live = drag?.id === p.item.id ? drag : null
-            // Mid-drag the panel follows the pointer unsnapped; it lands on a
-            // whole cell only when released, so the motion reads as direct.
+            // Mid-drag the panel follows the pointer unsnapped; it snaps to a
+            // cell on release.
             const x = live ? live.x : p.x
             const y = live ? live.y : p.y
             const extent = itemExtent(p.item)
@@ -182,8 +174,7 @@ export default function OsdScreen({
                   if (disabled) return
                   const step = NUDGE[e.key]
                   if (!step) return
-                  // Shift jumps by five cells; crossing a 60-column screen one
-                  // press at a time is nobody's idea of an editor.
+                  // Shift moves five cells at a time.
                   const scale = e.shiftKey ? 5 : 1
                   e.preventDefault()
                   onMove(p.item.id, p.x + step.dx * scale, p.y + step.dy * scale)

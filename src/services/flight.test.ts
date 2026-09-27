@@ -45,8 +45,8 @@ beforeEach(() => {
 
 describe('setModeConfirmed', () => {
   it('believes the heartbeat, not the ack', async () => {
-    // ArduPilot acknowledges DO_SET_MODE and then declines the change --
-    // "requires position" -- leaving the ack saying ACCEPTED forever.
+    // ArduPilot can ack DO_SET_MODE as ACCEPTED and then decline the change
+    // ("requires position").
     const result = await setModeConfirmed(GUIDED, 200)
     expect(sent[0]?.command).toBe(DO_SET_MODE)
     expect(result).toBe(4) // MAV_RESULT_FAILED
@@ -65,8 +65,8 @@ describe('setModeConfirmed', () => {
 
 describe('takeoff', () => {
   it('switches a Copter to Guided before commanding the climb', async () => {
-    // The bug this exists for: NAV_TAKEOFF from Stabilize is refused, and
-    // the aircraft then auto-disarms on the ground having done nothing.
+    // NAV_TAKEOFF from Stabilize is refused, and the aircraft then disarms
+    // itself on the ground.
     setTimeout(() => useVehicleStore.setState({ customMode: GUIDED }), 50)
     await expect(takeoff(20)).resolves.toBe(0)
     expect(sent.map((s) => s.command)).toEqual([DO_SET_MODE, NAV_TAKEOFF])
@@ -75,19 +75,16 @@ describe('takeoff', () => {
   })
 
   it('does not command a climb it could not get into Guided for', async () => {
-    // The heartbeat never reaches Guided, so takeoff must not be sent: a
-    // NAV_TAKEOFF in Stabilize is refused, and reporting that refusal would
-    // hide the real reason, which is the mode.
+    // The heartbeat never reaches Guided, so takeoff is not sent; the error
+    // should name the mode, not the refused takeoff.
     const result = await takeoff(20, 300)
     expect(result).toBe(4)
     expect(sent.some((s) => s.command === NAV_TAKEOFF)).toBe(false)
   })
 
   it('re-arms if the mode switch outlasted the ground disarm timer', async () => {
-    // Copter disarms itself after about ten seconds sitting armed on the
-    // ground, which the switch into Guided is quite capable of outlasting --
-    // so the arm the button insisted on can be gone by the time we get
-    // there. Putting it back beats refusing a takeoff that was asked for.
+    // Copter disarms itself after about ten seconds armed on the ground,
+    // which can happen during the switch to Guided, so re-arm.
     useVehicleStore.setState({ armed: false })
     setTimeout(() => useVehicleStore.setState({ customMode: GUIDED }), 30)
     await expect(takeoff(20)).resolves.toBe(0)
@@ -110,10 +107,9 @@ describe('takeoff', () => {
   })
 
   it('takes a quadplane off the copter way, which is the vertical one', async () => {
-    // Measured against SITL: Guided + NAV_TAKEOFF gives 20 m of climb and
-    // 3 m of ground track, where mode TAKEOFF gives 51 m and 277 m -- a
-    // runway takeoff run, which is not what a VTOL aircraft is for. Both
-    // are ACCEPTED, so the ack alone cannot tell them apart.
+    // On SITL, Guided + NAV_TAKEOFF climbs vertically, while mode TAKEOFF
+    // makes a runway takeoff run. Both are ACCEPTED, so the ack cannot tell
+    // them apart.
     useParamStore.setState({ entries: new Map([['Q_ENABLE', qParam(1)]]) })
     useVehicleStore.setState({ vehicleType: 1, customMode: 5, armed: true })
     setTimeout(() => useVehicleStore.setState({ customMode: PLANE_GUIDED }), 30)
@@ -125,11 +121,9 @@ describe('takeoff', () => {
   })
 
   it('falls to the harmless route when Q_ENABLE has not arrived', async () => {
-    // Parameters download after the link comes up, so there is a window
-    // where the airframe is unknown. Guessing fixed wing on a quadplane
-    // starts a runway run in a VTOL aircraft; guessing quadplane on a fixed
-    // wing gets FAILED back and nothing happens. Only one of those is safe
-    // to be wrong about.
+    // Before parameters download the airframe is unknown. Guessing quadplane
+    // on a fixed wing just gets FAILED back; the opposite guess starts a
+    // runway run in a VTOL aircraft.
     useParamStore.setState({ entries: new Map() })
     useVehicleStore.setState({ vehicleType: 1, customMode: 5, armed: true })
     setTimeout(() => useVehicleStore.setState({ customMode: PLANE_GUIDED }), 30)
@@ -138,11 +132,9 @@ describe('takeoff', () => {
   })
 
   it('takes a plane off by mode, because the command does not work there', async () => {
-    // Measured against SITL, armed and in Guided: a fixed wing answers
-    // NAV_TAKEOFF with FAILED, and NAV_VTOL_TAKEOFF is UNSUPPORTED on both
-    // plane types -- it is a mission item with no runtime handler. Mode
-    // TAKEOFF is accepted by both and actually leaves the ground. So the
-    // button sends a mode change and no command at all.
+    // A fixed wing answers NAV_TAKEOFF with FAILED, and NAV_VTOL_TAKEOFF is
+    // UNSUPPORTED on both plane types (a mission item with no runtime
+    // handler). Mode TAKEOFF works, so only a mode change is sent.
     useParamStore.setState({ entries: new Map([['Q_ENABLE', qParam(0)]]) })
     useVehicleStore.setState({ vehicleType: 1, customMode: 0 })
     setTimeout(() => useVehicleStore.setState({ customMode: PLANE_TAKEOFF }), 30)
@@ -153,8 +145,7 @@ describe('takeoff', () => {
   })
 
   it('refuses on a vehicle with no takeoff at all', async () => {
-    // A rover. Better to say unsupported than to send a climb command to
-    // something that drives.
+    // A rover: unsupported.
     useVehicleStore.setState({ vehicleType: 10, customMode: 0 })
     await expect(takeoff(30)).resolves.toBe(3)
     expect(sent).toEqual([])

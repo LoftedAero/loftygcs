@@ -1,9 +1,6 @@
-// Mission actions: the four things the toolbar does.
-//
-// Read and write go through the connection like every other vehicle action.
-// Open and save use an input element and a blob download rather than a
-// native dialog, so the same code runs in the browser build and in Electron
-// -- and the privileged preload surface stays as small as it is.
+// Mission read, write, open and save. Open and save use an input element and
+// a blob download rather than a native dialog, so the same code runs in the
+// browser and in Electron without widening the preload surface.
 
 import { connectionService } from './connection'
 import { useMissionStore } from '../stores/mission-store'
@@ -34,9 +31,8 @@ export async function readFromVehicle(): Promise<void> {
 }
 
 /**
- * Send the plan to the vehicle. Uploading is not atomic -- a transfer that
- * dies partway leaves the vehicle holding its previous mission -- so this
- * only marks the plan synced once the vehicle's ack says accepted.
+ * Send the plan to the vehicle. The plan is marked synced only once the
+ * vehicle acks it as accepted; a failed transfer leaves the previous mission.
  */
 export async function writeToVehicle(): Promise<void> {
   const store = useMissionStore.getState()
@@ -58,9 +54,7 @@ export function openFromFile(): Promise<void> {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.waypoints,.txt,.plan,.mission'
-    // Attached rather than floating: a detached input's click is ignored by
-    // some browsers, and an element that is not in the document cannot be
-    // reached by a test either.
+    // Attached to the document: some browsers ignore a click on a detached input.
     input.style.display = 'none'
     document.body.appendChild(input)
     let settled = false
@@ -70,9 +64,8 @@ export function openFromFile(): Promise<void> {
       input.remove()
       resolve()
     }
-    // Dismissing the picker fires cancel, not change. Without this the
-    // promise never settles and the toolbar stays disabled for the rest of
-    // the session -- the caller has no way to tell a hang from a slow read.
+    // Dismissing the picker fires cancel, not change; without this the
+    // promise would never settle.
     input.oncancel = done
     input.onchange = async () => {
       const file = input.files?.[0]
@@ -81,8 +74,7 @@ export function openFromFile(): Promise<void> {
       try {
         const text = await file.text()
         const plan = /\.plan$/i.test(file.name) ? fromPlan(text) : fromWaypoints(text)
-        // Loading does NOT mark the plan synced: the vehicle still holds
-        // whatever it held, and that difference is the point of the badge.
+        // Loading does not mark the plan synced; the vehicle still holds its own.
         store.setPlan(plan, { name: file.name })
         store.setTransfer({ kind: 'done', text: `Loaded ${plan.items.length} items` })
       } catch (err) {
@@ -136,9 +128,8 @@ export function saveToFile(name = 'mission.waypoints'): void {
 }
 
 /**
- * Put planned home where the vehicle currently thinks home is. Without a
- * fix there is nothing to copy, which the caller reports rather than
- * silently placing home at null island.
+ * Put planned home at the vehicle's current position. Returns false without
+ * a fix, rather than placing home at 0,0.
  */
 export function homeFromVehicle(): boolean {
   const v = useVehicleStore.getState()

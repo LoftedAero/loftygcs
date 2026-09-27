@@ -2,13 +2,8 @@
 //
 // Every command this app offers, uploaded to real ArduPilot one at a time.
 //
-// The catalog is hand-written data, and two of its entries were wrong in
-// ways nothing else could catch: DO_GRIPPER was listed as 212, which is
-// DO_AUTOTUNE_ENABLE, so choosing "Gripper" would have started a tuning
-// run; and CONDITION_CHANGE_ALT is refused by both Copter and Plane, so it
-// was a menu entry that could only ever fail on upload. Neither is visible
-// in a type, a unit test, or a review -- the firmware is the only thing
-// that knows.
+// The catalog is hand-written, and a wrong command id or a command the
+// firmware refuses is only caught by the firmware itself.
 //
 // Run against whichever vehicle SITL is serving:
 //   npm run sitl           (or: npm run sitl -- plane)
@@ -22,11 +17,8 @@ import type { MissionItem, ProtocolEvent } from './types'
 
 const run = process.env.SITL === '1' ? describe : describe.skip
 
-// Which commands are Copter-only is no longer known here. It was a bare set
-// of ids in this file, which meant the test knew something the app did not:
-// the palette offered spline waypoints to a fixed wing. It is a `copterOnly`
-// field on the catalog now, and this reads it -- so what the UI offers and
-// what this uploads are the same list by construction.
+// Copter-only commands come from the catalog's `copterOnly` field, so the UI
+// and this test share one list.
 /** MAV_TYPE values that are copters, from the heartbeat. */
 const COPTER_TYPES = new Set([2, 13, 14, 15, 3])
 
@@ -48,8 +40,7 @@ function itemFor(seq: number, command: number): MissionItem {
     y: spec?.location === false ? 0 : CMAC.y,
     z: spec?.altitude ? 50 : 0,
   }
-  // A jump to item 0 is rejected as invalid rather than unsupported, which
-  // would look like a catalog error and is not one.
+  // A jump to item 0 is rejected as invalid, which is not a catalog error.
   if (command === 177) return { ...base, param1: 1, param2: 1 }
   return base
 }
@@ -62,8 +53,7 @@ run('the mission command catalog', () => {
       if (out.t === 'tx') socket?.write(out.bytes)
       else if (out.t === 'evt') events.push(out.evt)
     })
-    // Retried: the runner relaunches SITL between files, and connecting
-    // into that gap is a race, not a result.
+    // Retried: the runner relaunches SITL between test files.
     const sock = await connectSitl()
     socket = sock
     sock.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
@@ -77,9 +67,8 @@ run('the mission command catalog', () => {
       }
     }
     await waitFor('a heartbeat', () => events.some((e) => e.t === 'heartbeat'), 30000)
-    // Mission storage is not ready at the first heartbeat: every upload
-    // before it is answered "No space on vehicle", which reads exactly
-    // like a rejected command and is not one.
+    // Mission storage is not ready at the first heartbeat, and uploads before
+    // then are answered "No space on vehicle".
     await waitFor(
       'the vehicle to finish booting',
       () => events.some((e) => e.t === 'statustext' && /ready|initialised|EKF/i.test(e.text)),

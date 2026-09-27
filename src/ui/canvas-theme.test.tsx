@@ -10,16 +10,10 @@ import { useThemeStore } from '../stores/theme-store'
 
 // Canvases and the theme.
 //
-// A canvas holds its last paint until something repaints it, and the palette
-// reaches it as resolved strings rather than as var() -- so a component that
-// draws from tokens has to redraw when the theme changes, or it keeps the
-// other theme's colors. Nothing about that is visible in a type or caught by
-// a lint: the plot kept a white background on a dark window until the mouse
-// moved over it, because moving the mouse was the only thing left that
-// changed a dependency.
-//
-// The instruments and the flight plot are safe by accident -- they redraw on
-// every animation frame -- so this covers the two that draw once and stop.
+// A canvas keeps its last paint, and the palette reaches it as resolved
+// strings rather than var(), so a component drawing from tokens must redraw
+// when the theme changes. The instruments and flight plot redraw every
+// animation frame; this covers the two canvases that draw once.
 
 /** A 2D context that records which calls a draw made. */
 function recordingContext(calls: string[]) {
@@ -51,8 +45,8 @@ beforeEach(() => {
   calls = []
   HTMLCanvasElement.prototype.getContext = (() =>
     recordingContext(calls)) as unknown as HTMLCanvasElement['getContext']
-  // jsdom has no layout, and both components refuse to draw into a zero-sized
-  // canvas -- correctly, so the stub gives them one.
+  // jsdom has no layout, and both components skip drawing into a zero-sized
+  // canvas, so the stub gives them a size.
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
     configurable: true,
     get: () => size.w,
@@ -90,8 +84,7 @@ describe('the log plot', () => {
     const before = drawCount()
     expect(before).toBeGreaterThan(0)
     flipTheme()
-    // The bug this guards: the old background survived until an unrelated
-    // redraw fired, which in practice meant moving the mouse over the plot.
+    // The theme change alone must trigger the redraw.
     expect(drawCount()).toBeGreaterThan(before)
   })
 })

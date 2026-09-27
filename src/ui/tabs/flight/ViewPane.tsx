@@ -1,19 +1,9 @@
 import { LaButton, LaSwitch } from '../../components/La'
 import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 
-// How the flight window is arranged, as a pane rather than a flyout.
-//
-// These switches have moved twice. They were a strip of six across the top,
-// which gave arranging the window the same weight as flying the aircraft;
-// then a "View ▾" menu, which fixed that but left one control on the
-// command bar doing something no other control there does -- everything
-// beside it commands the vehicle, and this one moves furniture.
-//
-// The lower pane is where a second thing goes, and this is a second thing:
-// something you look at and set in the space under the controls, one at a
-// time, exactly like Messages and Preflight. It also gets room a 210px
-// flyout never had, so the groups can sit side by side instead of stacking
-// into a column taller than the screen.
+// Flight window layout switches, as a tab of the lower pane. Keeping them off
+// the command bar leaves that bar for commands to the vehicle, and the pane
+// has room for the groups to sit side by side.
 
 export default function ViewPane() {
   const layout = useFlightLayoutStore()
@@ -52,10 +42,8 @@ export default function ViewPane() {
       </section>
 
       <section className="view-pane__group">
-        {/* A map layer, not a panel: it draws over the map rather than
-            taking room from anything. On by default, because a vehicle with
-            no receiver draws nothing anyway -- the switch is for the field
-            where the sky is busy and the markers are over the plan. */}
+        {/* A map overlay rather than a panel. On by default, since without
+            a receiver it draws nothing. */}
         <h4 className="view-pane__head">Map layers</h4>
         <LaSwitch
           label="ADS-B traffic"

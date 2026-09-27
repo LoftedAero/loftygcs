@@ -12,18 +12,15 @@ import {
 
 // Where ground elevation comes from.
 //
-// Terrarium tiles from AWS's public elevation-tiles-prod bucket: no key, no
-// rate limit to negotiate, CORS open, and the same SRTM/NED measurements
-// ArduPilot's own terrain server is built from -- checked against Everest,
-// Badwater and two flying fields before this was written, not assumed.
+// Terrarium tiles from AWS's public elevation-tiles-prod bucket: no key,
+// CORS open, and the same SRTM/NED data ArduPilot's terrain server is built
+// from.
 //
-// They are tiles, so they go through the offline cache the map already
-// uses. Downloading an area for a trip therefore brings its terrain along
-// at zoom 12, where a field is one or two tiles.
+// They go through the map's offline cache, so downloading an area also
+// brings its terrain at zoom 12, where a field is one or two tiles.
 //
-// Everything degrades: no network and nothing cached means no terrain, and
-// every caller has to draw the case where the answer is null. A profile
-// that silently invents ground is worse than one that says it has none.
+// With no network and nothing cached there is no terrain, and every caller
+// must handle a null answer rather than invent ground.
 
 export const TERRAIN_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
 
@@ -33,12 +30,9 @@ export const TERRAIN_ATTRIBUTION = 'Elevation: SRTM, USGS NED, GMTED via AWS Ter
 /** The offline cache namespace, kept apart from the imagery layers. */
 export const TERRAIN_LAYER_ID = 'terrain'
 
-// Decoded tiles are held in memory: a mission profile resamples the same
-// ground on every edit, and re-decoding a PNG per keystroke is the
-// difference between a profile that follows the drag and one that lags it.
-// A quarter of a megabyte each, so the oldest is dropped past the cap --
-// the compressed tile is still in the offline cache, so a dropped one costs
-// a decode, not a download.
+// Decoded tiles are held in memory because a mission profile resamples the
+// same ground on every edit. Each is a quarter of a megabyte, so the oldest
+// is dropped past the cap; the compressed tile stays in the offline cache.
 const MAX_DECODED = 48
 const decoded = new Map<string, Float32Array>()
 const inFlight = new Map<string, Promise<Float32Array | null>>()
@@ -120,18 +114,16 @@ function loadTile(t: TileCoord): Promise<Float32Array | null> {
 /**
  * The decoded tiles covering these coordinates.
  *
- * Fetched together rather than one lookup at a time so a route of two
- * hundred samples over one tile is one request, and so the caller can hand
- * the whole set to `sampleElevation` synchronously afterwards.
+ * Fetched together so many samples over one tile make one request, and the
+ * caller can then pass the set to `sampleElevation` synchronously.
  */
 export async function loadTerrain(points: readonly LatLon[]): Promise<TerrainGrids> {
   return loadTerrainTiles(terrainTilesFor(points))
 }
 
 /**
- * The same, for a caller that already knows its tiles -- which is how the
- * profile avoids refetching: dragging a waypoint changes the samples on
- * every frame but almost never changes the tile they land in.
+ * The same, for a caller that already knows its tiles. Dragging a waypoint
+ * changes the samples every frame but rarely the tiles they land in.
  */
 export async function loadTerrainTiles(tiles: readonly TileCoord[]): Promise<TerrainGrids> {
   const grids = new Map<string, Float32Array>()
@@ -147,29 +139,21 @@ export async function loadTerrainTiles(tiles: readonly TileCoord[]): Promise<Ter
 /**
  * As many terrain tiles as an area may ask for.
  *
- * A flying field is one or two, a county is a handful. The whole world at
- * this zoom is 341,598 -- which is what the map shows before anyone has
- * moved it, and what this cap exists for: without it, opening Mission mode
- * asked the cache about every terrain tile on Earth (starving every other
- * read on the page) and offered to download thirty gigabytes of them.
- * Sixty-four covers about eight hundred kilometers on a side, which is
- * further than anything flies in one trip.
+ * A flying field is one or two tiles. The whole world at this zoom is
+ * 341,598, which is what the map shows before it is moved. Sixty-four covers
+ * about 800 km on a side.
  */
 export const MAX_AREA_TERRAIN_TILES = 64
 
 /**
- * The tiles an area needs, for the offline download to fetch alongside the
- * map. Covering the whole rectangle rather than its corners: a view wider
- * than a terrain tile would otherwise come back with a hole in the middle.
+ * The tiles covering an area, for the offline download to fetch alongside
+ * the map.
  *
- * An area past the cap returns nothing rather than a truncated list: there
- * is no useful terrain answer for a continent, and half of one would be a
- * profile with a hole in it that nothing explains.
+ * An area past the cap returns nothing rather than a truncated list, which
+ * would leave an unexplained hole in the profile.
  */
 export function terrainTilesForArea(bounds: LatLonBounds): TileCoord[] {
-  // Counted before it is built: the list for a world view is a third of a
-  // million objects, and constructing them only to throw them away is a
-  // visible pause on the way to answering "no".
+  // Count before building: a world view would be a third of a million tiles.
   if (countTiles(bounds, TERRAIN_ZOOM, TERRAIN_ZOOM) > MAX_AREA_TERRAIN_TILES) return []
   return tilesForBounds(bounds, TERRAIN_ZOOM, TERRAIN_ZOOM)
 }
@@ -177,18 +161,13 @@ export function terrainTilesForArea(bounds: LatLonBounds): TileCoord[] {
 /**
  * Keep elevation for wherever the mission map is looking.
  *
- * The imagery stores itself as a side effect of being drawn, which made a
- * half-promise: pan your field at home and the *map* works at the no-signal
- * field, but the terrain profile there reads "unavailable", because nothing
- * ever displayed an elevation tile to store on the way past. So the settled
- * view prefetches its own -- genuine speculative fetching, unlike the
- * imagery, and cheap by construction: terrain is one fixed zoom whose tiles
- * span ten kilometers, so a session touches a handful, already-stored ones
- * are skipped, and the area cap returns nothing for a continent.
+ * Imagery is cached as a side effect of being drawn, but elevation tiles
+ * are never displayed, so the settled view prefetches them. This stays
+ * cheap: one fixed zoom with ten-kilometer tiles, stored tiles skipped, and
+ * nothing past the area cap.
  *
- * One run at a time, remembering only the newest ask: pans settle faster
- * than fetches finish, and a queue of every intermediate view would fetch
- * ground nobody stopped on.
+ * One run at a time, keeping only the newest request, so intermediate views
+ * during a pan are not fetched.
  */
 let nextView: LatLonBounds | null = null
 let prefetching = false
@@ -203,8 +182,7 @@ export async function prefetchTerrainForView(bounds: LatLonBounds): Promise<void
       nextView = null
       const tiles = terrainTilesForArea(view)
       if (tiles.length > 0) {
-        // Two at a time: this is background courtesy traffic, not a download
-        // anyone is watching.
+        // Two at a time: this is background traffic.
         await prefetchTiles(TERRAIN_LAYER_ID, TERRAIN_URL, tiles, () => {}, undefined, 2)
       }
     }
@@ -221,10 +199,8 @@ export interface TerrainCoverage {
 /**
  * How much of an area's terrain is already on this machine.
  *
- * Asked separately from the map's own coverage because the two are
- * genuinely independent: terrain is one zoom level of very large tiles, so
- * an area can have every scrap of imagery and no elevation at all, and the
- * profile would then go quiet at the field with no explanation.
+ * Separate from imagery coverage: an area can have all its imagery cached
+ * and no elevation at all.
  */
 export async function terrainCoverage(bounds: LatLonBounds): Promise<TerrainCoverage> {
   const tiles = terrainTilesForArea(bounds)

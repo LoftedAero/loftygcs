@@ -2,13 +2,12 @@
 // exchange. Downloading, we ask for each item by sequence and the vehicle
 // answers; uploading, we announce a count and then answer whatever the
 // vehicle requests, in whatever order and however many times it asks. Both
-// directions end with a MISSION_ACK, and an upload is not real until that
-// ack says accepted -- the transfer is non-atomic, and a mission that dies
-// halfway leaves the vehicle with its old plan, not half of the new one.
+// directions end with a MISSION_ACK, and an upload only counts once that ack
+// says accepted. A mission that dies halfway leaves the vehicle with its old
+// plan, not half of the new one.
 //
-// Everything here is parameterized by mission_type because geofences and
-// rally points ride this exact handshake with a different type value: when
-// their UI arrives, this file already speaks their protocol.
+// Parameterized by mission_type because geofences and rally points use the
+// same handshake with a different type value.
 import type { FieldValue, MissionItem } from './types'
 
 /** MAV_MISSION_RESULT names, for turning a rejected upload into a sentence. */
@@ -88,8 +87,8 @@ export class MissionClient {
     const a = this.active
     if (!a) return
     // Old firmware omits mission_type on some messages; the decoder then
-    // yields 0, which only ever matches the primary mission -- correct, since
-    // that firmware has no other kind.
+    // yields 0, which matches only the primary mission. That firmware has no
+    // other kind.
     const mt = (fields.missionType as number) ?? 0
     if (mt !== a.missionType) return
 
@@ -159,8 +158,8 @@ export class MissionClient {
       }
       case 'MISSION_ACK': {
         const result = fields.type as number
-        // Downloads are acked by us, not the vehicle -- but an error ack IS
-        // the vehicle's way of refusing to serve the list at all.
+        // Downloads are acked by us, not the vehicle, but an error ack is the
+        // vehicle refusing to serve the list at all.
         if (a.kind === 'download' && result === 0) return
         if (result === 0) {
           this.finish(() => (a as Upload | Clear).resolve())
@@ -193,7 +192,7 @@ export class MissionClient {
 
   /**
    * Replace the vehicle's mission. Items must be complete and contiguous
-   * from seq 0 (the planned home) -- this layer transfers what it is given.
+   * from seq 0 (the planned home); this layer transfers what it is given.
    */
   upload(items: MissionItem[], missionType = 0, onProgress: Progress = () => {}): Promise<void> {
     return this.begin<void>((resolve, reject) => {
@@ -242,10 +241,10 @@ export class MissionClient {
   }
 
   /**
-   * The other side went quiet. Resend whatever it should be reacting to:
-   * the request for the item a download is stuck on, or -- uploading -- the
-   * count (nothing requested yet) or the last item (its next request or ack
-   * got lost). Bounded, then the transfer fails with what stalled.
+   * The other side went quiet. Resend whatever it should be reacting to: the
+   * request a download is stuck on, or for an upload the count (nothing
+   * requested yet) or the last item (its next request or ack got lost).
+   * Bounded, then the transfer fails with what stalled.
    */
   private onStepTimeout() {
     const a = this.active

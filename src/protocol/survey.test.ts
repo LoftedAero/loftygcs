@@ -8,9 +8,8 @@ import {
   type GeoPoint,
 } from './survey'
 
-// A survey is the one part of mission planning where "it looks right" is not
-// good enough: a gap between passes is a strip of ground that never got
-// photographed, and nobody finds out until the map is stitched.
+// A gap between survey passes is ground that never gets photographed, and it
+// only shows up once the map is stitched.
 
 const HOME = { lat: -35.363262, lon: 149.165237 }
 const deg = (lat: number, lon: number): GeoPoint => ({
@@ -32,8 +31,7 @@ function square(m: number): GeoPoint[] {
 
 describe('polygonAreaM2', () => {
   it('measures a square in real square meters', () => {
-    // The whole reason the geometry is done in a local projection: computed
-    // in raw degrees this comes out wrong by the cosine of the latitude.
+    // In raw degrees this would be off by the cosine of the latitude.
     expect(polygonAreaM2(square(200))).toBeGreaterThan(200 * 200 * 0.97)
     expect(polygonAreaM2(square(200))).toBeLessThan(200 * 200 * 1.03)
   })
@@ -61,8 +59,7 @@ describe('surveyGrid', () => {
   })
 
   it('lays passes half a spacing in from the edges', () => {
-    // Otherwise the first pass wastes half its swath outside the area and
-    // the far edge is missed entirely.
+    // Otherwise the first pass wastes half its swath and the far edge is missed.
     const r = surveyGrid(square(200), opts)
     const lats = r.points.map((p) => p.x / 1e7)
     const south = Math.min(...lats)
@@ -73,12 +70,9 @@ describe('surveyGrid', () => {
   })
 
   it('alternates direction so the passes join end to end', () => {
-    // A grid that always ran west to east would fly the width of the area
-    // empty between every pass -- double the flight time for the same photos.
     const r = surveyGrid(square(200), opts)
     const lonOf = (i: number) => r.points[i]!.y
-    // Pass 1 runs one way, pass 2 comes back: the end of pass 1 and the
-    // start of pass 2 are on the same side.
+    // The end of pass 1 and the start of pass 2 are on the same side.
     expect(Math.abs(lonOf(1) - lonOf(2))).toBeLessThan(Math.abs(lonOf(0) - lonOf(1)))
   })
 
@@ -86,8 +80,7 @@ describe('surveyGrid', () => {
     const straight = surveyGrid(square(200), { ...opts, angleDeg: 0 })
     const turned = surveyGrid(square(200), { ...opts, angleDeg: 90 })
     expect(turned.passes).toBeGreaterThan(0)
-    // Same area and spacing, so a square gives about the same coverage
-    // whichever way the passes run.
+    // A square gives about the same path length either way.
     expect(turned.lengthM).toBeGreaterThan(straight.lengthM * 0.8)
     expect(turned.lengthM).toBeLessThan(straight.lengthM * 1.2)
     // But the passes themselves point a different way.
@@ -105,9 +98,8 @@ describe('surveyGrid', () => {
   })
 
   it('breaks a concave area into separate passes rather than cutting across', () => {
-    // A U shape. A scan line through the notch crosses the boundary four
-    // times, and flying straight between the second and third crossing would
-    // take the aircraft over ground that is not in the survey.
+    // A U shape: a scan line through the notch crosses the boundary four
+    // times, and the stretch between the middle two is outside the area.
     const d = 200 / 111320
     const dLon = 200 / (111320 * Math.cos((HOME.lat * Math.PI) / 180))
     const u: GeoPoint[] = [
@@ -128,8 +120,7 @@ describe('surveyGrid', () => {
   })
 
   it('still covers an area narrower than one pass', () => {
-    // Drawing a thin strip and being told nothing fits would be technically
-    // true and useless; one pass down the middle is what was meant.
+    // One pass down the middle.
     const thin = [
       deg(HOME.lat, HOME.lon),
       deg(HOME.lat + 10 / 111320, HOME.lon),
@@ -151,8 +142,7 @@ describe('surveyGrid', () => {
   it('reports a length that matches the path it returned', () => {
     const r = surveyGrid(square(300), opts)
     expect(r.lengthM).toBeCloseTo(pathLengthM(r.points), 0)
-    // Sanity: covering 300 m at 50 m spacing is 6 passes of 300 m plus the
-    // turns, so a few kilometers rather than a few hundred meters.
+    // 300 m at 50 m spacing is 6 passes of 300 m plus the turns.
     expect(r.lengthM).toBeGreaterThan(1800)
     expect(r.lengthM).toBeLessThan(4000)
   })
@@ -160,9 +150,8 @@ describe('surveyGrid', () => {
 
 describe('guards against an unflyable grid', () => {
   it('refuses a huge area at a fine spacing instead of computing it', () => {
-    // A degree of latitude at 40 m spacing is nearly 3,000 passes -- the
-    // shape a user gets by drawing on a zoomed-out map, which used to lock
-    // the window while it generated.
+    // A degree of latitude at 40 m spacing is nearly 3,000 passes, easy to
+    // draw on a zoomed-out map.
     const huge: GeoPoint[] = [
       { x: 390000000, y: -1190000000 },
       { x: 400000000, y: -1190000000 },

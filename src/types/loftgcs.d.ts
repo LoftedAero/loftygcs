@@ -14,12 +14,9 @@ export interface LinkOpenOptions {
 }
 
 /**
- * How to launch a simulator.
- *
- * The renderer builds this and the main process acts on it, so the shapes
- * are declared here and matched in electron/sitl-core.ts. Every field is
- * optional except the vehicle: the defaults are the managed build, its own
- * physics, and a wipe -- what someone gets who just presses Start.
+ * How to launch a simulator; matched in electron/sitl-core.ts. Only the
+ * vehicle is required: the defaults are the managed build, its own physics,
+ * and a wipe.
  */
 export type SimPhysics = { kind: 'builtin' } | { kind: 'flightaxis' }
 
@@ -70,8 +67,7 @@ export interface LoftGcsBridge {
     // the renderer shows its own chooser and answers with a portId (or '').
     /**
      * The candidate list for the open request. Fires again whenever a port
-     * appears or goes away while the request is open, so a chooser drawn
-     * from it is live rather than a snapshot.
+     * appears or goes away while the request is open.
      */
     onPortsAvailable(cb: (ports: SerialPortChoice[]) => void): () => void
     /** Main answered the open request itself (see autoPickNew); close the chooser. */
@@ -79,10 +75,9 @@ export interface LoftGcsBridge {
     choose(portId: string): void
     cancel(): void
     /**
-     * Answer the next port request from the list difference rather than
-     * showing the chooser, when exactly one port has appeared since the last
-     * request. Armed by the flash path just before it reboots a board into
-     * its bootloader, which enumerates as a new device; one-shot, and it
+     * Answer the next port request without the chooser when exactly one new
+     * port has appeared. Armed by the flash path before rebooting a board
+     * into its bootloader, which enumerates as a new device. One-shot, and it
      * expires on its own.
      */
     autoPickNew(opts?: { wait?: boolean }): void
@@ -95,14 +90,15 @@ export interface LoftGcsBridge {
      * Spawns SITL and resolves once it is accepting on the TCP port.
      * Home is taken at boot; moving it later means restarting.
      *
-     * `waitingForRealFlight` says the simulator started but nothing is on
-     * RealFlight's SOAP port yet, so it will not talk MAVLink until
-     * something is -- the launch succeeded, the vehicle is just mute.
+     * `waitingForRealFlight`: the simulator started but nothing is on
+     * RealFlight's SOAP port yet, so it will not send MAVLink until there is.
      */
     start(launch: SimLaunch): Promise<{ port: number; waitingForRealFlight: boolean }>
     stop(): Promise<void>
-    /** Native file pickers: SITL needs a path, not a file's contents. */
-    /** `startIn` is a folder to open the dialog at; ignored if it is gone. */
+    /**
+     * Native file pickers, since SITL needs a path rather than contents.
+     * `startIn` is the folder to open at; ignored if it no longer exists.
+     */
     pickBuild(startIn?: string): Promise<SimBuildChoice | null>
     pickParams(startIn?: string): Promise<string | null>
     onProgress(cb: (p: { file: string; done: number; total: number }) => void): () => void
@@ -116,9 +112,9 @@ export interface LoftGcsBridge {
     /** Main-process fetch, restricted to firmware.ardupilot.org (no CORS there). */
     fetchFirmware(url: string): Promise<ArrayBuffer>
     /**
-     * Whether this window may be throttled in the background. Off only while
-     * the gamepad has control: throttled, a covered or minimized window
-     * pauses gamepad input and slows the override stream to a crawl.
+     * Whether this window may be throttled in the background. Off while the
+     * gamepad has control, since throttling pauses gamepad input and slows
+     * the override stream.
      */
     setBackgroundThrottling(allowed: boolean): void
     /** The whole window's scale, Chromium's page zoom: 1 is 100%. */
@@ -126,9 +122,9 @@ export interface LoftGcsBridge {
   }
 
   /**
-   * HUD video. The main process speaks RTSP or listens for RTP and passes
-   * the compressed H.264 bitstream over; the renderer decodes it with
-   * WebCodecs. Decoded frames are far too large to cross a process boundary.
+   * HUD video. The main process handles RTSP or RTP and passes the H.264
+   * bitstream over; the renderer decodes it with WebCodecs, since decoded
+   * frames are too large to cross a process boundary.
    */
   video: {
     open(url: string): Promise<{ ok: true } | { ok: false; error: string }>
@@ -141,9 +137,8 @@ export interface LoftGcsBridge {
 
 declare global {
   /**
-   * One candidate from Electron's select-serial-port list. Deliberately not
-   * `SerialPortInfo`: that name is taken by the Web Serial DOM type, which
-   * carries only usbVendorId/usbProductId and is a different thing.
+   * One candidate from Electron's select-serial-port list. Not named
+   * `SerialPortInfo`, which is the Web Serial DOM type.
    */
   interface SerialPortChoice {
     portId: string
@@ -154,8 +149,8 @@ declare global {
     vendorId?: string
     productId?: string
     serialNumber?: string
-    /** Windows only. Carries the USB interface, which is what separates a
-        board's MAVLink port from its SLCAN one. */
+    /** Windows only. Includes the USB interface, which separates a board's
+        MAVLink port from its SLCAN one. */
     deviceInstanceId?: string
   }
 

@@ -1,20 +1,11 @@
-// Pointing the camera, and knowing where it is pointed.
+// Camera and gimbal commands, and decoding where the gimbal points. Pure:
+// builds command parameters and reads status messages, never sends.
 //
-// ArduPilot has carried three generations of this and answers all of them,
-// which is the whole difficulty. The old way is DO_MOUNT_CONFIGURE (204)
-// plus DO_MOUNT_CONTROL (205), where angles ride in the command and the
-// mode is set separately. The current way is the gimbal manager protocol:
-// DO_GIMBAL_MANAGER_PITCHYAW (1000) with lock flags, which is what any
-// gimbal shipped since 2022 expects and what a station should prefer.
-//
-// So which one gets sent depends on the firmware version, which the vehicle
-// now tells us. Below 4.2 the gimbal manager does not exist and 1000 is
-// answered with UNSUPPORTED; at or above it, 205 still works but is the
-// deprecated path and does not carry the lock flags that decide whether the
-// camera holds an earth heading or follows the airframe.
-//
-// Everything here is pure: it builds command parameter arrays and reads
-// status messages, and never sends anything.
+// ArduPilot answers several generations of mount commands. The old path is
+// DO_MOUNT_CONFIGURE (204) plus DO_MOUNT_CONTROL (205); the current one is
+// the gimbal manager's DO_GIMBAL_MANAGER_PITCHYAW (1000), which carries the
+// lock flags. Below 4.2, 1000 is answered UNSUPPORTED, so the choice goes by
+// firmware version.
 
 import type { FirmwareVersion } from './types'
 
@@ -32,7 +23,7 @@ export function mountModeLabel(mode: number): string {
   return MOUNT_MODES.find((m) => m.value === mode)?.label ?? `Mode ${mode}`
 }
 
-/** MAV_CMD numbers used here, named so a reader need not look them up. */
+/** MAV_CMD numbers used here. */
 export const CMD = {
   doMountConfigure: 204,
   doMountControl: 205,
@@ -46,11 +37,8 @@ export const CMD = {
 } as const
 
 /**
- * GIMBAL_MANAGER_FLAGS.
- *
- * The pair that matters day to day is the lock bits: with yaw locked the
- * camera holds an earth-frame heading while the aircraft turns under it,
- * and unlocked it follows the nose. Every other bit is a special case.
+ * GIMBAL_MANAGER_FLAGS. With yaw locked the camera holds an earth-frame
+ * heading; unlocked it follows the nose.
  */
 export const GIMBAL_FLAGS = {
   retract: 1,
@@ -72,12 +60,9 @@ export interface GimbalCommand {
 }
 
 /**
- * Point the gimbal at an angle, in whichever dialect this vehicle speaks.
- *
- * Pitch is negative down in both, which is the one thing the two agree on.
- * `lockYaw` holds an earth heading; without it the camera follows the
- * airframe -- and on the old protocol there is no way to ask for either, so
- * it is simply absent rather than faked.
+ * Points the gimbal, using whichever protocol this firmware supports. Pitch
+ * is negative down in both. `lockYaw` has no equivalent on the old protocol
+ * and is ignored there.
  */
 export function pointGimbal(
   firmware: FirmwareVersion | null,
@@ -88,9 +73,8 @@ export function pointGimbal(
   if (hasGimbalManager(firmware)) {
     const flags = GIMBAL_FLAGS.pitchLock | (lockYaw ? GIMBAL_FLAGS.yawLock : 0)
     // pitch, yaw, pitch rate, yaw rate, flags, unused, gimbal device id.
-    // The rates are NaN in the spec to mean "use the angles"; ArduPilot
-    // takes zero the same way and NaN does not survive the float encode on
-    // every link, so zero it is.
+    // The spec uses NaN rates to mean "use the angles"; ArduPilot treats zero
+    // the same way, and NaN does not survive every link's float encoding.
     return { command: CMD.gimbalManagerPitchYaw, params: [pitchDeg, yawDeg, 0, 0, flags, 0, 0] }
   }
   // pitch, roll, yaw, unused, unused, unused, MAV_MOUNT_MODE (2 = MAVLink).
@@ -103,12 +87,9 @@ export function setMountMode(mode: number): GimbalCommand {
 }
 
 /**
- * Take a photo.
- *
- * IMAGE_START_CAPTURE is the modern command and what a camera behind the
- * camera protocol expects; ArduPilot's own servo and relay triggers answer
- * DO_DIGICAM_CONTROL instead. The caller sends the modern one and falls
- * back, rather than this file guessing from a parameter it cannot see.
+ * IMAGE_START_CAPTURE, for cameras using the camera protocol. ArduPilot's
+ * servo and relay triggers answer DO_DIGICAM_CONTROL instead
+ * (`takePhotoLegacy`); the caller falls back on UNSUPPORTED.
  */
 export function takePhoto(count = 1, intervalS = 0): GimbalCommand {
   // camera id (0 = all), interval, count (0 = forever), sequence.
@@ -116,7 +97,7 @@ export function takePhoto(count = 1, intervalS = 0): GimbalCommand {
 }
 
 export function takePhotoLegacy(): GimbalCommand {
-  // param5 = shot: ArduPilot's trigger, the one CAM_TRIGG_TYPE drives.
+  // param5 = shot, which fires the trigger CAM_TRIGG_TYPE configures.
   return { command: CMD.doDigicamControl, params: [0, 0, 0, 0, 1, 0, 0] }
 }
 
@@ -133,11 +114,8 @@ export function recordVideo(start: boolean): GimbalCommand {
 }
 
 /**
- * Zoom.
- *
- * Type 1 is a continuous zoom whose value is -1, 0 or 1 -- out, stop, in --
- * and which keeps going until it is stopped. That is what a press-and-hold
- * button wants; the stepped type only exists on cameras that publish steps.
+ * Continuous zoom (type 1): -1 out, 0 stop, 1 in. It runs until stopped,
+ * which suits a press-and-hold button.
  */
 export function zoom(direction: -1 | 0 | 1): GimbalCommand {
   return { command: CMD.setCameraZoom, params: [1, direction, 0, 0, 0, 0, 0] }
@@ -152,12 +130,9 @@ export interface GimbalAttitude {
 const DEG = 180 / Math.PI
 
 /**
- * Where the gimbal says it is pointed, from GIMBAL_DEVICE_ATTITUDE_STATUS.
- *
- * The message carries a quaternion, w first. The conversion is the standard
- * aerospace ZYX one, with the pitch term clamped: a gimbal looking straight
- * down puts the argument of asin at exactly 1, where floating point
- * routinely lands a hair outside and produces NaN.
+ * Gimbal attitude from GIMBAL_DEVICE_ATTITUDE_STATUS's quaternion (w first),
+ * using the standard ZYX conversion. The asin argument is clamped because a
+ * gimbal looking straight down lands just outside [-1, 1] and yields NaN.
  */
 export function attitudeFromQuaternion(q: readonly number[]): GimbalAttitude | null {
   const [w, x, y, z] = q
@@ -171,13 +146,7 @@ export function attitudeFromQuaternion(q: readonly number[]): GimbalAttitude | n
   }
 }
 
-/**
- * The same, from the older MOUNT_STATUS.
- *
- * Its three fields are centidegrees and in the order pitch, roll, yaw --
- * which is not the order anything else uses, and is the reason this is a
- * function rather than three lines at the call site.
- */
+/** Gimbal attitude from the older MOUNT_STATUS: centidegrees, ordered pitch, roll, yaw. */
 export function attitudeFromMountStatus(
   pointingA: number,
   pointingB: number,

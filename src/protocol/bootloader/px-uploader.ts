@@ -1,11 +1,9 @@
-// ArduPilot/PX4 serial bootloader client -- a port of px_uploader.py's
-// protocol (GPL-3.0 heritage), the same flow Mission Planner's px4uploader
-// uses. It is a plain byte protocol over the CDC port, which is what makes
-// flashing possible over Web Serial.
+// ArduPilot/PX4 serial bootloader client, ported from px_uploader.py's
+// protocol (GPL-3.0); Mission Planner's px4uploader uses the same flow. It is
+// a plain byte protocol over the CDC port, so it works over Web Serial.
 //
-// Safety order is load-bearing (plan risk R5): identify the board and match
-// it against the firmware's board_id BEFORE erasing anything. A wrong-board
-// refusal must cost the user nothing.
+// Callers must identify the board and match its board_id against the
+// firmware before erasing anything, so a wrong-board refusal costs nothing.
 
 const INSYNC = 0x12
 const EOC = 0x20
@@ -32,7 +30,7 @@ const REPLY_TIMEOUT_MS = 2000
 
 /**
  * px_uploader.py's CRC accumulator: the standard reflected CRC-32 table,
- * but with init 0 and no final complement -- matching what the bootloader
+ * but with init 0 and no final complement, matching what the bootloader
  * computes over its whole flash (erased bytes read 0xff).
  */
 const CRC_TABLE = (() => {

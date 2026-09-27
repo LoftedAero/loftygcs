@@ -89,8 +89,7 @@ describe('joining position to attitude', () => {
   })
 
   it('turns a heading the short way round', () => {
-    // The trap: a plain average of 359 and 1 is 180, so the aircraft spins
-    // a half turn between two samples a second apart every time it flies
+    // A plain average of 359 and 1 is 180: a half turn every time it flies
     // north.
     const path = flightPath(
       logWith(
@@ -134,8 +133,8 @@ describe('choosing a position source', () => {
   })
 
   it('drops the records logged before the EKF had a fix', () => {
-    // Null island is a real place, and a track drawn through it crosses the
-    // Atlantic twice.
+    // Pre-fix records sit at 0,0, which would drag the track across the
+    // Atlantic.
     const path = flightPath(
       logWith({ message: 'POS', time: [0, 1, 2], lat: [0, 0, 51], lon: [0, 0, -1], alt: [0, 0, 5] }),
     )
@@ -169,8 +168,7 @@ describe('altitude, and what a globe with no terrain needs', () => {
   })
 
   it('prefers the relative altitude the log recorded', () => {
-    // POS carries RelHomeAlt outright, and the vehicle's own number beats
-    // any arithmetic done out here.
+    // POS carries RelHomeAlt; the vehicle's own number is preferred.
     const path = flightPath(real)
     for (const s of path.samples) {
       expect(s.altAboveHome).toBeCloseTo(s.alt - path.groundAlt!, 0)
@@ -178,8 +176,8 @@ describe('altitude, and what a globe with no terrain needs', () => {
   })
 
   it('subtracts the ground when the source has no relative field', () => {
-    // AHR2 and GPS report AMSL only. Drawn as-is on a terrain-less globe,
-    // a track at a field 584 m up floats 584 m over the rendered ground.
+    // AHR2 and GPS report AMSL only. On a globe with no terrain, a track at a
+    // field 584 m up would float 584 m over the rendered ground.
     const path = flightPath(
       logWith({ message: 'AHR2', time: [0, 1], lat: [51, 51], lon: [-1, -1], alt: [584, 599] }),
     )

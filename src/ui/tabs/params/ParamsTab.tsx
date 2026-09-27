@@ -6,9 +6,8 @@ import ParamSidebar from './ParamSidebar'
 import { useConnectionStore } from '../../../stores/connection-store'
 import ParamRow from './ParamRow'
 
-// The full parameter table: the escape hatch that makes the curated
-// Configuration tab safe to keep small. Virtualized -- a Copter has ~1400
-// parameters and the DOM gets only the visible slice.
+// The full parameter table, behind the curated setup screens. Virtualized:
+// a Copter has about 1400 parameters and only the visible slice is rendered.
 export default function ParamsTab() {
   const phase = useConnectionStore((s) => s.phase)
   const loadState = useParamStore((s) => s.loadState)
@@ -31,23 +30,14 @@ export default function ParamsTab() {
   const virtualizer = useVirtualizer({
     count: names.length,
     getScrollElement: () => scrollRef.current,
-    // Matches .param-row's min-height: the row carries a display name and
-    // a description line under the value now.
+    // Matches .param-row's min-height (name plus a description line).
     estimateSize: () => 52,
     overscan: 12,
   })
 
-  // With nothing connected this screen still has a job: a saved parameter
-  // file is a document, and reading, searching, comparing and editing one
-  // needs no aircraft. Mission Planner has had exactly this for years and it
-  // is the one page its disconnected Config screen keeps.
-  //
-  // The empty case is not special-cased at all. It renders the ordinary
-  // screen with an empty table, and the column beside it already has the
-  // control that fills it -- "Import from file", which is the same
-  // button whether it is opening a set or staging one against a vehicle. A
-  // second opener that appeared only while disconnected would be one more
-  // thing to keep in step with the first, for a state that is not special.
+  // With nothing connected this screen still opens and edits a saved
+  // parameter file, as Mission Planner does. The empty case is the ordinary
+  // screen with an empty table; "Import from file" in the column fills it.
   if (!offline && loadState === 'downloading') {
     return (
       <LaCard title="Parameters">
@@ -75,31 +65,16 @@ export default function ParamsTab() {
   }
 
   return (
-    // Not a card, and that is the point. Every other screen with an actions
-    // column -- Logs, MAVFTP, Mission -- puts its main pane and its column
-    // side by side on the page ground, each with its own frame. This one wrapped
-    // both in a card, so a white bordered column sat 17px inside a white
-    // bordered card and the two read as one panel with a divider through it.
-    // MAVFTP already had the shape to copy: a card while there is nothing to
-    // show, its own full-height layout once there is. The heading goes with
-    // the card; the rail already says which screen this is.
+    // Not a card: like the other screens with an actions column, the pane and
+    // the column sit side by side, each with its own frame.
     <div className="params-screen">
-      {/* One grid, not a column beside a column: the toolbar and the note
-          are placed in the table's track only, and the actions column is
-          placed in the table's *row* -- so the two framed panels start and
-          end on the same lines. Nested in a flex wrapper the column spanned
-          all three rows and stood 58px taller than the table it sits beside,
-          which reads as a misalignment rather than as a taller column. */}
+      {/* One grid, so the pane and the actions column start and end on the
+          same lines. */}
       <div className="params-layout">
-        {/* The search, the table and the count are one panel, so its frame
-            runs the full height of the screen and matches the column's.
-            They were three grid rows with the frame on the table alone,
-            which left the table's box shorter than the column beside it at
-            both ends. Header and footer do not scroll; only the rows do. */}
+        {/* Search, table and count are one framed panel; only the rows
+            scroll. */}
         <div className="params-pane">
-          {/* Search stays with the list it filters. It wants the width, and
-              it is the one control used while reading rather than between
-              tasks -- which is what the actions column is for. */}
+          {/* Search stays with the list it filters. */}
           <div className="la-row params-toolbar">
             <LaInput
               placeholder="Search parameters"
@@ -109,11 +84,8 @@ export default function ParamsTab() {
             />
           </div>
           <div className="params-scroll" ref={scrollRef}>
-            {/* The table's own empty state, inside the frame where the rows
-                would be -- not a card standing in for the screen. It covers
-                a filter that matched nothing as well as a set that has not
-                been loaded, because both are the same news: there is
-                nothing here to read. */}
+            {/* Empty state for both an unloaded set and a filter with no
+                matches. */}
             {names.length === 0 && (
               <p className="app-placeholder params-empty">
                 {order.length === 0
@@ -141,9 +113,8 @@ export default function ParamsTab() {
           <p className="params-note">
             {names.length} of {order.length} parameters
             {source === 'file' ? ` from ${fileName ?? 'a file'} — not a vehicle.` : '.'}
-            {/* Which documentation is on screen. Parameters are added and
-                re-scaled between releases, so a hint from the wrong version
-                is worse than no hint -- worth one line to say. */}
+            {/* Which release the documentation is from, since parameters
+                change between releases. */}
             {metadataSource && ` Hints from ArduPilot ${metadataSource}.`}
           </p>
         </div>

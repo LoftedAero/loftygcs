@@ -5,10 +5,8 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { MAV_STATE } from '../flight/hud-draw'
 
-// Detecting a board **reboots it into its bootloader**. On a vehicle in the
-// air that is the whole aircraft stopping, so the states where it must not
-// happen are pinned here rather than left to a reading of the JSX: this is
-// the one control on the screen whose worst case is a crash.
+// Detecting a board reboots it into its bootloader, which in flight stops the
+// aircraft. These tests pin the states where Detect must be refused.
 
 const setVehicle = (patch: Record<string, unknown>) =>
   act(() => {
@@ -33,7 +31,7 @@ afterEach(() => {
 
 describe('detecting a board is refused while the vehicle is flying it', () => {
   it('refuses when armed, whether or not it has left the ground', () => {
-    // Armed is the hard line: an armed vehicle is one whose motors can turn.
+    // An armed vehicle is one whose motors can turn.
     setVehicle({ armed: true, systemStatus: MAV_STATE.standby })
     render(<FirmwareTab />)
     expect(detectButton().disabled).toBe(true)
@@ -48,8 +46,7 @@ describe('detecting a board is refused while the vehicle is flying it', () => {
   })
 
   it('refuses during a failsafe', () => {
-    // CRITICAL and EMERGENCY are ArduPilot's own failsafe states, and a
-    // vehicle handling one is not a vehicle to take the autopilot away from.
+    // CRITICAL and EMERGENCY are ArduPilot's failsafe states.
     setVehicle({ systemStatus: MAV_STATE.critical })
     render(<FirmwareTab />)
     expect(detectButton().disabled).toBe(true)
@@ -57,8 +54,8 @@ describe('detecting a board is refused while the vehicle is flying it', () => {
   })
 
   it('allows it on a vehicle sitting still, which is asked about rather than blocked', () => {
-    // Connected and disarmed is the ordinary bench case: it still reboots the
-    // vehicle, so the button is live and the dialog is what stops it.
+    // Connected and disarmed (the usual bench case) still reboots the
+    // vehicle, so the button is live and a confirmation dialog asks first.
     setVehicle({ systemStatus: MAV_STATE.standby })
     render(<FirmwareTab />)
     expect(detectButton().disabled).toBe(false)

@@ -2,14 +2,9 @@
 //
 // The geometry is done in local meters, not degrees. A degree of longitude is
 // 111 km at the equator and 55 km at 60 degrees of latitude, so a grid
-// computed in raw lat/lon comes out sheared -- the passes are not parallel and
-// the spacing is not the spacing that was asked for. Projecting to meters
-// about the polygon's own center, solving there and projecting back keeps the
-// spacing true over the few kilometers a survey actually spans.
-//
-// Kept apart from the map component because "does this path cover the
-// polygon" has a right answer, and one far easier to ask of a function than
-// of a picture.
+// computed in raw lat/lon comes out sheared. Projecting to meters about the
+// polygon's center keeps the spacing true over the few kilometers a survey
+// spans.
 
 /** Degrees * 1e7, as mission items carry them. */
 export interface GeoPoint {
@@ -31,9 +26,8 @@ export interface SurveyOptions {
   /** Direction of the passes, degrees clockwise from north. */
   angleDeg: number
   /**
-   * How far each pass runs past the polygon edge, meters. A camera wants the
-   * aircraft settled and level before the boundary, and a multirotor wants
-   * room to turn round; both are answered by flying past it.
+   * How far each pass runs past the polygon edge, meters, so the aircraft is
+   * level before the boundary and has room to turn.
    */
   overshootM: number
 }
@@ -85,10 +79,8 @@ export function polygonAreaM2(poly: readonly GeoPoint[]): number {
 /**
  * Where a horizontal line at `y` crosses the polygon's edges.
  *
- * Vertices sitting exactly on the line are the awkward case: counted twice
- * they produce a zero-length pass, counted not at all they open a gap in the
- * coverage. The half-open test here -- lower endpoint inclusive, upper
- * exclusive -- counts each crossing once, which is the standard fix.
+ * The half-open test (lower endpoint inclusive, upper exclusive) counts a
+ * vertex lying exactly on the line once, not twice or never.
  */
 function crossingsAt(poly: readonly LocalPoint[], y: number): number[] {
   const xs: number[] = []
@@ -115,17 +107,15 @@ export interface SurveyResult {
   problem?: string
 }
 
+/** Upper bound on passes; see the check in surveyGrid. */
+export const MAX_PASSES = 400
+
 /**
  * Cover a polygon with parallel passes, joined end to end.
  *
- * The angle is rotated out rather than solved for: the polygon is turned so
- * the passes lie horizontal, scanned with horizontal lines, and turned back.
- * That keeps the scan a one-dimensional problem, which is where the
- * correctness lives.
+ * The polygon is rotated so the passes lie horizontal, scanned with
+ * horizontal lines, and rotated back.
  */
-/** More passes than this is not a survey anyone flies -- see the check below. */
-export const MAX_PASSES = 400
-
 export function surveyGrid(polygon: readonly GeoPoint[], opts: SurveyOptions): SurveyResult {
   const empty = (problem: string): SurveyResult => ({ points: [], passes: 0, lengthM: 0, problem })
   if (polygon.length < 3) return empty('A survey area needs at least three corners.')
@@ -147,11 +137,8 @@ export function surveyGrid(polygon: readonly GeoPoint[], opts: SurveyOptions): S
   const minN = Math.min(...turned.map((p) => p.n))
   const maxN = Math.max(...turned.map((p) => p.n))
 
-  // Refuse an area that would take more passes than anyone can fly before
-  // computing them. This is a correctness guard as much as a speed one: a
-  // wide area at a fine spacing runs to tens of thousands of waypoints, more
-  // than ArduPilot's mission storage holds, and the honest answer is a
-  // number to change rather than a locked-up window while it is generated.
+  // Check before computing: a wide area at a fine spacing runs to tens of
+  // thousands of waypoints, more than ArduPilot's mission storage holds.
   const wanted = Math.floor((maxN - minN) / opts.spacingM) + 1
   if (wanted > MAX_PASSES) {
     return empty(
@@ -161,13 +148,10 @@ export function surveyGrid(polygon: readonly GeoPoint[], opts: SurveyOptions): S
   }
 
   const rows: number[] = []
-  // Half a spacing in from the edge: a pass laid exactly on the boundary
-  // spends half its swath outside the area, and the far edge then falls to
-  // the last pass rather than being missed by it.
+  // Half a spacing in from the edge, so no swath is half outside the area.
   const first = minN + opts.spacingM / 2
   if (first > maxN) {
-    // Narrower than one spacing. One pass down the middle still covers it,
-    // and covering it is what drawing the area asked for.
+    // Narrower than one spacing: one pass down the middle.
     rows.push(minN + (maxN - minN) / 2)
   } else {
     for (let y = first; y <= maxN; y += opts.spacingM) rows.push(y)
@@ -179,16 +163,13 @@ export function surveyGrid(polygon: readonly GeoPoint[], opts: SurveyOptions): S
 
   for (const y of rows) {
     const xs = crossingsAt(turned, y)
-    // Crossings pair into spans that lie inside the polygon. A concave area
-    // gives more than one span on a line, and each is its own pass: flying
-    // straight between them would cut across ground that is not in the
-    // survey at all.
+    // Crossings pair into spans inside the polygon. A concave area can give
+    // several spans on one line, each flown as its own pass.
     for (let i = 0; i + 1 < xs.length; i += 2) {
       const lo = xs[i]! - opts.overshootM
       const hi = xs[i + 1]! + opts.overshootM
       if (hi <= lo) continue
-      // Alternate direction, so consecutive passes join end to end instead
-      // of flying the width of the area empty between every one.
+      // Alternate direction so consecutive passes join end to end.
       const ends: LocalPoint[] = flip
         ? [
             { e: hi, n: y },

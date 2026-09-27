@@ -25,10 +25,8 @@ vi.mock('./connection', () => ({
 
 const { enable, startReading, stop, stopReading } = await import('./joystick')
 
-// Choosing which device to read is a safety question, not a convenience
-// one: with a wheel, a HOTAS and a gamepad on the same desk, reading
-// "whichever the browser listed first" means the sticks are somewhere
-// other than where the screen says they are.
+// With several input devices attached, reading whichever the browser listed
+// first would put the sticks somewhere other than where the screen says.
 
 const POLL_MS = 33
 const SEND_MS = 50
@@ -106,7 +104,7 @@ describe('picking a device', () => {
   })
 
   it('reads nothing while several are attached and none is chosen', () => {
-    // The heart of it: silence rather than a guess.
+    // Nothing is read rather than a guess.
     attach(fakePad('Logitech G920 Wheel', 0), fakePad('Xbox Wireless Controller', 1))
     startReading()
     vi.advanceTimersByTime(POLL_MS)
@@ -124,8 +122,7 @@ describe('picking a device', () => {
   })
 
   it('remembers the device by id, not by index', () => {
-    // The wheel is plugged in first today, so every index has moved. A
-    // remembered index would silently be a different device.
+    // The wheel now enumerates first, so every index has moved.
     useJoystickStore.getState().chooseDevice('Xbox Wireless Controller')
     attach(fakePad('Xbox Wireless Controller', 1), fakePad('Logitech G920 Wheel', 0))
     startReading()
@@ -139,8 +136,7 @@ describe('picking a device', () => {
     attach(fakePad('Logitech G920 Wheel', 0))
     startReading()
     vi.advanceTimersByTime(POLL_MS)
-    // Falling back to the wheel here would be the exact substitution this
-    // whole mechanism exists to prevent.
+    // Must not fall back to the wheel.
     expect(useJoystickStore.getState().pad).toBeNull()
   })
 })
@@ -284,7 +280,7 @@ describe('out of focus', () => {
   })
 
   it('turns background throttling off while flying, and back on after', () => {
-    // Throttling is what pauses gamepad input in a window out of sight.
+    // Background throttling pauses gamepad input in a hidden window.
     inShell(true)
     flying()
     expect(throttling).toEqual([false])
@@ -330,8 +326,8 @@ describe('each device keeps its own mapping', () => {
         'Logitech G920 Wheel': { ...DEFAULT_CONFIG, deadzone: 0.02 },
       },
     })
-    // Same tick: the device changes, control is dropped, and only then may
-    // the new device's mapping come in.
+    // In one tick: the device changes, control is dropped, then the new
+    // device's mapping applies.
     attach(fakePad('Logitech G920 Wheel', 0))
     vi.advanceTimersByTime(POLL_MS)
     expect(useJoystickStore.getState().active).toBe(false)
@@ -341,7 +337,7 @@ describe('each device keeps its own mapping', () => {
 describe('while mapping, before control is taken', () => {
   it('does not flip a switch with the press that taught it', () => {
     // Learn assigns the button while it is still down; the next read must not
-    // count that same press, or the preview shows the switch already moved.
+    // count that same press.
     attach(fakePad('Xbox Wireless Controller', 0, [0, 1, 0, 0], [true]))
     startReading()
     vi.advanceTimersByTime(POLL_MS)

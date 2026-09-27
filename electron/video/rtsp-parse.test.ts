@@ -111,7 +111,7 @@ describe('authentication', () => {
 
   it('computes the digest response the RFC specifies', () => {
     // HA1 = md5(user:realm:pass), HA2 = md5(method:uri),
-    // response = md5(HA1:nonce:HA2). Checked against those by hand.
+    // response = md5(HA1:nonce:HA2).
     const header = authorization(
       { scheme: 'digest', realm: 'Cam', nonce: 'abc123' },
       'DESCRIBE',

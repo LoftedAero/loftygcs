@@ -1,26 +1,14 @@
-// What is actually plugged into this flight controller.
-//
-// ArduPilot gives every detected sensor a device ID and stores it in a
-// parameter -- INS_ACC_ID, COMPASS_DEV_ID, BARO1_DEVID and their siblings.
-// Each is a packed 32-bit word rather than a number anyone reads, and
-// unpacking it answers the questions a bench session actually asks: is the
-// external compass being seen at all, is that IMU the one the board is meant
-// to have, did the second baro appear on the bus it should be on.
-//
-// Mission Planner's Hardware ID screen does the same job, and the values
-// below are ArduPilot's own -- taken from its headers rather than inferred
-// from what a particular board happened to report:
+// Decodes the packed device IDs ArduPilot stores for each detected sensor
+// (INS_ACC_ID, COMPASS_DEV_ID, BARO1_DEVID and siblings). Values come from
+// ArduPilot's headers:
 //
 //   libraries/AP_HAL/Device.h                        (bus types, bit layout)
 //   libraries/AP_InertialSensor/AP_InertialSensor_Backend.h
 //   libraries/AP_Compass/AP_Compass_Backend.h
 //   libraries/AP_Baro/AP_Baro_Backend.h
 //
-// The device type is **class specific**: 0x0B is an ICM20948 to the compass
-// driver and an MS5611 to the barometer one. So a decoder that does not know
-// which parameter it is reading cannot name the part, and every lookup here
-// takes the class with the number. Getting that wrong would put a confident
-// wrong sensor name on screen, which is worse than the raw hex it replaced.
+// The device type is class specific: 0x0B is an ICM20948 to the compass driver
+// and an MS5611 to the barometer driver, so every lookup takes the class.
 
 /** `bus_type:3, bus:5, address:8, devtype:8`, from AP_HAL/Device.h. */
 const BUS_TYPES = ['Unknown', 'I2C', 'SPI', 'DroneCAN', 'SITL', 'MSP', 'Serial', 'QSPI'] as const
@@ -131,10 +119,10 @@ const TABLES: Record<DeviceClass, Record<number, string>> = {
 }
 
 export interface DecodedDevice {
-  /** The raw parameter value, so an unrecognised part is still traceable. */
+  /** The raw parameter value, so an unrecognized part is still traceable. */
   id: number
   busType: string
-  /** Which instance of that bus -- I2C0, SPI2. */
+  /** Which instance of that bus (I2C0, SPI2). */
   bus: number
   /** Address on the bus: an I2C address, or a chip select for SPI. */
   address: number
@@ -144,12 +132,8 @@ export interface DecodedDevice {
 }
 
 /**
- * One packed device ID.
- *
- * Zero means the slot is empty -- ArduPilot leaves the parameter at zero for
- * an IMU or compass it never found -- and that is a different thing from a
- * device it found but this table cannot name, so it decodes to null rather
- * than to a device on an unknown bus at address zero.
+ * Decodes one packed device ID. Zero means nothing was detected in that slot
+ * and decodes to null; an unrecognized device type keeps its number.
  */
 export function decodeDeviceId(id: number, cls: DeviceClass): DecodedDevice | null {
   if (!id) return null
@@ -167,8 +151,7 @@ export function decodeDeviceId(id: number, cls: DeviceClass): DecodedDevice | nu
 /** How a device reads on one line: "ICM42688 on SPI1, address 0x01". */
 export function describeDevice(d: DecodedDevice): string {
   const part = d.name ?? `Type 0x${d.devType.toString(16).padStart(2, '0')}`
-  // DroneCAN and SITL have no bus number or address worth printing: the
-  // first is a node on a network and the second is not a device at all.
+  // DroneCAN and SITL have no meaningful bus number or address.
   if (d.busType === 'DroneCAN' || d.busType === 'SITL') return `${part} on ${d.busType}`
   return `${part} on ${d.busType}${d.bus}, address 0x${d.address.toString(16).padStart(2, '0')}`
 }
@@ -182,14 +165,9 @@ export interface DeviceSlot {
 }
 
 /**
- * The device-ID parameters worth showing, in the order they are numbered.
- *
- * Listed rather than pattern-matched: the names are not regular -- the IMU
- * uses `INS_ACC_ID` then `INS_ACC2_ID`, the compass `COMPASS_DEV_ID` then
- * `COMPASS_DEV_ID2`, and the barometer `BARO1_DEVID` from the start -- and a
- * pattern loose enough to catch all three would catch other things too.
- * Slots the vehicle does not have simply have no parameter, and are left out
- * rather than shown empty.
+ * The device-ID parameters, in numbered order. Listed explicitly because the
+ * naming is irregular (INS_ACC_ID/INS_ACC2_ID, COMPASS_DEV_ID/COMPASS_DEV_ID2,
+ * BARO1_DEVID). Slots the vehicle lacks have no parameter and are skipped.
  */
 export const DEVICE_SLOTS: DeviceSlot[] = [
   { param: 'INS_ACC_ID', label: 'Accel 1', cls: 'imu' },

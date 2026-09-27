@@ -1,18 +1,17 @@
 // Pure layout logic for the OSD screen editor: grid geometry, parameter
-// naming, and collision detection. No React and no store access, so the rules
-// that are easy to get wrong are the ones that are easy to test.
+// naming, and collision detection. No React or store access, for testing.
 
 import type { ParamMeta } from '../../../services/param-metadata'
 import { OSD_ITEMS, itemExtent, type OsdItem } from './osd-items'
 
-/** ArduPilot exposes four layout screens; OSD5/OSD6 are the on-OSD parameter
- *  editors, a different feature entirely and not laid out here. */
+/** ArduPilot exposes four layout screens; OSD5/OSD6 are parameter-editor
+ *  screens, not laid out here. */
 export const OSD_SCREENS = [1, 2, 3, 4] as const
 
 export interface Grid {
   cols: number
   rows: number
-  /** How the size was decided, shown to the user so it is not a mystery. */
+  /** How the size was decided, shown to the user. */
   label: string
 }
 
@@ -25,18 +24,16 @@ export const TEXT_RESOLUTIONS: readonly { value: number; grid: Grid }[] = [
 
 const SD: Grid = TEXT_RESOLUTIONS[0]!.grid
 
-/** OSD_TYPE value for MSP DisplayPort -- the only backend that draws HD. */
+/** OSD_TYPE value for MSP DisplayPort, the only backend that draws HD. */
 export const TYPE_MSP_DISPLAYPORT = 5
 
 /**
  * The character grid for a screen.
  *
  * Only MSP DisplayPort has a selectable text resolution; every other backend
- * (MAX7456, SITL, plain MSP, TXONLY) draws the classic 30x16 analog grid, and
- * OSD{n}_TXT_RES is ignored on those -- so a stale HD value left in the
- * parameters must not widen the grid. NTSC actually shows 13 visible rows
- * rather than 16, but the parameters accept 16 and ArduPilot lays out against
- * 16, so the grid stays 16 and the editor marks the rows NTSC will cut.
+ * (MAX7456, SITL, plain MSP, TXONLY) draws the 30x16 analog grid and ignores
+ * OSD{n}_TXT_RES. NTSC shows only 13 rows, but ArduPilot lays out against 16,
+ * so the grid stays 16 and the editor marks the rows NTSC cuts.
  */
 export function screenGrid(osdType: number | undefined, txtRes: number | undefined): Grid {
   if (osdType !== TYPE_MSP_DISPLAYPORT) return SD
@@ -59,8 +56,7 @@ export interface Placement {
 
 /**
  * Read one screen's placements out of the parameter table. Items whose
- * parameters the connected firmware does not have are dropped, so a build
- * without, say, the RC link panels simply shows fewer items.
+ * parameters the connected firmware lacks are dropped.
  */
 export function readPlacements(
   entries: Map<string, { value: number }>,
@@ -85,11 +81,9 @@ export function clamp(v: number, lo: number, hi: number): number {
 /**
  * Highest legal value for one coordinate.
  *
- * The firmware's declared range wins where it is tighter than the grid --
- * ArduPilot widened every panel to the HD range except RPM, which still caps
- * at 29x15, and a write past a parameter's range is rejected rather than
- * clamped. Where metadata is missing (offline, unmatched version) the grid is
- * the only bound available.
+ * The parameter's declared range wins where it is tighter than the grid
+ * (RPM caps at 29x15), since a write past it is rejected rather than
+ * clamped. Without metadata the grid is the only bound.
  */
 export function coordLimit(
   metadata: Record<string, ParamMeta>,
@@ -124,12 +118,8 @@ export function clampPlacement(
 }
 
 /**
- * Ids of enabled panels that do not fit on the grid.
- *
- * Switching a screen from HD back to SD is the way this happens: a panel
- * parked at column 45 is perfectly legal on a 60-column screen and simply
- * never drawn on a 30-column one. The parameter keeps its value, so nothing
- * complains -- the panel just silently stops appearing.
+ * Ids of enabled panels that do not fit on the grid, typically after
+ * switching a screen from HD to SD. Such a panel silently stops appearing.
  */
 export function findOffGrid(placements: readonly Placement[], grid: Grid): Set<string> {
   const out = new Set<string>()
@@ -142,11 +132,8 @@ export function findOffGrid(placements: readonly Placement[], grid: Grid): Set<s
 }
 
 /**
- * Ids of enabled panels whose cells overlap another enabled panel.
- *
- * Overlap is the characteristic OSD mistake and it is invisible until the
- * vehicle is in the air, so the editor flags it rather than waiting for the
- * video feed to show it.
+ * Ids of enabled panels whose cells overlap another enabled panel, which is
+ * otherwise invisible until the vehicle is flying.
  */
 export function findOverlaps(placements: readonly Placement[]): Set<string> {
   const live = placements.filter((p) => p.enabled)

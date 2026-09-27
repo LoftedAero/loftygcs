@@ -9,9 +9,7 @@ import PreviewNotice from './ui/shell/PreviewNotice'
 import UnsavedChangesModal from './ui/shell/UnsavedChangesModal'
 import RebootPrompt from './ui/components/RebootPrompt'
 import { holdsVehicleTabs, tabFills, useUiStore, visibleTabs } from './stores/ui-store'
-import { useGuideStore } from './stores/guide-store'
 import { useConnectionStore } from './stores/connection-store'
-import GuideRunner from './ui/guides/GuideRunner'
 import OverviewTab from './ui/tabs/overview/OverviewTab'
 import FirmwareTab from './ui/tabs/firmware/FirmwareTab'
 import ConfigurationTab from './ui/tabs/configuration/ConfigurationTab'
@@ -79,19 +77,15 @@ export default function App() {
   const activeTab = useUiStore((s) => s.activeTab)
   const connected = useConnectionStore((s) => holdsVehicleTabs(s.phase))
 
-  // A tab that leaves the rail must not leave someone staring at it. Losing
-  // the link while on, say, Radio drops you to the top of what is left --
-  // Betaflight does the same, returning to its Welcome tab. The destination
-  // is read from the list rather than named here, so changing which tabs
-  // survive a disconnect needs nothing of this file. Nothing is prompted
-  // about on the way: the parameters those screens stage against are cleared
-  // by the disconnect, so there is nothing left to lose.
   // The gamepad is read for the whole session, not only while its pane is
   // open: control taken on the Fly screen stays taken on every other one.
   useEffect(() => {
     startReading()
   }, [])
 
+  // Losing the link while on a vehicle-only tab drops to the first tab that
+  // remains. No unsaved-changes prompt: the disconnect already cleared the
+  // parameters those screens stage against.
   useEffect(() => {
     if (connected) return
     const offline = visibleTabs(false)
@@ -99,13 +93,10 @@ export default function App() {
     const first = offline[0]
     if (first) useUiStore.setState({ activeTab: first.id })
   }, [connected, activeTab])
-  const guideActive = useGuideStore((s) => s.activeGuide !== null)
-  // A running guide replaces the rail as well as the content: it is a
-  // sequence to follow, and half-leaving it mid-step loses the thread.
-  const showRail = mode === 'setup' && !guideActive
+  const showRail = mode === 'setup'
   // Fly and Mission always take the window; inside Setup, so do the tabs
   // that lay out their own full height rather than tiling cards.
-  const flush = mode !== 'setup' || (!guideActive && tabFills(activeTab))
+  const flush = mode !== 'setup' || tabFills(activeTab)
 
   return (
     <div className="la-app">
@@ -113,7 +104,7 @@ export default function App() {
       <main className={showRail ? 'la-main app-main' : 'la-main app-main app-main--full'}>
         {showRail && <NavRail />}
         <div className={flush ? 'app-content app-content--flush' : 'app-content'}>
-          {mode === 'setup' && (guideActive ? <GuideRunner /> : <SetupContent />)}
+          {mode === 'setup' && <SetupContent />}
           {mode === 'fly' && <FlightTab />}
           {mode === 'mission' && <MissionTab />}
         </div>
@@ -124,8 +115,7 @@ export default function App() {
       <PreferencesModal />
       <SerialChooserModal />
       <UnsavedChangesModal />
-      {/* The one restart dialog, for whichever screen owed it -- see
-          RebootPrompt. Cards show only the reminder left after Later. */}
+      {/* The single restart dialog for every screen; see RebootPrompt. */}
       <RebootPrompt />
       {/* Last, so it sits over everything on first run. */}
       <PreviewNotice />

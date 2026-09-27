@@ -17,20 +17,15 @@ import {
 
 // KML and GPX, joined to the three plans Mission mode edits.
 //
-// What an import *means* is decided by what is being edited, not by what is
-// in the file: on Mission it is waypoints, on Fence it is boundaries, on
-// Rally it is alternates. That is the rule the rest of Mission mode already
-// follows -- the switch changes what things mean -- and it is why the
-// ordinary import asks nothing at all.
+// What an import becomes is decided by the plan being edited, not by the
+// file: waypoints on Mission, boundaries on Fence, rally points on Rally.
 //
-// Only two questions are worth a dialog, and neither is "which shape":
-// whether a fence keeps the vehicle in or out, which the file cannot say;
-// and what to do when the file holds nothing of the kind being imported,
-// where the alternative to asking is doing nothing and not saying why.
+// The only things worth asking are whether a fence keeps the vehicle in or
+// out, which the file cannot say, and what to do when the file holds nothing
+// of the kind being imported.
 //
-// Everything is capped and simplified on the way in. A GPX track is a fix a
-// second, ArduPilot's mission storage is not, and importing an hour's walk
-// as 3,600 waypoints would be a way of not importing it at all.
+// Everything is capped and simplified on the way in: a GPX track is a fix a
+// second, and an hour of it would be 3,600 waypoints.
 
 /** As many waypoints as an imported track may become. */
 export const MAX_IMPORT_ITEMS = 80
@@ -57,9 +52,8 @@ export function destinationFor(editing: PlanKind): GeoDestination {
 /**
  * The shapes in a file that suit where they are going.
  *
- * A fence wants closed areas; a mission wants lines and points. A file
- * routinely holds both -- a route drawn beside the paddock it crosses --
- * and taking the wrong one is worse than taking none.
+ * A fence wants closed areas; a mission wants lines and points. A file often
+ * holds both.
  */
 export function usableShapes(shapes: readonly GeoShape[], dest: GeoDestination): GeoShape[] {
   if (dest === 'fence') return shapes.filter((s) => s.kind === 'polygon')
@@ -71,9 +65,8 @@ const toWire = (f: GeoFix) => ({ x: Math.round(f.lat * 1e7), y: Math.round(f.lon
 /**
  * What a relative altitude of zero is worth, or null when nothing says.
  *
- * Only the vehicle's own home carries an elevation; a home dropped on the
- * map keeps zero, and reading that as sea level would put an imported track
- * hundreds of meters underground.
+ * Only the vehicle's own home carries an elevation. A home placed on the map
+ * has zero, which must not be read as sea level.
  */
 function homeAmsl(plan: MissionPlan): number | null {
   return plan.home && plan.home.z !== 0 ? plan.home.z : null
@@ -89,10 +82,9 @@ export interface ApplyOptions {
 /**
  * Apply every shape at once.
  *
- * Several tracks become one route rather than a choice: a path drawn in
- * Google Earth comes back in the pieces it was drawn in, and stitching them
- * in file order is what the person who drew them meant. Several polygons
- * become several fence shapes, which is what a fence is made of.
+ * Several tracks are stitched into one route in file order, since a path
+ * drawn in Google Earth comes back in the pieces it was drawn in. Several
+ * polygons become several fence shapes.
  */
 export function applyGeoShapes(
   shapes: readonly GeoShape[],
@@ -161,12 +153,9 @@ export function applyGeoShapes(
 /**
  * The altitude to give an imported waypoint.
  *
- * A file's elevation is always above sea level, so it is only usable
- * directly in the AMSL frame; converting it to a relative one needs a home
- * elevation nobody may have supplied. Where it cannot be converted the
- * editor's default altitude is used, which is at least a number someone
- * chose -- an imported track flown at whatever height the GPS thought the
- * hiker's wrist was at is not a mission.
+ * A file's elevation is AMSL, so it is used directly only in the AMSL frame;
+ * the relative frame needs a known home elevation. Otherwise the editor's
+ * default altitude is used.
  */
 function altitudeFor(
   f: GeoFix,
@@ -186,8 +175,8 @@ export function pickGeoFile(): Promise<GeoFilePick | null> {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.kml,.gpx,.xml'
-    // Attached rather than floating: a detached input's click is ignored by
-    // some browsers, and a test cannot reach one either.
+    // Attached to the document: some browsers ignore a detached input's
+    // click, and tests cannot reach one.
     input.style.display = 'none'
     document.body.appendChild(input)
     let settled = false
@@ -228,10 +217,8 @@ function exportRoute(name: string) {
   const points: ExportPoint[] = []
   plan.items.forEach((it, i) => {
     if (it.x === 0 && it.y === 0) return
-    // Terrain-frame altitudes are left as they are: the height above a hill
-    // is not a height above the sea, and guessing at the difference in a
-    // file someone will fly against is worse than a route drawn a little
-    // low in Google Earth.
+    // Terrain-frame altitudes are not converted, since the ground height is
+    // not known here.
     const amslM = it.frame === 0 ? it.z : (base ?? 0) + it.z
     points.push({
       lat: it.x / 1e7,
@@ -243,7 +230,7 @@ function exportRoute(name: string) {
   return {
     name,
     points,
-    // With no surveyed home there is no elevation to be absolute about.
+    // Without a surveyed home, altitudes can only be relative.
     altitudeMode: base === null ? ('relativeToGround' as const) : ('absolute' as const),
   }
 }
@@ -288,9 +275,7 @@ function exportRally(): ExportPoint[] {
 /**
  * Whether there is anything to write, and whether GPX can hold it.
  *
- * GPX has no way to express an area, so a fence has nothing to say in it.
- * Better to grey the button than to write a file whose contents are a lie
- * about what a fence is.
+ * GPX cannot express an area, so a fence exports as KML only.
  */
 export function exportable(editing: PlanKind): { kml: boolean; gpx: boolean } {
   const store = useMissionStore.getState()

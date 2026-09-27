@@ -4,8 +4,6 @@ import { modeNumberByName, modeTable } from '../../../protocol/modes'
 
 describe('base layers', () => {
   it('defaults to satellite', () => {
-    // Aerial is what you are actually looking at when you fly; a street map
-    // says nothing about the field you are standing in.
     expect(BASE_LAYERS[0]?.id).toBe('satellite')
     expect(layerById('satellite').id).toBe('satellite')
   })
@@ -16,8 +14,7 @@ describe('base layers', () => {
   })
 
   it('carries attribution on every layer', () => {
-    // Esri's imagery terms require the credit to stay visible, so a layer
-    // without one is a licensing bug, not a cosmetic one.
+    // Esri's imagery terms require the credit to stay visible.
     for (const l of BASE_LAYERS) {
       expect(l.attribution.length, `${l.id} needs attribution`).toBeGreaterThan(10)
     }
@@ -30,8 +27,8 @@ describe('base layers', () => {
   })
 
   it('uses Esri tile order for the imagery service', () => {
-    // ArcGIS numbers its tiles {z}/{y}/{x}; the usual {z}/{x}/{y} silently
-    // serves the wrong square of the planet.
+    // ArcGIS orders its tiles {z}/{y}/{x}; the usual {z}/{x}/{y} silently
+    // serves the wrong tile.
     const sat = layerById('satellite')
     expect(sat.url).toContain('{z}/{y}/{x}')
   })
@@ -42,8 +39,7 @@ describe('modeNumberByName', () => {
   const PLANE = 1 // MAV_TYPE_FIXED_WING
 
   it('resolves the same name to different numbers per vehicle', () => {
-    // The whole reason the dedicated buttons look modes up by name: Auto is
-    // 3 on Copter and 10 on Plane, RTL is 6 and 11.
+    // Auto is 3 on Copter and 10 on Plane; RTL is 6 and 11.
     expect(modeNumberByName(COPTER, 'Auto')).toBe(3)
     expect(modeNumberByName(PLANE, 'Auto')).toBe(10)
     expect(modeNumberByName(COPTER, 'RTL')).toBe(6)

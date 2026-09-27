@@ -33,17 +33,8 @@ import {
   triggerCamera,
 } from '../../../services/flight'
 
-// Every command you give the vehicle, in one place.
-//
-// They used to be spread across three: mode and arm in the app's footer,
-// these in a bar under the HUD, and the view switches in a strip under the
-// header. The footer's justification was that it never scrolls away -- but
-// nothing on this screen scrolls, so the split bought nothing and cost the
-// pilot a hunt. The view switches moved out to a Layout menu, and Follow
-// moved onto the map it belongs to.
-//
-// Ordered by how often a hand reaches for them: flying, then adjusting,
-// then the occasional command behind a picker.
+// Every command you give the vehicle, in one place, ordered by how often they
+// are used: flying, then adjusting, then occasional commands behind a picker.
 
 interface DoAction {
   id: string
@@ -91,10 +82,9 @@ export default function FlightControls() {
   const planItems = useMissionStore((s) => s.plan.items)
   const progress = missionProgress(missionSeq, planItems, wpDistM, groundspeedMs)
   const isCopter = vehicleClass(vehicleType) === 'copter'
-  // How this airframe leaves the ground, from the same function the command
-  // uses -- so the tooltip cannot promise one thing while Takeoff does
-  // another. A quadplane goes the copter's way (vertically, to the altitude
-  // asked for); only a fixed wing takes off by mode.
+  // How this airframe takes off, from the same function the command uses so
+  // the tooltip matches. A quadplane climbs vertically like a copter; only a
+  // fixed wing takes off by mode.
   const qEnable = useParamStore((s) => s.entries.get('Q_ENABLE')?.value)
   const takeoffVia = takeoffStyle(vehicleType, qEnable)
 
@@ -109,14 +99,12 @@ export default function FlightControls() {
 
   const modes = modeTable(vehicleType)
 
-  // The mode picked but not yet sent. Null means "showing what the vehicle
-  // is actually in", which is what it shows whenever nothing is staged.
+  // The mode picked but not yet sent; null shows the vehicle's actual mode.
   const [pendingMode, setPendingMode] = useState<number | null>(null)
   const shownMode = pendingMode ?? customMode
   const modeStaged = pendingMode !== null && pendingMode !== customMode
-  // Any change to the vehicle's own mode clears the staged one -- our Set
-  // landing, but also a failsafe or a switch on the transmitter. A staged
-  // choice made before the situation changed is not one to keep offering.
+  // Any change to the vehicle's mode (our Set, a failsafe, the transmitter)
+  // clears the staged one.
   useEffect(() => setPendingMode(null), [customMode])
   const applyMode = () => {
     if (pendingMode === null) return
@@ -124,12 +112,9 @@ export default function FlightControls() {
   }
 
   /**
-   * Whether the vehicle has explained a refusal itself.
-   *
-   * MAV_RESULT says FAILED and nothing else; the reason -- "Arm: Need
-   * Position Estimate", "Mode change to Guided failed: requires position" --
-   * arrives just after the ack as a warning, which the HUD shows. Only a
-   * refusal it did not explain needs the app to say anything.
+   * Whether the vehicle has explained a refusal itself. MAV_RESULT only says
+   * FAILED; the reason ("Arm: Need Position Estimate") arrives just after the
+   * ack as a warning, which the HUD already shows.
    */
   const explained = () =>
     useVehicleStore
@@ -138,10 +123,9 @@ export default function FlightControls() {
         (t) => t.severity <= HUD_MESSAGE_SEVERITY && Date.now() - t.at < REASON_WINDOW_MS,
       )
 
-  // Results go to the HUD, where the vehicle's own warnings are (Mission
-  // Planner's arrangement), not to a line under these buttons. Success says
-  // nothing: the mode, the armed state, the altitude are the confirmation.
-  // It does clear what an earlier refusal left there.
+  // Results go to the HUD beside the vehicle's own warnings. Success says
+  // nothing (the vehicle state is the confirmation) but clears any earlier
+  // refusal.
   const report = (what: string) => async (result: number) => {
     if (result === 0) return clearNote()
     // The vehicle usually explains itself just after the ack, not with it.
@@ -160,11 +144,9 @@ export default function FlightControls() {
     void setModeConfirmed(num)
       .then(async (r) => {
         await report(name)(r)
-        // Auto with a takeoff as its first item will not start itself from
-        // the ground: Copter waits for the throttle stick to be raised,
-        // which a station with no transmitter cannot do. Say so rather than
-        // leaving a vehicle that is armed, in Auto, and going nowhere until
-        // it auto-disarms.
+        // Copter will not start an Auto takeoff from the ground until the
+        // throttle stick is raised, which a GCS without a transmitter cannot
+        // do; otherwise it sits armed in Auto until it auto-disarms.
         if (r === 0 && name === 'Auto' && isCopter && relAltM < 1) {
           say('Copter will not start an Auto takeoff from the ground')
         }
@@ -197,23 +179,13 @@ export default function FlightControls() {
 
   return (
     <div className="flight-controls">
-      {/* Tier one: what mode it is in and whether it is armed. Full size and
-          first, because everything else is an adjustment to these two. */}
+      {/* Tier one: flight mode and arm state. */}
       <div className="flight-controls__primary">
-        {/* Two groups that wrap as wholes: in a narrow column the jumps go
-            under the mode and Arm, rather than a row breaking between any
-            two buttons. The gap between them is what makes them groups; the
-            rule that used to divide them sat alone at the start of the
-            second line once they wrapped. */}
+        {/* Two groups that wrap as wholes in a narrow column. */}
         <div className="flight-controls__group">
-          {/* Chosen, then sent -- not sent on change.
-            A <select> takes the mouse wheel, so a scroll that happens to
-            pass over this one used to command a mode change on a flying
-            aircraft, with nothing pressed and nothing confirmed. Staging
-            the choice also makes this the same gesture as the value fields
-            below and as a parameter edit: pick, then commit. The staged
-            state wears `.is-dirty`, which is the app's existing "this is
-            what the button will send" highlight. */}
+          {/* Chosen, then sent with Set. A <select> takes the mouse wheel, so
+            sending on change would let a stray scroll change the mode in
+            flight. `.is-dirty` marks a staged choice. */}
           <LaSelect
             className={`flight-controls__mode${modeStaged ? ' is-dirty' : ''}`}
             value={String(shownMode)}
@@ -251,14 +223,9 @@ export default function FlightControls() {
         </div>
 
         <div className="flight-controls__group">
-          {/* Tier two: one-touch jumps that are really mode changes, so they
-            sit beside the mode picker but a step down in size. */}
-          {/* Just "Takeoff". The altitude was in the label, but what the
-            command actually does differs by airframe, and one honest word
-            beats a number that is only true for some of them -- measured
-            against SITL, armed and in Guided: a quadplane answers
-            NAV_TAKEOFF with ACCEPTED and a fixed wing with FAILED. The
-            altitude is on the tooltip. */}
+          {/* Tier two: one-touch jumps that are really mode changes. */}
+          {/* No altitude in the label: what Takeoff does differs by airframe,
+            so the details are on the tooltip. */}
           <LaButton
             variant="secondary"
             title={
@@ -269,7 +236,7 @@ export default function FlightControls() {
             disabled={!connected || !armed || takeoffVia === 'unsupported'}
             onClick={() => {
               // A copter's EKF refuses Guided for a few seconds after boot; the
-              // vehicle says so ("requires position"), and that is on the HUD.
+              // vehicle's reason ("requires position") shows on the HUD.
               void takeoff(TAKEOFF_ALT_M).then(report('Takeoff')).catch(fail('Takeoff'))
             }}
           >
@@ -283,10 +250,8 @@ export default function FlightControls() {
           </LaButton>
         </div>
 
-        {/* Read, not pressed -- so it takes the top row's right-hand end,
-            which was the one piece of always-visible space on this screen
-            and was empty. It also stops a read-only readout sitting in the
-            middle of the strip of controls below. */}
+        {/* A readout, not a control, so it sits at the right end of the top
+            row rather than among the controls. */}
         {progress.position !== null && (
           <span className="flight-progress" title="Mission item the vehicle is flying">
             <span className="flight-progress__label">WP</span>
@@ -306,12 +271,10 @@ export default function FlightControls() {
         )}
       </div>
 
-      {/* Tier three, on a recessed strip: numbers you nudge while it is up
-          there, then the occasional command, then arranging the window.
-          Ordered by how often a hand goes to them. */}
+      {/* Tier three, on a recessed strip: values to adjust in flight, then
+          occasional commands. */}
       <div className="flight-controls__secondary">
-        {/* Typed in the reader's units and converted on the way out: the
-            vehicle is commanded in SI whatever the box says. */}
+        {/* Typed in display units, converted to SI before sending. */}
         <Field
           id="fc-speed"
           label="Speed"
@@ -350,9 +313,8 @@ export default function FlightControls() {
             void setCurrentMissionItem(Number(wp)).then(report('Set item')).catch(fail('Set item'))
           }
         />
-        {/* Labelled like the fields beside it, and one group, so a wrap takes
-            both or neither and the line it lands on reads as a fourth field
-            rather than a stray at the right-hand edge. */}
+        {/* Labeled like the fields beside it, and one group so it wraps as a
+            whole. */}
         <div className="flight-controls__run">
           <label className="la-field__label" htmlFor="fc-action">
             Action
@@ -469,8 +431,7 @@ function Field({
         placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        // Enter is what a hand does after typing a number; making it wait
-        // for a mouse trip to the button is the wrong shape in flight.
+        // Enter sends, as well as the Set button.
         onKeyDown={(e) => {
           if (e.key === 'Enter' && value !== '') onSet()
         }}

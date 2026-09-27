@@ -7,7 +7,7 @@ import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
 import { connectionService } from '../../../services/connection'
 
 // A whole calibration against a simulated transmitter: channel 1 roll, 2
-// pitch (reversed -- back is the lower pulse), 3 throttle, 4 yaw, 5 a switch.
+// pitch (reversed: back is the lower pulse), 3 throttle, 4 yaw, 5 a switch.
 
 const entry = (value: number) => ({ value, origValue: value, mavType: 9, dirty: false })
 

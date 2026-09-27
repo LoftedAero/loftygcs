@@ -17,30 +17,11 @@ import {
   signalBars,
 } from './app-status'
 
-// The app bar's vehicle status: a row of indicators, one per thing worth
-// glancing at, rather than one sentence.
+// The app bar's vehicle status: a row of indicators rather than one sentence.
 //
-// What it replaced was a single `.la-readout` inherited from the other
-// Lofted Aero apps, where that element is the app's own main live value and
-// earning the bar's slack is right. Here it held `Name · Mode · Armed` and
-// still absorbed every spare pixel: measured at 691px in a 1600px window and
-// 1651px at 2560, against a longest-ever string of 203px. Two thirds of the
-// bar to say one short thing, and the wrong short thing -- mode and armed
-// state are also in the flight controls two inches below, while battery,
-// GPS, link and prearm were only ever drawn on the HUD canvas, behind an
-// overlays toggle, on one screen out of three.
-//
-// The shape is QGroundControl's and so is the rule that matters most:
-// **an indicator that has nothing to say is not drawn**. QGC instantiates no
-// vehicle indicators at all without a vehicle; Betaflight sets its whole
-// status cluster to `display: none`. Neither has a box reading "Not
-// connected", which is exactly what this bar used to show. Whether a subject
-// exists is read from SYS_STATUS's present mask rather than from its value,
-// because a value cannot separate "no battery monitor" from "a monitor
-// reading zero".
-//
-// Every string comes from the same helpers the HUD paints with, so the bar
-// and the HUD cannot drift into describing one vehicle two ways.
+// Following QGroundControl, nothing is drawn without a vehicle (no "Not
+// connected" box). Strings come from the same helpers the HUD uses, so the
+// two cannot describe one vehicle differently.
 export default function AppStatus() {
   const phase = useConnectionStore((s) => s.phase)
   const error = useConnectionStore((s) => s.error)
@@ -79,12 +60,8 @@ export default function AppStatus() {
   })
   if (!status) return null
 
-  // The one clickable indicator, and it goes where the reason is. "Not
-  // ready" is a question -- which check? -- and the Preflight pane is the
-  // screen that answers it, so the word is the route to it rather than a
-  // dead end that has to be looked up somewhere else. Opening the pane as
-  // well as selecting it: with the lower pane switched off, changing which
-  // tab is active would do nothing anyone could see.
+  // The status word opens the Preflight pane, which says why the vehicle is
+  // not ready. The lower pane is shown too, in case it was switched off.
   const explain = () => {
     setMode('fly')
     setLogPane('preflight')
@@ -97,10 +74,8 @@ export default function AppStatus() {
 
   return (
     <div className="app-status" role="group" aria-label="Vehicle status">
-      {/* A button only while there is a vehicle to explain. Offering a route
-          to the preflight checks of an aircraft that is not there is a
-          control that cannot do what it says -- so opening a link, a failed
-          connect and a lost link render the same chip as plain text. */}
+      {/* A button only while there is a vehicle; otherwise (connecting,
+          failed or lost link) the same chip as plain text. */}
       {present ? (
         <button
           type="button"
@@ -114,8 +89,7 @@ export default function AppStatus() {
       ) : (
         <span
           className={`app-status__state app-status__state--${status.tone}`}
-          /* The error phase puts the transport's own words here, and they can
-             be long. The row clips them; the tooltip does not. */
+          /* Error text can be long; the row clips it, the tooltip does not. */
           title={status.text}
         >
           <span className="app-status__dot" aria-hidden="true" />
@@ -123,11 +97,9 @@ export default function AppStatus() {
         </span>
       )}
 
-      {/* Not a reading: what the vehicle is running, fixed for the life of
-          the connection. It sits with the state rather than among the
-          gauges because those three change and this does not, and it keeps
-          a reserved width with a dash in it so the moment
-          AUTOPILOT_VERSION lands is not the moment the gauges jump. */}
+      {/* Firmware is fixed for the connection, so it sits with the state
+          rather than the gauges. Its width is reserved so the gauges do not
+          shift when AUTOPILOT_VERSION arrives. */}
       {present && (
         <Item
           slot="firmware"
@@ -141,19 +113,10 @@ export default function AppStatus() {
         />
       )}
 
-      {/* The three readings are always drawn while a vehicle is connected,
-          whether or not it has the hardware. That is a deliberate reversal:
-          they were gated on the SYS_STATUS present mask, and a flight
-          controller with no GPS then had no GPS reading at all -- which
-          tells a pilot nothing, and reads as a layout fault rather than as
-          news. "No GPS" is itself a reading, and the one that decides
-          whether the position modes can be flown. Betaflight draws all six
-          of its sensor cells for the same reason.
-
-          The rule that stands is the one above it: with no *vehicle* the
-          whole row is absent. What changed is that inside a connected
-          vehicle the set is fixed, which also means the row is one width
-          for every aircraft rather than one per sensor fit. */}
+      {/* The three readings are always drawn while connected, whether or not
+          the hardware is fitted: "No GPS" is itself a reading, and it decides
+          whether the position modes can be flown. It also keeps the row one
+          width for every aircraft. */}
       {present && (
         <Item
           slot="battery"
@@ -175,9 +138,8 @@ export default function AppStatus() {
           cap="GPS"
           icon={<GpsIcon />}
           value={gpsSats > 0 ? `${gpsKind(gpsFix)} · ${gpsSats}` : gpsKind(gpsFix)}
-          // Three is ArduPilot's own threshold: below it the vehicle refuses
-          // Loiter, Auto and RTL, so it is a fact about what can be flown
-          // rather than a comfort level chosen here.
+          // ArduPilot's own threshold: below a 3D fix it refuses Loiter, Auto
+          // and RTL.
           tone={gpsUsable(gpsFix) ? undefined : 'warn'}
           title={`GPS — ${gpsSats} satellites`}
         />
@@ -193,25 +155,17 @@ export default function AppStatus() {
         />
       )}
 
-      {/* Last, and the only reading without a reserved width. A mode name is
-          the one value here whose length is set by firmware rather than by
-          this app -- "Loiter to QLand" and "Heli_Autorotate" are the longest
-          ArduPilot ships today and a future one could be longer -- so it
-          goes on the end, where growing simply extends the row instead of
-          pushing four gauges sideways. */}
+      {/* Last and without a reserved width: mode names come from firmware
+          ("Loiter to QLand" is among the longest), so growing only extends
+          the row. */}
       {present && <Item slot="mode" cap="Mode" value={modeName || '—'} />}
     </div>
   )
 }
 
 /**
- * One reading in a slot of its own fixed width.
- *
- * The slot is the point: a value that resizes as it changes drags every
- * reading after it sideways, and a row of gauges that shuffles while you
- * read it is worse than no row. Each width is measured against the longest
- * string that reading can actually produce (see app.css), so the number
- * changes and nothing moves.
+ * One reading in a fixed-width slot, sized in app.css to the longest string
+ * it can produce, so a changing value does not shift its neighbors.
  */
 function Item({
   slot,
@@ -236,29 +190,21 @@ function Item({
   return (
     <div className={cls.filter(Boolean).join(' ')} title={title ?? cap}>
       {icon}
-      {/* The icon is what the reading is labelled with on screen; the word
-          is still here for anyone reading the page rather than looking at
-          it, and it is what the tooltip says. */}
+      {/* The icon labels the reading on screen; this labels it for screen
+          readers. */}
       <span className="app-sr-only">{cap}</span>
       <span className="app-status__val">{value}</span>
     </div>
   )
 }
 
-// Drawn rather than imported, the way the app bar's gear already is: three
-// glyphs is not a reason to take on an icon set, and these have to sit on a
-// permanently dark ground and take `currentColor` so a warning tone reaches
-// them. All 16px on the same 0 0 16 16 grid so they share a baseline.
+// Inline SVG rather than an icon set; they use `currentColor` so a warning
+// tone reaches them. All on the same 20x20 grid so they share a baseline.
 
 /**
- * A cell, its terminal, and how full it is.
- *
- * The fill is `battery_remaining` drawn as a picture of itself, not a
- * judgement about it -- null (MAVLink's -1, "no estimate") draws an empty
- * cell rather than a flat one, which are very different pieces of news. Any
- * *color* comes from the item's tone, which is set from the vehicle's own
- * BATT_LOW_VOLT and BATT_CRT_VOLT rather than from a threshold invented
- * here.
+ * A cell filled to `battery_remaining`. Null (MAVLink's -1, "no estimate")
+ * draws an empty cell. Color comes from the item's tone, which follows the
+ * vehicle's BATT_LOW_VOLT and BATT_CRT_VOLT.
  */
 function BatteryIcon({ fill }: { fill: number | null }) {
   return (
@@ -289,15 +235,8 @@ function BatteryIcon({ fill }: { fill: number | null }) {
 }
 
 /**
- * A globe: latitude, longitude and a meridian.
- *
- * A satellite is the conventional glyph here and three attempts at one --
- * dish on a mast, dish with a feed horn, body with solar panels -- were all
- * illegible at 16px, which is the only size this is ever drawn at. Rendered
- * at 96px they were fine; that is not the test. A globe survives the size,
- * says "where on Earth" (which is the reading), and cannot be confused with
- * the link bars beside it, which matters more than matching a convention
- * nobody can make out.
+ * A globe rather than the conventional satellite, which is illegible at the
+ * small size this is drawn at.
  */
 function GpsIcon() {
   return (
@@ -314,10 +253,8 @@ function GpsIcon() {
 /**
  * Four ascending bars, lit to the receiver's RSSI.
  *
- * Unlit bars stay drawn at low opacity rather than disappearing: the shape
- * is what says "four bars, one lit", and bars that vanish read as a smaller
- * icon rather than as a weak signal. `null` -- the link does not report RSSI
- * at all -- lights none of them, and the value beside it falls back to the
+ * Unlit bars stay at low opacity so the shape still reads as four bars.
+ * `null` (no RSSI reported) lights none; the value beside it then shows the
  * packet rate.
  */
 function SignalIcon({ bars }: { bars: number | null }) {

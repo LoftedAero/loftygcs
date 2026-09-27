@@ -1,7 +1,6 @@
-// Normalizes raw decoded messages into TelemetryDelta units the rest of the
-// app can trust: degrees, meters, volts -- never the wire's centidegrees,
-// millimeters, or centiamps. All unit conversion happens here and nowhere
-// else.
+// Normalizes decoded messages into TelemetryDelta units: degrees, meters and
+// volts rather than the wire's centidegrees, millimeters and centiamps. All
+// wire unit conversion happens here.
 import { attitudeFromMountStatus, attitudeFromQuaternion } from './gimbal'
 import type { DecodedMessage, TelemetryDelta } from './types'
 
@@ -14,7 +13,7 @@ const SERVO_OUTPUT_COUNT = 16
  */
 const SERVO_OUTPUT_PORTS = 2
 
-/** One message can carry several facts -- SYS_STATUS is both power and sensors. */
+/** One message can yield several deltas (SYS_STATUS is both power and sensors). */
 export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
   const f = msg.fields
   switch (msg.msgName) {
@@ -25,11 +24,8 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           rollRad: f.roll as number,
           pitchRad: f.pitch as number,
           yawRad: f.yaw as number,
-          // The body rates come with the same message and were being
-          // dropped. Compass calibration needs them: how fast the vehicle is
-          // turning about *earth vertical* is a projection of these, and
-          // that is the one measure that still works nose-down, where Euler
-          // yaw is degenerate.
+          // Compass calibration projects these onto earth vertical, which
+          // still works nose-down where Euler yaw is degenerate.
           rollRateRad: f.rollspeed as number,
           pitchRateRad: f.pitchspeed as number,
           yawRateRad: f.yawspeed as number,
@@ -72,9 +68,9 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           altErrorM: f.altError as number,
         },
       ]
-    // Two generations of the same fact. The modern message carries a
-    // quaternion, the old one three centidegree fields in an unusual order;
-    // a vehicle sends one or the other, never both.
+    // Two generations of the same data: the modern message carries a
+    // quaternion, the old one three centidegree fields in an unusual order.
+    // A vehicle sends one or the other.
     case 'GIMBAL_DEVICE_ATTITUDE_STATUS': {
       const at = attitudeFromQuaternion((f.q as number[]) ?? [])
       return at ? [{ k: 'gimbal', ...at }] : []
@@ -95,8 +91,7 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
         {
           k: 'battery',
           voltageV: (f.voltageBattery as number) / 1000,
-          // -1 means "not measured" on the wire; keep it as-is so the UI can
-          // show a dash instead of a fictitious 0.01 A draw.
+          // -1 means "not measured"; kept so the UI can show a dash.
           currentA: (f.currentBattery as number) < 0 ? -1 : (f.currentBattery as number) / 100,
           remainingPct: f.batteryRemaining as number,
         },
@@ -134,20 +129,17 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
       const count = Math.min((f.chancount as number) || 16, 16)
       const channels: number[] = []
       for (let i = 1; i <= count; i++) channels.push((f[`chan${i}Raw`] as number) ?? 0)
-      // 255 is MAVLink's "receiver does not report RSSI"; -1 keeps that
-      // distinct from a genuine reading of zero, which means no signal.
+      // 255 is MAVLink's "RSSI not reported"; -1 keeps it distinct from a
+      // real reading of zero.
       const raw = f.rssi as number | undefined
       const rssi = raw === undefined || raw === 255 ? -1 : raw
       return [{ k: 'rc', channels, rssi }]
     }
     case 'SERVO_OUTPUT_RAW': {
-      // `port` says which sixteen these are, and it is not optional reading:
-      // `GCS_MAVLINK::send_servo_output_raw` sends port 1 for outputs 17-32
-      // whenever any of them is not a GPIO -- which by default is all of
-      // them -- so a 32-channel board sends both, back to back, every cycle.
-      // Taken as outputs 1-16, the second one overwrites the real values with
-      // the upper half's, which on most aircraft is sixteen zeros. SITL builds
-      // with 16 channels and never sends it, so nothing live catches this.
+      // `port` says which sixteen these are. A 32-channel board sends port 1
+      // (outputs 17-32) right after port 0 every cycle; ignoring the port
+      // would overwrite outputs 1-16 with the upper half, usually zeros. SITL
+      // builds with 16 channels and never sends port 1.
       const port = (f.port as number | undefined) ?? 0
       if (port >= SERVO_OUTPUT_PORTS) return []
       const valuesUs: number[] = []
@@ -164,11 +156,10 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
 /**
  * A pack's total from BATTERY_STATUS's cell slots, in volts, or null.
  *
- * The slots are cells only when the monitor measures cells. ArduPilot's
- * `send_battery_status` otherwise writes the pack total into the first slot
- * and, past the 65,534 mV a slot can hold, carries the rest into the next --
- * so the total is the sum of every used slot either way. Unused is 65535 in
- * `voltages` and 0 (or 65535) in the extension.
+ * The slots are cells only when the monitor measures cells. Otherwise
+ * ArduPilot writes the pack total into the first slot and carries anything
+ * past 65,534 mV into the next, so the total is the sum of every used slot
+ * either way. Unused is 65535 in `voltages` and 0 or 65535 in the extension.
  */
 export function packVoltage(voltages: readonly number[], ext: readonly number[]): number | null {
   const UNUSED = 0xffff
@@ -181,10 +172,7 @@ export function packVoltage(voltages: readonly number[], ext: readonly number[])
 
 /**
  * Place one SERVO_OUTPUT_RAW's sixteen values at its port's offset, keeping the
- * other port's.
- *
- * Index 0 is SERVO1. The result is always 32 long, so an index is an output
- * number whichever port has been heard from.
+ * other port's. The result is always 32 long; index 0 is SERVO1.
  */
 export function mergeServoOutputs(
   prev: readonly number[],

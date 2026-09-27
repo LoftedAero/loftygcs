@@ -1,37 +1,23 @@
 // @vitest-environment node
 //
-// Connecting to SITL, for the integration tests that need to.
+// Shared SITL connection for the integration tests.
 //
-// It exists because every one of them had its own `net.connect` and only
-// one of them retried. SITL accepts a single TCP client and exits when that
-// client leaves, so `scripts/sitl.mjs` relaunches it after every test file
-// -- and a file that connects the instant the previous one finished lands
-// in the second or two before the new process has bound the port. The error
-// is `ECONNREFUSED`, which reads as "no simulator running" when in fact one
-// is starting; the failure is a race, not a result, and it made two files
-// fail on a run where the vehicle was perfectly healthy.
+// SITL accepts a single TCP client and exits when it disconnects, so
+// `scripts/sitl.mjs` relaunches it after every test file. Connecting before
+// the new process binds the port gets ECONNREFUSED, so connections retry.
 //
-// Lives in test-fixtures rather than beside the tests in src/protocol: it
-// opens sockets, and protocol/ is the one directory that must stay
-// environment-agnostic.
+// Kept out of src/protocol, which must stay environment-agnostic.
 
 import net from 'node:net'
 import { once } from 'node:events'
 
 export const SITL_HOST = '127.0.0.1'
-/**
- * SITL_PORT reaches a second simulator started with `-I1` (5770) when 5760
- * is somebody else's -- a flight in progress is not a test fixture.
- */
+/** Set SITL_PORT to reach a second simulator started with `-I1` (5770). */
 export const SITL_PORT = Number(process.env.SITL_PORT) || 5760
 
 /**
- * A socket to SITL, waiting out a relaunch.
- *
- * Retried for thirty seconds because that covers the runner noticing the
- * disconnect, spawning a fresh simulator, and it binding the port -- about
- * a second in practice, and longer on a loaded machine which is exactly
- * when this would otherwise flake.
+ * Opens a socket to SITL, retrying through a relaunch. A relaunch usually
+ * takes about a second; the generous timeout covers a loaded machine.
  */
 export async function connectSitl(timeoutMs = 30000): Promise<net.Socket> {
   const deadline = Date.now() + timeoutMs
@@ -39,9 +25,8 @@ export async function connectSitl(timeoutMs = 30000): Promise<net.Socket> {
     try {
       const socket = net.connect(SITL_PORT, SITL_HOST)
       await once(socket, 'connect')
-      // Tearing a test down races SITL's own shutdown, and the reset then
-      // arrives as an unhandled exception -- which made a fully green run
-      // exit non-zero, defeating the gate the run exists to be.
+      // Teardown races SITL's own shutdown; an unhandled reset would fail
+      // an otherwise green run.
       socket.on('error', () => {})
       return socket
     } catch {

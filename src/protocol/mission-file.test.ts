@@ -15,8 +15,7 @@ describe('waypoints files', () => {
     const items = parseWaypointsFile(MP_FILE)
     expect(items).toHaveLength(3)
     expect(items[0]).toMatchObject({ seq: 0, frame: 0, command: 16, current: 1 })
-    // Degrees to 1e7 int, exactly -- this is where float sloppiness would
-    // move a waypoint by meters.
+    // Degrees to 1e7 int, exactly.
     expect(items[0]!.x).toBe(-353632621)
     expect(items[2]!.y).toBe(1491640000)
     expect(items[1]).toMatchObject({ command: 22, param1: 15, z: 50 })

@@ -8,21 +8,14 @@ import { modeSpans, type ModeSpan } from '../../../protocol/log-modes'
 
 // The time-series plot, drawn on a canvas.
 //
-// Canvas rather than SVG for the same reason the HUD is: a single IMU field
-// from a ten-minute flight is a hundred thousand points, and that many DOM
-// nodes is not a plot, it is a hang. Redrawn on change rather than per
-// frame -- nothing here animates, and a log does not move.
+// Canvas rather than SVG: one IMU field from a ten-minute flight is a
+// hundred thousand points. Redrawn on change, not per frame.
 //
-// Wheel zooms about the pointer and drag pans, both on the time axis only:
-// the y range is what the data is, and a plot you can lose your data off the
-// top of is a plot you spend your time hunting in.
+// Zoom and pan act on the time axis only; the y range always fits the data.
 
 /**
- * Width of one y-axis gutter, per plotted field.
- *
- * Wide enough for the longest thing format() produces -- "2.29e-3" is
- * seven monospace characters -- plus a gap. At 46 the columns touched and
- * read as one number: "1176.0" and "2.29e-3" became "1176.02.29e-3".
+ * Width of one y-axis gutter, per plotted field: the longest format()
+ * output ("2.29e-3", seven monospace characters) plus a gap.
  */
 const AXIS_W = 58
 
@@ -43,17 +36,13 @@ export function rangeOf(
     if (v > max) max = v
   }
   if (!Number.isFinite(min)) return { min: 0, max: 1 }
-  // A constant trace still needs a band to be drawn in, or it lands on a
-  // division by zero and vanishes.
+  // A constant trace needs a nonzero band, or it divides by zero.
   return min === max ? { min: min - 1, max: max + 1 } : { min, max }
 }
 
 /**
- * The y range each *axis* is drawn against.
- *
- * An axis spans everything assigned to it, so two traces sharing one are
- * directly comparable -- which is the whole reason to put them together.
- * Axes nobody is using get no range and no gutter.
+ * The y range each axis is drawn against, spanning every trace assigned to
+ * it so they are directly comparable. Unused axes get no range.
  */
 export function axisRanges(
   series: readonly { time: Float64Array; values: Float64Array; axis: number }[],
@@ -103,7 +92,7 @@ export default function LogPlot() {
       .filter((s): s is PlottedSeries => s !== null)
   }, [log, selected])
 
-  // Full extent of everything selected, which is what "reset zoom" means.
+  // Full extent of everything selected, for "reset zoom".
   const extent = useMemo(() => {
     let t0 = Infinity
     let t1 = -Infinity
@@ -138,11 +127,8 @@ export default function LogPlot() {
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     draw(ctx, size, series, view, cursor, spans, box, playhead)
-    // `theme` is not read here -- draw() reads the tokens itself -- but a
-    // canvas holds its last paint until something repaints it, and nothing
-    // else in this list changes when the palette does. Without it the plot
-    // keeps its old background until an unrelated redraw happens to fire,
-    // which in practice meant "until you move the mouse over it".
+    // `theme` is not read here (draw() reads the tokens itself), but it must
+    // trigger a repaint when the palette changes.
   }, [size, series, view, cursor, spans, box, playhead, theme])
 
   if (!log) return null
@@ -158,10 +144,8 @@ export default function LogPlot() {
   }
 
   return (
-    // The wrapper and canvas are always mounted, even with nothing selected.
-    // Returning a different element for the empty case left the sizing
-    // observer -- which runs once, on mount -- attached to nothing, so the
-    // canvas stayed zero-sized and drew nothing for the rest of the session.
+    // The wrapper and canvas are always mounted, even with nothing selected,
+    // because the sizing observer attaches once on mount.
     <div className="log-plot" ref={wrapRef}>
       {series.length === 0 && (
         <p className="log-plot__hint app-placeholder">
@@ -196,8 +180,7 @@ export default function LogPlot() {
         }}
         onMouseDown={(e) => {
           const t = toTime(e.clientX)
-          // Shift pans, plain drag boxes. Zooming is the thing done most
-          // often on a log, so it gets the unmodified gesture.
+          // Shift pans; a plain drag box-zooms.
           if (e.shiftKey) panRef.current = t
           else boxRef.current = t
         }}
@@ -209,13 +192,8 @@ export default function LogPlot() {
           if (start === null) return
           const end = toTime(e.clientX)
           if (end === null) return
-          // A click is not a zoom. Below a few pixels it was someone
-          // pointing at the trace, and zooming to a sliver of a second
-          // would be a nasty surprise.
           const width = Math.abs(end - start)
-          // Too small to be a zoom, so it was a click: send the replay to
-          // that instant instead. One gesture, two readings -- what the
-          // trace says there and where the aircraft was.
+          // Too small to be a zoom, so it was a click: seek the replay there.
           if (!view || width < (view.t1 - view.t0) / 200) {
             requestSeek(end)
             return
@@ -226,8 +204,7 @@ export default function LogPlot() {
           if (!view) return
           const at = toTime(e.clientX)
           if (at === null) return
-          // Zoom about the pointer, so the thing under it stays put --
-          // zooming about the center makes you chase what you were reading.
+          // Zoom about the pointer, so what is under it stays put.
           const factor = e.deltaY > 0 ? 1.2 : 1 / 1.2
           const t0 = at - (at - view.t0) * factor
           const t1 = at + (view.t1 - at) * factor
@@ -266,8 +243,7 @@ function Legend({
   return (
     <div className="log-legend">
       {series.map((s) => {
-        // An expression has no message, so it is named by its own text --
-        // and there is no servo function to look up for arithmetic.
+        // An expression has no message, so it is named by its own text.
         const label = s.message ? `${s.message}.${s.field}` : s.field
         const named = params && s.message ? fieldLabel(params, s.message, s.field) : null
         const at = cursor !== null ? sampleAt(s, cursor) : null
@@ -277,8 +253,7 @@ function Legend({
             <span className="log-legend__axis">Y{s.axis + 1}</span>
             <span className="log-legend__name">
               {label}
-              {/* The whole point of the labels: "RCOU.C3" means nothing,
-                  "RCOU.C3 (Motor 3)" means everything. */}
+              {/* e.g. "RCOU.C3 (Motor 3)" */}
               {named && <em className="log-legend__fn"> {named}</em>}
             </span>
             <span className="log-legend__value">
@@ -354,7 +329,7 @@ function draw(
 
   ctx.font = '11px "Roboto Mono", monospace'
 
-  // Flight modes first, behind everything: the context a trace is read in.
+  // Flight modes first, behind everything.
   if (spans.length > 0) {
     ctx.save()
     ctx.beginPath()
@@ -364,9 +339,8 @@ function draw(
       const x0 = xOf(Math.max(span.from, view.t0))
       const x1 = xOf(Math.min(span.to, view.t1))
       if (x1 <= x0) return
-      // Alternating tints of one hue rather than a color per mode: the
-      // label says which mode it is, and a rainbow behind the data would
-      // compete with the traces it exists to give context to.
+      // Alternating tints of one hue; the label names the mode, and many
+      // colors would compete with the traces.
       ctx.fillStyle = i % 2 === 0 ? 'rgba(70, 132, 197, 0.09)' : 'rgba(70, 132, 197, 0.04)'
       ctx.fillRect(x0, PAD.top, x1 - x0, plotH)
       ctx.strokeStyle = grid
@@ -401,9 +375,7 @@ function draw(
   axes.forEach((axis, column) => {
     const r = ranges.get(axis) ?? { min: 0, max: 1 }
     const on = series.filter((s) => s.axis === axis)
-    // An axis carrying one trace takes that trace's color, which is what
-    // ties the numbers to the line. An axis shared by several has no one
-    // color to borrow, so it stays neutral and the legend does the tying.
+    // An axis with one trace takes its color; a shared axis stays neutral.
     ctx.fillStyle = on.length === 1 ? on[0]!.color : ink
     ctx.textAlign = 'right'
     const x = (column + 1) * AXIS_W + 4
@@ -411,12 +383,10 @@ function draw(
       const y = PAD.top + (plotH * i) / 4
       ctx.fillText(format(r.max - ((r.max - r.min) * i) / 4), x, y)
     }
-    // The unit at the head of its column: without it the numbers on a
-    // three-axis plot are three columns of digits meaning nothing.
+    // The unit at the head of its column.
     const units = [...new Set(on.map((t) => t.unit).filter(Boolean))]
     if (units.length > 0) {
-      // At the very top of the canvas, clear of the topmost tick: both are
-      // right-aligned to the same edge, so anything closer overlaps it.
+      // At the very top, clear of the topmost tick, which shares its edge.
       ctx.textBaseline = 'top'
       ctx.fillText(units.length === 1 ? units[0]! : 'mixed', x, 2)
       ctx.textBaseline = 'middle'
@@ -448,8 +418,8 @@ function draw(
     ctx.strokeStyle = s.color
     ctx.lineWidth = 1.4
     ctx.beginPath()
-    // At most one segment per pixel column: a log has far more samples than
-    // the canvas has columns, and drawing them all repaints the same pixel.
+    // At most one segment per pixel column; a log has far more samples than
+    // the canvas has columns.
     const step = Math.max(1, Math.floor(s.values.length / (plotW * 2)))
     let started = false
     for (let i = 0; i < s.values.length; i += step) {
@@ -483,7 +453,7 @@ function draw(
     ctx.moveTo(Math.round(x1) + 0.5, PAD.top)
     ctx.lineTo(Math.round(x1) + 0.5, PAD.top + plotH)
     ctx.stroke()
-    // How long the selection is, which is the number being chosen.
+    // The selection's duration.
     ctx.fillStyle = ink
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
@@ -491,9 +461,8 @@ function draw(
     ctx.textBaseline = 'middle'
   }
 
-  // Where the 3D replay has got to: solid, charcoal, with a marker at the
-  // top. Not orange -- that is the first trace color, and a playhead the
-  // same color as the line it crosses disappears into it.
+  // The 3D replay's position. Charcoal, not orange, which is the first
+  // trace color.
   if (playhead !== null && playhead >= view.t0 && playhead <= view.t1) {
     const x = Math.round(xOf(playhead)) + 0.5
     ctx.strokeStyle = '#2D2D2F'

@@ -21,13 +21,11 @@ import {
   type BaseLayerId,
 } from '../flight/map-layers'
 
-// The mission map. Imperative Leaflet for the same reason the flight map is:
-// markers move under the pointer, and routing a drag through React's render
-// cycle fights the map's own DOM.
+// The mission map. Imperative Leaflet, like the flight map: routing drags
+// through React's render cycle fights the map's own DOM.
 //
-// Markers are numbered by their sequence on the vehicle, so what is on the
-// map and what is in the table are the same numbers -- and those are the
-// numbers a DO_JUMP refers to.
+// Markers are numbered by their sequence on the vehicle, matching the table
+// and the numbers a DO_JUMP refers to.
 
 export interface MissionMapProps {
   /** The command the palette has armed, or null to place the default. */
@@ -35,16 +33,12 @@ export interface MissionMapProps {
   onPlaced: () => void
   /**
    * A click landed on an empty plan. Missions almost always begin with a
-   * takeoff, and silently placing a waypoint instead is a mistake nobody
-   * notices until the vehicle refuses to start the mission -- so the first
-   * click asks rather than guesses.
+   * takeoff, so the first click asks rather than placing a waypoint.
    */
   onFirstItem: (at: { x: number; y: number }) => void
   /**
-   * The area currently on screen, for anything that acts on it -- the
-   * offline-map download is the first. Fired on settle rather than on every
-   * frame of a pan, because nothing acting on it needs to see the middle of
-   * a drag.
+   * The area currently on screen, e.g. for the offline-map download. Fired
+   * when the view settles, not during a pan.
    */
   onView?: (view: { bounds: LatLonBounds; zoom: number }) => void
   /** Shade the squares this base layer has not stored for offline use. */
@@ -66,10 +60,9 @@ function itemIcon(seq: number, selected: boolean, kind: 'nav' | 'other'): L.DivI
   })
 }
 
-// Status colors, used here as status and not as actions: a fence shape says
-// where the aircraft may and may not be. Written as literals because Leaflet
-// takes colors as options rather than through CSS -- they are --la-good and
-// --la-bad, and must be changed with them.
+// Status colors for fence shapes. Literals because Leaflet takes colors as
+// options rather than CSS; they are --la-good and --la-bad and must be
+// changed with them.
 const FENCE_IN = '#2FAE4E'
 const FENCE_OUT = '#D63031'
 
@@ -152,13 +145,12 @@ export default function MissionMap({
   const vehicleRef = useRef<L.Marker | null>(null)
   const [base, setBase] = useState<BaseLayerId>(loadBaseLayer)
   const [centered, setCentered] = useState(false)
-  // The same fact the state carries, readable from the vehicle subscription,
-  // which is bound once and would otherwise see `false` forever.
+  // Mirrors the state for the vehicle subscription, which is bound once.
   const centeredRef = useRef(false)
   centeredRef.current = centered
 
-  // Read inside handlers rather than closed over, so the click handler does
-  // not have to be rebound every time the armed tool changes.
+  // Read inside handlers so the click handler is not rebound when the armed
+  // tool changes.
   const toolRef = useRef(tool)
   toolRef.current = tool
   const placedRef = useRef(onPlaced)
@@ -169,8 +161,7 @@ export default function MissionMap({
   useEffect(() => {
     const el = containerRef.current
     if (!el || mapRef.current) return
-    // Zoom buttons bottom-right: the palette owns the whole left edge, and it
-    // grows -- bottom-left only looked clear because the strip was shorter.
+    // Zoom buttons bottom-right: the palette owns the left edge.
     const map = L.map(el, { zoomControl: false, attributionControl: true }).setView([0, 0], 3)
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     mapRef.current = map
@@ -181,17 +172,15 @@ export default function MissionMap({
       const armed = toolRef.current
       const at = { x: Math.round(e.latlng.lat * 1e7), y: Math.round(e.latlng.lng * 1e7) }
 
-      // While an area is being drawn, a click is a corner of it. Nothing else
-      // on the map means anything until the survey is generated or cancelled.
+      // While an area is being drawn, a click adds a corner.
       if (store.survey) {
         store.addSurveyVertex(at)
         return
       }
 
-      // A click belongs to whichever plan is being edited. Fence clicks go
-      // nowhere until a tool is armed, because a fence has five kinds of
-      // thing to place and no sensible default among them; rally has one, so
-      // a bare click adds a point the way it adds a waypoint in Mission.
+      // A click goes to whichever plan is being edited. Fence clicks need an
+      // armed tool (there is no sensible default among five); a rally click
+      // adds a point.
       if (store.editing === 'fence') {
         store.placeFencePoint(at)
         return
@@ -208,9 +197,7 @@ export default function MissionMap({
         return
       }
 
-      // Nothing armed means the common case, which is adding waypoints --
-      // arming a tool to do the thing you do ninety percent of the time is
-      // a click nobody should have to spend. The first one asks first.
+      // Nothing armed adds a waypoint. The first click asks first.
       if (armed === null && store.plan.items.length === 0) {
         firstRef.current(at)
         return
@@ -219,8 +206,7 @@ export default function MissionMap({
       placedRef.current()
     })
 
-    // Leaflet only watches the window, so a pane resize (the table growing,
-    // the settings column opening) leaves it drawing at the old size.
+    // Leaflet only watches the window, so pane resizes need a nudge.
     let frame = 0
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame)
@@ -244,20 +230,16 @@ export default function MissionMap({
     if (!map) return
     const spec = layerById(base)
     tileRef.current?.remove()
-    // Reads the offline cache first and stores what it fetches, so panning
-    // around the field before takeoff builds the cache for free.
+    // Reads the offline cache first and stores what it fetches.
     tileRef.current = createCachedTileLayer(spec).addTo(map)
     tileRef.current.setZIndex(0)
     saveBaseLayer(base)
-    // Credit for the elevation data sits with the imagery credit rather
-    // than in the actions column: it is the same kind of fact, and it was
-    // a line of small print beside controls people are trying to use.
+    // Elevation data credit goes with the imagery credit.
     map.attributionControl.addAttribution(TERRAIN_ATTRIBUTION)
   }, [base])
 
-  // The coverage overlay is rebuilt with the base layer as well as with the
-  // switch: what is stored for the satellite imagery says nothing about
-  // what is stored for the street map.
+  // The coverage overlay is rebuilt when the base layer changes, since each
+  // layer has its own cached tiles.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -311,9 +293,8 @@ export default function MissionMap({
     }
   }, [onView, centered])
 
-  // Redraw the whole plan on change. A mission is tens of markers, not
-  // thousands, and rebuilding is far simpler to keep correct than diffing --
-  // the flight map's per-frame path is the one that needs the cleverness.
+  // Redraw the whole plan on change. A mission is tens of markers, so
+  // rebuilding is simpler than diffing.
   const plan = useMissionStore((s) => s.plan)
   const selected = useMissionStore((s) => s.selected)
   const survey = useMissionStore((s) => s.survey)
@@ -324,9 +305,7 @@ export default function MissionMap({
   const selectedShape = useMissionStore((s) => s.selectedShape)
   const units = useUnits()
   // Whether home's popup was open when the plan last changed. Every edit
-  // rebuilds the whole layer, and clearing it closes the popup -- so the
-  // flag is read before the clear and used to reopen afterwards, or typing
-  // an altitude would dismiss the field it was typed into.
+  // rebuilds the layer and closes the popup, so it is reopened afterwards.
   const homePopupRef = useRef(false)
   useEffect(() => {
     const map = mapRef.current
@@ -339,9 +318,7 @@ export default function MissionMap({
     if (plan.home) {
       const pos: L.LatLngExpression = [plan.home.x / 1e7, plan.home.y / 1e7]
       route.push(pos)
-      // Home's altitude is edited here rather than in the settings column.
-      // It is a property of a point on the map, and every other point on
-      // this map is edited by touching it.
+      // Home's altitude is edited from its marker, like every other point.
       const homeMarker = L.marker(pos, { icon: homeIcon(selected === 'home'), draggable: true })
         .on('click', () => useMissionStore.getState().select('home'))
         .on('dragend', (e) => {
@@ -365,8 +342,8 @@ export default function MissionMap({
       const pos: L.LatLngExpression = [it.x / 1e7, it.y / 1e7]
       const spec = commandSpec(it.command)
       const isNav = spec?.category === 'nav'
-      // Only nav commands are legs of the route; an ROI is a place the
-      // camera looks at, not a place the aircraft goes.
+      // Only nav commands are legs of the route; an ROI is where the camera
+      // looks.
       if (isNav) route.push(pos)
       L.marker(pos, {
         icon: itemIcon(i + 1, selected === it.uid, isNav ? 'nav' : 'other'),
@@ -387,10 +364,8 @@ export default function MissionMap({
       L.polyline(route, { color: '#F7941D', weight: 3, opacity: 0.9 }).addTo(layer)
     }
 
-    // The fence and the rally points, always drawn -- a fence you cannot see
-    // while planning a mission is a fence you plan a mission through. The
-    // plan not being edited is drawn faint, so which one takes clicks is
-    // visible rather than something to remember.
+    // The fence and rally points are always drawn; plans not being edited
+    // are faint.
     const dim = editing === 'fence' ? 1 : 0.45
     for (const shape of fence.shapes) {
       const color = shape.inclusive ? FENCE_IN : FENCE_OUT
@@ -399,8 +374,8 @@ export default function MissionMap({
         weight: selectedShape === shape.uid ? 4 : 2,
         opacity: dim,
         fillOpacity: 0.08 * dim,
-        // Exclusion zones are hatched by dashing: on a satellite base map
-        // two translucent fills are hard to tell apart by hue alone.
+        // Exclusion zones are dashed: translucent fills are hard to tell apart
+        // on satellite imagery.
         dashArray: shape.inclusive ? undefined : '8 5',
       }
       if (shape.kind === 'polygon') {
@@ -446,8 +421,7 @@ export default function MissionMap({
       }
     }
 
-    // The polygon under construction, open rather than closed: it is not a
-    // shape until Finish says so, and drawing it closed would claim it is.
+    // The polygon under construction, drawn open until Finish.
     if (fenceDraft.length > 0) {
       const line = fenceDraft.map((q) => [q.x / 1e7, q.y / 1e7] as L.LatLngTuple)
       if (line.length > 1)
@@ -487,9 +461,8 @@ export default function MissionMap({
         .addTo(layer)
     })
 
-    // The survey area and a live preview of the passes it would generate.
-    // Drawn in blue: nothing here is part of the mission until Add turns it
-    // into waypoints, and orange is what the aircraft will actually fly.
+    // The survey area and a preview of its passes, in blue because they are
+    // not part of the mission until added.
     if (survey) {
       const ring = survey.polygon.map((p) => [p.x / 1e7, p.y / 1e7] as L.LatLngTuple)
       if (ring.length >= 3) {
@@ -531,8 +504,7 @@ export default function MissionMap({
       setCentered(true)
       if (route.length === 1) map.setView(route[0]!, 17)
       else {
-        // Extra room at the top: the palette floats over the map there, and
-        // fitting to the raw bounds parks the first waypoints underneath it.
+        // Extra room at the top, where the palette floats over the map.
         map.fitBounds(L.latLngBounds(route as L.LatLngTuple[]), {
           paddingTopLeft: [20, 76],
           paddingBottomRight: [20, 24],
@@ -547,11 +519,8 @@ export default function MissionMap({
       const map = mapRef.current
       if (!map || (v.latDeg === 0 && v.lonDeg === 0)) return
       const pos: L.LatLngExpression = [v.latDeg, v.lonDeg]
-      // An empty plan has nothing to center on, so the map sat at the world
-      // view and the vehicle was a marker somewhere on it -- drawn, and no
-      // more findable than if it were not. It gets the first fix instead,
-      // which is the field you are standing in. A plan wins if there is one:
-      // the redraw effect below fits to it and sets the same flag.
+      // With an empty plan, center on the vehicle's first fix. A plan takes
+      // precedence: the redraw effect fits to it and sets the same flag.
       if (!centeredRef.current) {
         centeredRef.current = true
         setCentered(true)
@@ -595,15 +564,11 @@ export default function MissionMap({
 }
 
 /**
- * The home marker's popup: where it is, and how high that is.
+ * The home marker's popup: position and altitude.
  *
- * Built as DOM rather than rendered, because the layer it lives in is
- * imperative Leaflet and mounting a React root per marker to hold one number
- * field would be the more surprising of the two.
- *
- * The altitude commits on change, not on every keystroke: each commit
- * rebuilds the layer, and a field that rebuilt itself per character would
- * lose the caret mid-number.
+ * Built as plain DOM, since the layer is imperative Leaflet. The altitude
+ * commits on change, not per keystroke, because each commit rebuilds the
+ * layer.
  */
 function homePopup(home: PlanHome, unit: DistanceUnit): HTMLElement {
   const el = document.createElement('div')
@@ -634,9 +599,8 @@ function homePopup(home: PlanHome, unit: DistanceUnit): HTMLElement {
   hint.textContent = 'Relative altitudes are measured from here.'
   el.append(hint)
 
-  // The only way back to no home at all. Dragging the marker moves it and
-  // "From vehicle" replaces it, but nothing removed it -- and an unwanted
-  // home is written to the vehicle as mission item 0 like any other.
+  // The only way to remove home, which is otherwise uploaded as mission
+  // item 0.
   const remove = document.createElement('button')
   remove.type = 'button'
   remove.className = 'la-btn la-btn--ghost la-btn--block'
@@ -654,9 +618,7 @@ function homePopup(home: PlanHome, unit: DistanceUnit): HTMLElement {
     store.setHome({ ...current, z: fromDistance(value, unit) })
   })
 
-  // The map owns the keyboard and the drag gesture, so a field inside it
-  // pans on arrow keys and starts a drag on a swipe unless both are stopped
-  // here.
+  // Stop propagation, or arrow keys pan the map and a swipe starts a drag.
   L.DomEvent.disableClickPropagation(el)
   L.DomEvent.disableScrollPropagation(el)
   L.DomEvent.on(input, 'keydown', L.DomEvent.stopPropagation)

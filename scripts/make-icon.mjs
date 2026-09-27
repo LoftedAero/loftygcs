@@ -1,13 +1,10 @@
-// Rasterise public/icons/icon.svg to build/icon.png, the source image
+// Rasterize public/icons/icon.svg to build/icon.png, the source image
 // electron-builder turns into a Windows .ico and a macOS .icns.
 //
 //   npm run icon
 //
-// Run through Electron rather than a rasteriser dependency: the project
-// already has Electron, and this is the same renderer that draws the icon's
-// SVG twin inside the app, so the two cannot disagree. Adding a native image
-// library for a file that changes about once a year would cost more than it
-// saves.
+// Uses Electron rather than an image library: it is already a dependency and
+// is the same renderer that draws the SVG inside the app.
 import { app, BrowserWindow } from 'electron'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
@@ -18,15 +15,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SIZE = 512
 
 /**
- * Three things here are deliberate, each of which cost an attempt:
- *
- *  - The image is drawn onto a canvas rather than captured off the window.
- *    capturePage waits for the compositor to produce a frame, and a window
- *    that is never shown never produces one -- it just hangs.
- *  - The page is a real file on disk, not a data: URL. A data: document is
- *    opaque-origin and loading anything into it is a fight.
- *  - The SVG reaches the page as a data: URI, not as a file. A file:// image
- *    taints the canvas, and toDataURL on a tainted canvas throws.
+ * - Draws onto a canvas instead of using capturePage, which waits for a
+ *   compositor frame that a hidden window never produces.
+ * - The page is a real file, because a data: document has an opaque origin.
+ * - The SVG is loaded as a data: URI, because a file:// image taints the
+ *   canvas and toDataURL then throws.
  */
 async function render() {
   const svg = readFileSync(path.join(root, 'public/icons/icon.svg'), 'utf8')
@@ -72,8 +65,8 @@ app
   .then(
     () => app.exit(0),
     (err) => {
-      // Without this an failure is invisible: the rejection is unhandled, the
-      // window keeps the process alive, and it hangs with nothing on stdout.
+      // Otherwise the hidden window keeps the process alive and a failure
+      // hangs silently.
       console.error(`could not render the icon: ${err?.message ?? err}`)
       app.exit(1)
     },

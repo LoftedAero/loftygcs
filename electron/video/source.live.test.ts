@@ -1,18 +1,15 @@
 // @vitest-environment node
 //
-// The video client against GStreamer, the way the SITL suite runs the protocol
-// against real ArduPilot: our own fake server can only ever confirm what we
-// already believe. Run with:
+// The video client against GStreamer, an independent implementation. Run with:
 //
 //   node scripts/video-testsrc.mjs rtsp        (one terminal)
 //   VIDEO=1 npm test                           (another)
 //
-// Skipped unless VIDEO=1, because it needs that server running.
+// Skipped unless VIDEO=1.
 //
-// What is actually under test here is the H.264 depayloader. rtph264pay does
-// things our fixtures never do -- it aggregates small NALs into STAP-A, splits
-// large ones across FU-A, and emits genuine SPS/PPS from x264enc -- and every
-// one of those paths fails silently, as a picture that never appears.
+// Mainly exercises the H.264 depayloader: rtph264pay aggregates small NALs
+// into STAP-A, splits large ones across FU-A and emits real SPS/PPS from
+// x264enc, and a failure in any of those paths is silent.
 
 import { spawn, spawnSync } from 'node:child_process'
 import { mkdtempSync, statSync, writeFileSync } from 'node:fs'
@@ -29,12 +26,10 @@ const live = process.env.VIDEO === '1' ? describe : describe.skip
 
 /**
  * Decodes an Annex-B stream with GStreamer and returns how many frames came
- * out. This is the assertion that cannot be fooled: our own code agreeing
- * with itself proves nothing, but if reassembly dropped a fragment or got the
- * order wrong, an independent decoder produces fewer frames than we fed it.
+ * out. If reassembly dropped a fragment or misordered NALs, an independent
+ * decoder produces fewer frames than we fed it.
  *
- * Scaled to a fixed 16x16 GRAY8 so the frame count is just a division and
- * this does not need to know the source resolution.
+ * Scaled to 16x16 GRAY8 so the frame count is a division of the file size.
  */
 function decodedFrameCount(annexB: Uint8Array): { frames: number; stderr: string } {
   const bin = findGstreamer()
@@ -56,10 +51,7 @@ function decodedFrameCount(annexB: Uint8Array): { frames: number; stderr: string
       '!',
       'avdec_h264',
       // Without this libav conceals damage and still emits a frame, so a
-      // truncated NAL decodes to a smeared picture that counts the same as a
-      // good one -- which is how a deliberately broken depayloader first got
-      // past this test. Dropping corrupt frames is what makes the count below
-      // mean something.
+      // truncated NAL would count the same as a good one.
       'output-corrupt=false',
       '!',
       'videoconvert',
@@ -148,23 +140,20 @@ live('against a real GStreamer RTSP server', () => {
     const keys = units.filter((u) => u.keyframe)
     expect(keys.length).toBeGreaterThan(0)
 
-    // Every keyframe carries its parameter sets, so a decoder can start on
-    // any of them -- this is what lets the HUD recover from a dropped link
-    // without waiting for the stream to be restarted.
+    // Every keyframe carries its parameter sets, so the HUD can recover from
+    // a dropped link on any keyframe.
     for (const k of keys) {
       const types = nals(k.data).map(nalType)
       expect(types).toContain(7) // SPS
       expect(types).toContain(8) // PPS
       expect(types).toContain(5) // IDR
       expect(types.indexOf(7)).toBeLessThan(types.indexOf(5))
-      // A delimiter, if the encoder emits one, has to stay first: parameter
-      // sets in front of it make a unit Chromium will not decode at all.
+      // A delimiter must stay first; Chromium will not decode otherwise.
       if (types.includes(9)) expect(types[0]).toBe(9)
     }
 
-    // Non-keyframes must NOT be padded with parameter sets, and must carry
-    // real slice data: a depayloader that silently drops P-frames still shows
-    // a picture, just a frozen one.
+    // Non-keyframes carry slice data and no parameter sets. Dropped P-frames
+    // would show as a frozen picture rather than an error.
     const inter = units.filter((u) => !u.keyframe)
     expect(inter.length).toBeGreaterThan(0)
     for (const u of inter) {
@@ -174,16 +163,13 @@ live('against a real GStreamer RTSP server', () => {
       expect(types).not.toContain(8)
     }
 
-    // The fixture itself has to be hard enough to be worth running. An
-    // earlier version used videotestsrc's `ball`, which encodes so small that
-    // every keyframe fitted in two RTP packets -- so FU-A reassembly never
-    // ran on a middle fragment, and the suite passed with a depayloader that
-    // was dropping them. At ~18 KB a keyframe spans a dozen packets. If this
-    // ever fails, the test source went slack, not the client.
+    // Guards the fixture: keyframes must be large enough (~18 KB, a dozen
+    // packets) to exercise middle fragments. videotestsrc's `ball` pattern
+    // fits a keyframe in two packets. If this fails, suspect the test source
+    // before the client.
     expect(Math.max(...keys.map((k) => k.data.length))).toBeGreaterThan(8000)
 
-    // Timestamps must advance, or the decoder queues everything at t=0 and
-    // the HUD plays the stream as fast as it arrives.
+    // Timestamps must advance, or the decoder queues everything at t=0.
     const stamps = units.map((u) => u.timestamp)
     expect(new Set(stamps).size).toBeGreaterThan(units.length / 2)
     expect(Math.max(...stamps)).toBeGreaterThan(Math.min(...stamps))
@@ -201,9 +187,8 @@ live('against a real GStreamer RTSP server', () => {
 
     const { frames, stderr } = decodedFrameCount(joined)
 
-    // One frame out for every access unit in. A dropped FU-A fragment, a
-    // mis-ordered NAL or a missing parameter set all show up here as a
-    // shortfall -- and as a stuttering picture in the HUD.
+    // One frame out per access unit in. A dropped fragment, misordered NAL
+    // or missing parameter set shows up as a shortfall.
     expect(frames).toBe(units.length)
     expect(stderr).not.toMatch(/error/i)
   }, 40_000)
@@ -214,15 +199,9 @@ live('against a real GStreamer RTSP server', () => {
 })
 
 /**
- * The RTSP tests above deliberately do not cover FU-A. Interleaved RTP over
- * TCP has no datagram limit, so GStreamer sends each keyframe whole in one
- * RTP packet and the fragment-reassembly path never runs -- which was found
- * the only way it ever is, by breaking that path on purpose and watching the
- * RTSP suite stay green.
- *
- * UDP is where a camera has to fragment, so that is where it gets tested.
- * This block starts its own sender: it needs no second terminal, only
- * GStreamer.
+ * The RTSP tests do not cover FU-A: interleaved RTP over TCP has no datagram
+ * limit, so GStreamer sends each keyframe whole. UDP forces fragmentation.
+ * This block starts its own sender and needs only GStreamer installed.
  */
 live('over UDP, where keyframes must fragment', () => {
   let sender: ReturnType<typeof spawn> | null = null
@@ -237,23 +216,16 @@ live('over UDP, where keyframes must fragment', () => {
   it('reassembles fragmented keyframes into a decodable stream', async () => {
     const { units } = await collect(`udp://:${UDP_PORT}`, 60, 25_000)
 
-    // The sender's MTU is 1200, so anything bigger arrived in pieces -- a
-    // keyframe here is ~145 KB across a hundred-odd packets, its slices
-    // individually spanning 6-8 FU-A fragments each.
-    //
-    // The threshold is calibrated, not guessed. A depayloader modified to
-    // drop every fragment after the second still produced 26 KB keyframes
-    // that decoded to the full frame count, because x264 emits many slices
-    // per picture and libav conceals a truncated one rather than failing. So
-    // "bigger than a packet" proves nothing; only a size near the real one
-    // does.
+    // The sender's MTU is 1200; a keyframe here is ~145 KB, each slice
+    // spanning 6-8 FU-A fragments. The threshold sits near the real size
+    // because a depayloader keeping only two fragments per NAL still yields
+    // ~26 KB keyframes that decode to the full frame count.
     const keys = units.filter((u) => u.keyframe)
     expect(keys.length).toBeGreaterThan(0)
     expect(Math.max(...keys.map((k) => k.data.length))).toBeGreaterThan(60_000)
 
-    // And the reassembly has to be exact: one frame out per unit in. Dropping
-    // a single middle fragment leaves a truncated NAL that still looks like a
-    // keyframe from the outside, and only a decoder notices.
+    // One frame out per unit in: a truncated NAL still looks like a keyframe
+    // from the outside, and only a decoder notices.
     const total = units.reduce((n, u) => n + u.data.length, 0)
     const joined = new Uint8Array(total)
     let at = 0

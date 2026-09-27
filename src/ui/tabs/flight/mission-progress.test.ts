@@ -42,8 +42,8 @@ describe('what to say about progress', () => {
   })
 
   it('still reports the sequence when the plan here is not the one aboard', () => {
-    // A mission uploaded from somewhere else, or none loaded here. The
-    // number is true; only the name needs a local plan.
+    // A mission uploaded elsewhere, or none loaded here: only the name
+    // needs a local plan.
     const p = missionProgress(7, ITEMS, 100, 10)
     expect(p.position).toBe('7 of 4')
     expect(p.commandName).toBeNull()
@@ -58,8 +58,7 @@ describe('what to say about progress', () => {
   })
 
   it('refuses an ETA when the vehicle is not going anywhere', () => {
-    // Dividing by a groundspeed of zero is Infinity, and hovering next to a
-    // waypoint makes the number flicker rather than inform.
+    // A groundspeed of zero would give Infinity.
     expect(missionProgress(2, ITEMS, 100, 0).etaS).toBeNull()
     expect(missionProgress(2, ITEMS, 100, 0.2).etaS).toBeNull()
   })

@@ -1,13 +1,8 @@
 // Design tokens, resolved for canvas drawing.
 //
-// Canvas has no var(): every color has to reach it as a string, so the
-// tokens must be read out of the document. Doing that inside a draw call
-// forces a style recalculation, which at sixty frames a second on several
-// instruments is real work for a value that changes about twice a year.
-//
-// So the values are read once and kept, keyed on the theme attribute --
-// reading one attribute per frame is free, and the cache refills by itself
-// the moment the theme changes, with nothing to subscribe or unsubscribe.
+// Canvas has no var(), so colors are read from the document. Reading computed
+// style in a draw call forces a style recalculation every frame, so values
+// are cached per theme attribute and refilled when the theme changes.
 
 const KEYS = [
   '--la-ink',
@@ -38,8 +33,7 @@ function readAll(): Partial<Record<TokenName, string>> {
 
 /**
  * The current value of a token. The fallback is used before the stylesheet
- * has loaded and in jsdom, where computed custom properties come back empty
- * -- a drawing routine should never have to care which.
+ * has loaded and in jsdom, where computed custom properties are empty.
  */
 export function token(name: TokenName, fallback: string): string {
   if (typeof document === 'undefined') return fallback

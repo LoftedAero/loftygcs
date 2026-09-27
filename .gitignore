@@ -1,12 +1,28 @@
 node_modules/
+
+# Build output: the web bundle, the Electron main process, the single-file
+# demo, and electron-builder's installers.
 dist/
 dist-web/
 dist-electron/
 dist-demo/
-*.local
-.DS_Store
+*.tsbuildinfo
 
-# Local SITL binaries + their eeprom/log state (npm run sitl:fetch)
+# Test and tool output
+coverage/
+*.log
+
+# Local environment and editor state
+.env
+.env.*
+*.local
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+
+# Local SITL binaries and their eeprom/log state (npm run sitl:fetch)
 sitl/
 
 # The encoded clip the video test source serves (npm run video:testsrc)

@@ -1,15 +1,6 @@
-// A second level of tabs *inside* one setup screen.
-//
-// The rail answers "which part of the aircraft", and a screen that answers
-// two different questions about the same part wants a switch of its own --
-// the Inspector's messages-versus-hardware, Tuning's loops-versus-navigation.
-// Betaflight does the same thing on its PID screen (PID / Rates / Filter),
-// and for the same reason: those cards would all fit on one page, but they
-// belong to different sittings.
-//
-// Shared rather than copied. The actions column is the cautionary tale in
-// this codebase -- three screens each grew a private version and each picked
-// a different width -- and a tab strip has exactly the same failure mode.
+// A second level of tabs inside one setup screen, for a screen with two
+// distinct views of the same subject (the Inspector's messages and hardware,
+// Tuning's loops and navigation). Shared so each screen does not grow its own.
 export interface SubTab<Id extends string> {
   id: Id
   label: string

@@ -2,13 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { LaButton } from '../../components/La'
 import { demoSticks } from '../../../transport/virtual-fc'
 
-// Sticks you can drag, shown only on the demo vehicle. Radio calibration is
-// otherwise the one flow nobody can try without hardware in their hands, and
-// an unreviewable feature may as well not be written.
-//
-// The pads are sticky rather than spring-loaded: the wizard asks you to hold
-// a stick at its limit and then press a button, which a self-centring control
-// makes impossible.
+// Draggable sticks, shown only on the demo vehicle, so radio calibration can
+// be tried without hardware. The pads do not spring back, because the wizard
+// asks you to hold a stick at its limit while pressing a button.
 
 interface Pad {
   side: 'left' | 'right'
@@ -23,8 +19,7 @@ const PADS: Pad[] = [
 ]
 
 export default function DemoTransmitter() {
-  // The store of record is the transport's, so the vehicle reacts even
-  // between renders; this is only what draws the knobs.
+  // The transport holds the real values; this only draws the knobs.
   const [, force] = useState(0)
   const [drag, setDrag] = useState<Pad | null>(null)
   const padRef = useRef<HTMLDivElement | null>(null)
@@ -42,9 +37,9 @@ export default function DemoTransmitter() {
     set(pad, ((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2)
   }
 
-  // Tracked on the window rather than through setPointerCapture. This panel
-  // re-renders at telemetry rate, and a captured pointer being re-bound on
-  // every one of those renders wedged the input pipeline outright.
+  // Tracked on the window rather than with setPointerCapture: the panel
+  // re-renders at telemetry rate, and re-binding a captured pointer on every
+  // render wedges input.
   useEffect(() => {
     if (!drag) return
     const el = padRef.current
@@ -72,9 +67,6 @@ export default function DemoTransmitter() {
 
   return (
     <div className="demo-tx">
-      {/* Why sticks appear at all, and nothing else: that they are sticky
-          rather than spring-loaded is in the comment at the top of the file,
-          and is obvious the first time one is dragged. */}
       <p className="demo-tx__note">Demo vehicle</p>
       <div className="demo-tx__pads">
         {PADS.map((pad) => {

@@ -9,9 +9,8 @@ import {
 } from './geo-import'
 import type { GeoFix, GeoShape } from './geo-file'
 
-// These drive the real store, because the whole point of the module is what
-// an imported shape *becomes*, and that depends on which of the three plans
-// is on screen.
+// These drive the real store, because what an imported shape becomes
+// depends on which of the three plans is on screen.
 
 const HOME = { x: 399500000, y: -1052500000, z: 1900 }
 
@@ -43,8 +42,8 @@ describe('what an import becomes', () => {
   })
 
   it('takes the shapes that suit where they are going', () => {
-    // A file routinely holds a route beside the paddock it crosses, and
-    // taking the wrong one is worse than taking none.
+    // A file often holds a route beside the area it crosses; taking the
+    // wrong one is worse than taking none.
     const mixed = [shape('track', line(3)), shape('polygon', line(4)), shape('points', line(2))]
     expect(usableShapes(mixed, 'fence').map((s) => s.kind)).toEqual(['polygon'])
     expect(usableShapes(mixed, 'waypoints').map((s) => s.kind)).toEqual(['track', 'points'])
@@ -54,8 +53,7 @@ describe('what an import becomes', () => {
 
 describe('applying several shapes at once', () => {
   it('stitches tracks into one route', () => {
-    // A path drawn in Google Earth comes back in the pieces it was drawn
-    // in; asking which piece to keep is asking the wrong question.
+    // A path drawn in Google Earth comes back in the pieces it was drawn in.
     applyGeoShapes([shape('track', line(3)), shape('track', line(4))], 'route.kml')
     expect(useMissionStore.getState().plan.items).toHaveLength(7)
   })
@@ -80,7 +78,7 @@ describe('applying several shapes at once', () => {
 describe('importing waypoints', () => {
   it('converts a file elevation into the editor frame', () => {
     // Home is 1900 m AMSL and the file says 2000, so the relative altitude
-    // is 100 -- not 2000, which would be an order of magnitude of climb.
+    // is 100.
     applyGeoShapes([shape('track', line(3, 2000))], 'ridge.gpx')
     const items = useMissionStore.getState().plan.items
     expect(items).toHaveLength(3)
@@ -95,8 +93,7 @@ describe('importing waypoints', () => {
   })
 
   it('uses the default altitude when nothing can be converted', () => {
-    // No home elevation: subtracting it would be inventing a number, and
-    // 2000 m relative to a home that is not at sea level is not a mission.
+    // No home elevation, so the file's AMSL values cannot be converted.
     useMissionStore.getState().setHome({ x: HOME.x, y: HOME.y, z: 0 })
     applyGeoShapes([shape('track', line(2, 2000))], 'ridge.gpx')
     expect(useMissionStore.getState().plan.items[0]!.z).toBe(50)
@@ -170,8 +167,8 @@ describe('importing into the other two plans', () => {
 })
 
 describe('what there is to export', () => {
-  // The buttons are on all three plans, so each has to answer for itself --
-  // an empty one has nothing to write, and a fence has nothing GPX can say.
+  // The buttons are on all three plans: an empty plan has nothing to
+  // write, and GPX cannot express a fence.
   it('has nothing to offer for an empty plan', () => {
     for (const plan of ['mission', 'fence', 'rally'] as const) {
       expect(exportable(plan)).toEqual({ kml: false, gpx: false })

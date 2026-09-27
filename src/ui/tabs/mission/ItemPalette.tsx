@@ -5,19 +5,11 @@ import { useMissionStore } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { homeFromVehicle } from '../../../services/mission'
 
-// The add-an-item palette: a vertical strip down the left edge of the map,
-// the way QGroundControl arranges it.
+// The add-an-item palette: a narrow vertical strip down the left edge of the
+// map, as in QGroundControl.
 //
-// Vertical because the map is wider than it is tall and a horizontal bar
-// across the top steals the band of map most likely to hold the mission.
-// Icons above labels rather than text buttons, so the strip stays narrow
-// enough to sit over the map without being in the way.
-//
-// A button arms a tool rather than adding immediately: a located item needs
-// a position, and the honest way to ask for one is to let the next map click
-// be the answer. Clicking an armed button disarms it. Everything the strip
-// does not show is behind "More", which is Mission Planner's model -- add a
-// generic item and choose its command from the row's dropdown.
+// A button arms a tool and the next map click places the item; clicking an
+// armed button disarms it. Other commands are behind "More".
 
 /** The command a plain map click places when nothing is armed. */
 export const DEFAULT_TOOL = 16
@@ -46,19 +38,15 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
   const cancelSurvey = useMissionStore((s) => s.cancelSurvey)
   const surveying = useMissionStore((s) => s.survey !== null)
   const [moreOpen, setMoreOpen] = useState(false)
-  // Only the commands this aircraft will accept. With nothing connected that
-  // is the chosen plan-for class rather than a guess at Copter.
+  // Only the commands this aircraft accepts; with nothing connected, the
+  // chosen plan-for class decides.
   const commands = commandsFor(usePlanVehicleClass())
-  // Where the flyout goes, in viewport coordinates. It has to be `fixed`:
-  // the palette is a scroll box (it must never outgrow a map dragged short)
-  // and an absolutely positioned child of a scroll box is clipped to it --
-  // which is exactly what happened here. The menu was in the DOM, twenty-one
-  // items and all, and none of it was on screen.
+  // The flyout's viewport position. It must be `fixed`: the palette is a
+  // scroll box, and an absolutely positioned child would be clipped to it.
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const moreRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
-  // Home's alternative, offered while its tool is armed rather than as a
-  // button of its own -- see below.
+  // The "at vehicle" flyout shown while the Home tool is armed.
   const [homePos, setHomePos] = useState<{ left: number; top: number } | null>(null)
   const homeRef = useRef<HTMLButtonElement>(null)
 
@@ -82,11 +70,8 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
   }, [moreOpen])
 
   /**
-   * Beside the button, and inside the window.
-   *
-   * Anchored to the button's bottom so it grows upward like the palette it
-   * belongs to, then pushed down if that would take it off the top -- which
-   * it would whenever the map has been dragged short.
+   * Places the menu beside the button, anchored to its bottom so it grows
+   * upward, and pushed down if that would leave the window.
    */
   const place = () => {
     const r = buttonRef.current?.getBoundingClientRect()
@@ -108,9 +93,7 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
 
   const pick = (id: number) => {
     const spec = commandSpec(id)
-    // Commands with no position have nothing to click for, so they are
-    // appended the moment they are chosen rather than arming a tool that
-    // would wait for a click that means nothing.
+    // Commands with no position are appended immediately.
     if (spec && !spec.location) {
       addItem(id)
       onTool(null)
@@ -150,13 +133,9 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
         <span className="mission-palette__label">Survey</span>
       </button>
 
-      {/* Home arms placement like every other tool, and while it is armed a
-          second tile appears beside it with the other way of answering the
-          same question. A permanent row of its own said the two were separate
-          jobs and cost the strip a row for the rarer of them; it still cannot
-          live on the home marker, because the whole point is reaching it
-          before a home exists. The tile is the palette's own chrome so it
-          reads as the strip growing an option, not as a menu opening. */}
+      {/* Home arms placement like any tool; while armed, a second tile offers
+          the vehicle's position instead. It lives here rather than on the home
+          marker because it is needed before a home exists. */}
       <button
         ref={homeRef}
         type="button"
@@ -194,13 +173,7 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
             }}
           >
             <FromVehicleIcon />
-            {/* One line, so the tile is exactly a palette button's box --
-                "From vehicle" wrapped to two and made it taller than
-                everything it sits beside. The preposition is what earns its
-                place: "Vehicle" alone is a noun with no verb, and "Current"
-                means the active mission item everywhere else in this app.
-                53px of the 56 there are; nowrap below keeps it one line if a
-                fallback font renders it wider. */}
+            {/* Kept short enough to fit on one line in a palette button. */}
             <span className="mission-palette__label">At vehicle</span>
           </button>
         </div>
@@ -228,9 +201,7 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
             role="menu"
             style={{ left: pos.left, top: pos.top }}
           >
-            {/* Grouped but unlabeled: the categories order the list, and
-                naming each one spent three lines apiece saying what the
-                commands underneath already say. */}
+            {/* Grouped by category, without headings. */}
             {(['nav', 'condition', 'do'] as const).map((cat) => (
               <div key={cat} className="mission-palette__group">
                 {commands
@@ -247,12 +218,8 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
                         pick(c.id)
                       }}
                     >
-                      {/* ArduPilot's own command names here, not our friendlier
-                        ones: anyone reaching past the five common items is
-                        working from the ArduPilot mission docs or a Mission
-                        Planner habit, and a translation only makes them guess
-                        which of ours is the one they read about. The plain
-                        name still shows on hover and in the table. */}
+                      {/* ArduPilot's command names, matching its mission docs;
+                        the friendly name shows on hover and in the table. */}
                       {c.mavName}
                     </button>
                   ))}
@@ -339,9 +306,7 @@ function SurveyIcon() {
   )
 }
 
-// A home under a fix: the Home tool's own roof, with the satellite ticks
-// that say where the position came from -- so the pair reads as two ways to
-// answer one question rather than as two different things.
+// The Home tool's roof with position-fix ticks above it.
 function FromVehicleIcon() {
   return (
     <svg {...box} aria-hidden="true">

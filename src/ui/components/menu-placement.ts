@@ -5,12 +5,8 @@ const EDGE = 8
 
 /**
  * Where a menu opened at a pointer goes: at the pointer, pulled back inside
- * the window by its measured size.
- *
- * The menus used to subtract a guessed size (250 x 260) from the window. A
- * menu that grew a row, or a window short enough to matter, put its bottom
- * past the edge with nothing to say so. Measured after layout and before
- * paint, so the first frame is already in place.
+ * the window by its measured size. Measured after layout and before paint,
+ * so the first frame is already in place.
  */
 export function useMenuPlacement(
   point: { x: number; y: number },

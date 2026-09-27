@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { isOsdParam } from './OsdActions'
 
-// What counts as "the OSD layout" when saving and loading it. The filter is
-// the whole feature: too wide and loading somebody's screen layout drags
-// their tuning along, too narrow and half the layout does not travel.
+// What counts as the OSD layout when saving and loading it. Too wide and a
+// loaded layout brings someone else's tuning along; too narrow and part of
+// the layout is lost.
 
 describe('isOsdParam', () => {
   it('takes the OSD settings and every screen', () => {
@@ -24,9 +24,8 @@ describe('isOsdParam', () => {
   })
 
   it('leaves everything else alone', () => {
-    // The point of the filter: a whole-vehicle file can be loaded here and
-    // contribute only its OSD, so borrowing a screen layout cannot bring
-    // somebody else's PIDs, calibration or failsafes with it.
+    // A whole-vehicle file loaded here contributes only its OSD, not PIDs,
+    // calibration or failsafes.
     for (const n of [
       'ANGLE_MAX',
       'ATC_ANG_PIT_P',
@@ -40,9 +39,9 @@ describe('isOsdParam', () => {
   })
 
   it('does not catch names that merely start with the letters', () => {
-    // Guards the regex: OSD_ and OSD<digit>_ only, not any word beginning
-    // OSD. ArduPilot has no such parameter today, but a filter that would
-    // silently widen when one appears is the kind that goes wrong quietly.
+    // Only OSD_ and OSD<digit>_, not any name beginning with OSD. ArduPilot
+    // has no such parameter today, but the filter should not widen if one
+    // appears.
     expect(isOsdParam('OSDX_THING')).toBe(false)
     expect(isOsdParam('OSDIFY')).toBe(false)
     expect(isOsdParam('MY_OSD_THING')).toBe(false)

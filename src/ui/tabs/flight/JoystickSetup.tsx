@@ -20,15 +20,11 @@ import {
 
 // Mapping a device: which control drives which channel, and how.
 //
-// A dialog rather than a page: it is opened once for a new device and then
-// rarely, and it cannot be opened while control is taken. Every change is the
-// current device's own mapping at once (joystick-store), so there is no Save
-// for the mapping itself -- the profile controls are for naming it, moving it
-// between devices, and taking it to another machine.
+// Cannot be opened while control is taken. Changes apply to the current
+// device's mapping immediately (joystick-store), so there is no Save; the
+// profile controls name a mapping, move it between devices, and export it.
 //
-// The two tables share their columns -- channel, the control and its Learn,
-// how it behaves, what it sends, remove -- so the eye runs down one set of
-// columns through both, and every button in the dialog is one width.
+// The axis and button tables share their columns so they line up.
 
 const MODE_LABELS: Record<ButtonMode, string> = {
   momentary: 'Momentary',
@@ -58,7 +54,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
   const [replacing, setReplacing] = useState<{ name: string; config: JoystickConfig } | null>(null)
   const current = picked && profiles[picked] ? picked : ''
 
-  // A result says what happened and then gets out of the way.
+  // Result notes clear themselves after a few seconds.
   useEffect(() => {
     if (!note) return
     const t = setTimeout(() => setNote(null), 4000)
@@ -66,7 +62,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
   }, [note])
 
   // Read from the store rather than this render's `config`: a Learn resolves
-  // renders later, and must not write back a mapping from before it began.
+  // several renders later and must not write back a stale mapping.
   const now = () => useJoystickStore.getState().config
   const setAxis = (i: number, patch: Partial<AxisMap>) => {
     setConfig({ axes: now().axes.map((a, j) => (j === i ? { ...a, ...patch } : a)) })
@@ -78,9 +74,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
   const learnLabel = (key: string) => (learn.listening === key ? 'Listening' : 'Learn')
 
   // Export writes the profile picked in the list, as Load and Delete act on
-  // it; with none picked, the mapping in use. It used to write the mapping in
-  // use under the picked profile's name, which labeled one mapping with
-  // another's name whenever the two differed.
+  // it; with none picked, the mapping in use.
   const saveToFile = () => {
     const name = current || 'Gamepad'
     const config = current ? profiles[current]! : useJoystickStore.getState().config
@@ -102,8 +96,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
       // A file from this app wraps the mapping; a bare mapping is read too.
       const cfg =
         parsed && typeof parsed === 'object' && 'config' in parsed ? parsed.config : parsed
-      // Sanitizing anything at all yields the default mapping, so a JSON file
-      // that is not a mapping would load as one. Ask for the shape first.
+      // Sanitizing any input yields a mapping, so check the shape first.
       const shaped =
         cfg !== null &&
         typeof cfg === 'object' &&
@@ -116,8 +109,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
           : f.name.replace(/(\.joystick)?\.json$/i, '')
       const incoming = sanitizeConfig(cfg)
       const existing = useJoystickStore.getState().profiles[name]
-      // A different profile under the same name is asked about; the same one
-      // again is not, since replacing it changes nothing.
+      // Confirm before replacing a different profile of the same name.
       if (existing && !sameMapping(existing, incoming)) setReplacing({ name, config: incoming })
       else keepOpened(name, incoming)
     } catch {
@@ -210,8 +202,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
                     checked={m.reverse}
                     onChange={(e) => setAxis(i, { reverse: e.target.checked })}
                   />
-                  {/* Beside Expo, which it enables: only a stick that springs
-                      back has a center for expo to soften. */}
+                  {/* Beside Expo, which only applies to a centered stick. */}
                   <LaSwitch
                     label=""
                     aria-label={`Channel ${m.channel} springs back to center`}
@@ -257,10 +248,8 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
             >
               Add axis
             </LaButton>
-            {/* With the sticks it shapes: a deadzone is around a centered
-                stick's middle, and nothing else in the dialog uses one. On
-                the table's first two columns, so the box sits under the
-                controls above it. */}
+            {/* With the axes, since the deadzone only applies to centered
+                sticks. */}
             <div className="js-setup__fields">
               <label className="js-setup__label" htmlFor="js-deadzone">
                 Deadzone
@@ -286,8 +275,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
                 <span>Channel</span>
                 <span>Button</span>
                 <span>Acts as</span>
-                {/* Microseconds or a flight mode, by what the button does; the
-                    unit is beside each box that takes one. */}
+                {/* Microseconds or a flight mode, depending on the button. */}
                 <span>Value</span>
                 <span className="js-grid__num">Sends</span>
                 <span />
@@ -302,8 +290,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
                     className={`app-table__row js-grid js-grid--buttons${!flightMode && conflicts.includes(m.channel) ? ' is-bad' : ''}`}
                   >
                     {flightMode ? (
-                      // Drawn disabled rather than left empty, so the row keeps
-                      // the table's shape.
+                      // Disabled rather than empty, to keep the row's shape.
                       <LaSelect aria-label={`Channel for ${who}`} disabled value="">
                         <option value="">—</option>
                       </LaSelect>
@@ -441,9 +428,7 @@ export default function JoystickSetup({ open, onClose }: { open: boolean; onClos
 
 /**
  * Named profiles, and the same profiles as files: load one onto this device,
- * save this one under a name, delete one, or move one between machines. One
- * row, because they are one subject -- the file buttons once sat in the
- * dialog's footer and read as a second, unrelated way of saving.
+ * save this one under a name, delete one, or import and export.
  */
 function Profiles({
   picked,
@@ -477,13 +462,11 @@ function Profiles({
 
   return (
     <section className="js-setup__group">
-      {/* The result of a load or a save goes beside the heading: a slot that
-          is always there, where the row itself has no room left. */}
+      {/* Load and save results go beside the heading. */}
       <div className="js-setup__headrow">
         <h4 className="js-setup__head">Profile</h4>
         <span className={`js-profiles__note${note?.bad ? ' is-bad' : ''}`} role="status">
-          {/* A space when empty, so the slot is a line tall either way: empty,
-              it had no height, and a note appearing pushed the dialog down. */}
+          {/* A space when empty, so a note appearing does not shift the dialog. */}
           {note ? note.text : <>&nbsp;</>}
         </span>
       </div>
@@ -533,9 +516,8 @@ function Profiles({
             </LaButton>
           </>
         ) : (
-          // Naming happens in the row it was asked from, so the dialog does
-          // not grow a line for it: the box where the list was, and two of
-          // the three buttons' places.
+          // Naming replaces the list and buttons in place, so the dialog
+          // does not grow.
           <>
             <LaInput
               aria-label="Profile name"
@@ -594,9 +576,9 @@ function ChannelSelect({ value, onChange }: { value: number; onChange: (ch: numb
 
 /**
  * A button's values as one line of microseconds: two for momentary and
- * toggle, one for set. Edited as text and taken on blur or Enter, so typing
- * "1500" does not pass through 1, 15 and 150. A value outside what a servo
- * can be sent is dropped, and a line left short goes back to what it was.
+ * toggle, one for set. Committed on blur or Enter, so typing "1500" does not
+ * pass through 1, 15 and 150. Out-of-range values are dropped, and a line
+ * left short reverts.
  */
 function ValuesInput({
   label,
@@ -633,10 +615,9 @@ function ValuesInput({
 }
 
 /**
- * The flight modes to choose from: the connected vehicle's, since those are
- * the ones a press can reach; with none connected, every name any ArduPilot
- * vehicle has. A saved name the list lacks is kept and shown, so a profile
- * made for another vehicle reads back as it was written.
+ * The flight modes to choose from: the connected vehicle's, or with none
+ * connected every ArduPilot mode name. A saved name the list lacks is kept,
+ * so a profile made for another vehicle reads back unchanged.
  */
 function FlightModeSelect({
   label,

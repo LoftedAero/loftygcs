@@ -48,8 +48,7 @@ describe('resolving a choice', () => {
 
 describe('applying a choice', () => {
   it('stamps the document and sets color-scheme', () => {
-    // color-scheme is the half that is easy to miss: it is what makes
-    // scrollbars and select popups dark, which no stylesheet of ours reaches.
+    // color-scheme darkens scrollbars and select popups, which CSS cannot reach.
     mockPrefersDark(false)
     useThemeStore.getState().setChoice('dark')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
@@ -59,7 +58,7 @@ describe('applying a choice', () => {
   it('remembers the choice, not the resolved value', () => {
     mockPrefersDark(true)
     useThemeStore.getState().setChoice('system')
-    // Storing "dark" here would freeze the theme the day the OS changed.
+    // Storing "dark" would stop following the OS.
     expect(localStorage.getItem('loftgcs.theme')).toBe('system')
     expect(useThemeStore.getState().resolved).toBe('dark')
   })

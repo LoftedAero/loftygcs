@@ -1,13 +1,8 @@
 // @vitest-environment node
 //
-// Does asking for the banner actually bring the frame line back?
-//
-// The airframe a vehicle draws as comes from a STATUSTEXT it emits **once**,
-// at boot -- so a GCS that attaches later never hears it and cannot know what
-// it is looking at. MAV_CMD_DO_SEND_BANNER (42428) is ArduPilot's own command
-// for re-sending it, and Mission Planner sends it for the same reason. None of
-// that is worth believing without asking a real ArduPilot, which is what this
-// does: start SITL (npm run sitl), then SITL=1 npm test.
+// Checks that MAV_CMD_DO_SEND_BANNER (42428) brings back the boot banner,
+// including the frame line, from a vehicle that booted before we attached.
+// Start SITL (npm run sitl), then SITL=1 npm test.
 import { describe, expect, it } from 'vitest'
 import type net from 'node:net'
 import { connectSitl } from '../test-fixtures/sitl-client'
@@ -50,8 +45,7 @@ describe.runIf(process.env.SITL === '1')('DO_SEND_BANNER', () => {
     }
 
     try {
-      // The engine fires the request itself on the first heartbeat, so this
-      // is the shipping path rather than a bespoke send.
+      // The engine sends the request itself on the first heartbeat.
       await waitFor(
         () => events.filter((e) => e.t === 'statustext').length > 0,
         15000,
@@ -59,21 +53,16 @@ describe.runIf(process.env.SITL === '1')('DO_SEND_BANNER', () => {
       )
       const lines = events.flatMap((e) => (e.t === 'statustext' ? [e.text] : []))
 
-      // The banner names the firmware. That much every vehicle does, and it
-      // is what proves the command was honored rather than ignored: SITL is
-      // long past boot by the time this connects.
+      // Every vehicle's banner names the firmware. SITL is long past boot by
+      // now, so seeing it proves the command was honored.
       expect(lines.some((l) => /Ardu(Copter|Plane|Rover|Sub)|APM:Copter|ChibiOS/i.test(l))).toBe(
         true,
       )
 
-      // And the part the airframe render depends on. A frame line is not
-      // guaranteed for every vehicle, so this asserts the *parse* rather
-      // than its presence: if ArduPilot said a frame, `frameName` must find
-      // it, because that is the string the store latches.
+      // Not every vehicle sends a frame line, so assert the parse rather than
+      // its presence.
       const frameLine = lines.find((l) => /\bFrame:/i.test(l))
       if (frameLine) expect(frameName([frameLine])).toBeTruthy()
-      // Recorded either way, so a run against a different vehicle says what
-      // it saw rather than passing silently.
       console.log(`banner lines: ${JSON.stringify(lines)}`)
     } finally {
       engine.stop()

@@ -1,21 +1,15 @@
 // Geofences and rally points: the model, and its translation to and from the
 // wire.
 //
-// Both ride the same mission protocol as the mission itself, distinguished
-// only by `mission_type` -- so MissionClient already transfers them and there
-// is no second state machine here. What this file owns is the shape mismatch
-// between what a fence *is* and how it is carried.
+// Both use the mission protocol, distinguished only by `mission_type`, so
+// MissionClient transfers them.
 //
-// On the wire a fence is a flat list of items. A polygon is not one item but
-// N consecutive vertex items, each repeating the polygon's total vertex count
-// in param1; the boundary between one polygon and the next exists only as
-// "we have now seen param1 of them". Editing that flat list directly is how
-// you end up with a half-written polygon that the vehicle rejects, so the UI
-// edits whole shapes and the flattening happens here, at the edge.
+// On the wire a fence is a flat list of items. A polygon is N consecutive
+// vertex items, each repeating the polygon's vertex count in param1; there is
+// no other boundary marker. The UI edits whole shapes and the flattening
+// happens here.
 //
-// Rally points have no such trouble -- one item each -- but they live here
-// because they are the same kind of thing to the user: places on the map that
-// are not the mission.
+// Rally points are one item each.
 import type { MissionItem } from './types'
 
 /** MAV_CMD values that make up a fence. */
@@ -47,10 +41,8 @@ export type FenceShape =
     }
 
 /**
- * The editable fields of a shape, flattened across both kinds.
- *
- * `Omit` over the union would keep only the fields both kinds share, which
- * is neither `points` nor `radiusM` -- the two things anyone actually edits.
+ * The editable fields of a shape, flattened across both kinds. `Omit` over
+ * the union would keep only the shared fields, dropping `points` and `radiusM`.
  */
 export type FenceShapePatch = Partial<{
   inclusive: boolean
@@ -86,10 +78,8 @@ export const emptyFence = (): FencePlan => ({ shapes: [], returnPoint: null })
 /**
  * Groups a downloaded fence back into shapes.
  *
- * Vertex runs are bounded by the count each vertex carries in param1 rather
- * than by any marker, so a truncated or malformed run is taken as far as it
- * goes and reported -- silently dropping it would hide a fence the vehicle is
- * actually enforcing.
+ * A truncated or malformed vertex run is kept as far as it goes and reported,
+ * since dropping it would hide a fence the vehicle may be enforcing.
  */
 export function fenceFromItems(items: readonly MissionItem[]): {
   plan: FencePlan
@@ -157,9 +147,8 @@ export function fenceToItems(plan: FencePlan): MissionItem[] {
   const push = (command: number, x: number, y: number, param1: number) => {
     out.push({
       seq: out.length,
-      // Fence items are always global, and altitude is meaningless in them --
-      // ArduPilot enforces a fence in two dimensions plus the FENCE_ALT_MAX
-      // parameter, not per-shape.
+      // Fence items are always global with no altitude: ArduPilot enforces
+      // shapes in two dimensions, plus the FENCE_ALT_MAX parameter.
       frame: 0,
       command,
       current: 0,
@@ -196,9 +185,7 @@ export function rallyFromItems(items: readonly MissionItem[]): RallyPoint[] {
 export function rallyToItems(points: readonly RallyPoint[]): MissionItem[] {
   return points.map((p, seq) => ({
     seq,
-    // Relative to home: a rally altitude given as AMSL is a common way to
-    // send an aircraft to the wrong height, and ArduPilot itself stores
-    // rally altitudes relative.
+    // Relative to home, which is how ArduPilot stores rally altitudes.
     frame: 3,
     command: RALLY_CMD,
     current: 0,
@@ -214,10 +201,9 @@ export function rallyToItems(points: readonly RallyPoint[]): MissionItem[] {
 }
 
 /**
- * What is wrong with this fence, in the vehicle's terms.
- *
- * Checked here rather than at upload because the vehicle's rejection is a
- * single MAV_MISSION_ERROR with no indication of which shape caused it.
+ * What is wrong with this fence, in the vehicle's terms. Checked before
+ * upload because the vehicle rejects with a single MAV_MISSION_ERROR that
+ * does not say which shape caused it.
  */
 export function validateFence(plan: FencePlan): string[] {
   const out: string[] = []
@@ -228,9 +214,8 @@ export function validateFence(plan: FencePlan): string[] {
       out.push('A circle needs a radius greater than zero.')
     }
   }
-  // ArduPilot breaches to the return point if one is set, and it must be
-  // somewhere the vehicle is allowed to be -- a return point outside every
-  // inclusion fence sends it straight into another breach.
+  // On a breach ArduPilot flies to the return point, so a return point
+  // outside every inclusion fence causes another breach.
   const inclusions = plan.shapes.filter((s) => s.inclusive)
   if (plan.returnPoint && inclusions.length > 0) {
     const inside = inclusions.some((s) => containsPoint(s, plan.returnPoint!))

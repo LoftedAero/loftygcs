@@ -1,24 +1,16 @@
-// Which airframe is this, beyond "a plane"?
+// Identifies the airframe from ArduPilot's boot announcement
+// ("QuadPlane Frame: F-35B"), which goes to both STATUSTEXT and a dataflash
+// MSG record, so one matcher serves the live link and log replay.
 //
-// ArduPilot announces its frame at boot -- "QuadPlane Frame: F-35B" -- and
-// that line goes to two places: STATUSTEXT over the link, and a MSG record
-// in the dataflash log. So the same string identifies a vehicle whether it
-// is connected or was flown last week, which is why this lives in protocol
-// rather than beside either consumer.
-//
-// The wording moves between firmware versions and the exact phrase is not
-// the interesting part. Four real spellings, from one aircraft's own logs:
+// The wording varies between firmware versions:
 //
 //   4.0.6        "QuadPlane initialised"                  (no frame at all)
 //   4.1.6beta1   "QuadPlane Frame: F-35B/"                (class, empty type)
 //   4.2.2        "QuadPlane Frame: F-35B"
 //   4.6.3        "QuadPlane initialised, Frame: F-35B"
 //
-// So what is matched is the part ArduPilot has kept stable -- "Frame:", and
-// the *class* of the name after it. 4.0.6 gets a null, honestly: it does not
-// say. Every version of this matcher that was written against one spelling
-// silently missed logs from another, which is why the test runs against a
-// real corpus rather than against strings anyone remembered.
+// Only the stable part is matched: "Frame:" and the class of the name after
+// it. 4.0.6 does not say, so it gets null.
 
 import type { ParsedLog } from './dataflash'
 
@@ -32,27 +24,23 @@ export function frameName(lines: readonly string[]): string | null {
 }
 
 /**
- * Airframes we can draw as themselves rather than as a generic vehicle.
- *
- * A short list on purpose. Every entry needs a model whose license lets it
- * ship here, so this grows one aircraft at a time and never by pattern.
+ * Airframes drawn as themselves rather than as a generic vehicle. Each entry
+ * needs a model whose license lets it ship here, so entries are added one
+ * aircraft at a time, never by pattern.
  */
 export type KnownAirframe = 'f35b'
 
 const MATCHERS: [KnownAirframe, RegExp][] = [
-  // Both EDF sizes report the same frame; they are the same aircraft to a
-  // renderer, and to the motors class that names them.
+  // Both EDF sizes report the same frame.
   ['f35b', /^F-?35B$/i],
 ]
 
 /**
  * The airframe a frame name identifies, or null for anything unrecognized.
  *
- * ArduPilot reports the frame as `class/type`, and matching is against the
- * class alone. A quadplane whose type is unset logs a bare trailing slash --
- * 4.1.6 writes "QuadPlane Frame: F-35B/" where 4.2.2 writes "Frame: F-35B" --
- * and an exact match on the whole string silently missed every log from that
- * firmware. Copter's "QUAD/PLUS" is the same shape with the type filled in.
+ * ArduPilot reports the frame as `class/type` and only the class is matched:
+ * a quadplane with no type set logs a trailing slash ("F-35B/"), and Copter
+ * reports e.g. "QUAD/PLUS".
  */
 export function knownAirframe(frame: string | null | undefined): KnownAirframe | null {
   if (!frame) return null
@@ -67,12 +55,8 @@ export function airframeFrom(lines: readonly string[]): KnownAirframe | null {
 }
 
 /**
- * The airframe a log was flown by.
- *
- * The frame line is written once, at boot, into MSG -- the same record
- * that carries the firmware banner. Nothing else in the log names the
- * airframe, so a log that was already running when recording started has
- * no answer here, and null is the honest one.
+ * The airframe a log was flown by. The frame line is written to MSG once at
+ * boot, so a log that started recording later returns null.
  */
 export function airframeFromLog(log: ParsedLog): KnownAirframe | null {
   const texts = log.messages.get('MSG')?.columns.get('Message')

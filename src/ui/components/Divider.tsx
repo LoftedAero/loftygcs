@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
-// The draggable column divider. Hand-rolled rather than pulled from a
-// library: it is about sixty lines, and a library's divider would arrive
-// with its own colors and hit areas to override back into the design system.
+// The draggable panel divider.
 //
-// The drag is tracked on the window rather than through setPointerCapture --
-// this screen re-renders at telemetry rate, and re-binding a captured pointer
-// on every one of those renders wedges the input pipeline.
+// The drag is tracked on the window rather than with setPointerCapture: the
+// screen re-renders at telemetry rate, and re-binding a captured pointer on
+// every render wedges the input pipeline.
 
 export interface DividerProps {
   /** The box the fraction is measured against. */
@@ -14,9 +12,8 @@ export interface DividerProps {
   ratio: number
   onRatio: (r: number) => void
   /**
-   * Which way the separator itself lies, in the ARIA sense: a `vertical`
-   * separator is a vertical bar dividing left from right and drags sideways;
-   * a `horizontal` one divides top from bottom and drags up and down.
+   * The separator's own orientation, in the ARIA sense: `vertical` divides
+   * left from right and drags sideways; `horizontal` divides top from bottom.
    */
   orientation?: 'vertical' | 'horizontal'
 }
@@ -69,8 +66,7 @@ export default function Divider({
         setDragging(true)
       }}
       onKeyDown={(e) => {
-        // Keyboard resize, because a pointer-only divider is unusable to
-        // anyone driving the app from the keyboard.
+        // Keyboard resize; Shift takes bigger steps.
         const step = e.shiftKey ? 0.1 : 0.02
         const less = vertical ? 'ArrowLeft' : 'ArrowUp'
         const more = vertical ? 'ArrowRight' : 'ArrowDown'

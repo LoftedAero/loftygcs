@@ -5,16 +5,9 @@ import { summarize, type CompareRow } from '../../../protocol/param-file'
 
 // Compare a file against the vehicle and choose what to take from it.
 //
-// Mission Planner's tool, and it exists because the alternative -- what this
-// app did until now -- is an Import button that silently applies every
-// difference in the file. That is fine when the file came from this aircraft
-// an hour ago and dangerous when it came from a similar one, because the
-// differences you wanted and the differences you did not look identical
-// until after they are written.
-//
-// So nothing is applied here. Selected rows are *staged* as ordinary edits
-// and still go through Write Params, which means the compare tool cannot do
-// anything the parameter table could not, and one confirmation covers both.
+// Modeled on Mission Planner's compare tool, so a file from a similar aircraft
+// is not applied wholesale. Nothing is written here: selected rows are staged
+// as ordinary edits and still go through Write.
 
 export interface ParamCompareModalProps {
   open: boolean
@@ -40,8 +33,8 @@ export default function ParamCompareModal({
 
   const summary = useMemo(() => summarize(rows), [rows])
 
-  // Everything that differs starts selected: taking the whole file is the
-  // common intent, and unticking a few is less work than ticking forty.
+  // Every difference starts selected, since taking the whole file is the
+  // common case.
   useEffect(() => {
     if (!open) return
     setSelected(new Set(rows.filter((r) => r.status === 'changed').map((r) => r.name)))
@@ -101,9 +94,7 @@ export default function ParamCompareModal({
           onChange={(e) => setFilter(e.target.value)}
           className="la-grow"
         />
-        {/* Two buttons, not one that changes label: which one is available
-            tells you nothing useful, and a control whose meaning flips as you
-            tick rows is one you have to read every time before pressing. */}
+        {/* Two buttons rather than one whose label flips with the selection. */}
         <LaButton
           variant="ghost"
           disabled={selectable.length === 0 || allShown}

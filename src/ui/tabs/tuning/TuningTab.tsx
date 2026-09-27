@@ -6,47 +6,33 @@ import SubTabs from '../../components/SubTabs'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useParamStore } from '../../../stores/param-store'
 
-// The tuning parameters people actually reach for, scoped to Mission Planner's
-// own tuning pages -- its Plane "Basic Tuning" and the Copter "Extended
-// Tuning" it reuses as "QP Extended Tuning" -- on the same two columns as
-// Configuration. It was two sub-tabs drawn as one banded document, the one
-// Setup screen that was not cards. The IMU's filtering -- low-pass filters,
-// both harmonic notches, the batch sampler -- is on Filters, ahead of this in
-// the rail: it is set once from a log before the gains, and on this page it
-// made a page and a half of cards. The rate controller's own filters went
-// there too: they are set once, from the gyro filter, before the gains, and
-// are not what a tuning session changes.
+// The commonly used tuning parameters, scoped to Mission Planner's Plane
+// "Basic Tuning" and Copter "Extended Tuning" (reused as "QP Extended
+// Tuning"). IMU and rate-controller filtering is on the Filters tab, since it
+// is set once from a log before the gains.
 //
-// **Every name was read off running 4.7.1 vehicles** -- Copter, Plane, and a
-// Plane booted as a quadplane -- because 4.7 renamed most of the multirotor
-// navigation set and the page had been showing none of it: PSC_ACCZ_P is
-// PSC_D_ACC_P, WPNAV_SPEED is WP_SPD, PILOT_SPEED_UP is PILOT_SPD_UP,
-// ANGLE_MAX is ATC_ANGLE_MAX. Older spellings are listed after the current
-// ones -- a vehicle reports one of them -- and **no unit is written here**
-// where the metadata has one: the renames changed units too (cm/s to m/s,
-// centidegrees to degrees), and Mission Planner flags the same change with a
-// "Change in 4.7" warning. Units come from the metadata for the firmware
-// connected, which is right for whichever spelling it has; TECS's rates, which
-// the metadata gives none, are the one exception.
+// Names are as reported by 4.7.1 Copter, Plane and quadplane. 4.7 renamed most
+// of the multirotor navigation set (PSC_ACCZ_P is PSC_D_ACC_P, WPNAV_SPEED is
+// WP_SPD, PILOT_SPEED_UP is PILOT_SPD_UP, ANGLE_MAX is ATC_ANGLE_MAX), so
+// older spellings follow the current ones and a vehicle reports one of them.
+// The renames also changed units (cm/s to m/s, centidegrees to degrees), so
+// units come from the connected firmware's metadata. TECS's rates, which the
+// metadata gives no unit, are the one exception.
 //
-// Left out of Mission Planner's set on purpose: its Plane page's airspeeds (on
-// Configuration), KFF_RDDRMIX (on Outputs) and its filters (on Filters); the
-// yaw damper (YAW2SRV_*) and throttle limits (THR_MIN/MAX/SLEWRATE), which
-// people rarely touch once set and which cost a quadplane's page two cards of
-// scrolling -- the Parameters table still has them; and the pre-TECS
-// ENRGY2THR / ALT2PTCH / ARSP2PTCH loops and the static INS_NOTCH_*, which 4.7
-// does not have. Added beyond it: rate FF, and Plane's attitude time
-// constants, which its page predates and which ArduPlane's own tuning guide
-// starts from.
+// Omitted from Mission Planner's set: the Plane page's airspeeds (on
+// Configuration), KFF_RDDRMIX (on Outputs) and filters (on Filters); the yaw
+// damper (YAW2SRV_*) and throttle limits (THR_MIN/MAX/SLEWRATE), left to the
+// Parameters table; and the pre-TECS ENRGY2THR / ALT2PTCH / ARSP2PTCH loops
+// and static INS_NOTCH_*, which 4.7 does not have. Added: rate FF, and
+// Plane's attitude time constants, which ArduPlane's tuning guide starts from.
 
 /** A spelling per firmware generation, newest first. */
 const one = (...names: string[]): MatrixParam => names
 
 /**
- * The multirotor attitude and navigation set, for a Copter or for a
- * quadplane's VTOL motors. ArduPilot names the quadplane's copies by prefix --
- * ATC_ becomes Q_A_, PSC_ becomes Q_P_, most others take Q_ -- and Mission
- * Planner serves both from one page the same way.
+ * The multirotor attitude and navigation set, for a Copter or a quadplane's
+ * VTOL motors. The quadplane's copies are prefixed: ATC_ becomes Q_A_, PSC_
+ * becomes Q_P_, and most others take Q_.
  */
 function multirotorSet(q: boolean, quicktune = false) {
   const atc = q ? 'Q_A_' : 'ATC_'
@@ -66,16 +52,11 @@ function multirotorSet(q: boolean, quicktune = false) {
     label: a.label,
     params: [`${atc}ANG_${a.k}_P`, one(`${atc}ACC_${a.acc}_MAX`, `${atc}ACCEL_${a.acc}_MAX`)],
   }))
-  // Rows in the order the cascade runs, outermost first. A matrix per axis, as
-  // Mission Planner boxes them: their I max is in different units (d% for the
-  // vertical accelerator, m/s/s for the horizontal velocity loop), so one
-  // matrix could only head that column with a unit wrong for half of it. A
-  // position loop is P only; the cells it has no I, D or I max for are blank
-  // rather than dashes.
-  // The rows are ArduPilot's own words for the loops -- "Position (vertical)
-  // controller", "Velocity (vertical) controller" -- and so the same three on
-  // both cards, rather than Altitude and Climb rate here and Position and
-  // Velocity beside it.
+  // Rows in cascade order, outermost first, with row labels from ArduPilot's
+  // own loop names. Vertical and horizontal get separate matrices because
+  // their I max units differ (d% for the vertical accelerator, m/s/s for the
+  // horizontal velocity loop). A position loop is P only, so its other cells
+  // are blank.
   const vertical: MatrixRow[] = [
     { label: 'Position', params: [one(`${psc}D_POS_P`, `${psc}POSZ_P`), null, null, null] },
     { label: 'Velocity', params: [one(`${psc}D_VEL_P`, `${psc}VELZ_P`), null, null, null] },
@@ -113,8 +94,7 @@ function multirotorSet(q: boolean, quicktune = false) {
     ...both([`${top}PILOT_SPD_UP`, `${top}PILOT_SPEED_UP`], 'Pilot climb speed'),
     ...both([`${top}PILOT_SPD_DN`, `${top}PILOT_SPEED_DN`], 'Pilot descent speed'),
   ]
-  // The attitude controller's settings that have no axis, under its angle
-  // gains -- the multirotor counterpart of the fixed wing's Attitude card.
+  // The attitude controller's per-vehicle (not per-axis) settings.
   const attitude: ParamFieldSpec[] = [
     ...both(
       q ? ['Q_A_ANGLE_MAX', 'Q_ANGLE_MAX'] : ['ATC_ANGLE_MAX', 'ANGLE_MAX'],
@@ -132,19 +112,15 @@ function multirotorSet(q: boolean, quicktune = false) {
   return { rate, angle, attitude, vertical, horizontal, speeds, autotune }
 }
 
-// Quicktune, in the autotune card because it does the autotune's job: every
-// official Plane build for flight hardware leaves QAUTOTUNE out and builds this
-// in instead (`!QAUTOTUNE_ENABLED`, `AP_QUICKTUNE_ENABLED` in the published
-// features.txt of CubeOrange, Pixhawk6X, MatekH743 and others, 4.6.3 to the
-// current beta), so on real hardware these are the only tuning rows the card
-// has. SITL builds both, and shows both. Copter builds neither.
+// Quicktune goes in the autotune card: official Plane builds for flight
+// hardware ship Quicktune instead of QAUTOTUNE (per their published
+// features.txt), so on real hardware these are the card's only tuning rows.
+// SITL builds both; Copter builds neither.
 //
-// The enable gates the rest live -- 13 QWIK_ parameters appear the moment it
-// is written, no restart, measured on 4.7.1 -- so it is OSD_TYPE's kind of
-// field, and the rows after it are reserved to hold the card's height. Only
-// these four: they are the setup ArduPilot's Quicktune guide asks for; the
-// algorithm's own knobs (doubling time, gain margin, thresholds) are left to
-// the Parameters table. The tune itself starts from a switch, RCn_OPTION 181.
+// QWIK_ENABLE exposes the other QWIK_ parameters without a restart, so it
+// writes immediately and the rows after it are reserved to hold the card's
+// height. These four are the setup ArduPilot's Quicktune guide asks for; the
+// tune itself starts from a switch (RCn_OPTION 181).
 const QUICKTUNE: ParamFieldSpec[] = [
   { param: 'QWIK_ENABLE', label: 'Quicktune', writeNow: true, gatesOthers: true },
   { param: 'QWIK_AXES', label: 'Quicktune axes', reserve: true },
@@ -166,11 +142,9 @@ const PLANE_RATE: MatrixRow[] = [
   label: a.label,
   params: ['P', 'I', 'D', 'FF', 'IMAX'].map((t) => `${a.k}_RATE_${t}`),
 }))
-// The attitude limits moved here from Configuration: Copter's lean limit is
-// on this page, and Mission Planner's Plane tuning page has them as "Nav
-// angles". 4.4 renamed them off centidegrees; the old spellings are carried
-// because the unit comes from the metadata for whichever the vehicle reports,
-// which is what makes carrying them safe here and not on Configuration.
+// Attitude limits, which Mission Planner's Plane page calls "Nav angles". 4.4
+// renamed them off centidegrees; the old spellings are safe to carry because
+// the unit comes from the metadata for whichever the vehicle reports.
 const PLANE_ATTITUDE: ParamFieldSpec[] = [
   ...both(['ROLL_LIMIT_DEG', 'LIM_ROLL_CD'], 'Roll limit'),
   ...both(['PTCH_LIM_MAX_DEG', 'LIM_PITCH_MAX'], 'Pitch up limit'),
@@ -183,10 +157,8 @@ const L1: ParamFieldSpec[] = [
   { param: 'NAVL1_DAMPING', label: 'Damping' },
 ]
 const TECS: ParamFieldSpec[] = [
-  // The one unit this page states: ArduPilot's metadata gives these none (it is
-  // in the display name, "metres/sec"), and they have not been renamed or
-  // rescaled across releases. ParamField prefers a stated unit, so this is
-  // used only because the metadata is silent.
+  // ArduPilot's metadata gives these no unit (it is in the display name), and
+  // they have not been rescaled across releases. A metadata unit would win.
   { param: 'TECS_CLMB_MAX', label: 'Climb rate max', unit: 'm/s' },
   { param: 'TECS_SINK_MIN', label: 'Sink rate min', unit: 'm/s' },
   { param: 'TECS_SINK_MAX', label: 'Sink rate max', unit: 'm/s' },
@@ -203,10 +175,7 @@ const flat = (rows: MatrixRow[]): string[] =>
     r.params.flatMap((p) => (p === null ? [] : typeof p === 'string' ? [p] : [...p])),
   )
 
-/**
- * A card's own Revert and Write, scoped to its parameters, as on every Setup
- * screen that has left the footer.
- */
+/** A card's own Revert and Write, scoped to its parameters. */
 function actionsFor(params: readonly string[]) {
   const owned = new Set(params)
   return (
@@ -257,10 +226,8 @@ function matrix(
 }
 
 /**
- * Two stacked columns on Configuration's even geometry, each reaching the
- * row's height so the shorter one's last card takes the slack rather than
- * leaving a step. Two fit a Copter's set or a plane's in an 1100px window, and
- * a quadplane shows one set at a time, so no layout here needs three.
+ * Two stacked columns, each filling the row's height so the shorter one's
+ * last card takes the slack.
  */
 function Columns({ columns }: { columns: ReactNode[][] }) {
   return (
@@ -275,9 +242,8 @@ function Columns({ columns }: { columns: ReactNode[][] }) {
 }
 
 /**
- * A multirotor's cards, for a Copter or for a quadplane's VTOL motors -- under
- * the same titles either way, since on a quadplane the view switch already
- * says which set is showing, and the VTOL view is meant to be the Copter page.
+ * A multirotor's cards, for a Copter or a quadplane's VTOL motors, under the
+ * same titles; on a quadplane the view switch says which set is showing.
  */
 function multirotorCards(q: boolean, quicktune = false) {
   const set = multirotorSet(q, quicktune)
@@ -289,11 +255,9 @@ function multirotorCards(q: boolean, quicktune = false) {
       set.angle,
       set.attitude,
     ),
-    // PSC_ is ArduPilot's position controller, which its metadata describes in
-    // two halves -- "Position (vertical) controller", "Position (horizontal)
-    // controller". The limits card holds WP_, LOIT_ and PILOT_ -- speeds, an
-    // acceleration and a radius, the navigation controllers' settings rather
-    // than all speeds.
+    // PSC_ is the position controller, which ArduPilot's metadata describes as
+    // vertical and horizontal halves. Navigation holds the WP_, LOIT_ and
+    // PILOT_ settings.
     vertical: matrix('Vertical position controller', PID_COLUMNS, set.vertical),
     horizontal: matrix('Horizontal position controller', PID_COLUMNS, set.horizontal),
     speeds: card('Navigation', set.speeds),
@@ -318,32 +282,25 @@ export default function TuningTab() {
   const entries = useParamStore((s) => s.entries)
   const [view, setView] = useState<'plane' | 'vtol'>('plane')
 
-  // Parameters too, not just a link: with them still arriving every card is
-  // missing its fields and hides itself, which reads as a vehicle with nothing
-  // to tune.
+  // Wait for parameters too, or every card hides itself for lack of fields.
   if (!connected || !ready) {
     return <NeedsVehicle title="Tuning" />
   }
 
-  // Autotune comes first, top left: it is where tuning starts, and the gains
-  // below it are what it writes. A multirotor's columns are by subject -- the
-  // attitude loops under autotune, the position controller and navigation
-  // beside them -- and a plane's are the arrangement that evens its columns,
-  // found by trying every assignment against the cards' measured heights.
+  // Autotune comes first, since tuning starts there and the gains below are
+  // what it writes. A multirotor's columns are by subject; a plane's are
+  // arranged to balance the column heights.
   //
-  // What the aircraft is comes from what it reports: a fixed-wing rate loop
-  // means a plane, and a plane with Q_A_ gains is a quadplane.
+  // A fixed-wing rate loop means a plane; a plane with Q_A_ gains is a
+  // quadplane.
   const plane = entries.has('RLL_RATE_P')
   const vtol = entries.has('Q_A_RAT_RLL_P')
   if (!plane) return <MultirotorColumns q={false} />
   if (!vtol) return <PlaneColumns />
 
-  // A quadplane shows its two sets one at a time, each laid out exactly as the
-  // Plane page and the Copter page lay out theirs -- Mission Planner's "Basic
-  // Tuning" and "QP Extended Tuning", which are separate pages there too. As
-  // one screen of three columns the cards could only fit by leaving their
-  // places on those pages, and a card that moves with the airframe is one
-  // nobody finds twice; stacked, the screen scrolled 630px.
+  // A quadplane shows its two sets one at a time, each laid out as on the
+  // Plane and Copter pages (separate pages in Mission Planner too), so cards
+  // keep the same place regardless of airframe.
   return (
     <>
       <SubTabs tabs={QUADPLANE_VIEWS} active={view} onChange={setView} label="Tuning view" />
@@ -358,9 +315,7 @@ const QUADPLANE_VIEWS = [
 ] as const
 
 function MultirotorColumns({ q }: { q: boolean }) {
-  // Quicktune's rows only where the firmware has it at all: they are reserved,
-  // and a reserved row on a build without the feature would be a greyed row
-  // nothing could ever turn on.
+  // Only where the firmware has Quicktune, since its rows are reserved.
   const quicktune = useParamStore((s) => s.entries.has('QWIK_ENABLE'))
   const m = multirotorCards(q, quicktune)
   return (

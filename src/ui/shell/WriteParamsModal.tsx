@@ -2,27 +2,17 @@ import { useMemo } from 'react'
 import { LaButton, LaModal } from '../components/La'
 import { useParamStore } from '../../stores/param-store'
 
-// What is about to be written, before it is written.
-//
-// Staged edits accumulate across tabs -- a frame change here, a failsafe
-// there, forty rows taken from a file in the compare tool -- and Write Params
-// is one button at the bottom of the window that sends all of it. Up to now
-// the only record of what that button would do was a count.
-//
-// This is not a "are you sure": it is the list, because the useful question
-// is never whether to write but whether *this* is what you meant to write.
-// The moment that matters is a parameter you do not remember touching.
+// Lists what a write is about to send. Staged edits accumulate across tabs,
+// so the confirmation shows each parameter with its old and new value rather
+// than just asking whether to write.
 
 export interface WriteParamsModalProps {
   open: boolean
   onConfirm: () => void
   onCancel: () => void
   /**
-   * Show only the edits this write will send.
-   *
-   * A card that owns its parameters sends only those, so listing the whole
-   * staged set here would promise work the button is not going to do -- which
-   * is exactly the misreading this dialog exists to prevent.
+   * Limits the list to the edits this write will send, for a card that
+   * writes only its own parameters.
    */
   owns?: (param: string) => boolean
 }

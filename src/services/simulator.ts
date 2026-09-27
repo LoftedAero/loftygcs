@@ -1,7 +1,6 @@
 // Driving the locally managed SITL: install it, start it, and attach the
-// app's normal TCP link to it. The point is fidelity -- unlike the built-in
-// demo vehicle, this is the real ArduPilot firmware, with its real parameter
-// set over MAVFTP, real arming checks, and real mode logic.
+// app's normal TCP link to it. Unlike the demo vehicle this is real ArduPilot
+// firmware, with its real parameters, arming checks and mode logic.
 import { connectionService } from './connection'
 import { useSimStore } from '../stores/sim-store'
 import type { SimLaunch } from '../types/loftgcs'
@@ -44,10 +43,9 @@ export async function startSimulator(launch: SimLaunch): Promise<void> {
     await refreshSimStatus()
     useSimStore.getState().setPhase('running')
     if (waitingForRealFlight) {
-      // Connecting now would attach to a port that answers nothing and time
-      // out waiting for a heartbeat, which reads as a broken simulator
-      // rather than as RealFlight not being up. The simulator is running and
-      // will pick RealFlight up whenever it appears; connect then.
+      // SITL sends nothing until RealFlight is exchanging data, so connecting
+      // now would time out. The simulator keeps retrying RealFlight; connect
+      // once it is up.
       useSimStore.getState().setWaitingForRealFlight(true)
       return
     }
@@ -62,9 +60,8 @@ export async function startSimulator(launch: SimLaunch): Promise<void> {
 export async function stopSimulator(): Promise<void> {
   const bridge = window.loftgcs
   if (!bridge) return
-  // Disconnect first: SITL exits the moment its TCP client drops, and doing
-  // it in this order means the app reports a clean disconnect rather than a
-  // link failure.
+  // Disconnect first: SITL exits when its TCP client drops, and this order
+  // reports a clean disconnect rather than a link failure.
   await connectionService.disconnect()
   await bridge.sim.stop()
   await refreshSimStatus()

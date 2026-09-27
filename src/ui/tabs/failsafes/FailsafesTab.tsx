@@ -6,28 +6,20 @@ import { useParamStore } from '../../../stores/param-store'
 // What the vehicle does when something goes wrong. Battery failsafe actions
 // live on the Power tab, next to the thresholds that trigger them.
 //
-// **Copter, Plane and a quadplane configure this differently, and the cards
-// are the same anyway.** Every name here was read off running 4.7.1 vehicles
-// of all three kinds. A card is one subject on every vehicle -- radio loss,
-// ground-station loss, the return home, the estimator, the fence, arming --
-// and lists whichever of its parameters the vehicle reports, so the same
-// setting is always found in the same place. Only VTOL assist has no
-// counterpart, and appears only on a quadplane.
+// Copter, Plane and quadplane name these parameters differently (names taken
+// from 4.7.1 vehicles of each kind). Each card covers one subject on every
+// vehicle (radio loss, GCS loss, return, EKF, fence, arming) and lists
+// whichever of its parameters the vehicle reports. Only VTOL assist is
+// quadplane-specific.
 //
-// What 4.7 changed, and this page first missed: Copter's RTL_ALT,
-// RTL_ALT_FINAL and RTL_CLIMB_MIN became RTL_ALT_M, RTL_ALT_FINAL_M and
-// RTL_CLIMB_MIN_M, in meters where they were centimeters -- the page showed
-// none of them, under a hardcoded "cm"; and ARMING_CHECK became
-// ARMING_SKIPCHK, which lists the checks to *skip*. Older spellings follow
-// the current ones, a vehicle reports one, and **no unit is written here
-// that the metadata states** -- it is right for whichever spelling arrives,
-// where "cm" over Plane's RTL_CLIMB_MIN, in meters, was wrong. The two
-// throttle PWM values are the exception: Plane's metadata gives its value no
-// unit at all.
+// 4.7 renamed Copter's RTL_ALT, RTL_ALT_FINAL and RTL_CLIMB_MIN to *_M
+// variants in meters instead of centimeters, and replaced ARMING_CHECK with
+// ARMING_SKIPCHK, which lists checks to skip. Older spellings are listed after
+// the current ones. Units come from the metadata, except the two throttle PWM
+// values, which Plane's metadata leaves unitless.
 //
-// Plane's own set was missing too: its GCS failsafe is FS_GCS_ENABL (no E),
-// its radio failsafe acts through FS_SHORT_ACTN and FS_LONG_ACTN, and its
-// crash detection is CRASH_DETECT. FS_SHORT_TIMEOUT is gone in 4.7.
+// Plane-specific: FS_GCS_ENABL (no E), FS_SHORT_ACTN and FS_LONG_ACTN for
+// radio failsafe, and CRASH_DETECT. FS_SHORT_TIMEOUT is gone in 4.7.
 const REASON = 'Failsafe changes take effect after a restart'
 
 /** One field per spelling, newest first; the card keeps whichever is reported. */
@@ -42,8 +34,7 @@ function card(title: string, fields: ParamFieldSpec[]) {
       key={title}
       title={title}
       showNames
-      // Three columns leave a control about 12 characters: bitmasks as a
-      // count, ArduPilot's sentence-length values by their short names.
+      // Three columns leave about 12 characters per control.
       compact
       fields={fields}
       actions={<CardParamActions reason={REASON} owns={(p) => names.has(p)} />}
@@ -51,9 +42,6 @@ function card(title: string, fields: ParamFieldSpec[]) {
   )
 }
 
-// Worth doing before a new airframe flies: switch the transmitter off on the
-// bench with the props removed and confirm the vehicle reacts. A standing
-// instruction on the card is one people learn to skip.
 const RADIO: ParamFieldSpec[] = [
   { param: 'FS_THR_ENABLE', label: 'Throttle failsafe' },
   { param: 'THR_FAILSAFE', label: 'Throttle failsafe' },
@@ -66,16 +54,14 @@ const RADIO: ParamFieldSpec[] = [
   { param: 'FS_OPTIONS', label: 'Options' },
 ]
 
-// Only useful when the vehicle is genuinely flown from the GCS: on a hobby
-// link this fires on ordinary telemetry dropouts. Plane times it with
-// FS_LONG_TIMEOUT, on the radio card.
+// On a typical telemetry link this fires on ordinary dropouts. Plane times it
+// with FS_LONG_TIMEOUT, on the radio card.
 const GCS: ParamFieldSpec[] = [
   ...both(['FS_GCS_ENABLE', 'FS_GCS_ENABL'], 'GCS failsafe'),
   { param: 'FS_GCS_TIMEOUT', label: 'Timeout' },
 ]
 
-// A quadplane's VTOL return is part of its return, so it is rows here rather
-// than a card of its own.
+// A quadplane's VTOL return settings are rows here, not a separate card.
 const RTL: ParamFieldSpec[] = [
   ...both(['RTL_ALT_M', 'RTL_ALT'], 'RTL altitude'),
   { param: 'RTL_ALTITUDE', label: 'RTL altitude' },
@@ -114,9 +100,7 @@ const FENCE: ParamFieldSpec[] = [
   { param: 'FENCE_RET_RALLY', label: 'Return to rally' },
 ]
 
-// These are what keep a misconfigured vehicle on the ground. The warning
-// against switching them off belongs where somebody does it, not standing on
-// the card. 4.7 inverted the mask: the checks to skip, not the ones to run.
+// 4.7 inverted the mask: ARMING_SKIPCHK lists checks to skip.
 const ARMING: ParamFieldSpec[] = [
   { param: 'ARMING_SKIPCHK', label: 'Checks skipped' },
   { param: 'ARMING_CHECK', label: 'Checks enabled' },
@@ -125,9 +109,8 @@ const ARMING: ParamFieldSpec[] = [
   { param: 'DISARM_DELAY', label: 'Auto-disarm delay' },
 ]
 
-// A quadplane only: the VTOL motors catching a fixed-wing flight that is
-// losing speed, height or attitude, and what happens when a transition to
-// forward flight does not complete.
+// Quadplane only: VTOL motors assisting a fixed-wing flight that is losing
+// speed, height or attitude, and the action when a transition fails.
 const VTOL: ParamFieldSpec[] = [
   { param: 'Q_ASSIST_SPEED', label: 'Assist below speed' },
   { param: 'Q_ASSIST_ALT', label: 'Assist below altitude' },
@@ -144,10 +127,7 @@ export default function FailsafesTab() {
     return <NeedsVehicle title="Failsafes" />
   }
 
-  // Two columns, read down: Arming, the two link failsafes, and the return
-  // they trigger; then Fence, EKF and crash -- and on a quadplane VTOL assist,
-  // the one card with no counterpart elsewhere. Each card is in the same
-  // column on every vehicle.
+  // Each card is in the same column on every vehicle.
   return (
     <div className="config-screen config-screen--even">
       <div className="app-stack app-stack--fill">

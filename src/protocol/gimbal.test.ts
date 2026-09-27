@@ -23,9 +23,7 @@ const fw = (major: number, minor: number, patch = 0): FirmwareVersion => ({
 
 describe('which protocol this firmware speaks', () => {
   it('uses the gimbal manager from 4.2 on', () => {
-    // The gimbal manager arrived in 4.2. Below it the command exists in the
-    // spec and is answered UNSUPPORTED, which looks to a user like a broken
-    // gimbal rather than an old one.
+    // The gimbal manager arrived in 4.2; older firmware answers it UNSUPPORTED.
     expect(hasGimbalManager(fw(4, 2))).toBe(true)
     expect(hasGimbalManager(fw(4, 6, 3))).toBe(true)
     expect(hasGimbalManager(fw(5, 0))).toBe(true)
@@ -34,8 +32,7 @@ describe('which protocol this firmware speaks', () => {
   })
 
   it('takes the old path when the vehicle never said', () => {
-    // A vehicle that did not answer AUTOPILOT_VERSION gets the command that
-    // every ArduPilot has always understood.
+    // No AUTOPILOT_VERSION answer: use the command every ArduPilot understands.
     expect(hasGimbalManager(null)).toBe(false)
     expect(pointGimbal(null, -45, 0).command).toBe(CMD.doMountControl)
   })
@@ -50,8 +47,8 @@ describe('pointing the gimbal', () => {
   })
 
   it('sends them where the old command expects them, which is not the same place', () => {
-    // DO_MOUNT_CONTROL is pitch, roll, yaw -- yaw is param3, not param2.
-    // Putting yaw in param2 rolls the camera instead of turning it.
+    // DO_MOUNT_CONTROL is pitch, roll, yaw, so yaw is param3. Yaw in param2
+    // rolls the camera instead of turning it.
     const { command, params } = pointGimbal(fw(4, 1), -45, 90)
     expect(command).toBe(CMD.doMountControl)
     expect(params[0]).toBe(-45)
@@ -66,8 +63,7 @@ describe('pointing the gimbal', () => {
     const free = pointGimbal(fw(4, 5), 0, 0, false).params[4]!
     expect(locked & GIMBAL_FLAGS.yawLock).toBeTruthy()
     expect(free & GIMBAL_FLAGS.yawLock).toBeFalsy()
-    // Pitch is always locked: a camera that pitches with the airframe is
-    // not pointing anywhere anyone asked for.
+    // Pitch is always locked to the horizon.
     expect(free & GIMBAL_FLAGS.pitchLock).toBeTruthy()
   })
 
@@ -157,8 +153,7 @@ describe('reading where it is pointed', () => {
 
   it('reads the old message, whose fields are in an unusual order', () => {
     // pointing_a is pitch, pointing_b is roll, pointing_c is yaw, all in
-    // centidegrees. Reading them in the roll-pitch-yaw order everything
-    // else uses swaps two axes silently.
+    // centidegrees, not the usual roll-pitch-yaw order.
     expect(attitudeFromMountStatus(-4500, 100, 9000)).toEqual({
       pitchDeg: -45,
       rollDeg: 1,

@@ -1,17 +1,13 @@
 // The browser half of `npm run cal-art`: draw an airframe in each of the six
 // compass-calibration attitudes and return one sprite sheet per aircraft.
 //
-// This runs inside an Electron window (see make-cal-art.mjs) rather than in
-// the app, because the result is a committed asset: the calibration tiles are
-// 64px and static, so paying for three.js, a GLTF parse and a WebGL context on
-// the Sensors page to redraw the same six pictures every time would be a cost
-// with nothing to show for it.
+// Runs in an Electron window (see make-cal-art.mjs) and produces a committed
+// asset, so the Sensors page does not need three.js and WebGL for six static
+// 64px pictures.
 //
-// Every convention here is copied from the live renderer on purpose -- the
-// pivot rotation, the normalization, the lights, the repaint, the held yaw --
-// because the accel-calibration wizard draws the same aircraft in the same six
-// attitudes with a real three.js scene. If the two disagree, one screen
-// contradicts another.
+// The pivot rotation, normalization, repaint and held yaw match the live
+// renderer, because the accel-calibration wizard draws the same aircraft in
+// the same six attitudes with a real three.js scene.
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { ROTATION_COUNT, boardRotation } from '../src/protocol/board-rotation.ts'
@@ -26,9 +22,9 @@ const REPAINT = {
 }
 
 /**
- * The six, in `ORIENTATIONS` order (src/protocol/cal-orientation.ts) -- which
- * is the order of the frames in the sheet, so the component can index it.
- * Roll and pitch are ArduPilot's: roll right positive, pitch up positive.
+ * In `ORIENTATIONS` order (src/protocol/cal-orientation.ts), which is the
+ * frame order in the sheet. Roll right and pitch up are positive, as in
+ * ArduPilot.
  */
 const FRAMES = [
   { id: 'level', roll: 0, pitch: 0 },
@@ -49,15 +45,9 @@ const VIEW_DIR = new THREE.Vector3(0, 0.42, 1).normalize()
 const FILL = 0.94
 
 /**
- * Lighting, dimmer than the live view's, and why.
- *
- * VehicleView lights a model that fills a panel; these are 72px pictures that
- * have to hold an outline against a white card. At the live intensities the
- * airframe came out near white and the tile read as an empty box in the light
- * theme -- which is the theme it is most often looked at in. The *directions*
- * are the live view's, so the shading still says the same thing about which
- * way up the aircraft is; only the exposure changes, plus a shade off every
- * material so the F-35B's own near-white paint comes down with it.
+ * Dimmer than the live view so a small tile keeps its outline against a white
+ * card. Light directions match the live view; PAINT darkens every material,
+ * including the F-35B's near-white paint.
  */
 const AMBIENT = 1.35
 const KEY = 1.7
@@ -73,8 +63,8 @@ function rotationFor({ roll, pitch }) {
 
 function load(loader, source) {
   return new Promise((resolve, reject) => {
-    // Parsed from memory rather than fetched: a file:// URL would taint the
-    // canvas, and toDataURL on a tainted canvas throws.
+    // Parsed from memory: a file:// URL would taint the canvas, and
+    // toDataURL on a tainted canvas throws.
     loader.parse(source, '', (gltf) => resolve(gltf.scene), reject)
   })
 }
@@ -96,14 +86,9 @@ function worldVertices(model) {
 }
 
 /**
- * One camera distance that fits all six attitudes, found by measuring.
- *
- * The live view fits the model's bounding *sphere*, which is the only thing
- * that works when the attitude is arbitrary and changing. Here the six are
- * known, so the real projected extent can be measured instead -- and it is
- * much smaller than the sphere, because a sphere around a wingspan is mostly
- * empty air. Fitting the sphere at this size drew an aeroplane about half the
- * width of its tile.
+ * One camera distance that fits all six attitudes. The live view fits the
+ * bounding sphere because its attitude is arbitrary; here the six are known,
+ * so the projected extent is measured, which frames the aircraft much tighter.
  */
 function fitDistance(camera, verts) {
   const mats = FRAMES.map(rotationFor)
@@ -130,10 +115,8 @@ function fitDistance(camera, verts) {
 
 /**
  * Render one aircraft's sheet: six frames left to right, `frame` pixels each.
- *
- * Supersampled and scaled down rather than rendered at size: these are 64px
- * pictures of a 30,000-triangle aeroplane, and MSAA alone leaves the wing
- * edges and the fin crawling.
+ * Supersampled and scaled down, since MSAA alone leaves thin edges jagged at
+ * this size.
  */
 async function sheet(source, frame, scale) {
   const big = frame * scale
@@ -198,9 +181,9 @@ async function sheet(source, frame, scale) {
 }
 
 /**
- * Steeper than the aircraft tiles' view -- about 40 degrees down rather than
- * 23. The board is read by its arrows and the vehicle by its silhouette, all
- * flat, and all lost to foreshortening from a shallow angle.
+ * About 40 degrees down rather than the aircraft tiles' 23: the board's
+ * arrows and the silhouette are flat and foreshorten badly from a shallow
+ * angle.
  */
 const BOARD_VIEW_DIR = new THREE.Vector3(0, 0.85, 1).normalize()
 
@@ -236,11 +219,7 @@ function arrow(y, faceUp, material) {
   )
 }
 
-/**
- * A top-down airplane lying on the ground, nose forward -- the vehicle the
- * board is mounted in. It replaced a grey disc with a pointer, which said
- * "forward" but not "aircraft".
- */
+/** A flat airplane on the ground, nose forward: the vehicle the board is in. */
 function silhouette() {
   const outline = [
     [24, 3], [25.8, 4.6], [26.9, 7.4], [27.3, 10.5], [27.6, 20], [45, 29], [45, 32.5],
@@ -267,14 +246,9 @@ function silhouette() {
 }
 
 /**
- * The autopilot board: a slab with a forward arrow on each face, the faces told
- * apart by tone -- blue with a white arrow on top, charcoal with a grey arrow
- * underneath.
- *
- * An arrow on both faces, because a board mounted face down still has to say
- * which way it points. Two tones, because with the same color all round, the
- * arrow was the only thing marking the top, and a board turned so its arrow
- * faced away could not be told from one mounted the other way up.
+ * The autopilot board: a slab with a forward arrow on each face, blue with a
+ * white arrow on top and charcoal with a grey arrow underneath, so a board
+ * mounted face down still shows its direction and which side is up.
  */
 function buildBoard() {
   const g = new THREE.Group()
@@ -293,14 +267,9 @@ function buildBoard() {
 }
 
 /**
- * The autopilot board in every fixed AHRS_ORIENTATION, one frame per enum
- * value, so the card can show the setting as a picture beside its dropdown.
- *
- * The board alone rather than mounted in a live aircraft: at card size an
- * airframe with a board inside it was two busy things competing, and the board
- * is the subject. The silhouette under it is the frame of reference, because a
- * board turned 90 degrees and seen from a three-quarter angle is otherwise just
- * the same board from somewhere else.
+ * The board in every fixed AHRS_ORIENTATION, one frame per enum value. The
+ * silhouette underneath is the frame of reference; without it a rotated board
+ * looks like the same board seen from another angle.
  */
 async function boardSheet(frame, scale) {
   const big = frame * scale
@@ -326,10 +295,9 @@ async function boardSheet(frame, scale) {
   const board = buildBoard()
   world.add(board)
 
-  // Every rotation of the board (0.63 at most) and the silhouette's tail
-  // (0.81) sit within this radius of a point just below the board, so one
-  // distance frames all 44 -- as close as that allows, because at card size
-  // the board is the part that has to read.
+  // Every board rotation (0.63 at most) and the silhouette's tail (0.81) fit
+  // within this radius of a point just below the board, so one distance
+  // frames all 44 as tightly as possible.
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100)
   const distance = 0.86 / Math.sin((camera.fov * Math.PI) / 360)
   camera.position.copy(BOARD_VIEW_DIR.clone().multiplyScalar(distance))

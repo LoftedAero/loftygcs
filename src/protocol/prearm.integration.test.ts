@@ -1,9 +1,7 @@
 // @vitest-environment node
 //
-// The distiller against ArduPilot's own words. The strings in prearm.test.ts
-// were taken from AP_Arming; this proves a live vehicle says things of that
-// shape and that they survive the round trip. Start SITL (npm run sitl),
-// then SITL=1 npm test.
+// The prearm distiller against a live vehicle's messages. Start SITL
+// (npm run sitl), then SITL=1 npm test.
 import { describe, expect, it } from 'vitest'
 import type net from 'node:net'
 import { connectSitl } from '../test-fixtures/sitl-client'
@@ -19,8 +17,6 @@ describe.runIf(process.env.SITL === '1')('prearm reasons from SITL', () => {
       if (o.t === 'tx') socket?.write(o.bytes)
       else if (o.t === 'evt') events.push(o.evt)
     })
-    // Retried: the runner relaunches SITL between files, and connecting
-    // into that gap is a race, not a result.
     socket = await connectSitl()
     socket.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
     engine.start()

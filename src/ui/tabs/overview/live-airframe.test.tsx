@@ -3,15 +3,11 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 
-// The live half of the airframe easter egg: a boot banner has to reach the
-// model the Overview draws. The store latch and the frame matcher have
-// their own tests; what this covers is the wiring between them and the
-// view, which is the part that silently does nothing when a prop is
-// forgotten.
+// A boot banner has to reach the model the Overview draws. The store latch and
+// frame matcher have their own tests; this covers the wiring to the view.
 //
-// VehicleView itself is replaced: it builds a WebGL scene and loads a glTF,
-// neither of which jsdom has, and the question here is only which airframe
-// it was handed.
+// VehicleView is mocked: it needs WebGL, which jsdom lacks, and the question
+// here is only which airframe it is handed.
 
 const seen: { vehicle?: string; airframe?: string | null | undefined }[] = []
 
@@ -25,11 +21,9 @@ vi.mock('../../components/VehicleView', () => ({
 beforeEach(() => {
   seen.length = 0
   useVehicleStore.getState().reset()
-  // The panel draws no model at all without a vehicle, so every case about
-  // *which* model it draws needs one connected first.
+  // The panel draws no model without a vehicle.
   useConnectionStore.setState({ phase: 'connected' })
-  // The panel's instruments draw to canvases jsdom does not implement; the
-  // noise is not the subject here.
+  // jsdom has no canvas; silence the instruments.
   HTMLCanvasElement.prototype.getContext = (() =>
     null) as unknown as HTMLCanvasElement['getContext']
 })
@@ -49,15 +43,13 @@ describe('the Overview airframe', () => {
     const { default: LiveVehiclePanel } = await import('./LiveVehiclePanel')
     render(<LiveVehiclePanel />)
     expect(screen.getByTestId('vehicle-view').getAttribute('data-airframe')).toBe('none')
-    // And the biplane's CC-BY credit is on screen, because the biplane is
-    // what a plane gets drawn as.
+    // The stock model is the biplane, so its CC-BY credit is shown.
     expect(creditHidden()).toBe(false)
   })
 
   it('draws the F-35B once the vehicle announces itself', async () => {
     const { default: LiveVehiclePanel } = await import('./LiveVehiclePanel')
-    // The line 4.2.2 sends; 4.6.3 words it differently and both are covered
-    // in the matcher's own tests.
+    // 4.2.2's wording; the matcher's tests cover 4.6.3's as well.
     boot('QuadPlane Frame: F-35B')
     render(<LiveVehiclePanel />)
     expect(screen.getByTestId('vehicle-view').getAttribute('data-airframe')).toBe('f35b')
@@ -67,8 +59,7 @@ describe('the Overview airframe', () => {
     const { default: LiveVehiclePanel } = await import('./LiveVehiclePanel')
     boot('QuadPlane initialised, Frame: F-35B')
     render(<LiveVehiclePanel />)
-    // CC-BY requires the credit to travel with the model. It must not
-    // travel with a model it does not cover.
+    // The CC-BY credit belongs with the biplane only.
     expect(creditHidden()).toBe(true)
   })
 
@@ -76,12 +67,8 @@ describe('the Overview airframe', () => {
     const { default: LiveVehiclePanel } = await import('./LiveVehiclePanel')
     useConnectionStore.setState({ phase: 'idle' })
     render(<LiveVehiclePanel />)
-    // The well stays so the card does not resize on connect, but nothing is
-    // in it: an unidentified vehicle falls back to the fixed wing, so a
-    // model here would announce an aeroplane nobody has connected.
+    // The well stays so the card does not resize on connect, but it is empty.
     expect(screen.queryByTestId('vehicle-view')).toBeNull()
-    // And the CC-BY credit is owed for showing the biplane, so it must not
-    // be on screen when the biplane is not.
     expect(creditHidden()).toBe(true)
   })
 
@@ -89,8 +76,7 @@ describe('the Overview airframe', () => {
     const { default: LiveVehiclePanel } = await import('./LiveVehiclePanel')
     render(<LiveVehiclePanel />)
     expect(seen.at(-1)?.airframe ?? null).toBeNull()
-    // The banner arrives after the panel is already on screen, which is the
-    // ordinary case: the vehicle connects and then introduces itself.
+    // The usual order: the panel is up before the banner arrives.
     boot('QuadPlane Frame: F-35B')
     expect(seen.at(-1)?.airframe).toBe('f35b')
   })

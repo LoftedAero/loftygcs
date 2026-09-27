@@ -1,15 +1,15 @@
-// STM32 ROM bootloader flashing over USB DFU (DfuSe, the ST extension) --
-// how a board with no ArduPilot bootloader gets one -- which is most of them,
-// so this is an ordinary path and not a recovery: hold BOOT0, plug in, and the
-// chip enumerates as 0483:DF11. Same protocol Betaflight's configurator and
-// ArduPilot's Web DFU Loader speak over WebUSB, and **Betaflight's
-// `src/js/protocols/usbdfu.js` is the reference to read before theorising
-// about a stall here** -- it is GPL-3.0 as this is, its comments carry the
-// state-machine and H7 findings that `toIdle` is ported from, and reasoning
-// from this file instead cost several bench power-cycles.
+// STM32 ROM bootloader flashing over USB DFU (DfuSe, ST's extension). This is
+// how a board without an ArduPilot bootloader gets one: hold BOOT0, plug in,
+// and the chip enumerates as 0483:DF11. It is the protocol Betaflight
+// Configurator and ArduPilot's Web DFU Loader use over WebUSB.
 //
-// The class is written against a narrow device interface rather than
-// WebUSB's USBDevice so the whole flow is testable against a scripted fake.
+// `toIdle` is ported from Betaflight Configurator's
+// `src/js/protocols/usbdfu.js` (GPL-3.0, like this file). Its comments
+// document the DFU state-machine and H7 quirks and are the first reference
+// for any stall here.
+//
+// Written against a narrow device interface rather than WebUSB's USBDevice so
+// the flow can be tested against a scripted fake.
 
 export const DFU_VENDOR_ID = 0x0483
 export const DFU_PRODUCT_ID = 0xdf11
@@ -25,8 +25,7 @@ const DFU_ABORT = 6
 const CMD_SET_ADDRESS = 0x21
 const CMD_ERASE = 0x41
 
-// DFU states. Which request brings a device back to idle depends on which
-// of these it is in, so they are no longer "the ones we care about".
+// DFU states. Which request returns a device to idle depends on its state.
 const dfuIDLE = 2
 const dfuDNBUSY = 4
 const dfuDNLOAD_IDLE = 5
@@ -36,13 +35,12 @@ const dfuERROR = 10
 /** Bound on `toIdle`'s polling, so a bootloader that never settles errors. */
 const MAX_IDLE_POLLS = 100
 
-// The most this code will send in one DNLOAD, whatever a device claims it
-// can take. The device's own `wTransferSize` is the real limit and is almost
-// always smaller; this is only a ceiling.
+// Upper bound on one DNLOAD. The device's `wTransferSize` is the real limit
+// and is usually smaller.
 const MAX_TRANSFER_SIZE = 2048
 
-// What to use when a device does not tell us. 1024 is the DFU functional
-// descriptor's most common value and is accepted by every STM32 ROM loader.
+// Used when a device does not report wTransferSize; every STM32 ROM loader
+// accepts 1024.
 const SAFE_TRANSFER_SIZE = 1024
 
 export interface DfuDevice {
@@ -53,18 +51,10 @@ export interface DfuDevice {
   /** The DfuSe interface name string, e.g. "@Internal Flash /0x08000000/04*016Kg,…". */
   memoryLayoutString(): string
   /**
-   * `wTransferSize` from the device's DFU functional descriptor.
-   *
-   * **Not a tuning knob -- a limit the device sets.** DFU 1.1 §6.1.1: the
-   * host may not send a DNLOAD payload larger than this. Sending more is not
-   * merely inefficient, it stalls the endpoint, and an STM32 in ROM DFU then
-   * latches into dfuERROR and refuses everything afterwards -- including
-   * CLRSTATUS -- until it is power-cycled. Measured on the bench against an
-   * H7 that reports 1024 while this code sent 2048: the first data block
-   * stalled, and the board stayed unusable across app restarts.
-   *
-   * Optional because a device that will not tell us is served by
-   * `SAFE_TRANSFER_SIZE` rather than by a guess in the caller.
+   * `wTransferSize` from the device's DFU functional descriptor. DFU 1.1
+   * §6.1.1 forbids a larger DNLOAD payload; an STM32 in ROM DFU that receives
+   * one stalls, latches into dfuERROR and refuses everything, CLRSTATUS
+   * included, until power-cycled. Absent means `SAFE_TRANSFER_SIZE`.
    */
   transferSize?: number | undefined
 }
@@ -108,7 +98,7 @@ export class DfuseFlasher {
     private cb: DfuCallbacks = {},
   ) {}
 
-  /** The device's own limit, floored at ours; never larger than it allows. */
+  /** The device's limit, capped at ours. */
   private get chunkSize(): number {
     const reported = this.device.transferSize ?? 0
     return reported > 0 ? Math.min(reported, MAX_TRANSFER_SIZE) : SAFE_TRANSFER_SIZE
@@ -146,26 +136,19 @@ export class DfuseFlasher {
   }
 
   /**
-   * Bring the device to dfuIDLE by sending the request its *current* state
-   * asks for -- never a fixed pair of requests.
+   * Bring the device to dfuIDLE with the request its current state calls for.
    *
    * Ported from Betaflight Configurator's `src/js/protocols/usbdfu.js`
-   * (GPL-3.0, as is this file), whose comments carry two findings that cost
-   * this bench three power cycles to half-rediscover:
+   * (GPL-3.0, as is this file):
    *
-   * - **CLRSTATUS outside dfuERROR is not harmless.** Older ST/AT32/GD32
-   *   ROMs tolerate it; a strict one STALLs it, exactly per spec. Their note
-   *   says it "aborted the flash right at the start of the verify phase
-   *   (device was in dfuDNLOAD_IDLE after writing)" -- which is the failure
-   *   measured here, to the phase. From a download- or upload-idle state the
-   *   correct request is ABORT.
-   * - **Some H7 ROMs wedge in dfuDNBUSY after an erase** and never settle,
-   *   so polling alone hangs forever. STM32CubeProgrammer unsticks them with
-   *   an undocumented CLRSTATUS pair: the first answers errUNKNOWN/dfuERROR,
-   *   the second OK/dfuIDLE. That is only correct for a caller that has
-   *   already waited out the device's own reported poll timeout, so it is
-   *   opt-in via `busyIsStuck` rather than done to every busy device -- a
-   *   strict ROM must never be sent a CLRSTATUS it would rightly STALL.
+   * - CLRSTATUS is only for dfuERROR. Older ST/AT32/GD32 ROMs tolerate it
+   *   elsewhere, but a strict ROM stalls it per spec. From download-idle or
+   *   upload-idle the correct request is ABORT.
+   * - Some H7 ROMs wedge in dfuDNBUSY after an erase. STM32CubeProgrammer
+   *   unsticks them with an undocumented CLRSTATUS pair (the first answers
+   *   errUNKNOWN/dfuERROR, the second OK/dfuIDLE). That is opt-in via
+   *   `busyIsStuck`, for callers that have already waited out the device's
+   *   poll timeout, since a strict ROM would stall it.
    */
   private async toIdle({ busyIsStuck = false } = {}): Promise<void> {
     for (let poll = 0; poll < MAX_IDLE_POLLS; poll++) {
@@ -212,19 +195,10 @@ export class DfuseFlasher {
     const total = segments.reduce((a, s) => a + s.data.length, 0)
     let written = 0
     for (const seg of segments) {
-      // The pointer is set once, then the device walks it as wBlockNum counts
-      // up from the DFU-mandated 2 -- the same shape as the read-back, and
-      // Betaflight's.
-      //
-      // This used to re-send the address before every chunk, on the theory
-      // that it was immune to block-counter disagreements across ROM
-      // revisions. What it was actually immune to never came up; the cost
-      // did. A DfuSe command is a DNLOAD, so the device goes dnbusy and
-      // reports a poll timeout for it exactly as it does for a real write --
-      // meaning every block paid **two** busy-waits, one of them for an
-      // address-pointer write that touches no flash. Measured on an H7:
-      // 1,634 blocks at 151 ms each, 247 s for 1.6 MB, against a read-back
-      // of the same bytes over the same bus in 8 s.
+      // Set the pointer once per segment; the device advances it as wBlockNum
+      // counts up from the DFU-mandated 2. Re-sending it per chunk would cost
+      // a second busy-wait per block, because a DfuSe command is itself a
+      // DNLOAD with its own poll timeout.
       await this.toIdle()
       await this.command(CMD_SET_ADDRESS, seg.address)
       let block = 2
@@ -232,10 +206,8 @@ export class DfuseFlasher {
       for (let offset = 0; offset < seg.data.length; offset += this.chunkSize) {
         const chunk = seg.data.subarray(offset, Math.min(offset + this.chunkSize, seg.data.length))
         const at = seg.address + offset
-        // A failure here says *where*. A write that stalls part way through
-        // 1,633 blocks is the hard kind to diagnose -- the device latches
-        // into dfuERROR and has to be power-cycled before anything can be
-        // asked again, so each guess costs a physical trip to the bench.
+        // Report where a write failed: after a stall the device latches into
+        // dfuERROR and needs a power cycle before it can be queried again.
         try {
           await this.device.controlOut(DFU_DNLOAD, block++, chunk)
           await this.waitReady()
@@ -254,43 +226,33 @@ export class DfuseFlasher {
   }
 
   /**
-   * Read the flash back and compare it byte for byte.
+   * Read the flash back and compare it byte for byte. This is the only
+   * evidence the write happened: ST's AN3156 says "No error is returned when
+   * performing Erase operations on write protected sectors", so a protected
+   * board acks everything and keeps its old firmware.
    *
-   * This is not belt-and-braces, it is the only evidence the write happened.
-   * ST's own AN3156 says of the erase command: *"No error is returned when
-   * performing Erase operations on write protected sectors"* -- so a clean
-   * run of acks proves nothing at all about a protected board, which will
-   * answer yes to everything and boot the firmware it already had.
-   * Betaflight's configurator verifies unconditionally for the same reason.
-   *
-   * The read is addressed the way `program` writes: set the pointer, drop
-   * back to dfuIDLE (an upload is only served from there), then block 2
-   * reads from the pointer.
+   * Addressed like `program`: set the pointer, return to dfuIDLE (uploads are
+   * only served from there), then read from block 2.
    */
   async verify(segments: { address: number; data: Uint8Array }[]): Promise<void> {
     this.cb.onPhase?.('verify')
     const total = segments.reduce((a, s) => a + s.data.length, 0)
     let checked = 0
     for (const seg of segments) {
-      // Reading is entered once per segment, not once per block: idle, then
-      // set the pointer, then idle again -- Betaflight's exact order, and
-      // the order this got wrong. Writing leaves the device in dnload-idle,
-      // where a DfuSe command (itself a DNLOAD) is what a strict ROM stalls;
-      // reaching dfuIDLE *first* is what makes the pointer write legal.
+      // Idle, set the pointer, idle again (Betaflight's order). Writing
+      // leaves the device in dnload-idle, where a strict ROM stalls a DfuSe
+      // command, so it has to reach dfuIDLE before the pointer write.
       await this.toIdle()
       await this.command(CMD_SET_ADDRESS, seg.address)
       await this.toIdle()
-      // The device walks its own pointer from there, one transfer per block,
-      // which is why wBlockNum counts up from the DFU-mandated 2 instead of
-      // the address being re-sent for every chunk.
+      // The device advances its pointer as wBlockNum counts up from 2.
       let block = 2
 
       for (let offset = 0; offset < seg.data.length; offset += this.chunkSize) {
         const want = seg.data.subarray(offset, Math.min(offset + this.chunkSize, seg.data.length))
         const at = seg.address + offset
-        // A transport failure among 1,633 reads is indistinguishable from
-        // every other unless it says where it happened: a stall on the first
-        // is a different bug from a stall half way through.
+        // Say where a read failed; a stall on the first block and one half
+        // way through are different bugs.
         let got: Uint8Array
         try {
           got = await this.device.controlIn(DFU_UPLOAD, block++, want.length)
@@ -322,9 +284,7 @@ export class DfuseFlasher {
   async leave(entryAddress: number): Promise<void> {
     this.cb.onPhase?.('leave')
     // The read-back leaves the device in dfuUPLOAD_IDLE, and a DfuSe command
-    // is itself a DNLOAD -- the same illegal transition that stalled the
-    // start of verify, one step later. Betaflight's `leave()` opens with
-    // clearStatus for exactly this reason. Reach dfuIDLE first.
+    // is a DNLOAD, so reach dfuIDLE first (as Betaflight's `leave()` does).
     await this.toIdle()
     await this.command(CMD_SET_ADDRESS, entryAddress)
     await this.device.controlOut(DFU_DNLOAD, 0)
@@ -334,9 +294,8 @@ export class DfuseFlasher {
   }
 
   /**
-   * `verify` is an option only so that a board whose ROM will not serve an
-   * upload can still be flashed; it defaults on, and turning it off means
-   * the run can no longer tell success from a write-protected no-op.
+   * `verify` can be turned off only for a ROM that will not serve an upload;
+   * without it a write-protected no-op looks like success.
    */
   async flash(
     segments: { address: number; data: Uint8Array }[],

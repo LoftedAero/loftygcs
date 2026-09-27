@@ -6,10 +6,8 @@ import { describePort, hex, usbIds } from './SerialChooserModal'
 
 describe('hex', () => {
   it('reads the decimal Electron actually sends', () => {
-    // Chromium stores these as uint16 and Electron stringifies them, so the
-    // ArduPilot vendor id 0x1209 arrives as "4617". Reading it as hex would
-    // print 1209 -- right by luck for that one id and wrong for every other,
-    // which is worse than printing nothing.
+    // Electron passes the uint16 ids as decimal strings: 0x1209 arrives as
+    // "4617".
     expect(hex('4617')).toBe('1209')
     expect(hex('22337')).toBe('5741')
     expect(hex('1155')).toBe('0483')
@@ -43,8 +41,7 @@ describe('describePort', () => {
   })
 
   it('names the DFU bootloader, which reports itself uselessly', () => {
-    // The app already recognises these ids to offer a recovery flash; a board
-    // in DFU shows up as a bare "STM32 BOOTLOADER" and looks like a mistake.
+    // A board in DFU otherwise shows up as a bare "STM32 BOOTLOADER".
     expect(
       describePort({ ...base, vendorId: '1155', productId: '57105', displayName: 'STM32' }),
     ).toMatch(/DFU bootloader/)

@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { fetchParamMetadata } from './param-metadata'
 
-// Against the real autotest.ardupilot.org, because the thing most likely to
-// break here is not the parsing -- that has its own tests against a copied
-// fixture -- but the *paths*. The versioned tree spells vehicles differently
-// from the current one, publishes only XML where the current one publishes
-// only JSON, and none of that is written down anywhere we control.
+// Runs against the real autotest.ardupilot.org to catch path changes. The
+// versioned tree spells vehicles differently from the current one and
+// publishes XML where the current one publishes JSON. Parsing has its own
+// fixture tests.
 //
-// Skipped unless asked for, the same as the SITL and video suites:
+// Skipped unless requested:
 //   NET=1 npm test
 
 const live = process.env.NET === '1' ? describe : describe.skip

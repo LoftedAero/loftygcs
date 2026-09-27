@@ -21,22 +21,16 @@ import {
   screenGrid,
 } from './osd-layout'
 
-// The whole OSD tab: panel toggles left, screen preview center, global
-// settings right -- Betaflight's arrangement, which exists to put everything
-// on one screen without scrolling. The list scrolls inside its own pane and
-// the preview is capped by viewport height so the rest never moves.
+// The OSD tab: panel toggles left, screen preview center, settings right,
+// Betaflight's arrangement for fitting everything on one screen. The list
+// scrolls in its own pane and the preview is capped by viewport height.
 //
-// Mission Planner's OSD tool is the reference for *what* is configurable --
-// four screens, the same sixty-five panels, the same parameters underneath --
-// but not for how it is edited: it offers a table of X/Y spinners beside a
-// preview. Panels are dragged on the preview itself here, and the spinners
-// are kept for the selected panel, where they are useful for exact placement
-// rather than being the only way to move anything. The one thing not taken
-// from Betaflight is its per-screen checkbox columns: ArduPilot's four
-// screens are whole layouts, so they are picked one at a time.
+// Panels are dragged on the preview; the X/Y spinners are kept for exact
+// placement of the selected panel. ArduPilot's four screens are whole
+// layouts, so they are picked one at a time rather than as Betaflight's
+// per-screen checkbox columns.
 //
-// Everything here stages through the parameter store, so an edit is a dirty
-// parameter like any other and the action bar's Write is what sends it.
+// Edits stage through the parameter store like any other parameter.
 
 const MSP_TYPES = new Set([3, 5]) // MSP and MSP_DISPLAYPORT
 
@@ -55,11 +49,10 @@ export default function OsdWorkspace() {
   const grid = screenGrid(osdType, txtRes)
   const hdWanted = txtRes !== undefined && txtRes > 0
 
-  // An off screen has no panels to lay out -- the vehicle does not report
-  // them. Measured on ArduPlane 4.7.1: with OSD2_ENABLE at 0 it reports seven
-  // OSD2_ parameters, and the only panel among them is Link quality, which
-  // sits outside the table the enable hides. Listed as it came, the screen
-  // offered one lone toggle. Set to 1, all sixty panels arrive, live.
+  // A disabled screen's panels are not reported. With OSD2_ENABLE at 0,
+  // ArduPlane 4.7.1 still reports Link quality (it sits outside the table the
+  // enable hides), so the screen is treated as empty rather than listing one
+  // lone panel. Enabling it brings all sixty in live.
   const enableParam = `OSD${screen}_ENABLE`
   const screenOff = (entries.get(enableParam)?.value ?? 1) === 0
   const placements = useMemo(
@@ -85,13 +78,8 @@ export default function OsdWorkspace() {
     if (on) setSelectedId(id)
   }
 
-  // The page draws itself with the OSD off, and did not: with OSD_TYPE at 0
-  // this returned a lone card saying the firmware exposes no panels, which
-  // replaced the whole workspace -- *including* the column holding the one
-  // control that turns the OSD on. The state hid its own fix, and the only
-  // way out was the Parameters table. Everything renders now; what changes
-  // is that nothing can be edited until the OSD is on, which is also the
-  // truth about the vehicle: with no backend there is nothing to lay out.
+  // With the OSD off the page still renders, disabled, so the column's
+  // OSD_TYPE control stays reachable.
   const osdOff = !osdType
 
   // The screen's own settings, in the order the dialog shows them. The font
@@ -111,11 +99,9 @@ export default function OsdWorkspace() {
     }
   }
 
-  // One line for whatever is wrong with the layout, worst first: a panel that
-  // will not be drawn at all outranks two that overlap, which outranks a grid
-  // the backend ignores. As three hints mounted under the preview they each
-  // grew the card as they came and went, and the preview is height-capped
-  // against chrome this file's CSS assumes is fixed.
+  // One line for the worst layout problem: panels off the grid, then
+  // overlaps, then a grid the backend ignores. One line keeps the card's
+  // height fixed, which the preview's height cap depends on.
   const layoutStatus =
     offGrid.size > 0
       ? `${offGrid.size} panel${offGrid.size === 1 ? '' : 's'} outside ${grid.label}`
@@ -125,9 +111,7 @@ export default function OsdWorkspace() {
           ? 'HD grid needs the MSP DisplayPort OSD type'
           : ''
 
-  // Alphabetical inside each group. The catalog is written in a rough
-  // reading order, which is fine for a spec and useless for finding one
-  // panel among sixty-five.
+  // Alphabetical within each group, to make one of sixty-five easy to find.
   const byGroup = new Map<OsdGroup, typeof placements>()
   for (const p of placements) {
     const list = byGroup.get(p.item.group) ?? []
@@ -180,8 +164,7 @@ export default function OsdWorkspace() {
                 {layoutStatus}
               </span>
             )}
-            {/* The fix for the worst of those states, as an ordinary action
-                rather than a link inside a red message. */}
+            {/* The fix for off-grid panels. */}
             {offGrid.size > 0 && (
               <LaButton variant="secondary" disabled={osdOff} onClick={bringBack}>
                 Bring panels on screen
@@ -217,18 +200,13 @@ export default function OsdWorkspace() {
                 </label>
               )
             })}
-            {/* Beside the picker, because it answers for the screen picked
-                there -- and because turning a screen on is what gives the
-                list and the preview anything to show. */}
+            {/* Beside the picker, since it applies to the screen picked there. */}
             {entries.has(enableParam) && <ScreenEnable param={enableParam} disabled={osdOff} />}
           </div>
           <div className="la-row osd-toolbar__right">
-            {/* A choice only where it is one. ArduPilot draws the HD grids
-                over MSP DisplayPort alone; on any other backend the dropdown
-                offered 50x18 and 60x22, the choice was stored, and the preview
-                -- rightly -- stayed 30x16, which read as the page ignoring it.
-                A stored HD value on another backend is still named, by the
-                title row's status. */}
+            {/* ArduPilot draws the HD grids only over MSP DisplayPort, so the
+                resolution is a choice only there. A stored HD value on another
+                backend is reported by the title row's status. */}
             {entries.has(txtResParam) && osdType === TYPE_MSP_DISPLAYPORT ? (
               <label className="la-row osd-toolbar__res">
                 <span className="la-field__label">Grid</span>
@@ -246,8 +224,7 @@ export default function OsdWorkspace() {
                 </LaSelect>
               </label>
             ) : (
-              // The same shape as the selectable case: a label and a value,
-              // rather than the grid's size in the slot units go in.
+              // Same shape as the selectable case: a label and a value.
               <span className="la-row osd-toolbar__res">
                 <span className="la-field__label">Grid</span>
                 <LaReadout placeholder="—" value={grid.label} />
@@ -256,11 +233,7 @@ export default function OsdWorkspace() {
           </div>
         </div>
 
-        {/* Picking an HD grid does nothing on its own -- ArduPilot draws the
-            wider grids only over MSP DisplayPort -- which the title row says.
-            No second control offering to change OSD_TYPE: the Display card in
-            the column already carries that parameter. */}
-        {/* The box the preview is fitted into -- see `.osd-screen-fit`. */}
+        {/* The box the preview is fitted into; see `.osd-screen-fit`. */}
         <div className="osd-screen-fit">
           <OsdScreen
             grid={grid}
@@ -270,8 +243,7 @@ export default function OsdWorkspace() {
             offGrid={offGrid}
             showNtscGuide={osdType !== TYPE_MSP_DISPLAYPORT}
             disabled={osdOff || screenOff}
-            // With nothing to lay out, the Panels card says what to do; the
-            // preview's own "turn panels on" would point at an empty list.
+            // With nothing to lay out, the Panels card explains why.
             {...(osdOff || screenOff ? { emptyText: null } : {})}
             onSelect={setSelectedId}
             onMove={move}
@@ -295,17 +267,15 @@ export default function OsdWorkspace() {
         <OsdSettings
           title="Display"
           fields={[
-            // Written as soon as it is picked, not staged: with OSD_TYPE at
-            // 0 the vehicle reports no panel positions at all, so staging it
-            // leaves this page empty however many times you choose a
-            // backend. The write is followed by a quiet re-read, which is
-            // where the panel parameters come from.
+            // Written immediately, not staged: at 0 the vehicle reports no
+            // panel positions, and the quiet re-read after the write is what
+            // brings them in.
             {
               param: 'OSD_TYPE',
               label: 'OSD type',
               writeNow: true,
               gatesOthers: true,
-              // The one name too long for the column's box.
+              // The full name is too long for the column's box.
               optionLabels: { 5: 'DisplayPort' },
             },
             { param: 'OSD_UNITS', label: 'Units' },
@@ -313,13 +283,9 @@ export default function OsdWorkspace() {
             { param: 'OSD_OPTIONS', label: 'Options' },
           ]}
         />
-        {/* Everything about screens in one place: which channel switches them,
-            how, and the picked screen's own settings. The channel was not on
-            the page at all, so the method and the PWM bands could be set with
-            nothing to act on. The screen's settings sit behind a dialog as
-            Outputs' ESC settings do -- set once per screen and rarely again,
-            they were three rows of the column for values mostly left at their
-            defaults. Its enable is beside the screen picker instead. */}
+        {/* Screen switching: which channel, how, and the picked screen's own
+            settings. Those are set rarely, so they sit behind a dialog, as
+            Outputs' ESC settings do. */}
         <OsdSettings
           title="Screen controls"
           fields={[
@@ -327,9 +293,8 @@ export default function OsdWorkspace() {
             {
               param: 'OSD_SW_METHOD',
               label: 'Method',
-              // ArduPilot's names are sentences; each short name is the part
-              // that tells them apart, short enough for the column's box. The
-              // sentence is the hover text.
+              // ArduPilot's names are sentences; short names fit the column,
+              // and the sentence is the hover text.
               optionLabels: { 0: 'On change', 1: 'PWM range', 2: 'On high' },
             },
           ]}
@@ -373,10 +338,9 @@ const SCREEN_LABELS: Record<string, { label: string; unit?: string }> = {
 }
 
 /**
- * One screen's own settings, in a dialog with its own Revert and Write --
- * Outputs' ESC settings dialog, in the same shape and for the same reason:
- * edits staged here and written from a button that does not show them are
- * edits nobody can see. Close is absent while anything here is unwritten.
+ * One screen's own settings, in a dialog with its own Revert and Write, like
+ * Outputs' ESC settings, so edits are not left staged out of sight. Close is
+ * hidden while anything here is unwritten.
  *
  * The PWM band only matters when screens are switched by PWM range
  * (OSD_SW_METHOD 1); ESC index picks which ESC's telemetry the ESC panels
@@ -434,12 +398,9 @@ function ScreenSettingsModal({
 /**
  * A screen's enable, written as it is flipped.
  *
- * Like `OSD_TYPE` it gates what the page can show -- an off screen's panels
- * are not reported, and enabling it brings all sixty in at once, no restart
- * -- so it writes on change and then re-reads, rather than staging behind
- * Write and leaving the list empty until someone reloads. A switch is its own
- * commit gesture, as Outputs' Reversed switch is; the same tick answers it,
- * and a write that does not land stays staged for the column's Write.
+ * Like `OSD_TYPE` it gates what the page can show (a disabled screen's
+ * panels are not reported), so it writes on change and then re-reads rather
+ * than staging. A failed write stays staged for the column's Write.
  */
 function ScreenEnable({ param, disabled }: { param: string; disabled: boolean }) {
   const entry = useParamStore((s) => s.entries.get(param))
@@ -478,10 +439,8 @@ function ScreenEnable({ param, disabled }: { param: string; disabled: boolean })
 /**
  * The selected panel's exact placement.
  *
- * One row, always drawn: with nothing selected this was a line of instructions
- * instead, so the card -- and the preview above it -- changed height on every
- * selection. The controls switch off rather than disappearing, which is the
- * same rule the OSD-off state follows.
+ * One row, always drawn so the card's height does not change with the
+ * selection. With nothing selected the controls are disabled.
  */
 function SelectionDetail({
   selected,
@@ -508,7 +467,7 @@ function SelectionDetail({
       <div className="la-row la-row--between la-row--wrap">
         <strong className="osd-selection__name">
           {item ? item.label : 'No panel selected'}
-          {/* In the row rather than under it, so saying so costs no height. */}
+          {/* In the row rather than under it, so it adds no height. */}
           {mspGap && <span className="la-muted"> · drawn only on an MSP OSD</span>}
         </strong>
         <div className="la-row">
@@ -536,8 +495,6 @@ function SelectionDetail({
               onChange={(e) => item && onMove(item.id, x, Number(e.target.value))}
             />
           </label>
-          {/* The ordinary button size, as every other button on the page:
-              the small one stood a size down from the boxes beside it. */}
           <LaButton variant="ghost" disabled={off} onClick={() => item && onDisable(item.id)}>
             Remove
           </LaButton>

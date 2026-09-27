@@ -5,14 +5,8 @@ import { useVehicleStore } from '../../stores/vehicle-store'
 import { useConnectionStore } from '../../stores/connection-store'
 import { SENSOR_BITS } from '../../protocol/sensors'
 
-// The bar draws nothing it cannot stand behind.
-//
-// This is the property the whole change rests on, and it is the one a
-// screenshot cannot pin: the element this replaced always rendered, so it
-// always had to say *something*, which is how a 691px box came to hold the
-// words "Not connected". Both references remove their status instead --
-// QGroundControl instantiates no vehicle indicators without a vehicle,
-// Betaflight sets its cluster to `display: none`.
+// With no vehicle the status row is not drawn at all, as in QGroundControl
+// and Betaflight.
 
 const connected = (patch: Record<string, unknown> = {}) =>
   act(() => {
@@ -44,27 +38,23 @@ describe('the app bar status row', () => {
   })
 
   it('draws GPS even on a vehicle that has none', () => {
-    // The reversal that matters. These were gated on the SYS_STATUS present
-    // mask, so a flight controller with no GPS had no GPS reading at all --
-    // which tells a pilot nothing and reads as a layout fault. "No GPS" is
-    // the reading that decides whether the position modes can be flown.
+    // Not gated on the SYS_STATUS present mask: "No GPS" is itself a reading,
+    // and it decides whether the position modes can be flown.
     connected({ sensorsPresent: SENSOR_BITS.prearm, gpsFix: 0, gpsSats: 0 })
     render(<AppStatus />)
     expect(screen.getByText('No GPS')).toBeTruthy()
   })
 
   it('keeps the same set of readings whatever the vehicle carries', () => {
-    // No battery monitor, no GPS, no RC. All five are still drawn, so the
-    // row is one shape across aircraft rather than one per sensor fit.
+    // No battery monitor, no GPS, no RC. All five are still drawn.
     connected({ sensorsPresent: SENSOR_BITS.prearm, batteryV: 0, batteryPct: -1, rcRssi: -1 })
     const { container } = render(<AppStatus />)
     expect(container.querySelectorAll('.app-status__item')).toHaveLength(5)
   })
 
   it('draws the firmware slot before the vehicle has reported a version', () => {
-    // AUTOPILOT_VERSION arrives a beat after the heartbeat. The slot has to
-    // be there already, holding a dash: appearing later would shove the four
-    // gauges sideways exactly as someone starts reading them.
+    // AUTOPILOT_VERSION arrives after the heartbeat. The slot holds a dash
+    // until then so the gauges do not shift.
     connected({ sensorsPresent: SENSOR_BITS.prearm })
     const { container } = render(<AppStatus />)
     const fw = container.querySelector('.app-status__item--firmware .app-status__val')
@@ -72,8 +62,7 @@ describe('the app bar status row', () => {
   })
 
   it('shows a dash rather than a zero for a reading the vehicle has not made', () => {
-    // 0.0V is what a monitor reading a dead pack shows too. A vehicle that
-    // never reported one must not be drawn as one that did.
+    // A value never reported is a dash, not 0.0V (a dead pack).
     connected({ sensorsPresent: SENSOR_BITS.prearm, batteryV: 0, batteryA: 0, batteryPct: -1 })
     const { container } = render(<AppStatus />)
     const battery = container.querySelector('.app-status__item--battery .app-status__val')
@@ -92,8 +81,7 @@ describe('the app bar status row', () => {
   })
 
   it('is only a button when there is a vehicle to explain', () => {
-    // The chip routes to the preflight checks. With no vehicle there are
-    // none, so it must not offer the trip.
+    // The chip links to the preflight checks, which need a vehicle.
     act(() => useConnectionStore.setState({ phase: 'handshaking' }))
     const { container, rerender } = render(<AppStatus />)
     expect(container.querySelector('button')).toBeNull()

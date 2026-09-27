@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useCalStore, orientationDone } from './cal-store'
 import { TURNS_REQUIRED } from '../protocol/cal-orientation'
 
-// Turning the vehicle is what completes a tile, and "turning" is an integral
-// of a rate over time. These drive the store with a clock so the arithmetic
-// is pinned rather than eyeballed against a real vehicle.
+// A tile completes on turns, the integral of a rate over time. These drive
+// the store with a fake clock to pin the arithmetic.
 
 const feed = (opts: {
   roll?: number
@@ -40,9 +39,8 @@ describe('counting turns in each attitude', () => {
     // π rad/s for 2 s is one turn: not enough.
     feed({ rate: { yawRateRad: Math.PI }, seconds: 2 })
     expect(orientationDone(useCalStore.getState().magCal, 'level')).toBe(false)
-    // Another 0.8 of a turn takes it past the threshold but not to two, which
-    // is the slack TURNS_REQUIRED exists for: the vehicle is regularly
-    // satisfied before the second rotation is quite finished.
+    // Another 0.8 of a turn passes the threshold short of two: TURNS_REQUIRED
+    // leaves slack because the vehicle is often satisfied before then.
     feed({ rate: { yawRateRad: Math.PI }, seconds: 1.6, from: 100000 })
     const turns = useCalStore.getState().magCal.turns.level ?? 0
     expect(orientationDone(useCalStore.getState().magCal, 'level')).toBe(true)
@@ -51,9 +49,8 @@ describe('counting turns in each attitude', () => {
   })
 
   it('marks every tile done once the vehicle has the samples it wants', () => {
-    // The complaint this fixes: the calibration completes while two tiles
-    // still read "to do", so the screen goes on asking for turns that no
-    // longer matter. The vehicle is the judge; these tiles are a guess.
+    // The vehicle decides when calibration is done; the tiles are only an
+    // estimate and must not keep asking for turns afterward.
     feed({ rate: { yawRateRad: Math.PI }, seconds: 1 })
     expect(orientationDone(useCalStore.getState().magCal, 'tailDown')).toBe(false)
     useCalStore.getState().magCalProgress(0, 100, 3, [], [0, 0, 0])
@@ -61,8 +58,7 @@ describe('counting turns in each attitude', () => {
   })
 
   it('keeps asking while a second compass is still short', () => {
-    // They progress at different rates because they see different parts of
-    // the rotation, so one at 100% is not the procedure being over.
+    // Compasses progress at different rates, so one at 100% does not mean done.
     useCalStore.getState().magCalProgress(0, 100, 3, [], [0, 0, 0])
     useCalStore.getState().magCalProgress(1, 62, 3, [], [0, 0, 0])
     expect(orientationDone(useCalStore.getState().magCal, 'tailDown')).toBe(false)
@@ -88,8 +84,8 @@ describe('counting turns in each attitude', () => {
   })
 
   it('does not credit a gap in the telemetry', () => {
-    // A stream that stalls, or a screen that was away: the vehicle may have
-    // been anywhere, so the interval is dropped rather than integrated.
+    // After a stall the vehicle may have been anywhere, so the gap is dropped
+    // rather than integrated.
     const st = useCalStore.getState()
     st.magCalAttitude(0, 0, { rollRateRad: 0, pitchRateRad: 0, yawRateRad: Math.PI }, 1000)
     st.magCalAttitude(0, 0, { rollRateRad: 0, pitchRateRad: 0, yawRateRad: Math.PI }, 60000)

@@ -1,12 +1,9 @@
 // Opening a video source and turning it into access units.
 //
-// Two kinds, one interface: an RTSP stream (negotiated, then RTP interleaved
-// down the same TCP socket) and a bare UDP port that something is already
-// sending RTP to. RTSP is carried over TCP rather than negotiating a UDP
-// transport because it is one socket instead of three, needs no inbound
-// ports open, and works through the NAT a companion computer usually sits
-// behind. That costs a little latency against raw UDP, which is why the
-// plain `udp://` source exists for setups that stream straight at us.
+// Two kinds behind one interface: an RTSP stream (RTP interleaved on the RTSP
+// TCP socket) and a bare UDP port that something is already sending RTP to.
+// Interleaved TCP is one socket, needs no inbound ports and works through
+// NAT; plain `udp://` is there for setups that want the lower latency.
 
 import net from 'node:net'
 import dgram from 'node:dgram'
@@ -58,8 +55,8 @@ abstract class BaseSource extends EventEmitter implements VideoSource {
     const pkt = parseRtp(datagram)
     if (!pkt) return
     for (const unit of this.depay.push(pkt)) {
-      // The codec string comes from the SPS, so it cannot be announced until
-      // one has been seen -- from the SDP if there was one, in-band if not.
+      // The codec string comes from the SPS, which arrives either in the SDP
+      // or in-band, so it cannot be announced before then.
       if (!this.announced) {
         const { sps } = this.depay.parameterSets()
         const codec = sps ? codecStringFromSps(sps) : null
@@ -83,12 +80,10 @@ class UdpSource extends BaseSource {
     const m = /^udp:\/\/([^:/]*)(?::(\d+))?/i.exec(url)
     const host = m?.[1] || '0.0.0.0'
     const port = Number(m?.[2] ?? 5600)
-    // Deliberately NOT reuseAddr. With it set, binding a port something else
-    // already holds succeeds on Windows and the other socket keeps the
-    // datagrams -- so the app says "Listening" and shows nothing, forever,
-    // with no error to explain it. Failing the bind instead turns a mystery
-    // into a sentence. (Multicast would want the port shared; when we support
-    // it, that is where reuse belongs, alongside joining the group.)
+    // No reuseAddr: on Windows it lets the bind succeed on a port another
+    // socket holds, and that socket keeps the datagrams, so nothing arrives
+    // and nothing reports an error. (Multicast would need reuse, together
+    // with joining the group.)
     this.socket = dgram.createSocket({ type: 'udp4' })
     this.socket.on('message', (msg) => this.feed(new Uint8Array(msg)))
     this.socket.on('error', (err) => {
@@ -119,9 +114,8 @@ class UdpSource extends BaseSource {
 
 class RtspSource extends BaseSource {
   private socket: net.Socket | null = null
-  // Typed loosely so an incoming chunk can be adopted without a copy: the
-  // socket hands us Buffer<ArrayBufferLike>, and at video rates copying
-  // every chunk into a fresh buffer is real work for nothing.
+  // Typed loosely so a Buffer<ArrayBufferLike> chunk from the socket can be
+  // adopted without a copy.
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0)
   private cseq = 1
   private session = ''
@@ -207,9 +201,8 @@ class RtspSource extends BaseSource {
   }
 
   /**
-   * Reads the socket, which carries two interleaved things: RTSP replies as
-   * text, and RTP packets framed with a `$` marker. They have to be pulled
-   * apart byte by byte -- a reply can arrive in the middle of the stream.
+   * Splits the socket into RTSP text replies and `$`-framed RTP packets. A
+   * reply can arrive between any two packets.
    */
   private onData(chunk: Buffer) {
     this.buffer = this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk])
@@ -265,8 +258,8 @@ class RtspSource extends BaseSource {
       })
 
     const first = await send()
-    // A 401 on the first try is normal: the challenge is only known after
-    // the camera sends it, so the request is repeated once with an answer.
+    // A 401 on the first try is expected: the request is repeated once with
+    // an answer to the camera's challenge.
     if (first.status === 401 && !this.challenge) {
       this.challenge = parseChallenge(first.headers['www-authenticate'])
       if (this.challenge && (user || pass)) return send()

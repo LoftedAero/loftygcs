@@ -1,19 +1,18 @@
 import tseslint from 'typescript-eslint'
 import importPlugin from 'eslint-plugin-import'
 
-// The layering rules are the architecture: protocol is environment-agnostic
-// (no DOM, React, Electron, or Node), transport touches protocol only for its
-// types, and the UI reaches the protocol solely through the worker client and
-// stores. Enforcing that here is what keeps the protocol core testable in
-// plain Node and portable between the browser and Electron builds.
+// Layering: protocol is environment-agnostic (no DOM, React, Electron or
+// Node), transport depends only on protocol, and the UI reaches the protocol
+// only through the worker client and stores. This keeps the protocol core
+// testable in plain Node and shared between the browser and Electron builds.
 export default tseslint.config(
   { ignores: ['dist/', 'dist-web/', 'dist-electron/', 'node_modules/'] },
   ...tseslint.configs.recommended,
   {
     plugins: { import: importPlugin },
     rules: {
-      // A leading underscore is the declared way to say "this parameter is
-      // part of an interface I implement but don't need here."
+      // A leading underscore marks a parameter required by an interface but
+      // unused.
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

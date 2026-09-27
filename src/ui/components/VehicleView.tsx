@@ -7,27 +7,17 @@ import f35bUrl from '../../models/f35b.glb?url'
 import type { VehicleClass } from '../../protocol/modes'
 import type { KnownAirframe } from '../../protocol/airframe'
 
-// A live 3D airframe, the way Betaflight's setup tab shows one. Models are
-// Betaflight's own (see src/models/ATTRIBUTION.md).
+// A live 3D airframe, like Betaflight's setup tab. See
+// src/models/ATTRIBUTION.md for the models' sources and licenses.
 //
-// Everything here is imperative on purpose: attitude arrives at telemetry
-// rate, and driving a WebGL scene through React state would spend the whole
-// frame budget on reconciliation. React owns the canvas element; three.js
-// owns everything inside it.
+// Imperative because attitude arrives at telemetry rate. React owns the
+// canvas element; three.js owns everything inside it.
 
 /**
- * Repaints on the stock models, by material name. The biplane ships in
- * fire-engine red; this is the neutral grey of the biplane in the Lofted
- * Aero mark instead.
- *
- * The other three move with it rather than staying as authored: the stock
- * "metal" is a mid grey that would vanish against a grey airframe, and the
- * pale wood propeller would too. Darkening the struts and gear and warming
- * the propeller keeps every part legible against the fuselage, which is the
- * whole reason the model is here.
- *
- * Only the biplane has these material names -- the quad's are all
- * "Material.00N" -- so this cannot bleed into the multirotor.
+ * Repaints the stock biplane by material name: its red body becomes a
+ * neutral grey, and the struts and propeller are adjusted to stay visible
+ * against it. The quad's materials are all "Material.00N", so it is
+ * unaffected.
  */
 const REPAINT: Record<string, number> = {
   body_paint: 0xb4b7bf, // airframe: light neutral grey
@@ -66,10 +56,8 @@ export default function VehicleView({
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100)
 
-    // The model is normalized to a unit bounding sphere and the camera is
-    // pulled back to fit it, recomputed whenever the panel resizes. With a
-    // fixed camera distance instead, a taller panel means more pixels per
-    // world unit and the airframe grows until it is cropped by its own frame.
+    // The model is normalized to a unit bounding sphere, and the camera
+    // distance is recomputed on resize so the model always fits the panel.
     const VIEW_DIR = new THREE.Vector3(0, 0.42, 1).normalize()
     const frameModel = () => {
       const vFov = (camera.fov * Math.PI) / 180
@@ -93,9 +81,7 @@ export default function VehicleView({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     mount.appendChild(renderer.domElement)
 
-    // Lighting chosen so the model reads as a solid object on a light
-    // background without looking like a video game: one key light, one fill,
-    // and enough ambient that nothing goes to black.
+    // One key light, one fill, and enough ambient that nothing goes black.
     scene.add(new THREE.AmbientLight(0xffffff, 2.2))
     const key = new THREE.DirectionalLight(0xffffff, 2.4)
     key.position.set(4, 8, 6)
@@ -115,9 +101,8 @@ export default function VehicleView({
       (gltf) => {
         if (disposed) return
         const model = gltf.scene
-        // Normalize: center on the origin, then scale so the bounding sphere
-        // has radius 1. Both models then frame identically however they were
-        // authored, and the camera maths above needs no per-model constants.
+        // Center on the origin and scale to a unit bounding sphere, so every
+        // model frames the same way.
         const box = new THREE.Box3().setFromObject(model)
         const sphere = box.getBoundingSphere(new THREE.Sphere())
         model.position.sub(sphere.center)
@@ -186,9 +171,8 @@ export default function VehicleView({
       })
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement)
     }
-    // airframe as well as vehicle: the scene is built once per model, and
-    // a vehicle that announces itself as an F-35B after the first frame
-    // would otherwise keep whatever was loaded before it said so.
+    // The airframe can be announced after the first frame, so it rebuilds
+    // the scene too.
   }, [vehicle, airframe])
 
   return <div ref={mountRef} className={className ?? 'vehicle-view'} />

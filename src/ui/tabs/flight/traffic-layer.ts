@@ -2,37 +2,15 @@ import L from 'leaflet'
 import { isClose, targetLabel, type RelativeTarget } from '../../../stores/traffic-store'
 import { distanceLabel, toDistance, type DistanceUnit } from '../../../units'
 
-// Other aircraft on the flying map.
-//
-// Markers rather than a canvas: this is tens of objects that move once a
-// second, not the per-frame path the vehicle's own trail is, and Leaflet's
-// marker layer already handles panning and zoom for free.
-//
-// What a marker has to say, in the order it is read: which way it is
-// pointing, how far above or below you it is, and what it is called. The
-// height is the number that decides whether a contact matters -- a
-// thousand feet of separation is a non-event and two hundred is not -- so
-// it sits beside the symbol rather than in a tooltip nobody opens while
-// flying.
+// Other aircraft on the flying map, as Leaflet markers (tens of objects that
+// move once a second). Each shows its heading, its height relative to this
+// vehicle, and its name, with the height beside the symbol rather than in a
+// tooltip.
 
 /**
- * A plan-view aeroplane, nose along the reported track.
- *
- * Drawn as a silhouette rather than the chevron this started as: on a map
- * already carrying a chevron for this vehicle and pins for the mission, one
- * more arrow is a symbol to decode, where an aeroplane is a thing to
- * recognise. Fuselage, swept wings, tailplane -- enough to read at 26 px and
- * no more, which is all a 26 px symbol can carry.
- *
- * A target with no heading gets a diamond instead: an aeroplane pointing
- * north because nothing said otherwise is a direction invented from missing
- * data, and on a traffic display that is the one thing not to do.
- */
-/**
- * An aeroplane from above, nose at -Y so a plain `rotate(heading)` points it
- * along the track: nose, swept wings back to the trailing edge, a slim tail
- * boom, then the tailplane. Symmetric about X by construction -- an
- * asymmetric aircraft symbol reads as a turn that is not happening.
+ * An aeroplane silhouette from above, nose at -Y so `rotate(heading)` points
+ * it along the track, symmetric about X. A target with no heading gets a
+ * diamond instead, rather than a direction invented from missing data.
  */
 const PLANFORM =
   'M0 -11 L1.6 -6 L1.6 -2 L10 3 L10 5.2 L1.6 3.2 L1.6 7.5 L4 9.6 L4 11 ' +
@@ -40,9 +18,8 @@ const PLANFORM =
 
 function trafficIcon(t: RelativeTarget, unit: DistanceUnit): L.DivIcon {
   const close = isClose(t)
-  // Status colors, used here as status: --la-bad and --la-ink-2. Leaflet
-  // takes colors as options rather than through CSS, so they are literals
-  // and must change with the tokens.
+  // --la-bad and --la-ink-2 as literals, since these are SVG attributes
+  // rather than CSS; keep them in step with the tokens.
   const fill = close ? '#D63031' : '#2D2D2F'
   const shape =
     t.headingDeg !== null
@@ -63,19 +40,9 @@ function trafficIcon(t: RelativeTarget, unit: DistanceUnit): L.DivIcon {
 }
 
 /**
- * How high, in whichever sense there is one -- signed above this vehicle
- * when it knows where it is, and the aircraft's own AMSL figure when it does
- * not. The same rule and the same words as the Traffic list, so the map and
- * the list never disagree about a number.
- *
- * Written in the user's own unit rather than the hundreds-of-feet a
- * transponder display would use. This one started in feet on the grounds
- * that a pilot reads them, which quietly ignored the app's unit preference
- * -- the rule everywhere else here is that a stored number converts at the
- * edge and nowhere else.
- *
- * Blank when nothing is known: "±0" would claim co-altitude, which is
- * exactly the contact worth being sure about before believing.
+ * Height relative to this vehicle when it has a fix, otherwise the aircraft's
+ * own AMSL altitude, in the user's distance unit. Blank when unknown, since
+ * "±0" would claim co-altitude.
  */
 function altLabel(t: RelativeTarget, unit: DistanceUnit): string {
   if (t.relative) {
@@ -96,11 +63,8 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * The traffic markers, updated in place.
- *
- * Keyed on the ICAO address so a moving aircraft keeps its marker rather
- * than being removed and re-added -- which would restart Leaflet's own
- * transitions and make the whole picture flicker once a second.
+ * The traffic markers, updated in place and keyed on ICAO address so a
+ * moving aircraft keeps its marker instead of flickering.
  */
 export class TrafficLayer {
   private group: L.LayerGroup

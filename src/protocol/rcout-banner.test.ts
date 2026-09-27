@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { boardNameFromBanner, groupForChannel, parseRcoutBanner } from './rcout-banner'
 
-// The strings here are what `AP_HAL::RCOutput::append_to_banner` produces --
-// `"%s %s:%u-%u"` per run, `"%s %s:%u"` for a lone channel -- not wording
-// anyone remembered. SITL cannot produce any of them (only the ChibiOS HAL
-// implements the banner), so this is the only place the parser is exercised
-// until it meets a real board.
+// Strings follow `AP_HAL::RCOutput::append_to_banner`: `"%s %s:%u-%u"` per
+// run, `"%s %s:%u"` for a lone channel. SITL cannot produce them (only the
+// ChibiOS HAL implements the banner), so these tests are the parser's only
+// coverage short of a real board.
 
 describe('the RCOut boot banner', () => {
   it('reads the runs a board reports', () => {
@@ -32,9 +31,8 @@ describe('the RCOut boot banner', () => {
   })
 
   it('ignores every other line in the feed', () => {
-    // The store passes the whole status feed through this, exactly as it does
-    // for the Frame: line, so anything else must come back null rather than an
-    // empty banner -- an empty one would overwrite a good reading.
+    // The store passes every status line through this, so anything else must
+    // return null; an empty banner would overwrite a good reading.
     for (const line of [
       'ArduCopter V4.7.1-beta1',
       'Frame: QUAD/PLUS',
@@ -46,8 +44,7 @@ describe('the RCOut boot banner', () => {
   })
 
   it('takes an unfamiliar mode name at face value', () => {
-    // Matching a known list here would drop a protocol added upstream, and the
-    // name is ArduPilot's to choose.
+    // Matching a known list would drop a protocol added upstream.
     const b = parseRcoutBanner('RCOut: SomethingNew:1-2')!
     expect(b.groups).toEqual([{ mode: 'SomethingNew', low: 1, high: 2 }])
   })
@@ -68,8 +65,7 @@ describe('the board name in the boot banner', () => {
   })
 
   it('does not take the other banner lines for one', () => {
-    // The IOMCU line is the dangerous one: hex words, same shape, and it sits
-    // directly above in the same banner.
+    // The IOMCU line has the same shape and sits directly above in the banner.
     for (const line of [
       'IOMCU: 20 1000 12345678',
       'ArduCopter V4.7.1-beta1 (f0a1b2c3)',

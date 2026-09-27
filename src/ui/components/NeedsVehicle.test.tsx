@@ -4,17 +4,10 @@ import { NeedsVehicle } from './ParamCard'
 import { useConnectionStore } from '../../stores/connection-store'
 import { useParamStore } from '../../stores/param-store'
 
-// The placeholder a vehicle-only tab draws. A reboot keeps the user on that
-// tab -- see `holdsVehicleTabs` -- so this is on screen for the seconds the
-// vehicle takes to come back, where it used to be one render before a
-// redirect. The two states say different things because only one of them is
-// the reader's to act on, and neither describes the tab.
-//
-// A third state joined them: a link is back but the parameters are still
-// arriving. Every curated tab is drawn from those, so without it the screen
-// showed this card *beside* cards built from a half-empty set -- and Flight
-// Modes went further and announced that the vehicle had no mode switch, while
-// the download that would disprove it was still running.
+// The placeholder a vehicle-only tab draws. A reboot keeps the user on the
+// tab (see `holdsVehicleTabs`), so this shows while the vehicle comes back.
+// No vehicle, rebooting, and parameters still downloading each say something
+// different; the last keeps tabs from drawing cards from a half-loaded set.
 
 afterEach(() => {
   cleanup()

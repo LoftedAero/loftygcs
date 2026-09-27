@@ -10,16 +10,14 @@ import {
   HEAD2,
 } from './dataflash'
 
-// Tested against a real ArduCopter SITL log rather than one this code wrote
-// itself -- the same discipline the video path uses GStreamer for. A parser
-// checked against its own encoder can only confirm what it already believes,
-// and the two bugs this fixture caught (double-applied scaling, and a
-// multiplier table whose "none" entry is zero) would both have survived that.
+// Tested against a real ArduCopter SITL log rather than one this code wrote,
+// since a parser checked against its own encoder only confirms its own
+// assumptions (such as double-applied scaling, or a multiplier table whose
+// "none" entry is zero).
 //
-// The fixture is the first 192 KiB of a genuine flight log: real FMT/FMTU/
-// UNIT/MULT tables, a full 1370-parameter dump, and telemetry from a copter
-// that took off at Canberra. Truncated because a prefix of a dataflash log is
-// still a dataflash log, which is a property worth having a test for anyway.
+// The fixture is the first 192 KiB of a flight log: real FMT/FMTU/UNIT/MULT
+// tables, a 1370-parameter dump, and telemetry from a copter that took off at
+// Canberra. A prefix of a dataflash log is still a valid log.
 
 const log = parseDataflash(
   new Uint8Array(gunzipSync(readFileSync('src/test-fixtures/copter-sitl.bin.gz'))),
@@ -65,24 +63,24 @@ describe('units and scaling', () => {
   })
 
   it('scales a scaled-integer field exactly once', () => {
-    // ORGN is the EKF origin, and this log's vehicle booted at Canberra --
-    // 584.09 m. Format char 'e' says "int32 * 100" and MULT says 0.01 for
-    // the same field; applying both gives 5.84 m.
+    // ORGN is the EKF origin; this vehicle booted at Canberra, 584.09 m.
+    // Format char 'e' says "int32 * 100" and MULT says 0.01 for the same
+    // field; applying both gives 5.84 m.
     const origin = log.messages.get('ORGN')!
     expect((origin.columns.get('Alt') as Float64Array)[0]).toBeCloseTo(584.09, 2)
   })
 
   it('decodes coordinates to exact degrees', () => {
     // The multiplier is float32 in the file (1.0000000116860974e-7), which
-    // left a millimetre of error on every latitude until it was snapped.
+    // leaves a millimeter of error on every latitude unless snapped.
     const origin = log.messages.get('ORGN')!
     expect((origin.columns.get('Lat') as Float64Array)[0]).toBe(-35.363262)
     expect((origin.columns.get('Lng') as Float64Array)[0]).toBe(149.165237)
   })
 
   it('puts gravity where it belongs, which no amount of unit metadata proves', () => {
-    // The end-to-end check: a stationary copter's Z accelerometer reads
-    // about -9.8 m/s^2. Wrong scaling anywhere upstream moves this.
+    // A stationary copter's Z accelerometer reads about -9.8 m/s^2. Wrong
+    // scaling anywhere upstream moves this.
     const accZ = getSeries(log, 'IMU', 'AccZ')!
     const mean = accZ.values.reduce((a, b) => a + b, 0) / accZ.values.length
     expect(mean).toBeLessThan(-9)
@@ -117,8 +115,7 @@ describe('series for plotting', () => {
 
 describe('surviving a damaged file', () => {
   it('reads a log that stops mid-message', () => {
-    // Which is what a log pulled off a card mid-write looks like, and what
-    // the fixture itself is -- a prefix of a longer flight.
+    // As a log pulled off a card mid-write does.
     const bytes = new Uint8Array(gunzipSync(readFileSync('src/test-fixtures/copter-sitl.bin.gz')))
     const cut = parseDataflash(bytes.subarray(0, bytes.length - 7))
     expect(cut.messages.size).toBe(log.messages.size)
@@ -142,7 +139,7 @@ describe('surviving a damaged file', () => {
     const parsed = parseDataflash(damaged)
     expect(parsed.skippedBytes).toBeGreaterThan(0)
     expect(parsed.problems.join(' ')).toMatch(/did not belong/)
-    // The point: it kept going, and still knows about the whole log.
+    // It kept going and still knows about the whole log.
     expect(parsed.messages.size).toBe(log.messages.size)
   })
 
@@ -159,15 +156,13 @@ describe('summarizing a trace', () => {
     expect(all.count).toBe(roll.values.length)
     expect(all.min).toBeLessThanOrEqual(all.mean)
     expect(all.mean).toBeLessThanOrEqual(all.max)
-    // Gravity again, as the arithmetic check that needs no fixture knowledge.
+    // Gravity again, as an arithmetic check.
     const accZ = seriesStats(getSeries(log, 'IMU', 'AccZ')!, 0, 1e9)
     expect(accZ.mean).toBeGreaterThan(-11)
     expect(accZ.mean).toBeLessThan(-9)
   })
 
   it('summarizes only what is inside the window', () => {
-    // The point of taking a window at all: a maximum from a part of the
-    // flight you have zoomed away from answers a question nobody asked.
     const roll = getSeries(log, 'ATT', 'Roll')!
     const mid = (roll.time[0]! + roll.time[roll.time.length - 1]!) / 2
     const first = seriesStats(roll, roll.time[0]!, mid)

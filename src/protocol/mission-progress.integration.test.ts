@@ -11,11 +11,8 @@ import { messageToDeltas } from './telemetry'
 import type { MissionItem, ProtocolEvent, TelemetryDelta } from './types'
 
 /**
- * A short square near the SITL home at CMAC.
- *
- * Seq 0 is home and carries `current: 1`, which is the shape ArduPilot
- * accepts -- the round-trip test next door found that out the hard way and
- * this mirrors it rather than rediscovering it.
+ * A short square near the SITL home at CMAC. Seq 0 is home with
+ * `current: 1`, the shape ArduPilot accepts.
  */
 function squareMission(home: MissionItem | undefined): MissionItem[] {
   const wp = (seq: number, lat: number, lon: number, alt: number): MissionItem => ({
@@ -49,8 +46,7 @@ describe.runIf(process.env.SITL === '1')('mission progress against SITL', () => 
       if (out.t === 'tx') socket?.write(out.bytes)
       else if (out.t === 'evt') events.push(out.evt)
     })
-    // Retried: the runner relaunches SITL between files, and connecting
-    // into that gap is a race, not a result.
+    // Retried: the runner relaunches SITL between files.
     socket = await connectSitl()
     socket.on('data', (d) => engine.pushBytes(new Uint8Array(d)))
     engine.start()
@@ -63,11 +59,8 @@ describe.runIf(process.env.SITL === '1')('mission progress against SITL', () => 
       }
     }
     await waitFor('heartbeat', () => events.some((e) => e.t === 'heartbeat'), 20000)
-    // Mission storage is not ready the instant the first heartbeat lands:
-    // uploading straight away is refused with NO_SPACE, which reads like a
-    // full vehicle and is really an uninitialized one. The neighbouring
-    // round-trip test never sees this because it does ten seconds of
-    // parameter and motor work first.
+    // Mission storage is not ready at the first heartbeat: an upload then
+    // is refused with NO_SPACE.
     await waitFor(
       'the vehicle to finish booting',
       () => events.some((e) => e.t === 'statustext' && /ready|initialised|EKF/i.test(e.text)),
@@ -78,9 +71,8 @@ describe.runIf(process.env.SITL === '1')('mission progress against SITL', () => 
     const home = await engine.downloadMission(0).then((m) => m[0])
     await engine.uploadMission(squareMission(home), 0)
 
-    // Guided takeoff, then Auto: a copter on the ground in Auto sits at
-    // the first item until the throttle is raised, which is not what this
-    // test is about.
+    // Guided takeoff, then Auto: a copter on the ground in Auto sits at the
+    // first item until the throttle is raised.
     await engine.runCommand(176, [1, 4, 0, 0, 0, 0, 0]) // DO_SET_MODE -> Guided
     await engine.runCommand(400, [1, 0, 0, 0, 0, 0, 0]) // arm
     await engine.runCommand(22, [0, 0, 0, 0, 0, 0, 30]) // takeoff to 30 m
@@ -112,8 +104,8 @@ describe.runIf(process.env.SITL === '1')('mission progress against SITL', () => 
     expect(withSeq.length).toBeGreaterThan(0)
     expect(withDist.length).toBeGreaterThan(0)
 
-    // A distance the vehicle actually flies: the square's legs are about
-    // 100 m, so anything past a few kilometers means the decode is wrong.
+    // The square's legs are about 100 m, so anything past a few kilometers
+    // means the decode is wrong.
     for (const d of withDist) {
       if (d.k !== 'missionProgress' || d.wpDistM === null) continue
       expect(d.wpDistM).toBeGreaterThanOrEqual(0)
@@ -128,8 +120,8 @@ describe.runIf(process.env.SITL === '1')('mission progress against SITL', () => 
   }, 180000)
 })
 
-// The normalizer itself, without a vehicle: these two messages are the whole
-// input to the feature, so their field names are worth pinning down.
+// The normalizer without a vehicle: these two messages are the feature's
+// whole input, so their field names are pinned here.
 describe('normalizing the two messages', () => {
   it('reads the sequence from MISSION_CURRENT', () => {
     const deltas = messageToDeltas({

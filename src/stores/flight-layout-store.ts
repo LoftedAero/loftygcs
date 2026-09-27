@@ -1,26 +1,16 @@
 import { create } from 'zustand'
 
-// How the Fly screen is arranged, following Mission Planner's shape: one
-// panel pinned to the left at a fixed aspect ratio with the controls and
-// messages filling the space beneath it, and the other panel taking the
-// whole height on the right. Dragging the divider resizes the left column,
-// which changes the fixed-aspect panel's height, which is what the stack
-// below it grows or shrinks to absorb.
-//
-// Persisted, because a layout you have to rebuild every session is worse
-// than not being able to change it at all.
+// The Fly screen layout, persisted. As in Mission Planner, one panel is pinned
+// left at a fixed aspect ratio with the controls and messages beneath it, and
+// the other takes the full height on the right. Dragging the divider resizes
+// the left column, and the stack below the fixed-aspect panel absorbs the
+// change in height.
 
 const STORAGE_KEY = 'loftgcs.flight.layout'
 
 export type FlightPanel = 'map' | 'hud'
 
-/**
- * Width and height of the fixed-aspect panel, as a ratio.
- *
- * 4:3 is what Mission Planner uses and what analog video is. A digital HD
- * feed would want 16:9, so this is likely to become a setting once the HUD
- * has a video source to letterbox.
- */
+/** Width over height of the fixed-aspect panel: 4:3, as analog video and Mission Planner use. */
 export const PANEL_ASPECT = 4 / 3
 
 /** The lower pane's tabs, in the order they are shown. */
@@ -30,14 +20,9 @@ export const LOG_PANES = [
   { id: 'preflight', label: 'Preflight' },
   { id: 'camera', label: 'Camera' },
   { id: 'joystick', label: 'Joystick' },
-  // The HUD's video source, beside the camera controls that point the thing
-  // it is showing. It was a modal behind the View menu -- two levels down
-  // from a screen where it is set up before flying, and a connection you
-  // watch rather than a question to dismiss.
+  // The HUD's video source, beside the camera controls.
   { id: 'video', label: 'Video' },
-  // Last, because it is the only one that is not about the aircraft. It was
-  // a "View" button on the command bar, where everything else commands the
-  // vehicle and this moved furniture.
+  // Last, as the only pane not about the aircraft.
   { id: 'view', label: 'View' },
 ] as const
 
@@ -61,15 +46,7 @@ export interface FlightLayoutState {
   videoUrl: string
   /** Which plotted series the Y axis numbers belong to. */
   plotAxisField: string | null
-  /**
-   * What the lower pane is showing.
-   *
-   * Camera and joystick are panes here rather than panels of their own
-   * because that is what they are: a thing you look at in the space under
-   * the controls, one at a time, like the messages and the preflight list.
-   * As separate panels they competed with those for the same room and had
-   * to be found in a menu about window layout.
-   */
+  /** Which tab the lower pane is showing. */
   logPane: LogPane
   /** The artificial horizon. Off leaves the background layer showing. */
   hudHorizon: boolean
@@ -127,9 +104,7 @@ const DEFAULTS: Persisted = {
   videoUrl: '',
   hudHorizon: true,
   hudOverlays: true,
-  // On by default: a vehicle with no receiver draws nothing, so the cost of
-  // it being on is zero, and traffic you did not know to switch on is the
-  // traffic you do not see.
+  // On by default: without a receiver it draws nothing.
   showTraffic: true,
 }
 
@@ -138,14 +113,12 @@ function load(): Persisted {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULTS
     const saved = JSON.parse(raw) as Partial<Persisted>
-    // Merged rather than trusted: a layout written by an older build must not
-    // leave a panel undefined and blank half the screen.
+    // Merged over defaults so a layout from an older build has no missing keys.
     return {
       ...DEFAULTS,
       ...saved,
       ratio: clampRatio(typeof saved.ratio === 'number' ? saved.ratio : DEFAULTS.ratio),
-      // A pane that no longer exists would render nothing at all, with the
-      // tab strip offering no clue which one is selected.
+      // A pane that no longer exists would render nothing.
       logPane: LOG_PANES.some((t) => t.id === saved.logPane) ? saved.logPane! : DEFAULTS.logPane,
     }
   } catch {
@@ -199,8 +172,7 @@ export const useFlightLayoutStore = create<FlightLayoutState>((set, get) => {
     },
     toggle: (key) => {
       const next = !get()[key]
-      // Never hide both panels: the result is an empty screen with no way
-      // back except the toggles the user just used.
+      // Never hide both panels.
       if (!next && key === 'showMap' && !get().showHud) return
       if (!next && key === 'showHud' && !get().showMap) return
       set({ [key]: next } as Pick<FlightLayoutState, typeof key>)
@@ -209,8 +181,7 @@ export const useFlightLayoutStore = create<FlightLayoutState>((set, get) => {
     togglePlotField: (name) => {
       const current = get().plotFields
       const next = current.includes(name) ? current.filter((f) => f !== name) : [...current, name]
-      // Adding the first field is always meant to show the plot; nobody picks
-      // a field in order to look at a panel that is switched off.
+      // Picking a field implies wanting to see the plot.
       set({ plotFields: next, showPlot: next.length > 0 ? true : get().showPlot })
       save()
     },

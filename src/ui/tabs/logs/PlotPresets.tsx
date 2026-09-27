@@ -2,18 +2,9 @@ import { useState } from 'react'
 import { LaButton, LaHint, LaInput } from '../../components/La'
 import { useLogStore } from '../../../stores/log-store'
 
-// Saved plot setups.
-//
-// Anyone reviewing logs has a handful of standing questions -- "is the yaw
-// tracking", "what did the motors do" -- and each is the same six fields on
-// the same axes in the same colors every time. Rebuilding that by hand at
-// the top of every log is the tedious part of log review, so a setup is
-// named once and recalled thereafter.
-//
-// Kept in the browser rather than beside the log: a preset belongs to the
-// person asking the question, not to the flight being asked about. It
-// carries expressions too, which is what makes it worth saving at all --
-// nobody wants to retype sqrt(IMU.AccX^2 + IMU.AccY^2).
+// Saved plot setups: named sets of fields and expressions, recalled on any
+// log. Stored in the browser, since a preset belongs to the user rather
+// than to a log.
 
 export default function PlotPresets() {
   const presets = useLogStore((s) => s.presets)

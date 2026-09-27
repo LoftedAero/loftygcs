@@ -6,9 +6,8 @@ import dgram from 'node:dgram'
 // cannot open raw sockets, so these exist only in the Electron build; the
 // renderer reaches them through window.loftgcs.link (see preload.ts).
 //
-// Each open link gets a numeric id. The renderer's TransportManager keeps
-// only one transport active, but ids still matter: a close racing an open
-// must not let the old socket's late data masquerade as the new link's.
+// Each link gets a numeric id so that when a close races an open, the old
+// socket's late data cannot be mistaken for the new link's.
 
 interface Link {
   kind: 'tcp' | 'udp'
@@ -47,7 +46,7 @@ export function registerLinkIpc(getWindow: () => BrowserWindow | null) {
       }
 
       // UDP: bind locally and, until a remote is known, learn it from the
-      // first packet -- SITL and telemetry bridges both start by sending.
+      // first packet. SITL and telemetry bridges both start by sending.
       const socket = dgram.createSocket('udp4')
       let remote: { address: string; port: number } | null = opts.host
         ? { address: opts.host, port: opts.port }
@@ -85,12 +84,9 @@ export function registerLinkIpc(getWindow: () => BrowserWindow | null) {
 /**
  * Drop every link, whatever the renderer thinks it still has open.
  *
- * Links are closed one id at a time by the renderer that opened them, which
- * covers the ordinary case and none of the others: a reload throws away the
- * ids without closing anything, and the socket stays in this process
- * holding its port. A UDP link is the one that bites -- it is *bound*, so
- * the next connection after a reload cannot have the same port back and
- * fails with EADDRINUSE, on a machine where nothing appears to be running.
+ * A renderer reload discards its link ids without closing them, leaving the
+ * sockets open here. A bound UDP socket then makes the next connection fail
+ * with EADDRINUSE.
  */
 export function closeAllLinks() {
   for (const link of links.values()) link.close()

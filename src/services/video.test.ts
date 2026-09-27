@@ -9,16 +9,12 @@ const statusCbs = new Set<(s: StatusMsg) => void>()
 const readyCbs = new Set<(i: { codec: string }) => void>()
 const unitCbs = new Set<(u: { data: Uint8Array; keyframe: boolean; timestamp: number }) => void>()
 const opened: string[] = []
-let closes = 0
 const bridge = {
   open: (url: string) => {
     opened.push(url)
     return Promise.resolve({ ok: true as const })
   },
-  close: () => {
-    closes++
-    return Promise.resolve({ ok: true as const })
-  },
+  close: () => Promise.resolve({ ok: true as const }),
   onStatus: (cb: (s: StatusMsg) => void) => (statusCbs.add(cb), () => statusCbs.delete(cb)),
   onReady: (cb: (i: { codec: string }) => void) => (readyCbs.add(cb), () => readyCbs.delete(cb)),
   onUnit: (cb: (u: { data: Uint8Array; keyframe: boolean; timestamp: number }) => void) => (
@@ -54,7 +50,6 @@ let status: VideoStatus
 beforeEach(async () => {
   vi.useFakeTimers()
   opened.length = 0
-  closes = 0
   ;(window as unknown as { loftgcs: unknown }).loftgcs = { video: bridge }
   vi.stubGlobal('VideoDecoder', FakeDecoder)
   vi.stubGlobal('EncodedVideoChunk', FakeChunk)

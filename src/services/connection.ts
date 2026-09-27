@@ -25,11 +25,8 @@ import { fieldRegistry } from './telemetry-fields'
 import { fetchParamMetadata } from './param-metadata'
 
 /**
- * How long to hold the metadata fetch for AUTOPILOT_VERSION.
- *
- * Long enough for one command round trip on a slow radio, short enough that
- * a vehicle which never answers still gets its hints while the parameter
- * table is still loading.
+ * How long to hold the metadata fetch for AUTOPILOT_VERSION: one command
+ * round trip on a slow radio, and still short of a parameter download.
  */
 const VERSION_WAIT_MS = 3000
 
@@ -38,12 +35,9 @@ const LINK_LOST_AFTER_MS = 3000
 const SNAPSHOT_INTERVAL_MS = 200
 
 /**
- * How long to wait for a vehicle we told to restart.
- *
- * ArduPilot is back on the bus in a few seconds; the budget is generous
- * because a USB flight controller re-enumerates on its own schedule, and a
- * board that boots slowly is not a board that has failed. Past it, the
- * silence is news.
+ * How long to wait for a vehicle we told to restart. ArduPilot is usually
+ * back in a few seconds, but a USB flight controller re-enumerates on its
+ * own schedule.
  */
 const REBOOT_RETURN_MS = 45000
 
@@ -58,21 +52,18 @@ class ConnectionService {
   private metadataTimer: ReturnType<typeof setTimeout> | null = null
   private metadataVehicle = ''
   private snapshotTimer: ReturnType<typeof setInterval> | null = null
-  // Deltas mutate this between snapshot flushes so the store re-renders at
-  // a few Hz no matter how fast telemetry arrives.
   /** What the current link was opened with, for naming it in a message. */
   private openedWith: TransportOptions | null = null
   /**
-   * The serial port this link is open on, so a reboot can reopen *it*.
-   *
-   * Web Serial's grant belongs to the device and outlives the reboot, but
-   * only a port already in hand can be opened without a chooser.
+   * The serial port this link is open on, so a reboot can reopen it without
+   * a chooser. Web Serial's grant belongs to the device and outlives the
+   * reboot.
    */
   private openedPort: SerialPort | null = null
   /**
-   * Where the port picked by hand sits among the ports sharing its USB ids --
-   * a Cube's MAVLink and SLCAN ports are one pair of ids -- which is how the
-   * same one is found again after a reboot. See `reboot-port.ts`.
+   * The chosen port's index among ports sharing its USB ids (a Cube's MAVLink
+   * and SLCAN ports share one pair), used to find it again after a reboot.
+   * See `reboot-port.ts`.
    */
   private serialRank = 0
   /** Reopened ports that opened but sent no heartbeat, during this reboot. */
@@ -80,6 +71,8 @@ class ConnectionService {
   /** When to stop waiting for a reboot we commanded; 0 when not waiting. */
   private rebootUntil = 0
   private rebootTimer: ReturnType<typeof setTimeout> | null = null
+  // Deltas accumulate here between snapshot flushes so the store re-renders
+  // at a few Hz however fast telemetry arrives.
   private pending: Partial<VehicleSnapshot> = {}
   private pendingDirty = false
 
@@ -91,8 +84,7 @@ class ConnectionService {
     try {
       await this.openLink(opts)
     } catch (err) {
-      // Cancelling the port chooser is not a failure, and reported as one it
-      // left a red chip on the app bar for choosing not to connect.
+      // Canceling the port chooser returns to idle, not an error.
       const error = describeLinkError(err, opts)
       setConnectionState(
         error === null ? { phase: 'idle', kind: null, error: null } : { phase: 'error', error },
@@ -103,9 +95,8 @@ class ConnectionService {
   /**
    * Open the transport and start waiting for a heartbeat.
    *
-   * Split out of `connect` because the reboot wait below opens the same link
-   * over and over, and must not announce each attempt as a new connection or
-   * report each failure as one.
+   * Separate from `connect` because the reboot wait reopens the link
+   * repeatedly without announcing each attempt as a new connection.
    */
   private async openLink(opts: TransportOptions) {
     this.openedWith = opts
@@ -117,31 +108,27 @@ class ConnectionService {
     )
     worker.start()
     this.openedPort = transport instanceof WebSerialTransport ? transport.openedPort : null
-    // Only for a port somebody chose. During a reboot wait the port is one this
-    // code chose from the rank, and measuring it again would only repeat it.
+    // Only for a port the user chose; during a reboot wait the port was
+    // picked from the rank already.
     const chosen = this.openedPort
     if (chosen && !this.rebooting) {
       void grantedSerialPorts().then((ports) => {
         this.serialRank = Math.max(0, siblingsOf(ports, chosen).indexOf(chosen))
       })
     }
-    // While a reboot is outstanding the bar keeps saying so: the link coming
-    // up is a step in that rather than a separate event, and flicking
-    // through "Waiting for heartbeat" on every retry would read as a link
-    // that cannot make up its mind.
+    // During a reboot the phase stays 'rebooting' rather than flicking to
+    // handshaking on every retry.
     if (!this.rebooting) setConnectionState({ phase: 'handshaking' })
     this.handshakeTimer = setTimeout(() => {
-      // A silent link usually means wrong baud/port -- or a board sitting
-      // in its bootloader, which the firmware flow will learn to detect.
-      // On serial the port itself narrows that down: a flight controller's
-      // own USB vendor going quiet is far more likely to be the wrong one
-      // of its several ports than a dead board.
+      // A silent link usually means the wrong baud or port, or a board in its
+      // bootloader. On serial, a flight controller's own USB vendor going
+      // quiet most likely means the wrong one of its several ports.
       const usb =
         opts.kind === 'serial' && transport instanceof WebSerialTransport
           ? transport.openedPort?.getInfo()
           : undefined
       // During a reboot wait, a port that opened and said nothing is the wrong
-      // sibling -- a Cube's SLCAN port, say -- so the next try starts past it.
+      // sibling (a Cube's SLCAN port, say), so the next try skips it.
       if (this.rebooting) this.rebootSkip++
       this.linkFailed(describeSilentLink(usb))
     }, HANDSHAKE_TIMEOUT_MS)
@@ -155,16 +142,13 @@ class ConnectionService {
   /**
    * The next link drop is one we asked for.
    *
-   * Called before the reboot command goes out, because the vehicle obeys it
-   * without acking and the USB device can be gone before the promise
-   * settles. Until this existed, restarting a board after a compass
-   * calibration -- which this app *tells* people to do -- put "Link closed:
-   * The device has been lost" on the app bar in red: the app reporting its
-   * own instruction as a fault, and leaving the reconnect to be done by
-   * hand.
+   * Call before sending the reboot command: the vehicle may obey without
+   * acking, and the USB device can be gone before the promise settles. The
+   * drop is then treated as a reboot and reconnected automatically rather
+   * than reported as a lost link.
    *
    * Harmless when the reboot is refused (an armed vehicle): the link never
-   * drops and the next heartbeat clears the phase a second later.
+   * drops and the next heartbeat clears the phase.
    */
   expectReboot() {
     const { phase } = useConnectionStore.getState()
@@ -175,10 +159,8 @@ class ConnectionService {
   }
 
   /**
-   * A link that went away: a step in a reboot, or news.
-   *
-   * Everything that ends a link badly comes through here, so that
-   * distinction is made in exactly one place.
+   * A link that went away, either as part of a reboot or as a failure.
+   * Every abnormal link end comes through here.
    */
   private linkFailed(message?: string) {
     if (!this.rebooting) {
@@ -199,26 +181,24 @@ class ConnectionService {
   /**
    * Try the link again, and keep trying until the vehicle is back.
    *
-   * **Opening it is the probe.** `getPorts()` lists what this origin was
-   * granted whether or not the device is plugged in -- measured, in the
-   * flash path -- so it cannot say when the board came back. `open()` can:
-   * it fails while the device is away and succeeds the moment it is not.
+   * Opening is the probe. `getPorts()` lists granted ports whether or not the
+   * device is plugged in, so it cannot tell when the board is back; `open()`
+   * fails until it is.
    */
   private async retryAfterReboot() {
     this.rebootTimer = null
     if (useConnectionStore.getState().phase !== 'rebooting') return
     const opts = this.openedWith
     if (opts) {
-      // Each candidate in turn within one try: a stale object from before the
-      // reboot cannot open, and stepping over it here beats waiting a second
-      // to learn the same thing again.
+      // Try each candidate in turn: a stale port object from before the
+      // reboot cannot open, and the next one may.
       for (const candidate of await this.rebootOptions(opts)) {
         try {
           await this.openLink(candidate)
           return
         } catch {
-          // Normal for the first several seconds: the device re-enumerates
-          // when the firmware's USB stack is up, and not before.
+          // Normal for the first few seconds, until the firmware's USB stack
+          // is up.
         }
       }
     }
@@ -233,10 +213,10 @@ class ConnectionService {
    * The links to try after a reboot, best first, each with a port attached so
    * no chooser is needed.
    *
-   * Serial ports are matched by USB ids and chosen by rank among them rather
-   * than by "the newest match", which on a Cube Orange was its SLCAN port: see
-   * `reboot-port.ts`. A port with no USB ids to match on (Bluetooth, a virtual
-   * COM port) has only the object in hand.
+   * Serial ports are matched by USB ids and chosen by rank among them, not
+   * by newest match, which on a Cube Orange is its SLCAN port (see
+   * `reboot-port.ts`). A port with no USB ids (Bluetooth, a virtual COM
+   * port) has only the object in hand.
    */
   private async rebootOptions(opts: TransportOptions): Promise<TransportOptions[]> {
     if (opts.kind !== 'serial') return [opts]
@@ -248,7 +228,7 @@ class ConnectionService {
   }
 
   async disconnect(error?: string) {
-    // Disconnecting is an answer to the question the reboot wait is asking.
+    // Disconnecting ends any reboot wait.
     this.rebootUntil = 0
     if (this.rebootTimer) clearTimeout(this.rebootTimer)
     this.rebootTimer = null
@@ -260,7 +240,7 @@ class ConnectionService {
     )
   }
 
-  /** Everything a disconnect does except say so: shared with the reboot wait. */
+  /** Everything a disconnect does except set the phase; shared with the reboot wait. */
   private async teardown() {
     if (this.handshakeTimer) clearTimeout(this.handshakeTimer)
     if (this.snapshotTimer) clearInterval(this.snapshotTimer)
@@ -272,11 +252,9 @@ class ConnectionService {
     this.pendingDirty = false
     useVehicleStore.getState().reset()
     useParamStore.getState().reset()
-    // Otherwise the next vehicle inherits the last one's field list, and a
-    // plot keeps drawing a line that belongs to an aircraft that is gone.
+    // Otherwise the next vehicle inherits the last one's plot fields.
     fieldRegistry.clear()
-    // Same reason: traffic belongs to the aircraft that heard it. Leaving it
-    // on the map would show the last flight's sky over the next field.
+    // Traffic belongs to the vehicle that heard it.
     useTrafficStore.getState().clear()
     useCalStore.getState().magCalReset()
     useCalStore.getState().setAccelAsked(null)
@@ -292,10 +270,8 @@ class ConnectionService {
   }
 
   private onTransportClosed(reason?: string) {
-    // The reason is a socket error message from the main process, so it gets
-    // the same cleaning a failed open does -- a link dropped mid-flight is
-    // exactly when nobody wants to read "ECONNRESET" off the app bar. The
-    // options are the ones this link was opened with.
+    // The reason is a raw socket error from the main process, so it gets the
+    // same cleanup as a failed open.
     const opts = this.openedWith
     const said = reason && opts ? describeLinkError(new Error(reason), opts) : reason
     this.linkFailed(said ? `Link closed: ${said}` : undefined)
@@ -312,31 +288,23 @@ class ConnectionService {
         ) {
           if (this.handshakeTimer) clearTimeout(this.handshakeTimer)
           this.handshakeTimer = null
-          // Back. A link that never dropped -- a telemetry radio, or a
-          // reboot the vehicle refused -- recovers here too, which is why
-          // the wait ends on a heartbeat rather than on a port.
+          // The wait ends on a heartbeat rather than a port, so a link that
+          // never dropped (a telemetry radio, or a refused reboot) recovers
+          // here too.
           this.rebootUntil = 0
           setConnectionState({ phase: 'connected' })
           if (conn.phase === 'handshaking' || conn.phase === 'rebooting') {
-            // A configurator without the parameters is an empty shell:
-            // fetch them as soon as the vehicle exists -- and again once a
-            // restart is over, which is the whole point of the restart. Both
-            // kinds of reboot need it for different reasons: a link that
-            // dropped had the parameter set cleared with it, so the screens
-            // would come back empty; a link that never dropped is holding
-            // values from before the vehicle re-read its own storage. Not
-            // `linkLost` -- nothing restarted there, and re-downloading
-            // 1,400 parameters over a radio that just recovered is the last
-            // thing that link needs.
+            // Fetch parameters on first connect and after a reboot. A link
+            // that dropped had its parameters cleared; one that did not holds
+            // values from before the vehicle re-read its storage. Not after
+            // `linkLost`: nothing restarted, and a radio that just recovered
+            // does not need 1,400 parameters pushed through it.
             void this.refreshParams()
           }
           if (conn.phase === 'handshaking') {
-            // Metadata survives a reboot (`reset` leaves it alone) and the
-            // firmware has not changed, so this is first-connection only.
-            // It waits a moment for AUTOPILOT_VERSION, because the
-            // version picks which metadata to fetch. Only a moment: a
-            // vehicle that never answers still gets hints, just the
-            // current release's, which is what it got before this existed.
+            // Metadata survives a reboot, so this is first-connection only.
+            // It waits briefly for AUTOPILOT_VERSION to pick the matching
+            // release; a vehicle that never answers gets the current one.
             this.metadataVehicle = vehicleTypeName(evt.vehicleType)
             this.metadataTimer = setTimeout(() => {
               this.metadataTimer = null
@@ -371,9 +339,9 @@ class ConnectionService {
         return
       }
       case 'fileProgress': {
-        // Whichever screen asked for a file: the Files browser and the Logs
-        // screen both transfer over the same FTP client, and anything else
-        // using it (the parameter blob) has its own progress.
+        // The Files and Logs screens share one FTP client, so update
+        // whichever has a transfer running. The parameter download reports
+        // its own progress.
         const files = useFilesStore.getState()
         if (files.transfer) {
           files.setTransfer({
@@ -388,9 +356,7 @@ class ConnectionService {
             kind: 'downloading',
             name: log.vehicleStatus.name,
             got: evt.got,
-            // The listing's size is the one to trust: MAVFTP reports the
-            // size it opened the file with, which agrees, but a zero from
-            // either would divide a progress bar by nothing.
+            // Prefer the listing's size; either may be zero.
             total: log.vehicleStatus.total || evt.total,
           })
         }
@@ -425,8 +391,8 @@ class ConnectionService {
           .setTransfer({ kind: 'busy', dir: evt.dir, got: evt.got, total: evt.total })
         return
       case 'magCalProgress':
-        // Keyed by compass: ArduPilot calibrates every used compass from one
-        // command and they progress at different rates.
+        // Keyed by compass: ArduPilot calibrates every compass from one
+        // command, and they progress at different rates.
         useCalStore
           .getState()
           .magCalProgress(evt.compassId, evt.pct, evt.calStatus, evt.completionMask, evt.direction)
@@ -442,7 +408,6 @@ class ConnectionService {
         })
         return
       case 'commandAck':
-        // Command tracking arrives with the calibration wizards (Phase 3).
         return
     }
   }
@@ -451,9 +416,8 @@ class ConnectionService {
     const p = this.pending
     switch (d.k) {
       case 'attitude':
-        // Compass calibration counts turns from these, and only while one is
-        // running -- the store's own guard, so nothing accumulates in the
-        // background.
+        // Compass calibration counts turns from these; the store ignores
+        // them unless a calibration is running.
         useCalStore.getState().magCalAttitude(d.rollRad, d.pitchRad, {
           rollRateRad: d.rollRateRad,
           pitchRateRad: d.pitchRateRad,
@@ -494,8 +458,7 @@ class ConnectionService {
         p.batteryPct = d.remainingPct
         break
       case 'batteryStatus':
-        // Merged, like the servo ports: each monitor arrives in its own
-        // message, and a batch holding one must keep the others'.
+        // Merged: each monitor arrives in its own message.
         p.batteries = {
           ...(p.batteries ?? useVehicleStore.getState().batteries),
           [d.id]: { voltageV: d.voltageV, currentA: d.currentA, remainingPct: d.remainingPct },
@@ -511,8 +474,7 @@ class ConnectionService {
         p.rcRssi = d.rssi
         break
       case 'servoOutputs':
-        // Merged rather than assigned: the two ports arrive as separate
-        // messages, usually in the same batch, and each must keep the other's.
+        // Merged: the two ports arrive as separate messages.
         p.servoOutputsUs = mergeServoOutputs(
           p.servoOutputsUs ?? useVehicleStore.getState().servoOutputsUs,
           d.port,
@@ -520,8 +482,7 @@ class ConnectionService {
         )
         break
       case 'missionProgress':
-        // Each message fills its own half; a null leaves the last value
-        // standing rather than blanking a readout that is still true.
+        // Each message fills its own fields; a null keeps the last value.
         if (d.seq !== null) p.missionSeq = d.seq
         if (d.wpDistM !== null) p.wpDistM = d.wpDistM
         if (d.altErrorM !== null) p.altErrorM = d.altErrorM
@@ -545,13 +506,9 @@ class ConnectionService {
   /**
    * Re-read every parameter.
    *
-   * `quiet` is for a refresh nobody asked for out loud -- writing a
-   * parameter that gates a whole subtree, where the point is to discover
-   * what the vehicle now exposes. It keeps the screen showing what it has:
-   * no `beginDownload`, so no curated tab blanks to a loading card; the new
-   * set is *merged*, so staged edits survive; and a failure is dropped,
-   * because a background read that could not complete is not a reason to
-   * put the Parameters tab into an error state.
+   * `quiet` is for a background refresh after writing a parameter that gates
+   * others. It skips `beginDownload` so no tab blanks to a loading card,
+   * merges the result so staged edits survive, and ignores failure.
    */
   async refreshParams(opts: { quiet?: boolean } = {}) {
     const worker = this.worker
@@ -563,9 +520,8 @@ class ConnectionService {
       if (opts.quiet) store.merged(result.params)
       else store.loaded(result.params)
     } catch (err) {
-      // A quiet refresh that could not finish leaves the screen as it was --
-      // but the progress bar has to stop, or the bar reads as a download
-      // still running.
+      // A failed quiet refresh leaves the screen alone, but the progress bar
+      // still has to stop.
       if (opts.quiet) {
         useParamStore.setState({ progress: null })
         return
@@ -579,7 +535,7 @@ class ConnectionService {
       const { params, source } = await fetchParamMetadata(vehicleName, firmware)
       useParamStore.getState().setMetadata(params, source)
     } catch {
-      // Metadata is decoration; offline or firewalled is not an error state.
+      // Metadata is optional; being offline is not an error.
     }
   }
 
@@ -588,12 +544,12 @@ class ConnectionService {
     this.worker?.send(msgName, fields)
   }
 
-  /** Run a MAV_CMD, resolving with the MAV_RESULT code (0 = accepted). */
   /** Watch (or stop watching) raw link traffic; costs nothing while off. */
   setInspecting(on: boolean): void {
     this.worker?.setInspecting(on)
   }
 
+  /** Run a MAV_CMD, resolving with the MAV_RESULT code (0 = accepted). */
   runCommand(command: number, params: number[] = [], timeoutMs?: number): Promise<number> {
     const worker = this.worker
     if (!worker) return Promise.reject(new Error('not connected'))
@@ -682,20 +638,12 @@ class ConnectionService {
   }
 
   /**
-   * Write every dirty parameter, confirming each against the echo.
+   * Write every staged edit, or only those `owns` claims, confirming each
+   * against the echo.
    *
-   * The names that went are reported alongside the count: the page has the
-   * metadata and can tell from them whether a reboot is now the next step,
-   * which a number cannot.
-   */
-  /**
-   * Send every staged edit, or only the ones a caller claims.
-   *
-   * The scope exists because a screen can hold more than one card that edits
-   * parameters, and a button labelled "Write (14)" on one of them must not
-   * quietly send the other's edits too. Callers without a scope -- the action
-   * bar, the parameters column -- still send everything, which is what those
-   * buttons have always meant.
+   * The scope lets one card's Write leave another card's edits alone.
+   * Returns the names written so the caller can check whether any need a
+   * reboot.
    */
   async writeDirtyParams(
     owns?: (param: string) => boolean,

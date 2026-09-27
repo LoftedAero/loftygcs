@@ -1,72 +1,45 @@
 // Where the motors are, for a given FRAME_CLASS and FRAME_TYPE.
 //
-// Drawn rather than borrowed. ArduPilot's own diagrams are on a wiki licensed
-// CC BY-SA 3.0, whose ShareAlike terms do not sit cleanly inside a GPL-3.0
-// app, and Mission Planner's are bitmaps that would need recolouring for this
-// theme. None of that is necessary: a motor layout is *facts* -- a number, an
-// angle and which way the propeller turns -- and the facts are in ArduPilot's
-// own source, `AP_MotorsMatrix.cpp`. This table is transcribed from it, and
-// the frame class and type numbers from `AP_Motors_Class.h`.
-//
-// Two forms appear there and both are kept faithfully:
+// Transcribed from ArduPilot's `AP_MotorsMatrix.cpp` (frame class and type
+// numbers from `AP_Motors_Class.h`) rather than copied from its wiki diagrams,
+// which are CC BY-SA 3.0 and do not sit cleanly inside a GPL-3.0 app. Two
+// forms appear there:
 //
 //   add_motor(num, angle_degrees, yaw_factor, testing_order)
 //   add_motor_raw(num, roll_factor, pitch_factor, yaw_factor, testing_order)
 //
-// The angle form is degrees clockwise from the nose -- checked against the
-// quad plus, whose testing order 1 sits at 0 degrees (front) and 2 at 90
-// (right). The raw form gives the position as control factors instead, and
-// ArduPilot derives those from the angle as `roll = cos(angle + 90)` and
-// `pitch = cos(angle)`, so inverting gives right = -roll and forward = pitch.
-//
-// **Motors are labelled by testing order, not by output number.** That is what
-// ArduPilot's diagrams letter, what its motor test spins, and what the Outputs
-// tab's own Motor 1..8 buttons drive; the output number is a wiring detail
-// that differs per frame and would be the wrong thing to put on a picture
-// somebody checks their propellers against.
+// The angle form is degrees clockwise from the nose (quad plus: testing order
+// 1 at 0 degrees, 2 at 90). The raw form gives control factors, which
+// ArduPilot derives as `roll = cos(angle + 90)` and `pitch = cos(angle)`, so
+// right = -roll and forward = pitch.
 
 /**
  * Which way a propeller turns, seen from above.
  *
- * `none` is a real state, not a gap: a V-tail's two front motors carry a yaw
- * factor of 0 -- they provide no yaw torque, the canted tail pair does -- and
- * drawing them with an arrow would claim something the firmware does not.
+ * `none` is a real state: a V-tail's two front motors carry a yaw factor of 0
+ * (the canted tail pair provides the yaw), so they get no arrow.
  */
 export type Spin = 'cw' | 'ccw' | 'none'
 
 export interface FrameMotor {
   /**
-   * ArduPilot's motor number -- the one `SERVOn_FUNCTION` calls Motor1..12 and
-   * the one every wiring diagram is drawn with.
+   * ArduPilot's motor number, the one `SERVOn_FUNCTION` calls Motor1..12 and
+   * wiring diagrams use.
    *
-   * **Not the motor test's number**, which is `test` below. The two differ on
-   * most frames and agree on a few, which is what made conflating them easy:
-   * a quad X motor 2 is the rear *left*, and it is third in the test sequence.
-   * `AP_MotorsMatrix` states both -- `add_motor(motor_num, angle, yaw,
-   * testing_order)` -- and this table was transcribed from the testing order
-   * alone, so every picture numbered its motors in the order they spin rather
-   * than the order they are wired.
+   * Not the motor test's number (`test`). The two differ on most frames: quad
+   * X motor 2 is the rear left and third in the test sequence.
    */
   n: number
   /**
-   * Where it falls in the motor test sequence, counting from 1.
-   *
-   * Shown as a letter (A, B, C...) wherever it is shown, which is Mission
-   * Planner's convention and the thing that keeps it from being read as a
-   * motor number.
+   * Position in the motor test sequence, from 1. Shown as a letter (A, B,
+   * C...), as Mission Planner does, so it is not read as a motor number.
    */
   test: number
-  /**
-   * Driven by the motor test but not a propeller.
-   *
-   * The tricopter's tail servo is step 3 of its test sequence, which is worth
-   * drawing precisely because nobody expects a motor test step to swing a
-   * servo.
-   */
+  /** Driven by the motor test but not a propeller (the tricopter's tail servo). */
   servo?: true
-  /** Right of centre, -1..1. */
+  /** Right of center, -1..1. */
   x: number
-  /** Forward of centre, -1..1. */
+  /** Forward of center, -1..1. */
   y: number
   spin: Spin
 }
@@ -128,9 +101,8 @@ const raw = (rows: ByFactors): FrameMotor[] => {
 
 /**
  * `[testing order, roll degrees, pitch degrees, spin]`, as ArduPilot's third
- * `add_motor` overload, which converts them with
- * `roll = cos(roll_deg + 90)` and `pitch = cos(pitch_deg)` before handing them
- * to the raw form -- so the position is `sin(roll_deg)` right and
+ * `add_motor` overload, which converts them with `roll = cos(roll_deg + 90)`
+ * and `pitch = cos(pitch_deg)`, so the position is `sin(roll_deg)` right and
  * `cos(pitch_deg)` forward.
  */
 type ByDegrees = readonly (readonly [number, number, number, number, Spin])[]
@@ -168,8 +140,7 @@ const QUAD: Record<number, FrameMotor[]> = {
     [2, 3, -135, 'ccw'],
     [3, 4, -45, 'cw'],
   ]),
-  // The V frame's yaw factors are fractional (0.7981), so the spin comes from
-  // their sign the way it does for the named constants.
+  // The V frame's yaw factors are fractional (0.7981); spin is their sign.
   [FRAME_TYPE.V]: angled([
     [1, 1, 45, 'cw'],
     [4, 2, 135, 'ccw'],
@@ -533,43 +504,29 @@ const DODECAHEXA: Record<number, FrameMotor[]> = {
 /**
  * The tricopter: two front arms and a rear arm whose motor pivots.
  *
- * Not from a motor matrix -- `AP_MotorsTri` has its own class -- but the
- * positions still come from the source rather than from a sketch: the front
- * pair carry roll factors of -1 (right) and +1 (left) with a pitch factor of
- * 0.5, and the rear motor a pitch factor of -1, which is the same
- * right = -roll, forward = pitch mapping the matrix frames use. The rear
- * roll factor is 0 by symmetry, being on the centreline.
+ * `AP_MotorsTri` is its own class, not a matrix. The front pair carry roll
+ * factors of -1 (right) and +1 (left) with pitch 0.5, the rear motor pitch -1,
+ * mapped the same way as the matrix frames.
  *
- * The propeller directions are the one part here that is *convention* rather
- * than source. `AP_MotorsTri` states none, because yaw is not made by
- * differential torque on a tricopter -- it is the tail servo pivoting, as
- * `_pivot_angle = safe_asin(yaw_thrust)` -- so the firmware does not care
- * which way they turn. They are drawn because a frame of blank motors beside
- * seven frames of arrows reads as a rendering fault, and the counter-rotating
- * front pair is what every tricopter build uses. The numbers are the test sequence's,
- * where 1 is the front right, 2 the back motor, 4 the front left, and step 3
- * is the tail servo -- drawn as a servo, and labelled with the channel it is
- * wired to (CH7) rather than with its step. And the frame type does
- * not apply at all: this class never reaches the matrix, so every type draws
- * the same aircraft.
+ * Propeller directions are convention, not source: yaw comes from the tail
+ * servo (`_pivot_angle = safe_asin(yaw_thrust)`), so the firmware does not
+ * care which way they turn. The counter-rotating front pair is what tricopter
+ * builds use. Frame type does not apply; every type draws the same aircraft.
  */
-// `AP_MotorsTri` drives three outputs and skips one: MOT_1 is the right
-// motor, MOT_2 the left and **MOT_4 the rear** -- there is no motor 3 on a
-// tricopter. Its test sequence is a different order again
-// (`_output_test_seq`): 1 right, 2 rear, 3 the tail servo, 4 left.
+// `AP_MotorsTri` drives MOT_1 (right), MOT_2 (left) and MOT_4 (rear); there is
+// no motor 3. Its test sequence (`_output_test_seq`) is 1 right, 2 rear, 3 the
+// tail servo, 4 left.
 const TRI_ANY: FrameMotor[] = [
   { n: 1, test: 1, x: 1, y: 0.5, spin: 'ccw' },
   { n: 4, test: 2, x: 0, y: -1, spin: 'cw' },
-  // Labelled by its output channel, because it has no motor number at all:
-  // `AP_MotorsTri.h` says `#define AP_MOTORS_CH_TRI_YAW CH_7` -- "tail servo
-  // uses channel 7" -- and 7 is the number somebody wires to.
+  // Labeled by its output channel, since it has no motor number:
+  // `AP_MotorsTri.h` defines `AP_MOTORS_CH_TRI_YAW CH_7`.
   { n: 7, test: 3, x: 0, y: -1, spin: 'none', servo: true },
   { n: 2, test: 4, x: -1, y: 0.5, spin: 'cw' },
 ]
 
 const CLASSES: Record<number, Record<number, FrameMotor[]>> = {
-  // Empty, like Y6's: the layout comes from the fallback below whatever the
-  // frame type says.
+  // Empty: the layout comes from the fallback in frameLayout for any type.
   [FRAME_CLASS.TRI]: {},
   [FRAME_CLASS.QUAD]: QUAD,
   [FRAME_CLASS.HEXA]: HEXA,
@@ -583,19 +540,15 @@ const CLASSES: Record<number, Record<number, FrameMotor[]>> = {
 /**
  * The motors for this frame, or null when there is no picture to draw.
  *
- * Null is the honest answer for the frames this table does not carry --
- * helicopters, tailsitters, single and coaxial copters, the scripting
- * matrices, and the tricopter and V-tail layouts whose geometry comes from a
- * different motors class. A diagram invented for those would be a confident
- * picture of the wrong aircraft.
+ * Null for frames this table does not carry: helicopters, tailsitters, single
+ * and coaxial copters, and the scripting matrices.
  */
 export function frameLayout(frameClass: number, frameType: number): FrameMotor[] | null {
   const byType = CLASSES[frameClass]
   if (!byType) return null
   const motors = byType[frameType]
   if (motors) return motors
-  // Y6 is the one class whose firmware falls back to a default layout for any
-  // type it does not name.
+  // Y6 firmware falls back to a default layout for any type it does not name.
   if (frameClass === FRAME_CLASS.Y6) return Y6_DEFAULT
   if (frameClass === FRAME_CLASS.TRI) return TRI_ANY
   return null
@@ -604,8 +557,8 @@ export function frameLayout(frameClass: number, frameType: number): FrameMotor[]
 /**
  * Motors sharing a position, as coaxial frames have.
  *
- * Returned as an index into the list so a drawing can offset the second of
- * each pair instead of hiding it under the first.
+ * Returns each motor's rank at its position so a drawing can offset the
+ * second of each pair.
  */
 export function coaxialRank(motors: readonly FrameMotor[]): number[] {
   const seen = new Map<string, number>()
@@ -620,9 +573,8 @@ export function coaxialRank(motors: readonly FrameMotor[]): number[] {
 /**
  * What ArduPilot calls each class we can draw.
  *
- * Only a fallback: the vehicle's own parameter metadata names these, and that
- * is what the screen prefers, because a firmware that renames one should not
- * need this file edited. Kept for the case where metadata has not arrived.
+ * A fallback for when parameter metadata, which the screen prefers, has not
+ * arrived.
  */
 export const FRAME_CLASS_NAMES: Record<number, string> = {
   [FRAME_CLASS.QUAD]: 'Quad',
@@ -638,10 +590,8 @@ export const FRAME_CLASS_NAMES: Record<number, string> = {
 /**
  * Every frame class that has a picture for this frame type, in class order.
  *
- * The set changes with the type, which is the point: a hexa has no V layout,
- * so choosing V leaves it out rather than showing a hexa drawn as something
- * it is not. Y6 is always in, because its firmware falls back to one layout
- * for any type it does not name.
+ * A hexa has no V layout, so choosing V leaves it out. Y6 is always in,
+ * because its firmware has a default layout.
  */
 export function classesForType(frameType: number): number[] {
   return Object.keys(CLASSES)
@@ -653,21 +603,16 @@ export function classesForType(frameType: number): number[] {
 /**
  * Which frame types each class actually accepts, from ArduPilot's own switch.
  *
- * This is the *support* matrix, which is not the same as the drawing table
- * above: a combination can be perfectly valid and still have no picture here
- * (the quad's NYT variants are), but a combination missing from this list is
- * one the firmware refuses. `AP_MotorsMatrix::setup_motors` ends each class in
- * `default: return false`, and a false there sets `_frame_class_string` to
- * "UNSUPPORTED" and `set_initialised_ok(false)` -- the motors never come up and
- * the vehicle will not arm.
+ * Separate from the drawing table: a valid combination may have no picture
+ * (the quad's NYT variants), but one missing here is refused.
+ * `AP_MotorsMatrix::setup_motors` ends each class in `default: return false`,
+ * which marks the frame "UNSUPPORTED"; the motors never initialize and the
+ * vehicle will not arm. Y6's switch has a default layout, so every type is
+ * valid for it.
  *
- * Y6 is the exception its firmware makes: its switch has a default that builds
- * a layout rather than failing, so every type is valid for it.
- *
- * Classes absent from this table -- helicopters, tricopters, single and coax,
- * tailsitters, the scripting matrices -- never reach the matrix at all
- * (`Copter::allocate_motors` gives them their own motors class), so frame type
- * does not choose their layout and nothing here can be unsupported for them.
+ * Classes absent here (helicopters, tricopters, single and coax, tailsitters,
+ * the scripting matrices) get their own motors class and never reach the
+ * matrix, so frame type cannot be unsupported for them.
  */
 const SUPPORTED: Record<number, ReadonlySet<number> | 'any'> = {
   [FRAME_CLASS.QUAD]: new Set([
@@ -721,9 +666,8 @@ const SUPPORTED: Record<number, ReadonlySet<number> | 'any'> = {
 /**
  * Will this firmware build motors for this pairing?
  *
- * Unknown is not unsupported: a class this table does not carry gets `true`,
- * because a newer firmware may have added one and claiming a working aircraft
- * is misconfigured is the worse error.
+ * A class this table does not carry gets `true`: newer firmware may have
+ * added it, and calling a working aircraft misconfigured is the worse error.
  */
 export function frameTypeSupported(frameClass: number, frameType: number): boolean {
   const types = SUPPORTED[frameClass]
@@ -735,8 +679,8 @@ export function frameTypeSupported(frameClass: number, frameType: number): boole
 /**
  * The type each class is drawn in when the chosen one does not apply to it.
  *
- * X for everything with arms on the diagonals, and the Y6's own B layout,
- * because those are the shapes people recognise the airframe by.
+ * X for everything with diagonal arms and B for the Y6, the shapes people
+ * recognize the airframe by.
  */
 const CANONICAL: Record<number, number> = {
   [FRAME_CLASS.QUAD]: FRAME_TYPE.X,
@@ -762,15 +706,10 @@ export interface FrameTile {
 /**
  * Every class we can picture, for a table that does not change size.
  *
- * The set is constant whatever the type, because a grid that grows and shrinks
- * as somebody arrows down a dropdown is unreadable -- and no tile is ever
- * empty, because a blank square next to a drawn one reads as a pairing that
- * exists and a pairing that does not, which is exactly backwards when the
- * blank one is the aircraft you have selected.
- *
- * A class that does not take the chosen type is drawn in its own canonical
- * type and marked unsupported, so the picture still says what the airframe is
- * without claiming the combination is valid.
+ * The set is constant whatever the type, so the grid does not reflow while
+ * someone arrows through a dropdown, and no tile is empty. A class that does
+ * not take the chosen type is drawn in its canonical type and marked
+ * unsupported.
  */
 export function frameTiles(frameType: number): FrameTile[] {
   const out: FrameTile[] = []

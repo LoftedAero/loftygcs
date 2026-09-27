@@ -4,39 +4,27 @@ import type { FtpDirEntry } from '../protocol/ftp/mavftp'
 
 // Browsing and editing the vehicle's SD card over MAVFTP.
 //
-// This is the screen that unlocks the things ArduPilot keeps as *files*
-// rather than parameters: Lua scripts, OSD fonts, terrain tiles, and the
-// odd config someone needs to pull off a card without a laptop and a card
-// reader in the field.
+// For what ArduPilot keeps as files rather than parameters: Lua scripts, OSD
+// fonts, terrain tiles and the like.
 //
-// Writing is deliberately slower than reading and there is nothing to be
-// done about it: there is no burst write, and ArduPilot serves one FTP
-// request at a time, so a file goes up at 239 bytes a round trip. A 40 kB
-// script is around twenty seconds over USB and minutes over a telemetry
-// radio, which is why the size is shown before the upload and the progress
-// during it.
+// Writing is much slower than reading: there is no burst write and ArduPilot
+// serves one FTP request at a time, so a file goes up 239 bytes per round
+// trip. A 40 kB script takes around twenty seconds over USB and minutes over
+// a telemetry radio.
 
-/** Anything much bigger than a script is a mistake, not a transfer. */
+/** Uploads beyond this would take far too long over MAVFTP. */
 export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 
 /**
- * Where to open.
- *
- * Real hardware mounts the card at /APM and that is where everything worth
- * browsing lives; SITL has no card and runs on the host filesystem, so its
- * root is the working directory. Probing in order costs one round trip on
- * hardware and gets the simulator right for free -- the same shape the log
- * download uses.
+ * Where to open, tried in order: hardware mounts the card at /APM, while
+ * SITL has no card and its root is the working directory.
  */
 const START_DIRS = ['/APM', '/']
 
 /**
- * The FTP root is not an ordinary directory.
- *
- * ArduPilot presents it as a merged view of the real filesystem and its
- * virtual mounts (@ROMFS, @SYS, @PARAM). A file written there does not come
- * back in the listing -- verified against SITL, not assumed -- so writing
- * into it would look like a transfer that silently did nothing.
+ * The FTP root is a merged view of the real filesystem and ArduPilot's
+ * virtual mounts (@ROMFS, @SYS, @PARAM). A file written there never shows up
+ * in the listing, so uploads are refused there.
  */
 export function isMergedRoot(path: string): boolean {
   return path === '/'
@@ -44,13 +32,12 @@ export function isMergedRoot(path: string): boolean {
 
 function describe(err: unknown): string {
   const text = err instanceof Error ? err.message : String(err)
-  // The NAK codes are ArduPilot's own words and mean nothing to a pilot.
+  // Translate ArduPilot's NAK codes into plain language.
   if (/FileNotFound/.test(text)) return 'No such file or directory on the vehicle'
   if (/FileProtected/.test(text)) return 'The vehicle refused: the file is protected'
   if (/FileExists/.test(text)) return 'Something with that name is already there'
   if (/FailErrno/.test(text)) return 'The vehicle refused the operation'
-  // The demo vehicle has no MAVFTP on purpose, and neither do some
-  // third-party autopilots; "op 3 timed out" is true and tells nobody that.
+  // The demo vehicle and some third-party autopilots have no MAVFTP.
   if (/timed out/.test(text)) return 'No answer — this vehicle may not support MAVFTP file access'
   return text
 }
@@ -64,8 +51,7 @@ export async function listPath(path: string): Promise<void> {
     useFilesStore.getState().setListing(path, entries)
     useFilesStore.getState().setStatus({ kind: 'idle' })
   } catch (err) {
-    // The path shown is left alone on a failure: replacing it with a
-    // directory that would not list loses the place you were standing.
+    // Keep the current path on failure.
     useFilesStore.getState().setStatus({ kind: 'error', text: describe(err) })
   }
 }
@@ -93,8 +79,8 @@ export async function openStart(): Promise<void> {
       useFilesStore.getState().setStatus({ kind: 'idle' })
       return
     } catch (err) {
-      // Only a missing directory is worth trying the next candidate for; a
-      // timeout means the link is the problem and the next one will too.
+      // Only a missing directory moves on to the next candidate; a timeout
+      // means the link is the problem.
       if (!(err instanceof Error && /FileNotFound/.test(err.message))) {
         useFilesStore.getState().setStatus({ kind: 'error', text: describe(err) })
         return
@@ -106,13 +92,7 @@ export async function openStart(): Promise<void> {
     .setStatus({ kind: 'error', text: 'No readable directory on this vehicle' })
 }
 
-/**
- * Download a file and save it.
- *
- * Straight to disk rather than into the app: unlike a log, there is nothing
- * here that this station knows how to show, and the reason to fetch a
- * script or a font is to have it.
- */
+/** Download a file and save it to disk. */
 export async function downloadEntry(entry: FtpDirEntry): Promise<void> {
   const store = useFilesStore.getState()
   const path = joinPath(store.path, entry.name)

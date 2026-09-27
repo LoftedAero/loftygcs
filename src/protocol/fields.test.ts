@@ -48,16 +48,14 @@ describe('collectFields', () => {
   })
 
   it('leaves out addressing fields', () => {
-    // They are identical on every packet of a link, so listing them buries
-    // the fields that actually say something.
+    // They are identical on every packet of a link.
     const into = new Map<string, number>()
     collectFields(msg('X', { targetSystem: 1, targetComponent: 1, real: 42 }), into)
     expect([...into.keys()]).toEqual(['X.real'])
   })
 
   it('keeps a message field called seq, which is not the packet counter', () => {
-    // A mission item's index is genuinely interesting; the frame's sequence
-    // number never reaches here to be confused with it.
+    // A mission item's seq is payload, not the frame's sequence number.
     const into = new Map<string, number>()
     collectFields(msg('MISSION_CURRENT', { seq: 3 }), into)
     expect(into.get('MISSION_CURRENT.seq')).toBe(3)

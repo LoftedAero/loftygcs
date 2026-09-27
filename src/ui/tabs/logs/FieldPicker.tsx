@@ -6,11 +6,9 @@ import { isSelected, useLogStore } from '../../../stores/log-store'
 
 // Choosing what to plot, grouped by the message that carries it.
 //
-// A flight log offers something like six hundred plottable fields, so the
-// list is collapsed to message names and searched rather than scrolled. The
-// search matches the *labelled* name too, which is the point of having the
-// labels: typing "motor" finds RCOU.C1 even though nothing in that field's
-// name says motor.
+// A log has around six hundred plottable fields, so the list is collapsed to
+// message names and searched. The search also matches channel labels, so
+// "motor" finds RCOU.C1.
 
 export default function FieldPicker() {
   const log = useLogStore((s) => s.log)
@@ -38,8 +36,7 @@ export default function FieldPicker() {
     if (!query) return groups
     return groups
       .map(([name, fields]) => {
-        // A message whose own name matches keeps all of its fields, so
-        // typing "RCOU" gives you the whole message rather than nothing.
+        // A message whose own name matches keeps all of its fields.
         if (name.toLowerCase().includes(query)) return [name, fields] as const
         const hits = fields.filter(
           (f) =>
@@ -64,8 +61,7 @@ export default function FieldPicker() {
       />
       <div className="log-picker__list">
         {filtered.map(([message, fields]) => {
-          // Searching opens what it found: closing it again would hide the
-          // answer behind the same click that revealed it.
+          // Search results are always expanded.
           const expanded = query !== '' || open.has(message)
           return (
             <div key={message} className="log-picker__group">

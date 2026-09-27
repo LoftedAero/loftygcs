@@ -5,18 +5,13 @@ import { connectionService } from '../../services/connection'
 import { useParamWrite } from './CardParamActions'
 import RebootButton from './RebootButton'
 
-// Write, revert, reload -- what a screen with an actions column needs to
-// send its parameters, in one place so the columns cannot drift apart.
+// Write, Revert and Reload for a screen's actions column, shared so the
+// columns stay consistent.
 //
-// **The same Write as a card's, kept in view.** It shares the card's
-// behavior (`useParamWrite`): "Write (N)" carries the count, where the column
-// had a "staged" pill beside a "Write params" button; the same confirmation;
-// the same restart dialog when what was written is read at boot, where the
-// column had a note under its reboot button; and a scope, so OSD's Write
-// sends the OSD's parameters and not an edit staged on another screen. What
-// differs is deliberate: the pair is always present rather than appearing
-// with the first edit, because the column is the page's one place to write
-// from and nothing under it may move.
+// Write behaves like a card's (`useParamWrite`): the count in the label, the
+// same confirmation, the restart dialog for boot-time parameters, and a scope
+// so a screen writes only its own parameters. Unlike a card's, the buttons
+// are always present so nothing below them moves.
 
 export interface VehicleParamActionsProps {
   /** Heading for the group; pages name it for what they edit. */
@@ -34,11 +29,9 @@ export default function VehicleParamActions({
 }: VehicleParamActionsProps) {
   const lastWrite = useParamStore((s) => s.lastWrite)
   const connected = useConnectionStore((s) => s.phase === 'connected')
-  // A set read from a file is a document, not an aircraft. Write and Reload
-  // are the two buttons that need something on the other end -- exactly the
-  // pair Mission Planner greys out, for the same reason. Revert is local and
-  // stays live, because reverting an edit to a file is still an edit to a
-  // file.
+  // A set read from a file is a document, not an aircraft, so Write and
+  // Reload are disabled (as Mission Planner does). Revert is local and stays
+  // live.
   const fromFile = useParamStore((s) => s.source === 'file')
   const canReachVehicle = connected && !fromFile
   const w = useParamWrite({ reason, owns })
@@ -78,9 +71,8 @@ export default function VehicleParamActions({
             : 'Connect a vehicle to write or reload.'}
         </LaHint>
       )}
-      {/* Failures only. A write that went through shows as its count going
-          back to plain "Write", as a card's does; one that did not leaves its
-          parameters staged, and this names them. */}
+      {/* Failures only: success shows as the count clearing from Write, and
+          failed parameters stay staged and are named here. */}
       {lastWrite && lastWrite.failed.length > 0 && (
         <LaHint error>
           Wrote {lastWrite.written.length}; failed: {lastWrite.failed.join(', ')}

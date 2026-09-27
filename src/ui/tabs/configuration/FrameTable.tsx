@@ -2,24 +2,14 @@ import FrameDiagram from './FrameDiagram'
 import { FRAME_CLASS_NAMES, frameTiles } from '../../../protocol/frame-layout'
 import { useParamStore } from '../../../stores/param-store'
 
-// Every frame we can picture, with the chosen one marked -- a picker made of
-// the pictures rather than a dropdown with a picture beside it.
+// A frame class picker made of the frame pictures, with the chosen one marked.
 //
-// The set is the same whatever the frame type, and no tile is ever blank. Two
-// things go wrong otherwise, and both were worth designing against: a grid
-// that grows and shrinks while somebody arrows through the type dropdown
-// cannot be read, and a blank tile beside a drawn one says "this pairing does
-// not exist, that one does" -- which is exactly backwards when the blank one
-// is the aircraft you have selected.
+// The set is the same for every frame type and no tile is blank (see
+// frameTiles). A class that does not take the chosen type is drawn in its
+// canonical shape and dimmed.
 //
-// So a class that does not take the chosen type keeps its picture, drawn in
-// its own canonical shape and dimmed. The dimming is what says the pairing is
-// not available; the card's title row names it outright when it is the one
-// you have selected.
-//
-// Blue for the selection, not orange: this is a working control showing its
-// state, and the orange on this screen belongs to the staged-edit highlight
-// and to Write.
+// The selection is blue, not orange: orange on this screen is for staged
+// edits and Write.
 export default function FrameTable({
   frameClass,
   frameType,
@@ -50,8 +40,7 @@ export default function FrameTable({
             role="radio"
             aria-checked={on}
             className={cls}
-            // Said in the hover rather than on the tile: a line of text under
-            // every dimmed picture would be a paragraph across the grid.
+            // In the tooltip, to keep text off the dimmed tiles.
             title={supported ? undefined : `ArduPilot has no ${name} ${typeName} frame`}
             onClick={() => onPick(c)}
           >

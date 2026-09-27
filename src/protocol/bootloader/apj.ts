@@ -1,7 +1,7 @@
 // ArduPilot .apj firmware files: a JSON envelope holding a zlib-compressed
 // base64 image plus the board identity the bootloader must match.
-// DecompressionStream exists in every home this code runs in (browser,
-// worker, Node 18+), so no zlib dependency.
+// DecompressionStream is available in the browser, workers and Node 18+, so
+// no zlib dependency is needed.
 
 export interface ApjFirmware {
   image: Uint8Array
@@ -41,7 +41,7 @@ export async function parseApj(text: string): Promise<ApjFirmware> {
   const image = await inflate(base64ToBytes(json.image))
   const imageSize = typeof json.image_size === 'number' ? json.image_size : image.length
   if (image.length !== imageSize) {
-    // Truth is the decompressed bytes; a mismatched header is corruption.
+    // The decompressed bytes are authoritative; a mismatched header means corruption.
     throw new Error(`corrupt .apj: image is ${image.length} bytes, header says ${imageSize}`)
   }
   return {

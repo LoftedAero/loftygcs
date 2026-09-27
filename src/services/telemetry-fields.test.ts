@@ -38,8 +38,7 @@ describe('fieldRegistry', () => {
   })
 
   it('rolls old samples off once the buffer wraps, keeping order', () => {
-    // The plot walks these front to back; a wrapped buffer returned in
-    // storage order would draw a line that jumps back in time.
+    // The plot walks these front to back, so they must come out in time order.
     for (let i = 0; i < 1000; i++) fieldRegistry.apply(i, { 'X.v': i })
     const s = fieldRegistry.samples('X.v')!
     expect(s.t.length).toBe(900)
@@ -51,8 +50,7 @@ describe('fieldRegistry', () => {
   })
 
   it('only bumps its version when a name is new', () => {
-    // The status list rebuilds its name array on this, and rebuilding a few
-    // hundred strings ten times a second would be pure waste.
+    // The status list rebuilds its name array whenever this changes.
     fieldRegistry.apply(1, { 'X.v': 1 })
     const after = fieldRegistry.version()
     fieldRegistry.apply(2, { 'X.v': 2 })
@@ -62,8 +60,7 @@ describe('fieldRegistry', () => {
   })
 
   it('forgets everything when the vehicle goes away', () => {
-    // Otherwise the next vehicle inherits the last one's fields and a plot
-    // keeps drawing a line belonging to an aircraft that is gone.
+    // Otherwise the next vehicle would inherit the last one's fields.
     fieldRegistry.apply(1, { 'X.v': 1 })
     fieldRegistry.clear()
     expect(fieldRegistry.names()).toEqual([])

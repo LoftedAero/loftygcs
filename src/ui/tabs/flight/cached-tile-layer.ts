@@ -4,14 +4,12 @@ import type { BaseLayer } from './map-layers'
 
 // A Leaflet tile layer that looks in the offline cache first.
 //
-// Leaflet's own TileLayer sets img.src and lets the browser fetch it, which
-// leaves no place to consult a cache. Overriding createTile lets the tile
-// come from IndexedDB when it is there and from the network otherwise --
-// and a network tile is stored on the way past, so ordinary panning around
-// the field before takeoff builds the cache for free.
+// Leaflet's TileLayer sets img.src and lets the browser fetch, leaving no
+// place to consult a cache. Overriding createTile reads from IndexedDB first
+// and stores network tiles as they pass, so panning around the field builds
+// the cache.
 //
-// Everything degrades to the stock behavior: no cache, or a cache that
-// errors, just means every tile comes from the network as before.
+// Without a working cache, every tile simply comes from the network.
 
 class CachedTileLayer extends L.TileLayer {
   private layerId: string
@@ -32,8 +30,8 @@ class CachedTileLayer extends L.TileLayer {
     let objectUrl: string | null = null
 
     const finish = (err?: Error) => done(err, img)
-    // Revoking on load rather than on removal: the decoded image stays valid
-    // once painted, and a blob URL per tile otherwise leaks for the session.
+    // Revoke on load rather than on removal: the decoded image stays valid,
+    // and otherwise each tile's blob URL leaks for the session.
     img.onload = () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl)
       finish()
@@ -58,8 +56,7 @@ class CachedTileLayer extends L.TileLayer {
         objectUrl = URL.createObjectURL(blob)
         img.src = objectUrl
       } catch {
-        // Offline with nothing cached for this square: let Leaflet show its
-        // empty tile rather than a broken image.
+        // Offline and not cached: Leaflet shows its empty tile.
         finish(new Error('tile unavailable'))
       }
     })()

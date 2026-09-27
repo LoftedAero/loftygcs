@@ -4,17 +4,12 @@ import AttitudeTiles, { type AttitudeTile } from './AttitudeTiles'
 
 // Six attitudes, spin each one twice.
 //
-// This is the instruction Mission Planner and QGroundControl both give, and
-// the reason it beats a coverage sphere is that it is a *procedure* rather
-// than a readout: six things to do, in order, each with an obvious physical
-// action. The sphere told you the truth and left you to work out what to do
-// with it.
+// The procedure Mission Planner and QGroundControl both give: six attitudes,
+// each an obvious physical action.
 //
-// What the vehicle is doing now is measured rather than asked for -- see
-// `cal-orientation.ts`. ArduPilot reports coverage as magnetic directions and
-// has no notion of "you have done four of the six", so the tiles are driven
-// from ATTITUDE, which every vehicle sends and which needs no magnetic model,
-// no GPS fix and no calibration state.
+// ArduPilot reports compass coverage as magnetic directions, not attitudes,
+// so the tiles are driven from ATTITUDE instead (see `cal-orientation.ts`),
+// which needs no magnetic model, GPS fix or calibration state.
 export default function CalAttitudes({ magCal }: { magCal: MagCalState }) {
   const tiles: AttitudeTile[] = ORIENTATIONS.map((o) => {
     const done = orientationDone(magCal, o.id)
@@ -25,8 +20,8 @@ export default function CalAttitudes({ magCal }: { magCal: MagCalState }) {
       done,
       here,
       // The compass wants the vehicle turned about vertical in each attitude;
-      // the accelerometer only wants it held still, which is why the arrow
-      // belongs to this caller rather than to the tiles.
+      // the accelerometer only wants it held still, so the caller supplies
+      // the arrow.
       spin: true,
       progress: here ? (magCal.turns[o.id] ?? 0) / (2 * Math.PI) / TURNS_REQUIRED : null,
     }

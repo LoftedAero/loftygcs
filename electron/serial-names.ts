@@ -1,31 +1,17 @@
 import { execFile } from 'node:child_process'
 
-// What a serial port actually is, according to the machine it is plugged into.
+// Windows driver names for serial ports.
 //
-// A CubeOrange presents *two* USB CDC interfaces from one cable -- the MAVLink
-// port and the SLCAN port for DroneCAN peripherals -- and they are
-// indistinguishable by everything Chromium hands us: same vendor id, same
-// product id, and the same `displayName`, because that field is the device's
-// USB product string and a product string describes the device, not one of its
-// interfaces. So the chooser offered two identical rows and the only way to
-// tell which was which was to connect to one and see whether a heartbeat
-// arrived.
+// A CubeOrange presents two USB CDC interfaces on one cable (MAVLink, and
+// SLCAN for DroneCAN), and Chromium reports both with the same vendor id,
+// product id and `displayName`, since that is the device's USB product
+// string. The Windows driver names them "Cube Orange+ Mavlink" and
+// "Cube Orange+ SLCAN"; Mission Planner reads the same names.
 //
-// Windows already knows. Its driver names them "Cube Orange+ Mavlink" and
-// "Cube Orange+ SLCAN", and that is the same source Mission Planner reads --
-// per ArduPilot's own docs, the ports are "clearly labeled" there only once
-// the driver set that supplies these names is installed, which is exactly the
-// admission that the label comes from the driver rather than from the GCS.
-//
-// Read rather than derived, deliberately. The interface number in the device
-// id (MI_00, MI_02) would let us guess -- ArduPilot puts MAVLink first -- but
-// that is a convention we would be asserting about every composite serial
-// device anyone plugs in, and it is the sort of confident guess that has been
-// wrong here before. The driver's own string needs no such assumption and is
-// right for boards nobody has thought about.
-//
-// Measured at 28 ms for two ports, so it happens before the chooser is shown
-// rather than filling in behind it.
+// The interface number in the device id (MI_00, MI_02) would allow a guess,
+// but that asserts a convention about every composite serial device. The
+// driver's string needs no assumption. The lookup takes tens of milliseconds,
+// so it runs before the chooser is shown.
 
 /** Windows appends "(COM31)"; the row already leads with the port name. */
 export function stripPortSuffix(name: string): string {
@@ -43,19 +29,15 @@ export function parseFriendlyName(stdout: string): string | null {
 const ENUM_ROOT = ['HKLM', 'SYSTEM', 'CurrentControlSet', 'Enum'].join('\\')
 
 /**
- * The friendly name for one device instance id, or null.
- *
- * Never throws and never hangs the chooser: a missing key, a `reg` that is
- * not there, or one that does not answer all resolve to null, and the port
- * keeps whatever name it already had.
+ * The friendly name for one device instance id, or null. Never throws: a
+ * missing key, a missing `reg`, or a timeout all resolve to null.
  */
 function friendlyName(deviceInstanceId: string, timeoutMs: number): Promise<string | null> {
   return new Promise((resolve) => {
     const child = execFile(
       'reg',
       ['query', `${ENUM_ROOT}\\${deviceInstanceId}`, '/v', 'FriendlyName'],
-      // No shell: a device id is full of `&`, which a shell would treat as
-      // backgrounding rather than as part of the key.
+      // No shell: device ids contain `&`.
       { windowsHide: true, timeout: timeoutMs },
       (err, stdout) => resolve(err ? null : parseFriendlyName(stdout)),
     )
@@ -70,9 +52,7 @@ export interface NameablePort {
 
 /**
  * Replace each port's display name with the driver's, where there is one.
- *
- * Windows only -- `deviceInstanceId` is a Windows field and every other
- * platform gets the list back untouched.
+ * Windows only; other platforms get the list back untouched.
  */
 export async function withDriverNames<T extends NameablePort>(
   ports: T[],

@@ -13,25 +13,16 @@ import { token } from '../../theme-tokens'
 import { useThemeStore } from '../../../stores/theme-store'
 import { useTerrain } from './use-terrain'
 
-// QGroundControl's altitude profile: the mission seen from the side, with
-// distance along the bottom and height up the left, and the ground drawn
-// underneath it.
+// The mission seen from the side, as in QGroundControl: distance along the
+// bottom, height up the left, ground underneath. Canvas rather than SVG
+// because the terrain is about two hundred samples that move while a
+// waypoint is dragged.
 //
-// It answers the question a map cannot -- does this mission fly into the
-// hill, or descend when it should climb. Canvas rather than SVG because the
-// terrain is two hundred samples that move as a waypoint is dragged, and
-// the DOM should not grow a node per sample.
-//
-// Everything is computed in meters above mean sea level and drawn as height
-// above home, so the three MAVLink altitude frames land on one axis: a
-// terrain-frame 50 and a relative 50 are different heights and drawing them
-// at the same place would hide exactly the mistake this is here to catch.
-//
-// Only items with an altitude appear. A DO_SET_SERVO has no height, and
-// inventing one for it would draw a mission that does not exist.
+// Everything is computed in meters AMSL and drawn as height above home, so
+// the three MAVLink altitude frames share one axis (a terrain-frame 50 and a
+// relative 50 are different heights). Only items with an altitude appear.
 
-// Top padding leaves room for the sequence number drawn above each marker;
-// at 12 the highest waypoint's label was clipped by the canvas edge.
+// Top padding leaves room for the sequence number above each marker.
 const PAD = { left: 44, right: 16, top: 22, bottom: 22 }
 
 export default function AltitudeProfile() {
@@ -49,8 +40,7 @@ export default function AltitudeProfile() {
     return map
   }, [plan])
 
-  // Points are needed by both the painter and the click handler, so they are
-  // computed once per render and read from a ref inside the canvas listener.
+  // Shared by the painter and the click handler.
   const pointsRef = useRef<{ uid: string; x: number; y: number }[]>([])
 
   useEffect(() => {
@@ -85,8 +75,7 @@ export default function AltitudeProfile() {
         z: a.amslM - home.amslM,
         seq: seqOf.get(a.uid) ?? 0,
       }))
-      // Ground is drawn only where it means something: with no surveyed home
-      // and no terrain under it, "height above home" has no datum.
+      // Without a surveyed home there is no datum for the ground.
       const ground =
         home.source === 'none'
           ? []
@@ -106,7 +95,7 @@ export default function AltitudeProfile() {
       const sx = (d: number) => PAD.left + (d / maxD) * plotW
       const sy = (z: number) => PAD.top + plotH - ((z - minZ) / zRange) * plotH
 
-      // The ground, before the axes so the hairlines read on top of it.
+      // The ground, before the axes so the hairlines draw on top.
       if (ground.length > 1) {
         ctx.fillStyle = line
         ctx.beginPath()
@@ -143,8 +132,7 @@ export default function AltitudeProfile() {
       for (const frac of [0, 0.5, 1]) {
         const z = minZ + zRange * frac
         const y = sy(z)
-        // Altitudes are held in meters and shown in the chosen unit, the
-        // same as every other readout.
+        // Held in meters, shown in the chosen unit.
         ctx.fillText(`${Math.round(toDistance(z, units.distance))}`, PAD.left - 6, y)
         if (frac > 0) {
           ctx.strokeStyle = line
@@ -183,11 +171,9 @@ export default function AltitudeProfile() {
       })
       ctx.stroke()
 
-      // Where the mission is below the ground, said in red on the ground
-      // itself rather than only as a number in the panel: the point of a
-      // profile is seeing *which* leg is the problem. Clearance is measured
-      // in height-above-home rather than AMSL, which is the same difference
-      // as long as both sides use it.
+      // Mark in red where the mission goes below the ground, so the offending
+      // leg is visible. Both sides are height above home, so the difference
+      // equals the AMSL one.
       const asItems = pts.map((p) => ({ uid: p.uid, amslM: p.z, d: p.d }))
       const asGround = ground.map((g) => ({ d: g.d, amslM: g.z }))
       const worst = minClearance(asGround, asItems)
@@ -233,8 +219,8 @@ export default function AltitudeProfile() {
     const observer = new ResizeObserver(draw)
     observer.observe(canvas)
     return () => observer.disconnect()
-    // See LogPlot: the palette is read inside the draw, so the theme has
-    // to be a dependency or the canvas keeps its last paint.
+    // The palette is read inside the draw, so the theme must be a dependency
+    // (as in LogPlot).
   }, [plan, selected, theme, units, terrain, seqOf])
 
   return (

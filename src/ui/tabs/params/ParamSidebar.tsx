@@ -10,16 +10,9 @@ import {
   type CompareRow,
 } from '../../../protocol/param-file'
 
-// The Parameters page's own actions column, matching the Mission planner's.
-//
-// These used to be split: Write, Revert and Refresh in the global action bar,
-// the file actions in a strip above the table. That split made sense while
-// staged edits could cross pages -- the footer button was the one place that
-// could send all of them. Now that leaving a page with unwritten edits asks
-// first, the edits belong to the page, and so do the buttons.
-//
-// The footer still carries Write for every other Setup tab; this column
-// replaces it only here.
+// The Parameters page's actions column: vehicle actions, then file actions.
+// Staged edits belong to the page (leaving with unwritten edits prompts), so
+// the page carries its own Write.
 
 export default function ParamSidebar() {
   return (
@@ -55,11 +48,8 @@ function ExportButton() {
 }
 
 /**
- * Load a file and show what it would change, rather than changing it.
- *
- * Listed above Import because it is the one to reach for: Import applies
- * every difference sight unseen, which is only safe when the file came off
- * this same aircraft.
+ * Load a file and show what it would change. Listed above Import, which
+ * stages every difference unreviewed.
  */
 function CompareButton() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -106,11 +96,8 @@ function CompareButton() {
 }
 
 /**
- * Take the whole file, unreviewed — with a word of warning first.
- *
- * The warning says what specifically goes wrong rather than asking whether
- * you are sure: a parameter set describes one aircraft, and its calibrations,
- * trims and gains were measured on that machine.
+ * Take the whole file, unreviewed, after a warning that calibrations and
+ * hardware-specific values belong to the aircraft they were measured on.
  */
 function ImportButton() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -127,16 +114,12 @@ function ImportButton() {
     const { entries, skipped } = parseParamFile(await file.text())
     const { entries: current, edit, loadedFile } = useParamStore.getState()
 
-    // Nothing loaded: the file becomes what is on screen. "Import" means
-    // bring this file in, and with an empty table that is the whole of it --
-    // staging differences against nothing applies nothing, which is what
-    // this did before and looked like a broken button. A file opened this
-    // way is marked as a file, so nothing offers to write it to an aircraft.
+    // Nothing loaded: open the file as the parameter set. It is marked as a
+    // file, so nothing offers to write it to an aircraft.
     if (current.size === 0) {
       loadedFile(
-        // A file says nothing about a parameter's MAVLink type. REAL32 is
-        // what Mission Planner assumes, and it only matters for a set that
-        // can be written -- which this one cannot be, being a file.
+        // A file has no MAVLink types; assume REAL32, as Mission Planner does.
+        // It only matters for a set that can be written, which a file cannot.
         entries.map((e) => ({ name: e.name, value: e.value, mavType: 9 })),
         file.name,
       )
@@ -172,9 +155,7 @@ function ImportButton() {
         variant="ghost"
         size="block"
         onClick={() => {
-          // The warning is about taking one aircraft's measured numbers onto
-          // another. With nothing loaded there is no aircraft to take them
-          // onto, so asking would be a dialog about a risk that is not there.
+          // With nothing loaded there is nothing to overwrite, so no warning.
           if (useParamStore.getState().entries.size === 0) fileRef.current?.click()
           else setWarning(true)
         }}
@@ -202,12 +183,7 @@ function ImportButton() {
           </>
         }
       >
-        {/* Two sentences: the one fact that makes this dangerous, and the
-            control that does it safely. It was three paragraphs -- the first
-            restating the title, the second explaining what a parameter set
-            is. Nobody reading a confirm dialog needs the concept explained;
-            they need to know that calibration belongs to the airframe it was
-            measured on, and where the other door is. */}
+        {/* The risk, and the safer alternative. */}
         <p className="app-placeholder">
           This may overwrite calibrations and hardware-specific values. Only perform this action if
           you know it is safe for this parameter set.
@@ -230,9 +206,7 @@ function ImportButton() {
           {result?.opened ? (
             `Opened ${result.applied} parameter${result.applied === 1 ? '' : 's'} from ${result.file}. These are the file's, not a vehicle's.`
           ) : (
-            /* The two routes out are named as they are labelled in the
-               column beside this, and emphasized so they read as the
-               controls they are rather than as a description of them. */
+            /* Names the column's buttons as labeled there. */
             <>
               Staged {result?.applied ?? 0} change{result?.applied === 1 ? '' : 's'} from{' '}
               {result?.file} - review and choose <strong>Write</strong> or <strong>Revert</strong>

@@ -24,12 +24,9 @@ import { videoService } from '../../../services/video'
 //   horizon      <- artificial horizon and its instruments, switchable
 //   overlays     <- tapes, state and telemetry, switchable
 //
-// That is what makes "video with no horizon" and "instruments with no video"
-// ordinary states rather than special cases. Everything is drawn on one
-// canvas from the telemetry rings on requestAnimationFrame: full telemetry
-// rate, zero React re-renders. The slower numbers come from the store
-// snapshot, read imperatively for the same reason. How it looks is in
-// hud-paint.ts; this is only the loop that feeds it.
+// The instruments are drawn on one canvas from the telemetry rings on
+// requestAnimationFrame, with no React re-renders; slower values are read
+// imperatively from the store snapshot. The drawing is in hud-paint.ts.
 
 export interface HudProps {
   /** Draw the horizon and its instruments. Off leaves the background showing. */
@@ -49,12 +46,10 @@ export default function Hud({ horizon, overlays, onContextMenu }: HudProps) {
   // layer does not have to tear down and restart the loop.
   const flags = useRef({ horizon, overlays })
   flags.current = { horizon, overlays }
-  // When the armed state last changed, so ARMED can announce itself and then
-  // get out of the way. DISARMED stays up: on the ground it is the answer to
-  // "why did nothing happen", and in the air it never appears.
+  // When the armed state last changed, so the ARMED banner can time out.
+  // DISARMED stays up.
   const armedAt = useRef({ armed: false, at: 0 })
-  // Whether there is a picture behind the canvas. A ref, read inside the
-  // frame, so a stream starting does not re-render anything.
+  // Whether video is playing behind the canvas; a ref so it causes no re-render.
   const videoBehind = useRef(false)
   useEffect(() => videoService.onStatus((s) => (videoBehind.current = s.state === 'playing')), [])
 
@@ -90,16 +85,12 @@ export default function Hud({ horizon, overlays, onContextMenu }: HudProps) {
         groundspeedMs: v.groundspeedMs,
         relAltM: v.relAltM,
         climbMs: v.climbMs,
-        // Read per frame like the stores above it: a property read, no
-        // subscription, and no re-render when the choice changes.
         units: usePreferencesStore.getState().units,
         throttlePct: v.throttlePct,
         batteryText: batteryLabel(v.batteryV, v.batteryA, v.batteryPct),
-        // rxCount is already the count over the last second, so it is the
-        // packet rate as it stands.
+        // rxCount is the count over the last second, i.e. the packet rate.
         linkText: linkLabel(v.rcRssi, link?.rxCount),
-        // Blank with no vehicle, like the link corner opposite: "No GPS" in
-        // red was a claim about an aircraft that was not there.
+        // Blank with no vehicle rather than "No GPS".
         gpsText: v.present ? gpsLabel(v.gpsFix, v.gpsSats) : '',
         gpsUsable: !v.present || gpsUsable(v.gpsFix),
         modeName: v.modeName,
@@ -122,7 +113,7 @@ export default function Hud({ horizon, overlays, onContextMenu }: HudProps) {
       className="flight-hud"
       onContextMenu={(e) => {
         if (!onContextMenu) return
-        // Ours replaces the browser's, the same bargain the map makes.
+        // Our menu replaces the browser's, as on the map.
         e.preventDefault()
         onContextMenu({ x: e.clientX, y: e.clientY })
       }}

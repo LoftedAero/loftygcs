@@ -2,11 +2,8 @@ import { useThemeStore, type ThemeChoice } from '../../stores/theme-store'
 
 // Light/dark, in the app bar because it applies to the whole window.
 //
-// One button rather than a three-way control: the common act is "make it
-// the other one", and clicking that leaves an explicit choice, which is
-// what someone who reached for the button wanted. Following the machine
-// again is the rare case, so it is a shift-click and a title-bar mention
-// rather than a third of the width.
+// One button rather than a three-way control: a click switches to the other
+// theme explicitly. Following the system theme again is a shift-click.
 
 const NEXT: Record<ThemeChoice, string> = {
   system: 'Following the system theme',
@@ -58,9 +55,8 @@ function SunIcon() {
 function MoonIcon() {
   return (
     <svg width="16" height="16" viewBox="-12 -12 24 24" aria-hidden="true">
-      {/* A crescent as one path: a filled disc with a second disc taken out
-          of it, so it stays a crescent at any size rather than depending on
-          two shapes lining up. */}
+      {/* A crescent as one path (a disc with a second disc cut out), so it
+          holds its shape at any size. */}
       <path
         d="M2.2 -8.6 A 8.6 8.6 0 1 0 6.4 5.6 A 6.9 6.9 0 0 1 2.2 -8.6 Z"
         fill="currentColor"

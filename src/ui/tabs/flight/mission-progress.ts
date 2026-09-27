@@ -1,11 +1,6 @@
-// What to say about mission progress, separated from how it is drawn.
-//
-// The arithmetic is small but every part of it has a wrong answer that looks
-// plausible on screen, which is what makes it worth testing rather than
-// inlining: an ETA computed from a groundspeed of zero is Infinity, one
-// computed while hovering over the waypoint is a flicker between 0 and 3
-// seconds, and a sequence number from a plan this GCS has never seen indexes
-// past the end of the array.
+// Mission progress text, kept separate from drawing so it can be tested. The
+// edge cases: an ETA at zero groundspeed, an ETA while hovering over the
+// waypoint, and a sequence number from a plan this GCS has not loaded.
 
 import type { PlanItem } from '../../../protocol/mission-plan'
 import { commandSpec } from '../../../protocol/mission-commands'
@@ -30,13 +25,12 @@ export function missionProgress(
   wpDistM: number | null,
   groundspeedMs: number,
 ): MissionProgress {
-  // Item 0 is home, never a waypoint being flown -- and it is what ArduPilot
-  // reports as current with no mission at all, which drew "WP 0 0 m".
+  // Item 0 is home, never a waypoint being flown; ArduPilot reports it as
+  // current when there is no mission at all.
   if (seq === null || seq < 1) return { position: null, commandName: null, etaS: null }
 
-  // The vehicle's plan and this GCS's plan can differ -- a plan uploaded
-  // elsewhere, or none loaded here at all. The sequence number is still
-  // true, so it is shown; only the parts that need the local plan drop out.
+  // The vehicle's plan may not be the one loaded here. The sequence number is
+  // still shown; only the parts that need the local plan drop out.
   const known = seq >= 0 && seq < items.length
   const total = items.length
   const position = total > 0 ? `${seq} of ${total - 1}` : String(seq)

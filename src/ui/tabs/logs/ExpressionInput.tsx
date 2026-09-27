@@ -3,16 +3,10 @@ import { LaButton, LaHint, LaInput } from '../../components/La'
 import { expressionError } from '../../../protocol/log-expression'
 import { useLogStore } from '../../../stores/log-store'
 
-// Plotting something the log does not record.
+// Plotting an expression over logged fields. It sits under the field list,
+// where the names it uses can be looked up.
 //
-// It sits under the field list because it answers the same question the
-// list does -- "what goes on the plot" -- and because the names it needs
-// are the ones directly above it: you find ATT.DesRoll by searching, then
-// type it into an expression.
-//
-// The error appears while typing rather than on submit. Half of these are
-// mistyped field names, and a log has six hundred of them; being told at
-// the moment of the typo beats being told after pressing a button.
+// Errors show while typing, since most are mistyped field names.
 
 /** Worked examples, chosen to teach the three things the syntax can do. */
 const EXAMPLES = [
@@ -29,7 +23,7 @@ export default function ExpressionInput() {
 
   if (!log) return null
 
-  // Nothing typed is not an error, it is the resting state.
+  // Empty input is not an error.
   const live = text.trim() ? expressionError(log, text) : null
   const problem = rejected ?? live
 

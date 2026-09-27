@@ -6,20 +6,11 @@ import { rowKey, useInspectorStore } from '../../../stores/inspector-store'
 import type { FieldValue } from '../../../protocol/types'
 
 // Everything on the link, live: which messages are arriving, from whom, how
-// often, and what the latest one said. The X-ray for "why is my airspeed
-// blank" -- either ARSP is not in this list, or it is and the problem is
-// ours.
+// often, and the latest values. Useful for telling a missing message from a
+// display bug.
 //
-// Watching costs nothing until this tab is open: the worker counts always
-// (an upsert per message, next to a decode that already happened) but only
-// builds snapshots while someone is looking, so mounting turns it on and
-// leaving turns it off.
-//
-// Hardware ID used to share this screen, on the argument that the two answer
-// one question from opposite sides -- what the vehicle is *saying* against
-// what it *found*. True, and not enough: the question "was my compass even
-// detected" is asked while calibrating it, so the answer now lives on
-// Sensors, next to the wizard that fails when it was not.
+// The worker always counts messages but only builds snapshots while this tab
+// is mounted.
 
 export default function InspectorTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
@@ -32,10 +23,7 @@ export default function InspectorTab() {
   const setFilter = useInspectorStore((s) => s.setFilter)
 
   useEffect(() => {
-    // Snapshotting only while this screen is mounted: the engine counts every
-    // message always, but building snapshots for a table nobody is looking at
-    // is the cost this gate exists to avoid. It used to also check which view
-    // was showing, back when Hardware ID shared the screen.
+    // Snapshots are built only while this screen is mounted.
     if (!connected) return
     connectionService.setInspecting(true)
     return () => {
@@ -67,11 +55,9 @@ export default function InspectorTab() {
 
   return (
     <div className="inspector">
-      {/* The filter bar is the pane's header, inside the frame -- the shape
-          Parameters and MAVFTP have. Outside it, the bar started the listing
-          and the detail column a line further down the page and left the top
-          of the screen empty beside it. The view switcher above still spans
-          both tracks, because it changes what the whole screen shows. */}
+      {/* The filter bar is the pane's header, inside the frame, as on
+          Parameters and MAVFTP, so the pane and the detail column start on
+          the same line. */}
       <div className="inspector__pane">
         <div className="inspector__bar">
           <LaInput
@@ -146,13 +132,9 @@ export default function InspectorTab() {
             ) : (
               <LaHint>Click a message to watch its latest field values here.</LaHint>
             )}
-            {/* No note about the refresh rate or the dialect. Both were true
-              and neither was needed: the rate is visible in the table that is
-              updating, and "only messages in this app's dialect appear" is a
-              property of every ground station -- MAVLink's CRC folds each
-              message's definition into the checksum, so one this GCS has no
-              definition for cannot survive framing at all. Kept here, where
-              it costs a reader nothing. */}
+            {/* Only messages in this app's dialect can appear: MAVLink's CRC
+              folds each message's definition into the checksum, so an
+              unknown one cannot survive framing. */}
           </section>
         </div>
       </aside>
@@ -160,7 +142,7 @@ export default function InspectorTab() {
   )
 }
 
-/** A field value at reading size: full precision belongs in the plots. */
+/** A field value at reading precision. */
 function formatValue(v: FieldValue): string {
   if (typeof v === 'number') {
     if (Number.isInteger(v)) return String(v)

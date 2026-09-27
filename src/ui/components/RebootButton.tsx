@@ -4,17 +4,12 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { useVehicleStore } from '../../stores/vehicle-store'
 import { rebootAutopilot } from '../../services/flight'
 
-// Restarting the autopilot, wherever that is the next thing to do.
+// Reboots the autopilot, for screens where a change only takes effect at
+// boot (a reboot-required parameter, a compass calibration).
 //
-// It lives here rather than on one page because the pages that need it are
-// the ones where a change has just been made that the firmware only reads
-// at boot -- a parameter marked reboot-required, a compass calibration --
-// and each of those would otherwise grow its own copy.
-//
-// It always asks first. The vehicle drops the link and comes back thirty
-// seconds later, and the same click on an armed aircraft is the click
-// nobody meant to make. ArduPilot refuses to reboot while armed, but a
-// station should not be the thing relying on that.
+// It always confirms first: the link drops for about thirty seconds, and the
+// dialog warns when the vehicle is armed rather than relying on ArduPilot's
+// own refusal.
 
 export interface RebootButtonProps {
   /** Shown under the button when a written parameter needs the reboot. */
@@ -37,8 +32,8 @@ export default function RebootButton({ note, size = 'block', onRebooted }: Reboo
       setStatus('Rebooting. It will reconnect on its own.')
       onRebooted?.()
     }
-    // The vehicle stops answering mid-command about as often as it acks, so
-    // a rejection here is not news. The link status says the rest.
+    // A rebooting vehicle often drops the link before acking, so a rejection
+    // is expected; the link status reports the rest.
     void rebootAutopilot().then(sent, sent)
   }
 

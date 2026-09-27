@@ -83,9 +83,8 @@ describe('reading a directory listing', () => {
   })
 
   it('keeps a skipped entry as a hole, because the index counts it', () => {
-    // 'S' entries occupy a slot the next request's offset has to account
-    // for, but they are not directory contents. Dropping them silently
-    // would make the listing re-read the same entries forever.
+    // 'S' entries are not directory contents but still occupy a slot the
+    // next request's offset must count, or the listing loops forever.
     const entries = parseDirEntries(bytes('Fa.BIN\t10\0S\0Fb.BIN\t20\0'))
     expect(entries).toHaveLength(3)
     expect(entries[1]).toBeNull()
@@ -101,8 +100,8 @@ describe('reading a directory listing', () => {
   })
 
   it('ignores the trailing separator rather than counting it', () => {
-    // A trailing NUL is normal, and an empty entry would inflate the index
-    // and skip a real file on the next page.
+    // A trailing NUL is normal; counting it as an entry would skip a real
+    // file on the next page.
     expect(parseDirEntries(bytes('Fa.BIN\t1\0'))).toHaveLength(1)
     expect(parseDirEntries(bytes(''))).toEqual([])
   })
@@ -124,9 +123,8 @@ function burstDevice(
   file: Uint8Array,
   mode: 'good' | 'unsupported' | 'silent' | 'duplicates' | 'gap' = 'good',
 ) {
-  // Which opcodes the device was actually asked for. Without this a burst
-  // test passes just as happily through the sequential fallback, which is
-  // exactly what happened before it existed.
+  // Which opcodes the device was asked for. Without this a burst test could
+  // pass through the sequential fallback.
   const saw: number[] = []
   let gapDropped = false
   const client: MavFtpClient = new MavFtpClient((payload) => {
@@ -159,9 +157,8 @@ function burstDevice(
         }
         const step = 64
         // 'gap' loses one packet mid-burst, exactly once. Everything after
-        // it arrives ahead of the contiguous point and must be ignored --
-        // writing it would leave a hole in the middle of the file that
-        // nothing later fills.
+        // it arrives ahead of the contiguous point and must be ignored, or
+        // the file gets a hole nothing later fills.
         let dropAt = mode === 'gap' && !gapDropped ? req.offset + step * 2 : -1
         for (let at = req.offset; at < file.length; at += step) {
           const chunk = file.subarray(at, Math.min(at + step, file.length))
@@ -221,13 +218,12 @@ describe('burst reads', () => {
   const file = new Uint8Array(1000).map((_, i) => (i * 7) & 0xff)
 
   it('reads a whole file from a stream of packets', async () => {
-    // A plain read costs a round trip per 239 bytes -- 28 ms of them
-    // against SITL, which is twenty-four minutes for a ten-megabyte log.
+    // A plain read costs a round trip per 239 bytes (about 28 ms against
+    // SITL), which is twenty-four minutes for a ten-megabyte log.
     const { client, saw } = burstDevice(file, 'good')
     const out = await client.readFile('/logs/1.BIN')
     expect(out).toEqual(file)
-    // The point of the test: it came by burst, and not one plain read was
-    // needed to finish it.
+    // It came by burst, with no plain reads.
     expect(saw).toContain(FtpOp.BurstReadFile)
     expect(saw).not.toContain(FtpOp.ReadFile)
   })
@@ -247,10 +243,8 @@ describe('burst reads', () => {
   })
 
   it('re-requests from the gap when a packet goes missing', async () => {
-    // Everything after a lost packet arrives ahead of where the file has
-    // been filled to. Accepting it would leave a hole that nothing later
-    // fills, and the log would be quietly corrupt rather than obviously
-    // broken -- the worst way for this to fail.
+    // Packets after a lost one arrive ahead of the fill point. Accepting them
+    // would leave a hole and a silently corrupt log.
     const { client, saw } = burstDevice(file, 'gap')
     const out = await client.readFile('/logs/1.BIN')
     expect(out).toEqual(file)
@@ -270,8 +264,8 @@ describe('burst reads', () => {
   })
 
   it('falls back when bursts are simply never answered', async () => {
-    // A link that drops them wholesale, which is the case a NAK does not
-    // cover and the one that would otherwise hang forever.
+    // A link that drops burst packets entirely: no NAK arrives, so this
+    // would otherwise hang.
     const { client, saw } = burstDevice(file, 'silent')
     const out = await client.readFile('/logs/1.BIN')
     expect(out).toEqual(file)
@@ -289,8 +283,8 @@ describe('canceling a read', () => {
     await vi.waitFor(() => expect(saw).toContain(FtpOp.BurstReadFile))
     client.cancelRead()
     await expect(read).rejects.toBeInstanceOf(FtpCancelled)
-    // The session is closed so the vehicle stops sending, and the slow path a
-    // failed burst would take is not taken for a file nobody wants.
+    // The session is closed so the vehicle stops sending, and a canceled
+    // read never falls back to sequential reads.
     expect(saw.slice(saw.indexOf(FtpOp.BurstReadFile))).toContain(FtpOp.TerminateSession)
     expect(saw).not.toContain(FtpOp.ReadFile)
   })
@@ -315,10 +309,8 @@ describe('canceling a read', () => {
 })
 
 /**
- * A device that accepts writes, keeping what it is sent so the test can
- * compare it with what was meant. It also records the raw requests, which
- * is how the offsets and the rename payload get checked -- those are the
- * parts a receiving autopilot would notice and a mock would not.
+ * A device that accepts writes and keeps what it receives. It also records
+ * the raw requests so the offsets and rename payload can be checked.
  */
 function writableDevice({ failAt = -1 } = {}) {
   const written = new Map<number, Uint8Array>()
@@ -372,8 +364,7 @@ function writableDevice({ failAt = -1 } = {}) {
 
 describe('writing a file to the vehicle', () => {
   it('arrives byte for byte', async () => {
-    // Bigger than one chunk on purpose: 239 is the payload limit, and an
-    // off-by-one in the chunking corrupts a Lua script silently.
+    // Larger than one 239-byte chunk, so an off-by-one in chunking shows.
     const file = new Uint8Array(1000).map((_, i) => (i * 31) & 0xff)
     const dev = writableDevice()
     await dev.client.writeFile('/APM/scripts/test.lua', file)
@@ -406,8 +397,8 @@ describe('writing a file to the vehicle', () => {
   })
 
   it('closes the session even when a write fails', async () => {
-    // A session left open is one of the four the vehicle has; leaking them
-    // makes the next transfer fail for a reason nobody can see.
+    // The vehicle has four sessions; a leaked one makes a later transfer
+    // fail.
     const dev = writableDevice({ failAt: 239 })
     await expect(dev.client.writeFile('/x', new Uint8Array(600))).rejects.toThrow()
     expect(dev.wasTerminated()).toBe(true)

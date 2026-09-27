@@ -29,8 +29,7 @@ describe('preferences', () => {
   })
 
   it('ignores a stored value this build does not understand', () => {
-    // A newer build's choice, or a corrupted key: fall back rather than
-    // hand an unknown unit to a converter that has no entry for it.
+    // A newer build's choice, or a corrupted key: fall back to a known unit.
     localStorage.setItem(
       KEY,
       JSON.stringify({ version: 99, units: { distance: 'furlongs', speed: 'kts' } }),
@@ -46,8 +45,7 @@ describe('preferences', () => {
     Storage.prototype.setItem = () => {
       throw new Error('QuotaExceededError')
     }
-    // Not remembering a preference is a nuisance; refusing to change it
-    // would be a fault.
+    // The preference still changes; it just is not saved.
     expect(() => store().setDistanceUnit('ft')).not.toThrow()
     expect(store().units.distance).toBe('ft')
     Storage.prototype.setItem = real
@@ -61,14 +59,11 @@ describe('preferences', () => {
   })
 
   it('reads a store written before climb rate had a control', async () => {
-    // The additive-shape claim, exercised rather than asserted in a comment:
-    // a document with no verticalSpeed key must come back as `follow`, which
-    // is precisely what those builds did. If this needed a VERSION bump, it
-    // would fail here.
+    // A document with no verticalSpeed key must come back as `follow`, which
+    // is what those builds did, with no VERSION bump.
     //
-    // Re-imported rather than poked through a setter: the document is only
-    // read at module load, so a setter would assert the in-memory default
-    // and pass whatever is in storage -- which is a test that cannot fail.
+    // Re-imported because the document is read only at module load; a
+    // setter would test the in-memory default instead.
     localStorage.setItem(
       KEY,
       JSON.stringify({ version: 1, units: { distance: 'ft', speed: 'kts' } }),
@@ -85,9 +80,8 @@ describe('preferences', () => {
 
 describe('what the vehicle is commanded, whatever is displayed', () => {
   it('returns a mission altitude unchanged through a units round trip', () => {
-    // The one that matters. A waypoint stored at 120 m is displayed as 394
-    // ft; typing that 394 back must not walk the stored value, because a
-    // units bug in a mission altitude is a flying-into-terrain bug.
+    // A waypoint stored at 120 m is displayed as 394 ft; typing that 394
+    // back must not drift the stored altitude.
     const storedM = 120
     for (const unit of ['m', 'ft'] as const) {
       const shown = Math.round(toDistance(storedM, unit))

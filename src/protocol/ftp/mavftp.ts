@@ -1,12 +1,9 @@
 // MAVFTP client: request/response over FILE_TRANSFER_PROTOCOL with per-op
-// timeout and retry, following pymavlink mavftp.py's semantics. Reads are
-// sequential for now -- ample for USB/TCP links; the pipelined burst-read
-// optimization for lossy radio links is roadmap and slots in behind the same
-// readFile() surface.
+// timeout and retry, following pymavlink mavftp.py's semantics.
 //
-// One rule worth its comment (from ArduPilot's @PARAM docs): all reads on a
-// file handle must use the SAME size, or a re-read after a lost packet can
-// split a parameter record across block boundaries on the device side.
+// From ArduPilot's @PARAM docs: all reads on a file handle must use the same
+// size, or a re-read after a lost packet can split a parameter record across
+// block boundaries on the device side.
 import {
   FTP_MAX_DATA,
   FtpError,
@@ -35,9 +32,8 @@ const FTP_ERROR_NAMES: Record<number, string> = {
 
 export class FtpNak extends Error {
   constructor(readonly code: number) {
-    // The name is in the message, not just the number: this error crosses
-    // the worker boundary as a plain Error, so the message is all a caller
-    // on the other side has left to reason about.
+    // The name goes in the message because this crosses the worker boundary
+    // as a plain Error.
     super(`MAVFTP NAK ${FTP_ERROR_NAMES[code] ?? 'error'} (${code})`)
   }
 }
@@ -64,11 +60,10 @@ const MAX_DIR_ENTRIES = 5000
  *
  * Each entry is a NUL-terminated string whose first character is its kind:
  * 'F' a file, 'D' a directory, 'S' an entry to skip. A file carries its
- * size after a tab. Nulls in the payload are the separators, and a trailing
- * one is normal -- so empty pieces are dropped rather than counted.
+ * size after a tab. A trailing NUL is normal, so empty pieces are dropped.
  *
- * Skipped entries come back as null: they occupy a slot in the index the
- * next request has to account for, but they are not directory contents.
+ * Skipped entries come back as null: they still occupy a slot in the index
+ * the next request has to account for.
  */
 export function parseDirEntries(data: Uint8Array): (FtpDirEntry | null)[] {
   const text = new TextDecoder().decode(data)
@@ -127,8 +122,7 @@ export class MavFtpClient {
     const pkt = decodeFtpPacket(payload)
 
     // A burst is one request answered by many packets, so only the first
-    // matches a pending seq and the rest would be dropped as stale. They
-    // are identified by what they are a reply *to*, not by their sequence.
+    // matches a pending seq. Route them by the opcode they answer instead.
     if (this.burst && pkt.reqOpcode === FtpOp.BurstReadFile) {
       this.burst.onPacket(pkt)
       return
@@ -151,11 +145,8 @@ export class MavFtpClient {
    * Stop the file read in progress.
    *
    * The read rejects with `FtpCancelled` and ends its session on the vehicle,
-   * which is what stops a burst: the vehicle otherwise goes on sending the
-   * rest of a ten-megabyte log into a client that has stopped listening, and
-   * the next request queues behind it. It does not fall back to sequential
-   * reads the way a failed burst does -- nobody wants the slow path to a file
-   * they just gave up on. Other requests in flight are left alone.
+   * which is what stops a burst. It does not fall back to sequential reads.
+   * Other requests in flight are left alone.
    */
   cancelRead() {
     this.readCancelled = true
@@ -207,11 +198,8 @@ export class MavFtpClient {
   /**
    * List a directory.
    *
-   * The offset field is an *entry index*, not a byte offset -- the one part
-   * of this opcode that does not work like the others -- so paging means
-   * counting the entries already seen rather than the bytes. The device
-   * ends the listing by NAKing with EndOfFile, which is a normal reply and
-   * not a failure.
+   * The offset field is an entry index, not a byte offset. The device ends
+   * the listing with an EndOfFile NAK, which is not a failure.
    */
   async listDirectory(path: string): Promise<FtpDirEntry[]> {
     const out: FtpDirEntry[] = []
@@ -228,8 +216,7 @@ export class MavFtpClient {
       if (entries.length === 0) break
       for (const e of entries) if (e) out.push(e)
       index += entries.length
-      // A directory with more entries than anyone wants to page through is
-      // a sign something is wrong; stop rather than loop forever.
+      // Stop rather than page forever through a device that never ends.
       if (out.length > MAX_DIR_ENTRIES) break
     }
     return out
@@ -265,16 +252,13 @@ export class MavFtpClient {
   /**
    * One burst: ask once, receive many.
    *
-   * A plain read is a round trip per 239 bytes, which measured at 28 ms
-   * against SITL -- eight kilobytes a second, or twenty-four minutes for a
-   * ten-megabyte log. ArduPilot answers a burst request with a stream of
-   * packets instead, which is the difference between this feature working
-   * and not. Pipelining ordinary reads does not help: the vehicle serves
-   * one FTP request at a time and simply times the rest out.
+   * A plain read is a round trip per 239 bytes (about 8 kB/s against SITL).
+   * ArduPilot answers a burst request with a stream of packets instead.
+   * Pipelining ordinary reads does not work: the vehicle serves one FTP
+   * request at a time and times the rest out.
    *
-   * Returns the offset one past the last contiguous byte received. Bursts
-   * are re-requested from there, so a dropped packet costs a little
-   * re-reading rather than a hole in the file.
+   * Returns the offset one past the last contiguous byte received. The next
+   * burst starts there, so a dropped packet never leaves a hole.
    */
   private burstOnce(
     session: number,
@@ -290,8 +274,8 @@ export class MavFtpClient {
         this.burst = null
         fn()
       }
-      // Idle timeout rather than a total one: a burst of a whole file is
-      // legitimately long, but a gap between packets means it died.
+      // Idle timeout rather than a total one: a whole-file burst is long, but
+      // a gap between packets means it died.
       const arm = () => {
         clearTimeout(timer)
         timer = setTimeout(() => finish(() => resolve(end)), this.opTimeoutMs * 4)
@@ -325,9 +309,8 @@ export class MavFtpClient {
         },
       }
       arm()
-      // Sent directly rather than through request(): every reply belongs to
-      // the burst handler, including the first, which would otherwise be
-      // consumed as an ordinary answer and never reach it.
+      // Sent directly rather than through request(), which would consume the
+      // first reply as an ordinary answer.
       this.sendPayload(
         encodeFtpPacket({
           seq: this.seq++ & 0xffff,
@@ -354,11 +337,8 @@ export class MavFtpClient {
   /**
    * Write a whole file, one chunk at a time.
    *
-   * No burst equivalent exists in the other direction, and pipelining does
-   * not work: ArduPilot serves one FTP request at a time and times the rest
-   * out -- the same thing that makes pipelined reads useless. So a script
-   * or a font goes up at 239 bytes a round trip, which is fine for the
-   * kilobytes those actually are and is why nothing larger is offered.
+   * There is no burst write, and pipelining does not work, so this is 239
+   * bytes per round trip. Fine for scripts and fonts, too slow for more.
    */
   async writeFile(
     path: string,
@@ -407,17 +387,16 @@ export class MavFtpClient {
     try {
       await this.request(FtpOp.TerminateSession, session, 0)
     } catch {
-      // A session the device already dropped is fine -- we wanted it gone.
+      // A session the device already dropped is fine.
     }
   }
 
   /**
    * Read a whole file, by burst where the vehicle supports it.
    *
-   * The fallback is the same shape as the parameter download's: try the
-   * fast path, and drop to the one that always works rather than failing.
-   * Firmware old enough to lack BurstReadFile answers UnknownCommand, and
-   * some links lose enough packets that a burst never completes.
+   * Falls back to sequential reads: firmware without BurstReadFile answers
+   * UnknownCommand, and some links lose enough packets that a burst never
+   * completes.
    */
   async readFile(
     path: string,
@@ -430,10 +409,9 @@ export class MavFtpClient {
     await this.resetSessions()
     stopIfCancelled()
     const { session, size } = await this.openFileRO(path)
-    // A cancel returns at once and closes the session behind it. Awaiting the
-    // close first held the button up for 589 ms against SITL: ArduPilot
-    // serves one FTP request at a time, so the TerminateSession ack waited
-    // for the rest of the burst already on its way.
+    // Cancel returns immediately and terminates the session in the
+    // background: ArduPilot serves one FTP request at a time, so the
+    // terminate ack only arrives after the burst already in flight.
     const closeAndStop = (err: unknown): never => {
       void this.terminate(session)
       throw err
@@ -478,9 +456,8 @@ export class MavFtpClient {
         chunks.push(chunk)
         offset += chunk.length
         onProgress?.(offset, size)
-        // A short chunk before the reported size can just mean the device
-        // capped one read; only EOF (null) ends the loop. But a zero-length
-        // chunk would loop forever -- treat it as EOF.
+        // A short chunk can just mean the device capped one read, so only EOF
+        // (null) ends the loop. A zero-length chunk is treated as EOF.
         if (chunk.length === 0) break
       }
     } finally {

@@ -1,6 +1,6 @@
-// Raw MAVLink over a WebSocket -- works identically in the browser and
-// Electron, which makes it the network path for the zero-install build
-// (mavlink-server and similar bridges expose exactly this).
+// Raw MAVLink over a WebSocket. Works the same in the browser and Electron,
+// so it is the network path for the browser build (mavlink-server and similar
+// bridges expose this).
 import { TransportError, type Transport, type TransportOptions } from './Transport'
 
 export class WebSocketTransport implements Transport {

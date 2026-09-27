@@ -1,9 +1,7 @@
-// Payload (de)serialization driven by the field tables in mavlink-mappings
-// (the ArduPilot-org maintained message definitions). node-mavlink's own
-// parser is built on Node streams and cannot run in a browser or worker, so
-// the byte-level work is done here; mavlink-mappings supplies the offsets,
-// sizes, and CRC-extra constants so nothing about the wire format is
-// hand-transcribed.
+// Payload (de)serialization driven by mavlink-mappings' field tables.
+// node-mavlink's parser needs Node streams and cannot run in a worker, so the
+// byte-level work is done here, with offsets, sizes and CRC-extra constants
+// taken from mavlink-mappings rather than hand-transcribed.
 import { minimal, standard, common, ardupilotmega } from 'mavlink-mappings'
 import type { DecodedMessage, FieldValue } from './types'
 

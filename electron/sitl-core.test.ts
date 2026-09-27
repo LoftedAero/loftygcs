@@ -53,18 +53,16 @@ describe('sitl-core', () => {
     // ...and the defaults file is what makes prearm pass at all.
     expect(a).toContain('--defaults')
     expect(flag(a, '--defaults')).toContain('copter.parm')
-    // Absolute, because the working directory is a subdirectory now and a
-    // bare filename would be looked for in the wrong place.
+    // Absolute, because SITL runs in a per-model subdirectory.
     expect(path.isAbsolute(flag(a, '--defaults')!)).toBe(true)
-    // No --rate override: forcing one drops the gyro sample rate under the
-    // arming check's threshold and the vehicle then never arms.
+    // No --rate: forcing one drops the gyro sample rate below the arming
+    // check's threshold and the vehicle never arms.
     expect(a).not.toContain('--rate')
     expect(a.join(' ')).toMatch(/--home -35\.363262/)
   })
 
   it('uses the right physics model per vehicle', () => {
-    // The two differ -- a plane launched on the copter model flies like
-    // nothing at all -- so this is the assertion, not the literal names.
+    // What matters is that the two differ, not the literal names.
     expect(args({ vehicle: 'plane' })).toContain(SIM_VEHICLES.plane.model)
     expect(args({ vehicle: 'copter' })).toContain(SIM_VEHICLES.copter.model)
     expect(SIM_VEHICLES.plane.model).not.toBe(SIM_VEHICLES.copter.model)
@@ -205,9 +203,8 @@ describe('choosing a build', () => {
   })
 })
 
-// Against the real published binaries rather than a fixture we wrote: a
-// banner scanner tested only on its own test data proves the scanner reads
-// what the test author believed ArduPilot writes.
+// Against the real published binaries, so the banner format is ArduPilot's
+// and not our assumption of it.
 describe.runIf(existsSync(path.join(BASE, executableName('copter'))))('reading real builds', () => {
   it('identifies the downloaded simulators', () => {
     const copter = readBuildInfo(path.join(BASE, executableName('copter')))
@@ -225,8 +222,7 @@ describe('what the vehicle boots with', () => {
   })
 
   it('keeps stored parameters when asked to', () => {
-    // Tuning wants the parameters it left behind; wiping them every launch
-    // is why this stopped being unconditional.
+    // Tuning work needs the parameters from the previous session.
     expect(args({ vehicle: 'copter', params: { kind: 'keep' } })).not.toContain('-w')
   })
 
@@ -284,15 +280,14 @@ describe('RealFlight', () => {
   })
 
   it('names only simulators it could have launched, for the stray killer', () => {
-    // This list is handed to taskkill/pkill, so what is *not* in it matters
-    // more than what is: "whatever holds 5760" would be an unidentified
-    // process on someone's machine, and the app has no business killing it.
+    // This list goes to taskkill/pkill, so it must name only simulators,
+    // never "whatever holds 5760".
     const win = simProcessNames(undefined, 'win32')
     expect(win).toEqual(['ArduCopter.exe', 'ArduPlane.exe'])
     expect(simProcessNames(undefined, 'linux')).toEqual(['ArduCopter', 'ArduPlane'])
 
-    // A custom build joins the set, by basename -- a full path would be
-    // handed to taskkill as an image name and match nothing.
+    // A custom build joins by basename; taskkill matches image names, not
+    // paths.
     const custom = simProcessNames('C:/builds/f35b/ArduPlane.exe', 'win32')
     expect(custom).toContain('ArduPlane.exe')
     expect(custom.every((n) => n === path.basename(n))).toBe(true)
@@ -305,17 +300,14 @@ describe('RealFlight', () => {
   })
 
   it('names RealFlight without an address, which means this machine', () => {
-    // ArduPilot also accepts `flightaxis:<host>` for a copy running across
-    // a network, and the app no longer offers it -- so the model string is
-    // always bare, and spelling out 127.0.0.1 would only be noise in the
-    // argument list.
+    // ArduPilot also accepts `flightaxis:<host>`; the app does not offer a
+    // remote host, so the model string is always bare.
     expect(modelName({ vehicle: 'plane', physics: { kind: 'flightaxis' } })).toBe('flightaxis')
   })
 
   it('keeps each model its own stored parameters, beside the build', () => {
-    // This is the layout an aircraft ships in: the executable, and a
-    // <model>/eeprom.bin next to it. Pointing at the executable has to find
-    // the parameters with no further instruction.
+    // The layout an aircraft ships in: the executable with <model>/eeprom.bin
+    // beside it, so pointing at the executable finds the parameters.
     const launch = {
       vehicle: 'plane' as const,
       exe: path.join('C:', 'rf', 'arduplane.exe'),
@@ -330,24 +322,21 @@ describe('RealFlight', () => {
   })
 })
 
-// The launch choices, driven through the real simulator. A launch path is
-// exactly the kind of thing that type-checks and then does nothing:
-// --defaults can name a file that is never read, and a custom build can
-// exit silently because a DLL is missing. Only running one settles it.
+// The launch choices, driven through the real simulator: --defaults can name
+// a file that is never read, and a custom build can exit silently when a DLL
+// is missing, so only running one proves anything.
 //
-// The probe throughout is SERIAL0_PROTOCOL -1, which switches MAVLink off.
-// It was chosen after SYSID_THISMAV turned out not to reach the heartbeat,
-// making a test that could not fail: "did a heartbeat arrive" is binary,
-// needs no MAVLink parsing, and cannot be true for the wrong reason.
+// The probe is SERIAL0_PROTOCOL -1, which switches MAVLink off. Whether a
+// heartbeat arrives is binary and needs no parsing. (SYSID_THISMAV does not
+// reach the heartbeat from a defaults file, so it cannot serve as a probe.)
 describe.runIf(process.env.SITL === '1')('launching the real simulator', () => {
   const dir = path.resolve('sitl')
   let child: ChildProcess | null = null
   afterEach(async () => {
     child?.kill()
     child = null
-    // SITL holds port 5760 and does not release it the instant it is
-    // killed; a shorter wait had the next launch's client attach to the
-    // dying process and sit there hearing nothing.
+    // SITL does not release port 5760 the instant it is killed; without the
+    // wait the next client can attach to the dying process.
     await new Promise((r) => setTimeout(r, 2000))
   })
 
@@ -377,18 +366,16 @@ describe.runIf(process.env.SITL === '1')('launching the real simulator', () => {
   }
 
   it('reads the defaults file at the absolute path it is given', async () => {
-    // The working directory is a subdirectory now, so --defaults became an
-    // absolute path. If SITL quietly failed to open it -- and it prints
-    // nothing either way, even for a file that does not exist -- every
-    // vehicle would launch without the configuration that gets it armed.
+    // SITL prints nothing when it cannot open a defaults file, so this checks
+    // that the absolute path is actually read.
     const off = path.join(mkdtempSync(path.join(tmpdir(), 'sitl-def-')), 'off.parm')
     writeFileSync(off, 'SERIAL0_PROTOCOL -1\n')
     expect(await heartbeats({ vehicle: 'copter', params: { kind: 'file', path: off } })).toBe(false)
   }, 60000)
 
   it('talks MAVLink when nothing switched it off', async () => {
-    // The control for the test above: without it, "no heartbeat" would be
-    // just as consistent with a simulator that never started.
+    // Control for the test above: "no heartbeat" would also fit a simulator
+    // that never started.
     expect(await heartbeats({ vehicle: 'copter', params: { kind: 'wipe' } })).toBe(true)
   }, 60000)
 
@@ -406,20 +393,16 @@ describe.runIf(process.env.SITL === '1')('launching the real simulator', () => {
     expect(await heartbeats({ vehicle: 'copter', params: { kind: 'eeprom', path: src } })).toBe(
       true,
     )
-    // The image was copied in rather than opened in place, so the file the
-    // aircraft was distributed as is still byte-for-byte what it was. The
-    // working copy is *not*, and must not be: SITL writes storage back as
-    // it runs, and that is the whole reason for copying.
+    // The image is copied in, so the original stays byte-for-byte intact
+    // while SITL writes storage back to the working copy.
     expect(readFileSync(src).equals(shipped)).toBe(true)
     expect(readFileSync(path.join(work, 'eeprom.bin')).equals(shipped)).toBe(false)
   }, 90000)
 
   it('starts on flightaxis with no RealFlight listening', async () => {
-    // This is why the app no longer refuses to launch without RealFlight.
-    // The simulator comes up, binds its GCS port and announces itself in
-    // milliseconds; ArduPilot's socket_creator thread then retries the SOAP
-    // connection for as long as the process runs, so starting RealFlight
-    // afterwards is a supported order.
+    // SITL binds its GCS port and announces itself without RealFlight, and
+    // socket_creator retries the SOAP connection for as long as the process
+    // runs, so starting RealFlight afterwards is supported.
     let out = ''
     const proc = spawnSim(dir, { vehicle: 'plane', physics: { kind: 'flightaxis' } })
     child = proc
@@ -431,10 +414,8 @@ describe.runIf(process.env.SITL === '1')('launching the real simulator', () => {
   }, 30000)
 
   it('accepts a GCS but says nothing until RealFlight is there', async () => {
-    // The other half, and the reason the launch still warns. A GCS attaches
-    // to a port that answers nothing, because the vehicle's update() returns
-    // early with no sample -- so "connected, no heartbeat" is the symptom,
-    // and it does not point at RealFlight on its own.
+    // Without FlightAxis data, update() returns early and no MAVLink is sent,
+    // so a GCS connects to a silent port. This is why the launch warns.
     child = spawnSim(dir, { vehicle: 'plane', physics: { kind: 'flightaxis' } })
     await waitForReady(child, 20000)
     const beat = await new Promise<boolean>((resolve) => {

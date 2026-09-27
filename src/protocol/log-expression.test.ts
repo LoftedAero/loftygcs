@@ -50,7 +50,7 @@ describe('arithmetic', () => {
 
   it('treats ^ the way a spreadsheet does', () => {
     // Right-associative and binding tighter than unary minus: -2^2 is -4,
-    // and 2^3^2 is 512 rather than 64. Anyone typing here expects Excel.
+    // and 2^3^2 is 512 rather than 64.
     expect(evalAt('-2^2 + A.Y')).toEqual([-3, -3, -3, -3])
     expect(evalAt('2^3^2 * A.Y')).toEqual([512, 512, 512, 512])
   })
@@ -71,8 +71,7 @@ describe('arithmetic', () => {
   })
 
   it('leaves a bad sample as infinity rather than losing the plot', () => {
-    // One divide by zero should be a gap in a trace, not an exception that
-    // takes the whole expression down.
+    // A divide by zero is a gap in the trace, not an exception.
     expect(evalAt('A.Y / (A.X - 10)')[1]).toBe(Infinity)
   })
 })
@@ -92,8 +91,7 @@ describe('lining up series that were logged at different rates', () => {
   })
 
   it('holds the last value past the end rather than extrapolating', () => {
-    // B stops at t=2; at t=3 it stays 100. Running a trend off the end of
-    // the data would invent numbers nobody logged.
+    // B stops at t=2; at t=3 it stays 100.
     expect(evalAt('A.Y + B.Z')[3]).toBe(101)
   })
 
@@ -131,8 +129,7 @@ describe('saying what is wrong', () => {
   })
 
   it('refuses an expression with no fields at all', () => {
-    // 2+2 is arithmetic, not a trace; plotting a constant is never what
-    // was meant and the flat line does not say so.
+    // A constant is never what was meant, and a flat line would not say so.
     expect(fails('2 + 2')).toMatch(/nothing to plot/)
     expect(fails('   ')).toMatch(/Type an expression/)
   })

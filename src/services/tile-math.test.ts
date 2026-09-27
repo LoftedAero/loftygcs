@@ -9,9 +9,8 @@ import {
   tilesForBounds,
 } from './tile-math'
 
-// Checked against the published slippy-map numbers rather than against this
-// file's own arithmetic: the OSM wiki's worked example is Greenwich at zoom
-// 17, and the corners of the world are fixed by the projection itself.
+// Checked against published slippy-map values (the OSM wiki's Greenwich
+// example at zoom 17) and the projection's fixed corners.
 
 describe('the projection', () => {
   it('puts the prime meridian and the equator at the middle', () => {
@@ -34,11 +33,8 @@ describe('the projection', () => {
   })
 
   it('round-trips through the inverse projection', () => {
-    // The forward formula is checked against the standard *inverse*, which
-    // is different arithmetic reaching the same place -- atan(sinh(...))
-    // rather than ln(tan + sec). An error in one would have to be mirrored
-    // exactly in the other to survive this, where a remembered tile number
-    // only ever proves the memory.
+    // Checked against the standard inverse, atan(sinh(...)), which is
+    // independent arithmetic from the forward ln(tan + sec).
     const tileYToLat = (y: number, z: number) =>
       (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / 2 ** z))) * 180) / Math.PI
     const tileXToLon = (x: number, z: number) => (x / 2 ** z) * 360 - 180
@@ -84,7 +80,7 @@ describe('covering an area', () => {
   })
 
   it('grows about fourfold per zoom level', () => {
-    // The reason a prefetch dialog has to show the number before starting.
+    // Why the prefetch dialog shows the tile count before starting.
     const z16 = countTiles(field, 16, 16)
     const z18 = countTiles(field, 18, 18)
     expect(z18).toBeGreaterThan(z16 * 8)

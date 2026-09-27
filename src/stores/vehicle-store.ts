@@ -46,9 +46,9 @@ export interface VehicleSnapshot {
   batteryA: number
   batteryPct: number
   /**
-   * Each monitor's own reading from BATTERY_STATUS, keyed by instance (0 is
-   * BATT_, 1 is BATT2_). Empty until one arrives; the three fields above are
-   * SYS_STATUS's primary and stay what the bar and HUD read.
+   * Each monitor's reading from BATTERY_STATUS, keyed by instance (0 is
+   * BATT_, 1 is BATT2_). The three fields above are SYS_STATUS's primary,
+   * which the app bar and HUD read.
    */
   batteries: Record<number, BatteryReading>
   gpsFix: number
@@ -58,73 +58,52 @@ export interface VehicleSnapshot {
   /** RC receiver RSSI, 0-254. 255 (or -1 here) means the link does not report it. */
   rcRssi: number
   /**
-   * What each output is actually driving, from SERVO_OUTPUT_RAW -- index 0 is
-   * SERVO1. Empty until the message has arrived once, then 32 long whichever
-   * of its two ports has been heard; 0 is an output with nothing on it.
+   * Output values from SERVO_OUTPUT_RAW, index 0 is SERVO1. Empty until the
+   * message first arrives, then 32 long; 0 is an output with nothing on it.
    */
   servoOutputsUs: number[]
-  /** Raw SYS_STATUS masks; decoded for display by protocol/sensors.ts. */
-  /**
-   * The airframe the vehicle announced, when it is one we can draw.
-   *
-   * Part of the snapshot rather than a separate store because it is reset
-   * with everything else: a different vehicle is a different aircraft.
-   */
+  /** The airframe the vehicle announced, when it is one we can draw. */
   airframe: KnownAirframe | null
   /**
-   * Which outputs the board drives, and with what -- from the same boot
-   * banner, and latched for the same reason.
-   *
-   * Null until a board says, which is most of the time: only the ChibiOS HAL
-   * builds this line, so SITL and the demo vehicle never send one.
+   * Which outputs the board drives and how, from the boot banner. Only
+   * ChibiOS builds print it, so SITL and the demo vehicle leave it null.
    */
   rcout: RcoutBanner | null
   /**
-   * `CHIBIOS_SHORT_BOARD_NAME`, from the boot banner's system-id line.
-   *
-   * What identifies the board's output timer groups: its `APJ_BOARD_ID` does
-   * not, since 44 of them are shared by boards with different pinouts.
+   * `CHIBIOS_SHORT_BOARD_NAME`, from the boot banner. This, not
+   * `APJ_BOARD_ID`, identifies the output timer groups: 44 board ids are
+   * shared by boards with different pinouts.
    */
   boardName: string | null
   /**
-   * Mission progress, as reported rather than inferred.
-   *
-   * The vehicle is the authority on which item it is flying: a plan uploaded
-   * from this GCS can differ from the one aboard, and guessing from position
-   * would be wrong exactly when it matters. Null means it has not said.
+   * Mission progress as the vehicle reports it; the plan aboard can differ
+   * from the one on screen. Null until reported.
    */
   missionSeq: number | null
   wpDistM: number | null
   altErrorM: number | null
+  /** Raw SYS_STATUS masks; decoded for display by protocol/sensors.ts. */
   sensorsPresent: number
   sensorsEnabled: number
   sensorsHealth: number
   /**
-   * What the vehicle said about itself, once, in AUTOPILOT_VERSION.
+   * From AUTOPILOT_VERSION; null until the vehicle answers. The version
+   * selects parameter metadata and the mount protocol generation.
    *
-   * Null until it answers, and for anything that never does. The version
-   * picks matching parameter metadata and decides which generation of the
-   * mount protocol to speak.
-   *
-   * The capability bits are kept but deliberately not acted on. A real
-   * flight controller reported no MAVFTP bit while serving files happily,
-   * so a screen that believed them told someone their working feature did
-   * not exist. What an operation actually answers is the only thing worth
-   * gating on.
+   * Capability bits are kept but not acted on: real flight controllers have
+   * served MAVFTP without setting the FTP bit.
    */
   firmware: FirmwareVersion | null
   capabilities: number
   /**
-   * ArduPilot's `APJ_BOARD_ID` for this flight controller, or 0 when it has
-   * not said -- which SITL never does, since the id is a ChibiOS build
-   * constant. It is what the output timer groups are looked up by.
+   * ArduPilot's `APJ_BOARD_ID`, or 0 when not reported (SITL never reports
+   * it; it is a ChibiOS build constant).
    */
   boardId: number
   /**
    * Where the camera mount says it is pointed, or null when there is none.
-   *
-   * Null is the useful state: it is how the Fly screen tells a vehicle with
-   * no gimbal from one whose gimbal is not answering.
+   * Lets the Fly screen tell a vehicle with no gimbal from one whose gimbal
+   * is not answering.
    */
   gimbal: { rollDeg: number; pitchDeg: number; yawDeg: number } | null
   statusTexts: StatusText[]
@@ -191,14 +170,11 @@ export const useVehicleStore = create<VehicleStore>((set) => ({
   appendStatusText: (st) =>
     set((s) => ({
       statusTexts: [...s.statusTexts.slice(-(STATUSTEXT_CAP - 1)), st],
-      // Latched rather than searched for later: the frame line arrives once,
-      // in the boot banner, and the status feed is a capped ring that it
-      // scrolls out of within a minute of a talkative vehicle.
+      // Latched: the frame line arrives once, in the boot banner, and soon
+      // scrolls out of the capped status ring.
       airframe: s.airframe ?? knownAirframe(frameName([st.text])),
-      // Replaced rather than kept, unlike the airframe: a board re-sends this
-      // after a reboot, and a reboot is exactly when the output modes change.
-      // `parseRcoutBanner` returns null for every other line, so a talkative
-      // vehicle cannot clear it.
+      // Replaced rather than latched: a reboot re-sends it and may change the
+      // output modes. Other lines parse to null and leave it alone.
       rcout: parseRcoutBanner(st.text) ?? s.rcout,
       boardName: boardNameFromBanner(st.text) ?? s.boardName,
     })),

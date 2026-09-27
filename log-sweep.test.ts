@@ -1,11 +1,7 @@
-// A sweep of the whole log pipeline across a real corpus.
-//
-// Everything the log code has been tested against so far is either SITL or
-// one committed fixture. These are ~99 logs off real flight controllers,
-// across several firmware versions and two airframes, including a set
-// recorded while chasing a magnetometer problem. Hardware logs break
-// parsers in ways a simulator never does: truncated tails from a power
-// cut, formats that appear mid-file, multi-instance sensors, gaps.
+// Runs the whole log pipeline over a directory of real logs. Hardware logs
+// break parsers in ways SITL and a single fixture do not: truncated tails
+// from a power cut, formats that appear mid-file, multi-instance sensors,
+// gaps.
 //
 // Run: LOG_SWEEP="<dir>" npx vitest run log-sweep.test.ts
 import { describe, it } from 'vitest'
@@ -100,15 +96,13 @@ describe.runIf(ROOT !== undefined)('log corpus sweep', () => {
         row.modes = modeSpans(log).length
         row.end = Math.round(logEnd(log))
 
-        // Labels read the log's own parameter dump; a malformed one used to
-        // be able to throw here.
+        // Labels read the log's own parameter dump, which may be malformed.
         channelLabels(log.params, 'RCOU')
         channelLabels(log.params, 'RCIN')
 
         const fields = plottableFields(log)
         row.fields = fields.length
-        // Stats over every plottable series: NaN or Infinity in a min/max is
-        // a decoding fault that a single-fixture test would never show.
+        // NaN or Infinity in a min/max means a decoding fault.
         for (const f of fields) {
           const s = getSeries(log, f.message, f.field)
           if (!s || s.values.length === 0) continue

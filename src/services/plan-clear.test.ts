@@ -44,8 +44,8 @@ describe('clearing on this screen only', () => {
   })
 
   it('leaves the badge saying the vehicle still has one', () => {
-    // The whole reason the clear asks: an empty screen and an empty vehicle
-    // look identical, so the badge is the only thing left saying otherwise.
+    // An empty screen and an empty vehicle look identical; only the badge
+    // tells them apart.
     useMissionStore.getState().markSynced()
     clearPlanHere('mission')
     const s = useMissionStore.getState()
@@ -71,9 +71,8 @@ describe('clearing on the vehicle too', () => {
   })
 
   it('keeps the plan when the vehicle refuses', async () => {
-    // A refused clear that emptied the screen anyway would report a vehicle
-    // with no mission while it still holds one -- the exact failure this
-    // path exists to prevent.
+    // Emptying the screen anyway would show a vehicle with no mission while
+    // it still holds one.
     refuse = 'Mission transfer refused: MAV_MISSION_ERROR'
     await expect(clearPlanOnVehicle('mission')).rejects.toThrow(/refused/)
     const s = useMissionStore.getState()

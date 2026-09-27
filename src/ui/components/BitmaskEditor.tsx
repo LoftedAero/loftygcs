@@ -2,16 +2,11 @@ import { useState } from 'react'
 import { LaButton, LaModal } from './La'
 import type { ParamMeta } from '../../services/param-metadata'
 
-// A bitmask parameter as checkboxes, Mission Planner's idea. A bitmask is a
-// number nobody can read: ARMING_CHECK 82 is three checks enabled, and working
-// that out by hand is arithmetic in the middle of a bench session.
-//
-// Shared rather than living in the Parameters table, because a curated screen
-// hits exactly the same wall: `SERIALn_OPTIONS` carries no named values, so
-// `ParamField` fell through to a plain number box and the Ports page asked
-// people to type a mask. Any field bound to a bitmask parameter gets this.
+// A bitmask parameter as a set of switches, as Mission Planner does
+// (ARMING_CHECK 82 is three checks enabled). Shared by the Parameters table
+// and any curated field bound to a bitmask parameter, such as SERIALn_OPTIONS.
 
-/** "Gyros, Accels, +2 more" -- what is actually switched on. */
+/** What is switched on, e.g. "Gyros, Accels, +2 more". */
 export function describeBits(
   value: number,
   bitmask: NonNullable<ParamMeta['bitmask']>,
@@ -23,29 +18,26 @@ export function describeBits(
   for (const [bit, label] of Object.entries(bitmask)) {
     if ((v & (1 << Number(bit))) !== 0) on.push(label)
   }
-  // A bit the metadata does not name is still set, and saying "none" for a
-  // non-zero value would be a lie about the vehicle's configuration.
+  // A bit the metadata does not name is still set; never say "none" for a
+  // non-zero value.
   if (on.length === 0) return `${v}`
   const all = on.join(', ')
   if (on.length <= max) return all
-  // Shortening only earns its place when it is shorter: "Roll, Pitch, Yaw"
-  // beats "Roll, Pitch, +1 more", which costs more room and says less.
+  // Only shorten when it is actually shorter: "Roll, Pitch, Yaw" beats
+  // "Roll, Pitch, +1 more".
   const short = `${on.slice(0, max).join(', ')}, +${on.length - max} more`
   return all.length <= short.length ? all : short
 }
 
 /**
- * The longest single name a compact bitmask shows instead of a count. The
- * narrowest place one is drawn is the OSD column, where "UseDecimalPack" (14)
- * was clipped to "UseDecimalPac"; twelve fits there.
+ * The longest single name a compact bitmask shows instead of a count; twelve
+ * characters fit the narrowest place one is drawn, the OSD column.
  */
 const ONE_NAME_MAX = 12
 
 /**
- * "2 selected", or "none" -- a bitmask's summary where its names will not fit.
- *
- * One short name is shown as itself: RC_PROTOCOLS at 1 is "All", and "1
- * selected" said less in more room.
+ * "2 selected" or "none": a bitmask's summary where its names will not fit.
+ * A single short name is shown as itself (RC_PROTOCOLS at 1 is "All").
  */
 export function countBits(value: number, bitmask?: NonNullable<ParamMeta['bitmask']>): string {
   let v = Math.trunc(value) >>> 0
@@ -112,8 +104,7 @@ export default function BitmaskEditor({
           )
         })}
       </div>
-      {/* What the switches add up to, which is the number the vehicle
-          actually stores and the only thing here a `.param` file carries. */}
+      {/* The value the switches add up to, which is what the vehicle stores. */}
       <div className="bitmask-foot">
         <span className="bitmask-foot__label">Value</span>
         <span className="bitmask-foot__value">{v}</span>

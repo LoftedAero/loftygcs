@@ -1,18 +1,15 @@
-// A video source to point the HUD at when the drone is not on the bench.
+// A video source to point the HUD at without a camera.
 //
 //   node scripts/video-testsrc.mjs rtsp     -> rtsp://127.0.0.1:8554/test
 //   node scripts/video-testsrc.mjs udp      -> RTP to 127.0.0.1:5600
 //
-// This exists because the loopback test in electron/video/source.test.ts
-// proves our client talks RTSP correctly to *our own idea* of a server, which
-// is exactly the assumption that a real camera breaks. GStreamer's encoder and
-// payloader make none of our assumptions: x264enc emits real SPS/PPS, and
-// rtph264pay does its own STAP-A aggregation and FU-A fragmentation. If our
-// depayloader only works against packets we generated, this is where it shows.
+// The loopback test in electron/video/source.test.ts only checks our client
+// against our own fake server. GStreamer shares none of our assumptions:
+// x264enc emits real SPS/PPS, and rtph264pay does its own STAP-A aggregation
+// and FU-A fragmentation.
 //
-// GStreamer is not a dependency of the app -- it is the thing we replaced. It
-// is only ever a test fixture, which is why this lives in scripts/ and why
-// nothing under electron/ or src/ knows it exists.
+// GStreamer is a test fixture only, not an app dependency, so nothing under
+// electron/ or src/ refers to it.
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import os from 'node:os'
@@ -26,20 +23,16 @@ const FPS = 30
 const RTSP_PORT = Number(process.env.VIDEO_TESTSRC_PORT ?? 8554)
 const UDP_PORT = Number(process.env.VIDEO_TESTSRC_UDP_PORT ?? 5600)
 
-// The pattern is a test decision, not a cosmetic one. `ball` -- the obvious
-// choice -- encodes to under 1 KB a frame even at 1080p and 8 Mbit, so its
-// keyframes fit in two RTP packets and the FU-A reassembly loop never runs on
-// a middle fragment. That made an earlier version of the live test pass with
-// a deliberately broken depayloader. `circular` is fine concentric rings at
-// ~18 KB a frame, so a keyframe spans a dozen-odd packets the way a real
-// camera's does -- real video is detailed and noisy, and that is exactly why
-// its keyframes fragment. The rings also make decode artifacts obvious to the
-// eye, which a flat test card does not.
+// The pattern matters. `ball` encodes to under 1 KB a frame even at 1080p and
+// 8 Mbit, so its keyframes fit in two RTP packets and FU-A reassembly never
+// sees a middle fragment. `circular` runs about 18 KB a frame, so a keyframe
+// spans a dozen or so packets as a real camera's does, and its rings make
+// decode artifacts easy to see.
 const PATTERN = process.env.VIDEO_TESTSRC_PATTERN ?? 'pattern=circular'
 const BITRATE = Number(process.env.VIDEO_TESTSRC_BITRATE ?? 8000)
 
-// Where a Windows box tends to have GStreamer even when nobody installed it
-// deliberately: Mission Planner ships a full copy for its own video support.
+// Mission Planner ships a full GStreamer for its own video support, so a
+// Windows machine often has one there.
 const CANDIDATES = [
   process.env.GSTREAMER_ROOT,
   'C:/ProgramData/Mission Planner/gstreamer/1.0/x86_64',
@@ -64,9 +57,8 @@ export function findGstreamer() {
 }
 
 /**
- * GStreamer's own property parser treats a backslash as an escape, so a
- * Windows path silently becomes a different path and the element fails with
- * no useful message. Forward slashes work on every platform.
+ * GStreamer's property parser treats a backslash as an escape, which silently
+ * mangles a Windows path. Forward slashes work everywhere.
  */
 const gstPath = (p) => p.replace(/\\/g, '/')
 
@@ -77,12 +69,11 @@ function run(bin, exe, args, opts = {}) {
   return spawn(file, args, { stdio: 'inherit', env, ...opts })
 }
 
-/** Encode the clip once and keep it; regenerating it every run is pure wait. */
+/** Encode the clip once and reuse it. */
 function ensureClip(bin) {
   if (existsSync(CLIP) && statSync(CLIP).size > 0) return
   mkdirSync(path.dirname(CLIP), { recursive: true })
-  // ASCII: a Windows console renders this script's output as cp1252, so a
-  // typographic ellipsis here comes out as mojibake.
+  // ASCII only: a Windows console renders this output as cp1252.
   console.log(`encoding a ${SECONDS}s test clip (one time, about a minute)...`)
   const exe = os.platform() === 'win32' ? 'gst-launch-1.0.exe' : 'gst-launch-1.0'
   const child = spawnSync(
@@ -132,9 +123,8 @@ function main() {
 
   if (mode === 'rtsp') {
     ensureClip(bin)
-    // gst-validate-rtsp-server is a real RTSP server (gst-rtsp-server under
-    // the hood) -- it negotiates the session, so this exercises
-    // DESCRIBE/SETUP/PLAY against an implementation that has never heard of us.
+    // gst-validate-rtsp-server wraps gst-rtsp-server, so DESCRIBE/SETUP/PLAY
+    // are exercised against an independent implementation.
     const exe =
       os.platform() === 'win32'
         ? 'gst-validate-rtsp-server-1.0.exe'
@@ -160,16 +150,14 @@ function main() {
       `key-int-max=${FPS}`,
       '!',
       'h264parse',
-      // Repeat the parameter sets so a receiver that joins late can still
-      // start -- exactly what a camera does, and what our depayloader relies
-      // on when there is no SDP to read them from.
+      // Repeat the parameter sets so a late receiver can start, as a camera
+      // does. With no SDP, the depayloader relies on this.
       'config-interval=1',
       '!',
       'rtph264pay',
       'pt=96',
       'config-interval=1',
-      // Below the 1500-byte MTU so keyframes must be split across FU-A
-      // packets. A test that never fragments would miss our worst bug.
+      // Below the 1500-byte MTU so keyframes are split across FU-A packets.
       'mtu=1200',
       '!',
       'udpsink',
@@ -182,6 +170,5 @@ function main() {
   }
 }
 
-// Only when run as a script: the live test imports findGstreamer from here,
-// and importing a module must never start a server or encode a clip.
+// Only when run as a script: the live test imports findGstreamer from here.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()

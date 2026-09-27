@@ -4,13 +4,11 @@ import { hasCoords } from '../../../protocol/mission-plan'
 
 // The mission, drawn on the flying map.
 //
-// Mission mode owns editing a plan; this only shows the one being flown, and
-// shows it faintly so the vehicle stays the brightest thing on the map. The
-// leg in progress is the exception: it is drawn solid and full width,
-// because "which one am I on" is the question this layer exists to answer.
+// Read-only and faint, so the vehicle stays the brightest thing on the map;
+// only the leg in progress is drawn solid.
 //
-// Imperative like everything else on this map: rebuilding a Leaflet layer
-// through React at telemetry rate fights the map's own DOM.
+// Imperative like the rest of this map: rebuilding a Leaflet layer through
+// React at telemetry rate fights the map's own DOM.
 
 /** The route in muted orange; the active leg in the brand action color. */
 const ROUTE = '#F7941D'
@@ -29,9 +27,8 @@ export function createMissionOverlay(map: L.Map): MissionOverlay {
 
   return {
     update(items, currentSeq) {
-      // Redrawing every frame would rebuild a dozen DOM nodes at telemetry
-      // rate for a plan that changes about once a flight, so the layer is
-      // keyed on what it draws and skipped when nothing moved.
+      // Keyed on what it draws, so telemetry-rate calls are skipped unless
+      // the plan or the current item changed.
       const located = items.filter((it) => hasCoords(it))
       const key = `${currentSeq}|${located.map((it) => `${it.x},${it.y}`).join(';')}`
       if (key === lastKey) return
@@ -43,9 +40,8 @@ export function createMissionOverlay(map: L.Map): MissionOverlay {
       L.polyline(points, { color: ROUTE, weight: 2, opacity: ROUTE_OPACITY }).addTo(layer)
 
       located.forEach((it, i) => {
-        // Sequence numbers are the vehicle's, and item 0 is home -- so the
-        // label matches what the vehicle reports and what the mission table
-        // shows, not this array's index.
+        // The vehicle's sequence number (item 0 is home), not the index
+        // into `located`.
         const seq = items.indexOf(it)
         const active = currentSeq !== null && seq === currentSeq
         L.circleMarker(points[i]!, {
@@ -58,8 +54,7 @@ export function createMissionOverlay(map: L.Map): MissionOverlay {
         }).addTo(layer)
       })
 
-      // The leg being flown: from the previous located item to the current
-      // one. Drawn last so it sits over the faint route beneath it.
+      // The leg being flown, drawn last so it sits over the faint route.
       if (currentSeq === null) return
       const currentIdx = located.findIndex((it) => items.indexOf(it) === currentSeq)
       if (currentIdx > 0) {

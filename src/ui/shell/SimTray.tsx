@@ -5,28 +5,15 @@ import { useSimStore } from '../../stores/sim-store'
 import { simulatorAvailable, subscribeSimEvents } from '../../services/simulator'
 import { useUiStore } from '../../stores/ui-store'
 
-// The simulator, in the app bar rather than as a fourth mode.
+// The simulator tray in the app bar, reachable from any mode. The status dot
+// shows whether a SITL is running, since a forgotten one leaves a stray TCP
+// connection or blocks a second SITL from binding.
 //
-// It was a whole screen holding one card, which put a simulator on the same
-// footing as flying and mission planning -- and it is not one of those, it
-// is a thing you switch on before doing one of them. As a tray it stays
-// reachable from wherever the work is, which is the point: you start SITL
-// from the Mission screen and go straight back to the plan you were drawing.
-//
-// The dot on the button is why this works at all. A simulator running in the
-// background is easy to forget, and the cost of forgetting is a mystery TCP
-// connection or a second SITL that will not bind. The dot is on the bar in
-// every mode, so "is one running" never needs a trip anywhere to answer.
-//
-// The panel is a portal to the body, placed from the button's own rect. It
-// hung inside the app bar, which sounds right and is not: `.la-appbar` is a
-// grid item with a z-index, which makes it a *stacking context* at level 3,
-// and a stacking context caps everything inside it -- so the panel could ask
-// for any z-index it liked and still lose to Leaflet's control corners at
-// 1000, which are in the root context because nothing between them and it
-// creates one. The panel opened behind the map, and raising its own z-index
-// could not fix that. Out here it is in the root context too, at 1500: above
-// the map, below the modals at 2000.
+// The panel is portaled to the body and positioned from the button's rect.
+// `.la-appbar` is a grid item with a z-index, so it forms a stacking context
+// that caps its children below Leaflet's controls (z-index 1000, root
+// context). In the root context the panel sits at 1500: above the map, below
+// the modals at 2000.
 
 export default function SimTray() {
   const phase = useSimStore((s) => s.phase)
@@ -36,14 +23,12 @@ export default function SimTray() {
   const wrap = useRef<HTMLDivElement>(null)
   const btn = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
-  // Viewport coordinates, since the panel no longer hangs from the tray.
+  // Viewport coordinates, since the panel is portaled.
   const [at, setAt] = useState<{ top: number; right: number } | null>(null)
 
   useEffect(() => subscribeSimEvents(), [])
 
-  // Under the button and aligned to its right edge -- the same place it sat
-  // when it was a child of the tray. Re-measured on resize, because a fixed
-  // element placed once does not follow the bar when the window changes.
+  // Under the button, aligned to its right edge; re-measured on resize.
   useEffect(() => {
     if (!open) return
     const place = () => {
@@ -55,22 +40,19 @@ export default function SimTray() {
     return () => window.removeEventListener('resize', place)
   }, [open])
 
-  // Click-away and Escape, the two ways anyone expects to dismiss a tray.
+  // Dismiss on click-away and Escape.
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node
-      // The panel is no longer inside the wrapper, so it has to be asked
-      // separately -- without this, a click on any control in it closes it.
+      // The portaled panel is outside the wrapper, so check it separately.
       if (!wrap.current?.contains(t) && !panel.current?.contains(t)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    // Capture, not bubble: Leaflet's drag handler calls stopPropagation on
-    // mousedown, so a click on the map never reached a bubble-phase listener
-    // and the tray would not dismiss over the one surface it most often
-    // covers. Capture runs before any of that.
+    // Capture phase: Leaflet's drag handler stops mousedown propagation, so a
+    // bubble-phase listener never hears clicks on the map.
     document.addEventListener('mousedown', onDown, true)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -129,14 +111,7 @@ export default function SimTray() {
   )
 }
 
-/**
- * What a browser tab can and cannot do here.
- *
- * Kept rather than dropped with the old screen: someone who has used the
- * desktop build looks for the simulator first, and "there is no button"
- * reads as a bug where "a browser cannot start a process" reads as a
- * reason -- and points at the two things that do work from here.
- */
+/** Explains why the browser build cannot run SITL, and what works instead. */
 function BrowserNote() {
   return (
     <>

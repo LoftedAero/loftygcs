@@ -4,9 +4,8 @@ import { gunzipSync } from 'node:zlib'
 import { parseDataflash, type MessageTable, type ParsedLog } from './dataflash'
 import { airframeFrom, airframeFromLog, frameName, knownAirframe } from './airframe'
 
-// The strings here are real. ArduPilot changed the wording between the
-// versions this aircraft has flown, which is the whole reason the matcher
-// looks for "Frame:" and not for a phrase:
+// Real banner strings. The wording differs between versions, which is why
+// the matcher looks for "Frame:" rather than a phrase:
 //   4.2.2 (every existing log):  "QuadPlane Frame: F-35B"
 //   4.6.3 (the current build):   "QuadPlane initialised, Frame: F-35B"
 const V406 = 'QuadPlane initialised'
@@ -50,8 +49,7 @@ describe('recognizing an airframe we can draw', () => {
   })
 
   it('matches the frame class, not the class/type pair', () => {
-    // 4.1.6 logs "F-35B/" -- the class with an unset type -- and an exact
-    // match on the whole string missed nine of this aircraft's own logs.
+    // 4.1.6 logs "F-35B/": the frame class with an unset type.
     expect(knownAirframe('F-35B/')).toBe('f35b')
     expect(frameName([V416])).toBe('F-35B/')
     // The same shape with the type filled in still must not match.
@@ -59,14 +57,12 @@ describe('recognizing an airframe we can draw', () => {
   })
 
   it('says nothing for a firmware that does not report a frame', () => {
-    // 4.0.6 announces the quadplane and never names it. Null is the honest
-    // answer; guessing from anything else in the log would not be.
+    // 4.0.6 announces the quadplane without naming the frame.
     expect(airframeFrom([V406, 'ArduPlane V4.0.6 (dc9e9b6a)'])).toBeNull()
   })
 
   it('does not claim an aircraft it has no model for', () => {
-    // The list grows one aircraft at a time, because each needs a model
-    // whose license lets it ship here.
+    // Each known airframe needs a model whose license lets it ship here.
     expect(knownAirframe('QUAD/PLUS')).toBeNull()
     expect(knownAirframe('F-22')).toBeNull()
     expect(knownAirframe(null)).toBeNull()
@@ -77,9 +73,8 @@ describe('recognizing an airframe we can draw', () => {
   })
 })
 
-// Against the aircraft's own logs rather than against strings typed from
-// memory. Point F35B_LOGS at a directory of .BIN files to run it; without
-// that, the strings above are a transcription and this says so by skipping.
+// Runs against real logs: point F35B_LOGS at a directory of .BIN files.
+// Skipped otherwise.
 describe.runIf(process.env.F35B_LOGS !== undefined)('real F-35B logs', () => {
   it('recognizes every log the aircraft has recorded', async () => {
     const { readdirSync } = await import('node:fs')
@@ -114,8 +109,8 @@ describe('reading it out of a log', () => {
   })
 
   it('answers null for a log that never said, rather than guessing', () => {
-    // A recording that started after boot has no frame line in it, and
-    // there is nothing else in a log that names the airframe.
+    // A recording started after boot has no frame line, and nothing else in
+    // a log names the airframe.
     expect(airframeFromLog(logWith(['Arming motors']))).toBeNull()
     expect(
       airframeFromLog({
@@ -131,9 +126,8 @@ describe('reading it out of a log', () => {
     const real = parseDataflash(
       new Uint8Array(gunzipSync(readFileSync('src/test-fixtures/copter-sitl.bin.gz'))),
     )
-    // This log really does say "Frame: QUAD/PLUS" -- a frame line that is
-    // read and correctly not recognized, which is the case that would break
-    // every other vehicle if the matcher were loose.
+    // This log says "Frame: QUAD/PLUS": a frame line that is read and
+    // correctly not recognized.
     expect(frameName(real.messages.get('MSG')!.columns.get('Message') as unknown as string[])).toBe(
       'QUAD/PLUS',
     )
@@ -153,8 +147,8 @@ describe('latching it off the live boot banner', () => {
     say(V422)
     expect(useVehicleStore.getState().airframe).toBe('f35b')
 
-    // The feed is a capped ring, so the banner is gone within a minute of a
-    // talkative vehicle -- the answer has to outlive the line that gave it.
+    // The status feed is a capped ring, so the frame must outlive the banner
+    // line that reported it.
     for (let i = 0; i < 260; i++) say(`chatter ${i}`)
     expect(useVehicleStore.getState().statusTexts.some((s) => /Frame:/.test(s.text))).toBe(false)
     expect(useVehicleStore.getState().airframe).toBe('f35b')

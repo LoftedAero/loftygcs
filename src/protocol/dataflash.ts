@@ -1,31 +1,23 @@
 // ArduPilot dataflash logs (.bin): the self-describing binary format the
 // vehicle writes to its SD card, and what MAVFTP hands back from /APM/LOGS.
 //
-// The format explains itself as it goes. Every message is
+// Every message is
 //
 //     A3 95 <type> <payload...>
 //
-// and the payload's shape is whatever a FMT message earlier in the file
-// said that type looks like. FMT describes itself first (type 128, always
-// "BBnNZ"), so a reader needs exactly one hard-coded fact to bootstrap the
-// rest. That is the whole trick, and it means a log from a firmware this
-// code has never seen still parses -- new messages included.
+// and the payload's shape is given by a FMT message earlier in the file. FMT
+// describes itself first (type 128, always "BBnNZ"), so that is the only
+// hard-coded fact, and logs from newer firmware still parse.
 //
-// Two consequences worth stating, because they shape everything below:
+//   - Field units are not in FMT. They come from FMTU messages referencing
+//     the UNIT and MULT tables, which may appear after the data they
+//     describe, so units are resolved in a second pass.
+//   - A type with no FMT has an unknown length, so the only recovery is to
+//     hunt for the next header. This happens on truncated logs and on logs
+//     pulled off a card mid-write.
 //
-//   - Field *units* are not in FMT. They arrive later, in FMTU messages
-//     that reference the unit and multiplier tables declared by UNIT and
-//     MULT messages, which may themselves appear after the data they
-//     describe. So units are resolved in a second pass, not inline.
-//   - A type with no FMT is unparseable, and its length is unknown, so
-//     there is nothing to skip. The only recovery is to hunt for the next
-//     header. That happens in practice at the very start of a log that was
-//     truncated, and on a log pulled off a card mid-write.
-//
-// Storage is columnar: one array per field, not one object per record. A
-// ten-megabyte log is a few hundred thousand records, and the object-per-
-// record shape costs an order of magnitude more memory and makes plotting a
-// gather instead of a slice.
+// Storage is columnar (one array per field) because a large log is hundreds
+// of thousands of records, and plotting then reads a slice.
 
 /** Every message begins with these two bytes. */
 export const HEAD1 = 0xa3
@@ -67,7 +59,7 @@ export interface MessageTable {
 export interface ParsedLog {
   /** Message tables by name: 'ATT', 'GPS', 'RCOU'... */
   messages: Map<string, MessageTable>
-  /** Every PARM record, last value wins -- the vehicle's config at log time. */
+  /** Every PARM record, last value wins: the vehicle's config at log time. */
   params: Map<string, number>
   /** Anything the file did that it should not have. */
   problems: string[]
@@ -120,23 +112,18 @@ export function payloadSize(format: string): number | null {
 /**
  * Scaling implied by a format character, for logs with no MULT table.
  *
- * c/C/e/E are documented as "integer * 100", and modern logs *also* carry a
- * MULT of 0.01 for those fields -- the same scaling stated twice. Applying
- * both turns the EKF origin altitude at Canberra from 584.09 m into 5.84 m,
- * which is how this was found. So exactly one is applied: MULT when the log
- * declares one, this table when it does not.
+ * c/C/e/E are documented as "integer * 100", and modern logs also carry a
+ * MULT of 0.01 for those fields. Only one is applied: MULT when the log
+ * declares one, this table otherwise.
  */
 const FORMAT_SCALE: Record<string, number> = { c: 0.01, C: 0.01, e: 0.01, E: 0.01 }
 
 /**
- * Nudge a multiplier back onto the power of ten it was written as.
+ * Snap a multiplier back onto the power of ten it was written as.
  *
- * The MULT table is authored as float32 and widened on the way in, so 1e-7
- * arrives as 1.0000000116860974e-7. Left alone it turns a latitude of
- * -35.3632624 into -35.363262413258525 -- a millimetre of error, but a
- * number that looks wrong in a table and invites the reader to distrust it.
- * Only snaps when the value is already within a hair of the power of ten,
- * so a genuinely odd multiplier is left exactly as the file gave it.
+ * MULT is stored as float32, so 1e-7 arrives as 1.0000000116860974e-7 and
+ * would put spurious digits on every latitude. Values not within a hair of
+ * a power of ten are left alone.
  */
 function snapPowerOfTen(mult: number): number {
   const exponent = Math.round(Math.log10(Math.abs(mult)))
@@ -167,14 +154,16 @@ class NumberColumn {
 /**
  * Read a dataflash log.
  *
- * Never throws on malformed input: a log pulled off a vehicle mid-write is
- * normal, and half a log is worth reading. Everything the file got wrong is
- * reported in `problems` instead.
+ * Never throws on malformed input, since a partial log is still worth
+ * reading. Problems are reported in `problems` instead.
  */
 export function parseDataflash(bytes: Uint8Array): ParsedLog {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const formats = new Map<number, MessageFormat>()
-  const tables = new Map<string, { format: MessageFormat; cols: Map<string, NumberColumn | string[]> }>()
+  const tables = new Map<
+    string,
+    { format: MessageFormat; cols: Map<string, NumberColumn | string[]> }
+  >()
   const params = new Map<string, number>()
   const problems: string[] = []
   let skippedBytes = 0
@@ -188,8 +177,7 @@ export function parseDataflash(bytes: Uint8Array): ParsedLog {
   let i = 0
   while (i + 3 <= bytes.length) {
     if (bytes[i] !== HEAD1 || bytes[i + 1] !== HEAD2) {
-      // Not a header. Hunt for the next one rather than giving up: the
-      // alternative is discarding a whole log for one bad byte.
+      // Not a header: hunt for the next one.
       i++
       skippedBytes++
       continue
@@ -207,8 +195,7 @@ export function parseDataflash(bytes: Uint8Array): ParsedLog {
 
     const format = formats.get(type)
     if (!format) {
-      // No FMT for this type means its length is unknown, so there is
-      // nothing to skip past -- only the next header to find.
+      // No FMT for this type, so its length is unknown: find the next header.
       i++
       skippedBytes++
       continue
@@ -235,8 +222,7 @@ export function parseDataflash(bytes: Uint8Array): ParsedLog {
         fmtu.push({ type: t, units, mults })
       }
     } else if (format.name === 'PARM') {
-      // Name and Value, whatever their positions -- PARM gained a Default
-      // column in 4.x and the older shape must still read.
+      // Look up Name and Value by name: PARM gained a Default column in 4.x.
       const nameIdx = format.fields.findIndex((f) => f.name === 'Name')
       const valueIdx = format.fields.findIndex((f) => f.name === 'Value')
       const name = values[nameIdx]
@@ -257,16 +243,13 @@ export function parseDataflash(bytes: Uint8Array): ParsedLog {
       const finished = col instanceof NumberColumn ? col.finish() : col
       if (finished instanceof Float64Array) {
         const spec = t.format.fields.find((f) => f.name === field)
-        // The scale is applied here, once, so every consumer -- plot, table,
-        // export -- sees the same number in the unit the field claims.
+        // Scale once here so every consumer sees the value in its stated unit.
         const scale = spec?.multiplier
         if (scale !== undefined && scale !== 1) {
           for (let k = 0; k < finished.length; k++) finished[k] = finished[k]! * scale
         }
-        // TimeUS is microseconds and its declared multiplier is 1e-6, so it
-        // is already seconds by now on any log that carries FMTU. On one
-        // that does not, make it seconds anyway: everything downstream plots
-        // against a time axis and must not have to ask which kind it got.
+        // TimeUS declares a 1e-6 multiplier, so with FMTU it is already in
+        // seconds. Without FMTU, convert it here so time is always seconds.
         if (field === 'TimeUS' && scale === undefined) {
           for (let k = 0; k < finished.length; k++) finished[k] = finished[k]! / 1e6
         }
@@ -328,12 +311,7 @@ function readRecord(
   return out
 }
 
-function readField(
-  bytes: Uint8Array,
-  view: DataView,
-  at: number,
-  format: string,
-): number | string {
+function readField(bytes: Uint8Array, view: DataView, at: number, format: string): number | string {
   switch (format) {
     case 'b':
       return view.getInt8(at)
@@ -354,14 +332,13 @@ function readField(
     case 'd':
       return view.getFloat64(at, true)
     case 'q':
-      // Beyond 2^53 this loses precision, but the only q/Q fields in
-      // practice are microsecond timestamps, which stay exact for ~285
-      // years -- and a Float64Array could not hold more anyway.
+      // Loses precision beyond 2^53, but q/Q fields are microsecond
+      // timestamps, which stay exact for about 285 years.
       return Number(view.getBigInt64(at, true))
     case 'Q':
       return Number(view.getBigUint64(at, true))
-    // The scaled integer forms decode raw here. Their scaling is applied
-    // once, at the end, from MULT or from FORMAT_SCALE -- never both.
+    // Scaled integers decode raw here. Scaling is applied at the end, from
+    // MULT or FORMAT_SCALE but never both.
     case 'c':
       return view.getInt16(at, true)
     case 'C':
@@ -377,9 +354,7 @@ function readField(
     case 'Z':
       return readText(bytes, at, 64)
     case 'a':
-      // int16_t[32]: an array field. Nothing plots it, and flattening it
-      // into columns would invent 32 fields, so it reads as its first
-      // element and the rest is left on the floor deliberately.
+      // int16_t[32]. Nothing plots it, so only the first element is kept.
       return view.getInt16(at, true)
     default:
       return 0
@@ -411,14 +386,10 @@ function appendRecord(
 /**
  * Second pass: attach units and multipliers to the field specs.
  *
- * FMTU names a message type and gives one unit id and one multiplier id per
- * field, as character codes indexing the UNIT and MULT tables. Those tables
- * are themselves ordinary log messages with no guarantee of appearing before
- * the FMTU that cites them, which is why this cannot happen inline.
- *
- * Both tables are read from the file rather than hard-coded. A firmware that
- * adds a unit still labels correctly, and there is no second list here to
- * drift out of agreement with the vehicle.
+ * FMTU gives one unit id and one multiplier id per field, as character codes
+ * indexing the UNIT and MULT tables. Those tables are ordinary log messages
+ * that may appear after the FMTU citing them. Both are read from the file
+ * rather than hard-coded, so new units still label correctly.
  */
 function applyUnits(
   formats: Map<number, MessageFormat>,
@@ -434,8 +405,8 @@ function applyUnits(
       if (label !== undefined && !NO_UNIT.has(label)) field.unit = label
 
       const mult = multTable.get(entry.mults.charCodeAt(idx))
-      // ArduPilot's table declares '-' as *zero*, meaning "no multiplier"
-      // -- a string field, mostly. Taken literally it would zero the column.
+      // ArduPilot declares '-' as zero, meaning "no multiplier". Taken
+      // literally it would zero the column.
       if (mult !== undefined && mult !== 0 && mult !== 1) field.multiplier = snapPowerOfTen(mult)
     })
   }
@@ -451,11 +422,8 @@ function applyUnits(
 }
 
 /**
- * A field as a plottable series, paired with its time base.
- *
- * Time comes from the message's own TimeUS column, which nearly every
- * ArduPilot message carries; without one there is nothing to plot against
- * and the caller gets null rather than an index-based fake.
+ * A field as a plottable series, paired with its message's TimeUS column.
+ * Messages without TimeUS yield null.
  */
 export interface Series {
   message: string
@@ -473,8 +441,7 @@ export function getSeries(log: ParsedLog, message: string, field: string): Serie
   const time = table.columns.get('TimeUS')
   if (!(values instanceof Float64Array) || !(time instanceof Float64Array)) return null
   const spec = table.format.fields.find((f) => f.name === field)
-  // Columns arrive already scaled and TimeUS already in seconds; rescaling
-  // here is how a value gets multiplied twice.
+  // Columns are already scaled and TimeUS is already in seconds.
   return { message, field, unit: spec?.unit ?? '', time, values }
 }
 
@@ -487,14 +454,7 @@ export interface SeriesStats {
   count: number
 }
 
-/**
- * Summarize a series over a time window.
- *
- * Over the *visible* window rather than the whole log, deliberately: the
- * number worth reading is the one for what you are looking at. A maximum
- * from a part of the flight you have zoomed away from answers a question
- * nobody asked.
- */
+/** Summarize a series over a time window, normally the visible one. */
 export function seriesStats(s: Series, from: number, to: number): SeriesStats {
   let min = Infinity
   let max = -Infinity
@@ -521,7 +481,9 @@ export function fieldUnit(log: ParsedLog, message: string, field: string): strin
 }
 
 /** Every plottable field, for a picker. Text and time columns are not. */
-export function plottableFields(log: ParsedLog): { message: string; field: string; unit: string }[] {
+export function plottableFields(
+  log: ParsedLog,
+): { message: string; field: string; unit: string }[] {
   const out: { message: string; field: string; unit: string }[] = []
   for (const [name, table] of log.messages) {
     if (!table.columns.has('TimeUS')) continue

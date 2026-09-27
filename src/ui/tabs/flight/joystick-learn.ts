@@ -15,12 +15,10 @@ const LEARN_TRAVEL = 0.5
 export type Learnable = 'axis' | 'button'
 
 /**
- * Learn: "move the control you want" rather than "pick axis 3", because the
- * browser's numbers mean nothing to anyone. Every read is compared with the
- * controls as they were when listening began, and the first that clearly
- * moved -- an axis travelling more than half its range, a button going
- * down -- is handed to the caller. One listener at a time: starting another
- * replaces it.
+ * Learn mode: the user moves the control they want rather than picking an
+ * axis number. Each read is compared with the state when listening began,
+ * and the first control that clearly moved (an axis past half its range, a
+ * button pressed) is reported. Starting another listener replaces this one.
  */
 export function useLearn() {
   const axes = useJoystickStore((s) => s.axes)

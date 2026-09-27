@@ -13,13 +13,10 @@ import {
   commandLabel,
 } from '../../../protocol/mission-commands'
 
-// The item table, Mission Planner's way: every item a row, every parameter
-// editable in place, the command a dropdown so a row can become something
-// else without being deleted and rebuilt.
+// The item table, as in Mission Planner: every item a row, every parameter
+// editable in place, and the command a dropdown so a row can change type.
 //
-// The four anonymous params are labelled per command from the catalog, which
-// is the whole reason that catalog exists -- an unlabelled grid of param1..4
-// is where Mission Planner loses people.
+// param1..4 are labeled per command from the catalog.
 
 export default function MissionTable() {
   const units = useUnits()
@@ -42,9 +39,7 @@ export default function MissionTable() {
     return (
       <div className="mission-table mission-table--empty">
         <p className="app-placeholder">
-          {/* The palette is only shown while the mission is what clicks
-              edit, so pointing at it from a fence would be pointing at
-              nothing. */}
+          {/* The palette is only shown while editing the mission. */}
           {editing === 'mission' ? (
             <>
               No items yet. Click the map, or{' '}
@@ -63,13 +58,8 @@ export default function MissionTable() {
   return (
     <div className="mission-table">
       <table className="mission-table__grid">
-        {/* Fixed widths rather than the browser's guess. Auto layout gives
-            the leftover width to whichever column has the widest content,
-            which here is the four parameter cells -- so a waypoint, the
-            command with the most parameters and the one everybody uses,
-            got four input boxes wide enough for a paragraph. Sized for the
-            longest label instead, with the slack going to the command
-            names, which are the part that can actually run long. */}
+        {/* Fixed widths, since auto layout would give the slack to the
+            parameter cells. The command column takes the slack instead. */}
         <colgroup>
           <col className="mission-col--seq" />
           <col className="mission-col--command" />
@@ -106,9 +96,7 @@ export default function MissionTable() {
             <th scope="col" className="mission-table__num">
               Dist
             </th>
-            {/* One add button, at the end of the row of labels rather than
-                repeated down every line. It appends, which is what adding
-                from a list means. */}
+            {/* One add button in the header; it appends. */}
             <th scope="col" className="mission-table__actions">
               <LaButton
                 variant="ghost"
@@ -170,9 +158,8 @@ function Row({
   onRemove: () => void
   onMove: (to: number) => void
 }) {
-  // Which commands this aircraft accepts. Read here rather than passed in:
-  // it is the same answer for every row, and threading it through the table
-  // would put a prop on Row that has nothing to do with the row.
+  // Which commands this aircraft accepts; read here rather than threaded
+  // through the table as a prop.
   const planClass = usePlanVehicleClass()
   const units = useUnits()
   const spec = commandSpec(item.command)
@@ -192,13 +179,9 @@ function Row({
           value={item.command}
           onChange={(e) => onChange(commandChange(Number(e.target.value)))}
         >
-          {/* An unknown command keeps its own entry rather than snapping to
-              whatever happens to be first in the list. */}
+          {/* An unknown command keeps its own entry. */}
           {!spec && <option value={item.command}>{commandLabel(item.command)}</option>}
-          {/* ArduPilot's own names, as in the palette's More list: anyone
-              reaching into this column is working from the mission command
-              reference, and a friendlier word only makes them guess which
-              of ours is the one they read about. */}
+          {/* ArduPilot's own names, matching the mission command reference. */}
           {commandsFor(planClass).map((c) => (
             <option key={c.id} value={c.id}>
               {c.mavName}
@@ -324,10 +307,9 @@ function Row({
 }
 
 /**
- * Changing a row's command clears the parameters, because they mean
- * different things now -- a hold time of 15 becoming 15 turns of a loiter
- * is the kind of surprise that flies a mission nobody planned. Position is
- * kept: the point on the map is still the point that was chosen.
+ * Changing a row's command clears the parameters, which mean different
+ * things per command (a hold time of 15 would become 15 loiter turns).
+ * Position is kept.
  */
 function commandChange(command: number): Partial<Omit<PlanItem, 'uid'>> {
   const spec = commandSpec(command)

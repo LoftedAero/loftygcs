@@ -1,14 +1,8 @@
 // Which flight mode the aircraft was in, and when.
 //
-// A log records mode changes, not mode state: three MODE records for a
-// whole flight, each saying "from here on, this". Turning that into spans
-// is what lets a plot shade its background by mode, which is the single
-// most useful piece of context you can put behind a trace -- an oscillation
-// means one thing in Stabilize and another in Auto.
-//
-// The mode *numbers* are per-vehicle (Auto is 3 on Copter and 10 on Plane),
-// so naming them needs to know what flew. The log says so itself, in the
-// firmware string its VER record carries.
+// A log records mode changes, not mode state, so MODE records are turned into
+// spans for shading plot backgrounds. Mode numbers are per vehicle (Auto is 3
+// on Copter and 10 on Plane); the vehicle comes from the log's firmware string.
 
 import type { ParsedLog } from './dataflash'
 import { modeName, type VehicleClass } from './modes'
@@ -31,10 +25,8 @@ const TYPE_FOR_CLASS: Record<VehicleClass, number> = {
 }
 
 /**
- * What kind of vehicle wrote this log.
- *
- * From the firmware string rather than a parameter: FRAME_CLASS exists on a
- * plane too, and a quadplane has both. The banner is unambiguous.
+ * What kind of vehicle wrote this log, from the firmware string. Parameters
+ * are ambiguous: FRAME_CLASS exists on a plane too.
  */
 export function vehicleClassFromLog(log: ParsedLog): VehicleClass {
   const banner = firmwareString(log)
@@ -61,12 +53,8 @@ export function firmwareString(log: ParsedLog): string | null {
 }
 
 /**
- * Flight-mode spans across the log.
- *
- * The last span runs to the end of the log rather than to the last MODE
- * record, because the vehicle stayed in that mode until the recording
- * stopped -- ending the shading at the final mode *change* would leave the
- * most interesting part of most flights unshaded.
+ * Flight-mode spans across the log. The last span runs to the end of the log,
+ * since the vehicle stayed in that mode until recording stopped.
  */
 export function modeSpans(log: ParsedLog): ModeSpan[] {
   const table = log.messages.get('MODE')
@@ -82,8 +70,8 @@ export function modeSpans(log: ParsedLog): ModeSpan[] {
     const from = time[i]!
     const to = i + 1 < time.length ? time[i + 1]! : Math.max(end, from)
     const num = mode[i]!
-    // A mode logged twice running is one span, not two -- ArduPilot
-    // re-records the mode for reasons of its own (a failsafe clearing, say).
+    // ArduPilot sometimes re-records the current mode (a failsafe clearing,
+    // say); merge repeats into one span.
     const prev = spans[spans.length - 1]
     if (prev && prev.mode === num) {
       prev.to = to

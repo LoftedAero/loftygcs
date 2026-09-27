@@ -1,16 +1,10 @@
 // Why the vehicle will not arm.
 //
-// ArduPilot already answers this precisely -- "PreArm: Compass not
-// calibrated", "PreArm: GPS horizontal speed error" -- but the answers
-// arrive as ordinary STATUSTEXT and scroll away in a feed that also carries
-// mode changes and EKF chatter. The pilot then reads a red "not ready" with
-// no reason attached and starts guessing.
-//
-// So this keeps the reasons rather than the messages. ArduPilot repeats each
-// failing check about every thirty seconds while disarmed, so the same text
-// arrives over and over: entries are keyed on the reason and only the newest
-// timestamp is kept, which turns a scrolling feed into a checklist that
-// shortens as things are fixed.
+// ArduPilot reports each failing check as STATUSTEXT ("PreArm: Compass not
+// calibrated"), mixed in with everything else. It repeats each one about
+// every thirty seconds while disarmed, so entries are keyed on the reason and
+// keep only the newest timestamp, giving a checklist that shortens as things
+// are fixed.
 
 /** A PreArm or Arm failure the vehicle reported, once per distinct reason. */
 export interface PrearmFailure {
@@ -21,9 +15,8 @@ export interface PrearmFailure {
 }
 
 /**
- * ArduPilot prefixes both kinds. "PreArm" is a check that runs continuously
- * while disarmed; "Arm" is one that only fails at the moment of the attempt.
- * Both answer the same question and both belong in the same list.
+ * "PreArm" checks run continuously while disarmed; "Arm" checks fail only at
+ * the moment of an attempt. Both go in the same list.
  */
 const PREARM_PREFIX = /^(PreArm|Arm)\s*:\s*/i
 
@@ -32,12 +25,8 @@ export function isPrearmMessage(text: string): boolean {
 }
 
 /**
- * Distil a status feed into the current reasons.
- *
- * `now` and `staleAfterMs` are passed rather than read from the clock so the
- * behavior is testable, and because "stale" is a display decision: a reason
- * last heard two minutes ago has almost certainly been fixed, and leaving it
- * up is how a checklist becomes something people ignore.
+ * Distill a status feed into the current reasons. A reason not repeated
+ * within `staleAfterMs` has almost certainly been fixed and is dropped.
  */
 export function prearmFailures(
   texts: readonly { text: string; at: number }[],

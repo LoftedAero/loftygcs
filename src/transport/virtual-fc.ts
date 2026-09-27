@@ -1,23 +1,15 @@
-// The virtual flight controller: a Transport that IS a simulated ArduPilot,
-// emitting genuine MAVLink v2 bytes through the real encoder. It exists so
-// the whole UI runs with no hardware -- demos, development, and component
-// tests all drive exactly the code path a real vehicle does. It is NOT a
-// substitute for SITL validation: it proves the app's plumbing, not
-// ArduPilot's behavior.
+// The virtual flight controller: a Transport that is a simulated ArduPilot,
+// emitting real MAVLink v2 bytes through the real encoder, so the UI runs
+// with no hardware for demos, development and component tests. It validates
+// the app's plumbing, not ArduPilot's behavior; SITL does that.
 //
-// Some of ArduPilot's behavior is modelled here anyway, and the rule for
-// what gets in is narrow on purpose: **only rules observed against real
-// SITL**, with the vehicle's own wording. Two app bugs shipped because this
-// vehicle was more permissive than the real one -- it accepted NAV_TAKEOFF
-// in any mode, and it accepted every mode change instantly -- so the Takeoff
-// button sent a command ArduPilot refuses, and the app reported a mode the
-// vehicle was not in. Those rules are here now.
+// Some ArduPilot rules are modeled, but only ones observed on SITL, using
+// the vehicle's own wording: a vehicle more permissive than the real one
+// hides app bugs, and an invented rule teaches the app something ArduPilot
+// never does.
 //
-// What is deliberately NOT modelled: flight dynamics (that is what SITL is
-// for), MAVFTP (its absence exercises the parameter stream fallback), and
-// the full ~1400-parameter set. Guessing at a rule would be worse than not
-// having it: a wrong rule here teaches the app a wrong lesson and any test
-// written against it bakes the error in.
+// Deliberately not modeled: flight dynamics (SITL's job), MAVFTP (its
+// absence exercises the parameter stream fallback), and the full parameter set.
 import { MavFramer, encodeFrame } from '../protocol/frames'
 import { decodeFrameFields } from '../protocol/serializer'
 import { SENSOR_BITS } from '../protocol/sensors'
@@ -25,19 +17,8 @@ import type { FieldValue } from '../protocol/types'
 import type { Transport, TransportOptions } from './Transport'
 
 /**
- * The on-screen transmitter for demo mode.
- *
- * Radio calibration is the one flow that cannot be exercised without a
- * transmitter in your hands, which would leave it unreviewable in the browser
- * demo. Shared mutable state rather than a method on the transport because
- * the alternative is threading a setter through the connection service for
- * something only the simulated vehicle will ever honor. Axes are -1..1;
- * `active` stays false until the demo UI takes the sticks, so an untouched
- * demo still shows the idle wiggle.
- */
-/**
  * Modes that will not engage without a position estimate: Auto, Guided,
- * Loiter, RTL. Observed on SITL, which refuses each of them by name.
+ * Loiter, RTL. SITL refuses each of them by name.
  */
 const NEEDS_POSITION = new Set([3, 4, 5, 6])
 
@@ -54,6 +35,12 @@ const POSITION_READY_MS = 4000
 /** How long a Copter sits armed on the ground before disarming itself. */
 const GROUND_DISARM_MS = 10000
 
+/**
+ * The on-screen transmitter for demo mode, so radio calibration can be
+ * exercised without hardware. Module state rather than a transport method,
+ * since only the simulated vehicle uses it. Axes are -1..1; until `active`,
+ * the channels show the idle wiggle.
+ */
 export const demoSticks = {
   active: false,
   roll: 0,
@@ -66,11 +53,8 @@ export const demoSticks = {
 // The OSD panels this simulated firmware "implements", with screen 1's
 // default layout: id, column, row, and whether screen 1 shows it.
 //
-// Deliberately not all sixty-five panels ArduPilot can compile in, because a
-// real build never has all of them either -- which also means demo mode
-// exercises the layout editor's habit of dropping panels the vehicle lacks.
-// The enabled positions are collision-free on the 30x16 analog grid, so the
-// editor opens on a layout that is actually valid.
+// A subset, as on a real build, so the editor's handling of missing panels
+// is exercised. Enabled positions do not collide on the 30x16 analog grid.
 export const OSD_PANELS: [string, number, number, boolean][] = [
   ['RSSI', 1, 1, true],
   ['HOME', 14, 1, true],
@@ -123,9 +107,8 @@ export const OSD_PANELS: [string, number, number, boolean][] = [
   ['RPM', 1, 10, false],
 ]
 
-// Four screens, as ArduPilot exposes them, switched by an RC channel. Only
-// the first is on: the others exist so the editor's screen picker has
-// somewhere to go, which is exactly how a fresh vehicle arrives.
+// Four screens, switched by an RC channel. Only the first is enabled, as on a
+// fresh vehicle.
 const OSD_SCREEN_PARAMS = [1, 2, 3, 4].flatMap((s) => [
   [`OSD${s}_ENABLE`, s === 1 ? 1 : 0, 2],
   [`OSD${s}_CHAN_MIN`, 900 + (s - 1) * 300, 4],
@@ -142,9 +125,8 @@ const OSD_SCREEN_PARAMS = [1, 2, 3, 4].flatMap((s) => [
 
 // A representative slice of an ArduCopter parameter set (name, value,
 // MAV_PARAM_TYPE) so every configuration tab has real content in demo mode.
-// Values are ArduCopter defaults where one exists. This is deliberately
-// broad rather than deep: enough of each family that the curated tabs look
-// like they will on hardware, without pretending to be all ~1400.
+// Values are ArduCopter defaults where one exists. Broad rather than deep:
+// enough of each family for the curated tabs, not all ~1400.
 const SIM_PARAMS: [string, number, number][] = [
   // Identity and frame
   ['SYSID_THISMAV', 1, 2],
@@ -183,23 +165,18 @@ const SIM_PARAMS: [string, number, number][] = [
   ['COMPASS_USE3', 0, 2],
   ['COMPASS_ORIENT', 0, 2],
   ['COMPASS_AUTODEC', 1, 2],
-  // Device IDs, so Hardware ID has a board to describe. The *encoding* is
-  // ArduPilot's own and was read off SITL before being used here --
-  // `bus_type:3, bus:5, address:8, devtype:8` -- while the parts are this
-  // demo airframe's: a modern IMU on SPI, an external compass on I2C where
-  // an external compass goes, and a baro on the bus its board shares.
+  // Device IDs for Hardware ID, in ArduPilot's encoding
+  // (`bus_type:3, bus:5, address:8, devtype:8`) with plausible demo parts.
   // uint32 parameters, so mavType 6 (MAV_PARAM_TYPE_UINT32).
   // 0x34 ICM42688, SPI bus 1, CS 1.
   ['INS_ACC_ID', 0x340102 | 0x0a, 6],
   ['INS_GYR_ID', 0x340102 | 0x0a, 6],
-  // 0x0A IST8310 at 0x0e on I2C bus 0: the classic external compass.
+  // 0x0A IST8310 at 0x0e on I2C bus 0.
   ['COMPASS_DEV_ID', 0x0a0e00 | 0x01, 6],
   // 0x06 DPS310 at 0x76 on I2C bus 0.
   ['BARO1_DEVID', 0x067600 | 0x01, 6],
-  // Enough of a copter's tuning set for the Tuning screen to be a screen
-  // rather than a "connect a vehicle" card. Values are ArduCopter's own
-  // defaults; a demo that showed invented gains would teach numbers nobody
-  // should carry to a real aircraft.
+  // Enough of the tuning set for the Tuning screen, at ArduCopter's own
+  // defaults rather than invented gains.
   ['ATC_RAT_RLL_P', 0.135, 9],
   ['ATC_RAT_RLL_I', 0.135, 9],
   ['ATC_RAT_RLL_D', 0.0036, 9],
@@ -234,9 +211,8 @@ const SIM_PARAMS: [string, number, number][] = [
   ['INS_GYRO_FILTER', 20, 9],
   ['GPS_TYPE', 1, 2],
 
-  // Radio. Every channel carries the full set the firmware does -- a
-  // calibration writes MIN, MAX, TRIM and REVERSED for each one, and a
-  // simulated vehicle missing half of them just looks like failed writes.
+  // Radio: the full per-channel set, since calibration writes MIN, MAX, TRIM
+  // and REVERSED for each channel.
   ...([1, 2, 3, 4, 5, 6, 7, 8].flatMap((n) => [
     [`RC${n}_MIN`, 1100, 4],
     [`RC${n}_MAX`, 1900, 4],
@@ -393,13 +369,12 @@ const ACCEL_CAL_PROMPTS = [
   'Place vehicle on its BACK and press any key.',
 ]
 
-// SITL's default home (CMAC field, Canberra) so numbers look familiar to
-// anyone who has flown SITL.
+// SITL's default home (CMAC field, Canberra).
 const HOME_LAT = -35.363262
 const HOME_LON = 149.165237
 const HOME_ALT_M = 584
 
-/** Home, takeoff, a small box of waypoints, and RTL -- wire-shaped fields. */
+/** Home, takeoff, a small box of waypoints, and RTL, as wire-shaped fields. */
 function demoMission(): Record<string, FieldValue>[] {
   const wp = (
     seq: number,
@@ -437,11 +412,8 @@ function demoMission(): Record<string, FieldValue>[] {
 }
 
 /**
- * A plausible completion mask for a simulated calibration at `pct`.
- *
- * Deterministic, so a demo looks the same twice, and scattered by a stride
- * that is coprime with 80 so the sections light up all over the sphere
- * rather than sweeping one band.
+ * A deterministic completion mask for a simulated calibration at `pct`,
+ * scattered by a stride coprime with 80 so sections fill all over the sphere.
  */
 function magCalMask(pct: number): number[] {
   const mask = new Array<number>(10).fill(0)
@@ -468,14 +440,8 @@ export class VirtualFcTransport implements Transport {
   private accelCalTimer: ReturnType<typeof setInterval> | null = null
   private accelCalPositions = 0
   private airborne = false
-  // A stored mission (item 0 = home), so Mission mode has something real to
-  // read in demo mode and the transfer machinery gets exercised end to end
-  // -- count, per-item requests, ack -- not just against scripted fixtures.
-  // Mission, fence and rally, keyed by MAVLink's mission_type -- the same
-  // three plans Mission mode edits. Storing all three means the geofence and
-  // rally screens have a vehicle to talk to in demo mode; before this they
-  // could only be given "unsupported", which made them undemonstrable in the
-  // browser build where there is no SITL to fall back on.
+  // Stored mission (item 0 = home), fence and rally, keyed by mission_type,
+  // so all three plan screens exercise the full transfer protocol in demo mode.
   private plans: Record<number, Record<string, FieldValue>[]> = {
     0: demoMission(),
     1: [],
@@ -489,14 +455,10 @@ export class VirtualFcTransport implements Transport {
   } | null = null
 
   /**
-   * Whether the EKF has a position estimate the vehicle will act on.
-   *
-   * Real ArduPilot refuses arming ("Arm: Need Position Estimate") and any
-   * position-holding mode ("Mode change to Guided failed: requires
-   * position") until this is true, and on SITL that takes the better part of
-   * a minute. A few seconds here: long enough that the refusal is a thing
-   * you can see and the wording is one you will meet again, short enough
-   * that a demo is not an exercise in waiting.
+   * Whether the EKF has a position estimate. Until then ArduPilot refuses
+   * arming ("Arm: Need Position Estimate") and position modes ("Mode change
+   * to Guided failed: requires position"). On SITL this takes most of a
+   * minute; the demo compresses it to a few seconds.
    */
   private positionOk = false
   /** When the vehicle last became armed, for the ground disarm timer. */
@@ -511,16 +473,13 @@ export class VirtualFcTransport implements Transport {
     this.timers.push(setInterval(() => this.sendRcChannels(), 200))
     this.timers.push(setInterval(() => this.sendTraffic(), 1000))
     setTimeout(() => this.sendStatusText(6, 'Loft GCS virtual vehicle ready'), 300)
-    // The EKF settling, compressed. Until it lands, arming and the position
-    // modes are refused exactly as the real vehicle refuses them.
+    // The EKF settling, compressed. Until then arming and position modes are refused.
     setTimeout(() => {
       this.positionOk = true
       this.sendStatusText(6, 'EKF3 IMU0 is using GPS')
     }, POSITION_READY_MS)
-    // A little scripted life: arm and lift off into a lazy circle. Set
-    // directly rather than through the command path, so the showreel does
-    // not depend on the gating above -- but it starts after it, so a demo
-    // still opens on a vehicle that behaves.
+    // Scripted demo flight: arm and circle. Set directly rather than through
+    // the command path, but only after the EKF has settled.
     setTimeout(() => {
       this.armed = true
       this.armedAt = Date.now()
@@ -530,8 +489,7 @@ export class VirtualFcTransport implements Transport {
     setTimeout(() => {
       if (this.armed) this.airborne = true
     }, 8000)
-    // Copter disarms itself after sitting armed on the ground, which is what
-    // silently undid a takeoff that never got into Guided.
+    // Copter disarms itself after sitting armed on the ground.
     this.timers.push(
       setInterval(() => {
         if (this.armed && !this.airborne && Date.now() - this.armedAt > GROUND_DISARM_MS) {
@@ -552,9 +510,8 @@ export class VirtualFcTransport implements Transport {
   }
 
   write(bytes: Uint8Array) {
-    // The demo vehicle streams telemetry unconditionally but answers the
-    // parameter protocol, so the Parameters tab is real in demo mode. It
-    // deliberately has NO MAVFTP -- exercising the stream fallback path.
+    // Telemetry streams unconditionally; the parameter protocol is answered.
+    // No MAVFTP, so the parameter stream fallback is exercised.
     for (const frame of this.rxFramer.push(bytes)) {
       const decoded = decodeFrameFields(frame.msgid, frame.payload)
       if (!decoded) continue
@@ -595,10 +552,8 @@ export class VirtualFcTransport implements Transport {
   /**
    * The vehicle side of mission transfer, for all three plans.
    *
-   * Parameterized by mission_type rather than special-cased, the same way
-   * MissionClient is on the other end -- so uploading a fence exercises the
-   * identical count/request/ack dance the mission does, and demo mode can
-   * demonstrate the geofence and rally screens rather than only refusing.
+   * Parameterized by mission_type, like MissionClient, so fence and rally
+   * use the same count/request/ack exchange as the mission.
    */
   private handleMission(msgName: string, fields: Record<string, FieldValue>) {
     const missionType = (fields.missionType as number) ?? 0
@@ -696,20 +651,11 @@ export class VirtualFcTransport implements Transport {
               calStatus: 3, // RUNNING_STEP_TWO
               attempt: 1,
               completionPct: pct,
-              // The mask a real vehicle fills as samples arrive, rather than
-              // the ten zero bytes this used to send. Not an invented rule --
-              // ArduPilot derives the percentage *from* this coverage, so a
-              // progress message with none of it is the one shape the real
-              // thing never takes, and it left the coverage sphere blank for
-              // the whole of a demo calibration. Scattered rather than
-              // filled in index order, because a vehicle being turned over
-              // does not visit the sections in the order they are numbered.
+              // ArduPilot derives the percentage from this coverage mask, so
+              // it must be consistent with completionPct.
               completionMask: magCalMask(pct),
-              // Zeros, because that is what ArduPilot sends: its
-              // `mavlink_msg_mag_cal_progress_send` passes 0.0f for all three
-              // direction fields. A demo that filled them in taught this app
-              // a lesson the real firmware never gives -- which is the whole
-              // reason the virtual FC is held to what SITL does.
+              // ArduPilot's `mavlink_msg_mag_cal_progress_send` passes 0.0f
+              // for all three direction fields.
               directionX: 0,
               directionY: 0,
               directionZ: 0,
@@ -748,20 +694,15 @@ export class VirtualFcTransport implements Transport {
       case 241: // preflight calibration
         ack()
         if (param5 === 1) {
-          // **A start while one is already running does nothing.**
-          // `AP_AccelCal::start` returns immediately on `_started`, and the
-          // command handler acks anyway -- so a GCS that closed its wizard
-          // part-way and opened it again gets an ACCEPTED and silence. That
-          // is the state this models: there is no MAVLink cancel, so the run
-          // in progress is still the run in progress.
+          // A start while one is running does nothing: `AP_AccelCal::start`
+          // returns on `_started` and the handler acks anyway. There is no
+          // MAVLink cancel.
           if (this.accelCalTimer) return
-          // Walk the six sides the way AP_AccelCal does, in its wording --
-          // the GCS is meant to read these prompts rather than assume an
-          // order, so the demo has to actually speak them.
+          // Walk the six sides in AP_AccelCal's order and wording.
           this.accelCalPositions = 0
           setTimeout(() => this.sendStatusText(6, ACCEL_CAL_PROMPTS[0]!), 300)
-          // And it *asks*, over and over, which is the half a GCS can rejoin
-          // a calibration from: the text above is said once per side.
+          // The text is sent once per side; the position request repeats
+          // every second, which is what lets a GCS rejoin a run.
           this.accelCalTimer = setInterval(() => this.askAccelPosition(), 1000)
           setTimeout(() => this.askAccelPosition(), 300)
         } else if (param5 === 2) {
@@ -784,10 +725,8 @@ export class VirtualFcTransport implements Transport {
         }, 500)
         return
       case 176: {
-        // DO_SET_MODE: param2 is the custom mode. Every mode that holds a
-        // position needs one, and ArduPilot refuses with this exact sentence
-        // until the EKF has one -- ack 4 plus a STATUSTEXT saying why, which
-        // is the pair the Fly screen now reports together.
+        // DO_SET_MODE: param2 is the custom mode. Position modes are refused
+        // until the EKF has a position, with ack 4 plus ArduPilot's STATUSTEXT.
         if (NEEDS_POSITION.has(param2) && !this.positionOk) {
           this.sendStatusText(
             4,
@@ -797,10 +736,8 @@ export class VirtualFcTransport implements Transport {
         }
         this.mode = param2
         this.sendStatusText(6, 'Mode change')
-        // Auto with a takeoff at its head does not start itself from the
-        // ground: Copter waits for a throttle raise no station can give it.
-        // The mission is "running" and the vehicle simply sits there, which
-        // is the confusing part worth reproducing.
+        // Auto on the ground sits at the takeoff item: Copter waits for a
+        // throttle raise before starting the mission.
         if (param2 === 3 && !this.airborne) this.sendStatusText(6, 'Mission: 1 Takeoff')
         return ack()
       }
@@ -819,10 +756,8 @@ export class VirtualFcTransport implements Transport {
         this.sendStatusText(6, this.armed ? 'Arming motors' : 'Disarming motors')
         return ack()
       case 22: // NAV_TAKEOFF
-        if (!this.armed) return ack(4) // FAILED, like the real thing
-        // Copter only takes off on command in Guided. Accepting this in
-        // Stabilize is exactly what hid the Takeoff button's missing mode
-        // change: the app looked fine and the aircraft never moved.
+        if (!this.armed) return ack(4) // FAILED
+        // Copter only accepts a takeoff command in Guided.
         if (this.mode !== 4) {
           this.sendStatusText(4, 'Takeoff failed: not in Guided')
           return ack(4)
@@ -836,23 +771,13 @@ export class VirtualFcTransport implements Transport {
   }
 
   /**
-   * Two aircraft passing the field, as ADSB_VEHICLE.
-   *
-   * Modelled on what real ArduPilot sends and only after seeing it: SITL's
-   * own SIM_ADSB was run first (`npm run sitl -- --adsb`) and its reports
-   * read, so the rate, the units and -- the part worth copying -- the flags
-   * are the firmware's, not invented here. One aircraft carries a full set
-   * and the other deliberately does not: an aircraft with no altitude and no
-   * callsign is ordinary in real traffic, and a demo where every field is
-   * always present is a demo that never exercises the null paths a display
-   * has to handle.
-   *
-   * Two, not twenty. This exists so the traffic screens have something to
-   * show without hardware, not to simulate an airspace.
+   * Two aircraft passing the field, as ADSB_VEHICLE. Rate, units and flags
+   * follow SITL's SIM_ADSB (`npm run sitl -- --adsb`). The second aircraft
+   * has no altitude or callsign, so the display's null paths are exercised.
    */
   private sendTraffic() {
     const t = this.t()
-    // Crossing a kilometre or so north of home, opposite directions, one
+    // About a kilometer north of home, crossing in opposite directions, one
     // above and one below the demo vehicle's circuit.
     const send = (
       icao: number,
@@ -875,7 +800,7 @@ export class VirtualFcTransport implements Transport {
         lat: Math.round(latDeg * 1e7),
         lon: Math.round(lonDeg * 1e7),
         altitudeType: 0,
-        // Millimeters, like the firmware sends.
+        // Millimeters.
         altitude: Math.round(altM * 1000),
         heading: Math.round(headingDeg * 100),
         horVelocity: 4000,
@@ -887,8 +812,7 @@ export class VirtualFcTransport implements Transport {
         squawk: 1200,
       })
     }
-    // Tracking across the field rather than orbiting: a marker that never
-    // moves proves nothing about a display that has to keep up with one.
+    // Moving targets, so the display has to keep up.
     const drift = (t * 0.6) % 360
     send(0xa1b2c3, (20 + drift) % 360, 1.2, HOME_ALT_M + 250, 'N172SP', (110 + drift) % 360)
     send(0x4ca1f0, (200 - drift + 360) % 360, 0.9, HOME_ALT_M + 40, null, (290 - drift + 360) % 360)
@@ -898,9 +822,8 @@ export class VirtualFcTransport implements Transport {
     const t = this.t()
     const wiggle = (base: number, amp: number, f: number) =>
       Math.round(base + amp * Math.sin(t * f))
-    // With the on-screen transmitter in use, the sticks drive the channels
-    // instead of the idle wiggle -- a wandering channel would defeat the
-    // radio calibration's whole job of spotting which one the user moved.
+    // The on-screen sticks replace the idle wiggle, which would confuse radio
+    // calibration's detection of the moved channel.
     const s = demoSticks.active ? demoSticks : null
     const stick = (axis: number, reversed = false) =>
       Math.round(1500 + (reversed ? -1 : 1) * 400 * axis)
@@ -908,8 +831,8 @@ export class VirtualFcTransport implements Transport {
       timeBootMs: Math.round(t * 1000),
       chancount: 8,
       chan1Raw: s ? stick(s.roll) : wiggle(1500, 60, 0.7),
-      // Pitch wired backwards on purpose: it is the usual real-world case,
-      // and it gives the calibration a reversal to actually find.
+      // Pitch reversed on purpose, as is common, so calibration has a
+      // reversal to detect.
       chan2Raw: s ? stick(s.pitch, true) : wiggle(1500, 40, 0.9),
       chan3Raw: s ? stick(s.throttle) : this.flying() ? wiggle(1550, 30, 0.5) : 1100,
       chan4Raw: s ? stick(s.yaw) : wiggle(1500, 20, 1.1),
@@ -1058,11 +981,10 @@ export class VirtualFcTransport implements Transport {
   }
 
   /**
-   * "Put it on this side", as a command to the GCS.
-   *
-   * ArduPilot's `send_accelcal_vehicle_position` -- a COMMAND_LONG carrying
-   * MAV_CMD_ACCELCAL_VEHICLE_POS with the step in param1, broadcast with no
-   * target, repeated every second for as long as it is waiting.
+   * Asks the GCS for the next side, as ArduPilot's
+   * `send_accelcal_vehicle_position` does: a broadcast COMMAND_LONG carrying
+   * MAV_CMD_ACCELCAL_VEHICLE_POS with the step in param1, repeated every
+   * second while waiting.
    */
   private askAccelPosition() {
     this.emit('COMMAND_LONG', {
@@ -1070,10 +992,8 @@ export class VirtualFcTransport implements Transport {
       targetComponent: 0,
       command: 42429,
       confirmation: 0,
-      // `_param1`, not `param1`: that is what mavlink-mappings calls the
-      // field, and the encoder takes any key it is given -- a wrong one
-      // produces a well-formed message full of zeros, which is a request to
-      // be placed in side 0 and matches nothing.
+      // mavlink-mappings names it `_param1`. The encoder accepts any key, so
+      // `param1` would silently send zero.
       _param1: this.accelCalPositions + 1,
       _param2: 0,
       _param3: 0,

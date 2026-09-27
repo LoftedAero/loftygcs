@@ -2,12 +2,7 @@
 //
 // Web Mercator (EPSG:3857), the scheme every slippy map uses: at zoom z the
 // world is a 2^z square of 256 px tiles, x running west to east and y north
-// to south. The latitude formula is the part worth writing down rather than
-// half-remembering -- it is a Gudermannian, not a linear scale, which is why
-// Greenland looks like Africa.
-//
-// Pure and dependency-free so it can be tested without a map, a browser, or
-// a network.
+// to south. Latitude maps through the Gudermannian, not linearly.
 
 export interface TileCoord {
   z: number
@@ -36,12 +31,8 @@ export function latToTileY(lat: number, z: number): number {
 }
 
 /**
- * Every tile covering the bounds, across a zoom range.
- *
- * Counts grow by four with each zoom level, so the caller is expected to ask
- * how many before asking for them: a field-sized box from z14 to z19 is a
- * few thousand tiles, and the same box to z21 is tens of thousands, which is
- * a different conversation with someone's data plan.
+ * Every tile covering the bounds, across a zoom range. Counts grow fourfold
+ * per zoom level, so callers should check `countTiles` first.
  */
 export function tilesForBounds(
   bounds: LatLonBounds,
@@ -78,12 +69,8 @@ export function countTiles(bounds: LatLonBounds, minZoom: number, maxZoom: numbe
 }
 
 /**
- * A rough size for that many tiles.
- *
- * Satellite tiles run 15-25 KB of JPEG; 20 KB is the middle of that and the
- * number is only ever used to warn someone before a long download, so a
- * figure that is right to within a factor of two is worth more than a
- * precise one that requires fetching everything to compute.
+ * A rough size per tile, used only to warn before a long download. Satellite
+ * tiles run 15-25 KB of JPEG.
  */
 export const BYTES_PER_TILE = 20_000
 

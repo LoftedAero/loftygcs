@@ -1,18 +1,16 @@
-// Mission files. The lingua franca is the tab-separated "QGC WPL 110"
-// format (.waypoints/.txt) that Mission Planner, QGroundControl and the SITL
-// tooling all read and write; QGC's newer JSON .plan is import-only here.
+// Mission files. The common format is the tab-separated "QGC WPL 110"
+// (.waypoints/.txt) that Mission Planner, QGroundControl and the SITL tooling
+// all read and write; QGC's JSON .plan is import-only here.
 //
 // The wire type keeps lat/lon as degrees * 1e7; the file keeps degrees as
-// text. Seven decimals both ways, because that is the resolution the int
-// actually carries -- fewer truncates centimeters, more invents them.
+// text with seven decimals, the resolution the integer carries.
 import type { MissionItem } from './types'
 
 const HEADER = /^QGC WPL (\d+)\s*$/
 
 /**
  * Parses a .waypoints file into items renumbered 0..n-1 in file order.
- * Line 0 of the body is home by convention; interpreting it is the
- * caller's business, same as with a download.
+ * Line 0 of the body is home by convention; the caller interprets it.
  */
 export function parseWaypointsFile(text: string): MissionItem[] {
   const lines = text.split(/\r?\n/)
@@ -31,8 +29,8 @@ export function parseWaypointsFile(text: string): MissionItem[] {
       throw new Error(`Mission file line ${n + 1}: not a number where one was expected`)
     }
     items.push({
-      // Renumbered rather than trusted: hand-edited files skip and repeat
-      // sequence numbers, and ArduPilot requires them contiguous from 0.
+      // Renumbered: hand-edited files skip and repeat sequence numbers, and
+      // ArduPilot requires them contiguous from 0.
       seq: items.length,
       current: num[1]!,
       frame: num[2]!,
@@ -88,9 +86,8 @@ export interface PlanImport {
 
 /**
  * Imports a QGC .plan (JSON). Simple items only: complex items (Survey,
- * corridor scan...) are QGC-side generators that a .plan stores unexpanded,
- * so there is nothing here to translate them into -- refusing by name beats
- * silently flying a mission with a hole where the survey was.
+ * corridor scan, ...) are stored unexpanded, so they are refused by name
+ * rather than dropped.
  */
 export function parsePlanFile(text: string): PlanImport {
   let doc: unknown

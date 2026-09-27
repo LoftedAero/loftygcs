@@ -8,10 +8,8 @@ import { usePreferencesStore } from '../../../stores/preferences-store'
 
 // The progress strip, given data the demo vehicle cannot produce.
 //
-// The virtual FC has no flight dynamics on purpose, so it never flies a
-// mission and never sends MISSION_CURRENT; SITL proves the data path and
-// this proves the rendering. Between them the feature is covered end to end
-// without either pretending to be the other.
+// The virtual FC has no flight dynamics, so it never sends MISSION_CURRENT.
+// SITL covers the data path; this covers the rendering.
 
 const setPlan = (count: number) => {
   useMissionStore.getState().clear()
@@ -38,8 +36,7 @@ describe('mission progress on the Fly screen', () => {
   it('shows nothing until the vehicle reports an item', () => {
     setPlan(3)
     render(<FlightControls />)
-    // A vehicle in Loiter is not flying a mission, and an empty "WP —" would
-    // be a readout claiming to know something it does not.
+    // A vehicle in Loiter is not flying a mission.
     expect(strip()).toBeNull()
   })
 
@@ -75,9 +72,8 @@ describe('mission progress on the Fly screen', () => {
   })
 
   it('sits on the top row, where the always-visible space is', () => {
-    // It is read rather than pressed, so it takes the right-hand end of the
-    // row that is never empty -- and stops a readout sitting in the middle
-    // of the strip of controls below it.
+    // A readout, not a control, so it sits at the end of the always-present
+    // top row rather than among the controls below.
     setPlan(4)
     render(<FlightControls />)
     act(() => useVehicleStore.setState({ missionSeq: 2, wpDistM: 150, groundspeedMs: 10 }))

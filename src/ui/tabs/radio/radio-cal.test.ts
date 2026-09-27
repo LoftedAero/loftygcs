@@ -30,8 +30,7 @@ describe('detectDeflection', () => {
   })
 
   it('holds off until something is actually deflected', () => {
-    // Idle jitter must not be mistaken for a stick throw, or the wizard maps
-    // whichever channel happened to twitch.
+    // Idle jitter must not be mistaken for a stick throw.
     expect(detectDeflection(CENTER, [1508, 1495, 1103, 1502, 1500, 1500])).toBeNull()
     const justUnder = CENTER.slice()
     justUnder[0] = 1500 + MIN_DEFLECTION_US - 1
@@ -39,7 +38,7 @@ describe('detectDeflection', () => {
   })
 
   it('refuses to choose between two channels moving together', () => {
-    // Both sticks knocked at once: better to ask again than to guess.
+    // Two sticks moved at once: ask again rather than guess.
     const now = [1900, 1880, 1100, 1500, 1500, 1500]
     expect(detectDeflection(CENTER, now)).toBeNull()
   })
@@ -50,9 +49,8 @@ describe('detectDeflection', () => {
   })
 
   it('skips channels an earlier step already claimed', () => {
-    // The throttle has no spring, so it is normal for it to still be sitting
-    // at the top when the next stick is asked for. Left in the running it
-    // would out-deflect every later stick and win all four steps.
+    // The throttle has no spring and often stays at the top; if not excluded
+    // it would out-deflect every later stick.
     const now = [1900, 1500, 1900, 1500, 1500, 1500]
     expect(detectDeflection(CENTER, now)?.channel).toBe(3)
     expect(detectDeflection(CENTER, now, new Set([3]))?.channel).toBe(1)
@@ -84,8 +82,7 @@ describe('mappingFromDeflection', () => {
 describe('the stick conventions', () => {
   it('asks for pitch back rather than forward', () => {
     // ArduPilot's pitch input keeps its sign through to the Euler angle, and
-    // positive Euler pitch is nose up -- so the maximum is stick back. Get
-    // this backwards and every calibration reverses the elevator.
+    // positive pitch is nose up, so the maximum is stick back.
     expect(STICK_SPECS.pitch.maxDirection).toContain('back')
     expect(STICK_SPECS.roll.maxDirection).toContain('right')
     expect(STICK_SPECS.yaw.maxDirection).toContain('right')
@@ -93,10 +90,8 @@ describe('the stick conventions', () => {
   })
 
   it('draws the two vertical sticks in a consistent frame', () => {
-    // Screen up means away from the pilot: the throttle is pushed away and
-    // the pitch stick is pulled toward, so they must draw opposite ways.
-    // Purely presentational -- but drawing them the same way would tell the
-    // user to move the wrong stick the wrong way.
+    // Screen up means away from the pilot: throttle max is pushed away and
+    // pitch max pulled back, so they draw in opposite directions.
     expect(STICK_SPECS.throttle.axis).toBe('y')
     expect(STICK_SPECS.pitch.axis).toBe('y')
     expect(STICK_SPECS.throttle.sense).toBe(1)
@@ -131,8 +126,8 @@ describe('updateTravel', () => {
 
 describe('exercisedChannels', () => {
   it('keeps only channels that were really swept', () => {
-    // A switch nudged a few microseconds by vibration is not a calibrated
-    // channel, and writing its resting value as both endpoints breaks it.
+    // A switch nudged a few microseconds by vibration was not swept; writing
+    // its resting value as both endpoints would break it.
     const travel: Travel[] = [
       { min: 1100, max: 1900 },
       { min: 1495, max: 1505 },
@@ -212,8 +207,8 @@ describe('buildWrites', () => {
   })
 
   it('trims the sticks to center but the throttle to its bottom', () => {
-    // ArduPilot reads throttle as a range from MIN to MAX with no neutral,
-    // so a mid-stick trim there is meaningless at best.
+    // ArduPilot reads throttle from MIN to MAX with no neutral, so a
+    // mid-stick trim is meaningless.
     expect(find('RC1_TRIM')).toBe(1500)
     expect(find('RC3_TRIM')).toBe(1000)
   })

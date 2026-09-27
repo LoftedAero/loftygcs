@@ -4,7 +4,6 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useParamStore } from '../../../stores/param-store'
 import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
-import { useProfileLabels } from '../../../stores/guide-store'
 import { connectionService } from '../../../services/connection'
 import ChannelMonitor from './ChannelMonitor'
 import DemoTransmitter from './DemoTransmitter'
@@ -28,11 +27,9 @@ import {
   type Travel,
 } from './radio-cal'
 
-// The guided calibration. Mission Planner captures endpoints and leaves the
-// user to work out which channel is which and what needs reversing;
-// QGroundControl walks the sticks one at a time, both ways, and derives both.
-// This is the latter, because the mapping and the reversals are exactly the
-// part people get wrong, and getting them wrong is discovered in the air.
+// Guided radio calibration. Like QGroundControl, it walks each stick both
+// ways and derives the channel mapping and reversals, rather than leaving
+// those to the user as Mission Planner does.
 
 export default function RadioCalWizard({
   open,
@@ -45,7 +42,6 @@ export default function RadioCalWizard({
   onSaved?: () => void
 }) {
   const channels = useVehicleStore((s) => s.rcChannels)
-  const { channelLabels } = useProfileLabels()
   const isDemo = useConnectionStore((s) => s.kind === 'virtual')
 
   const [stage, setStage] = useState<StageId>('intro')
@@ -74,13 +70,13 @@ export default function RadioCalWizard({
     stage === 'identify' && !isMax && spec && expected
       ? reachedMin(spec, expected, baseline, travel, channels)
       : false
-  // On a min step, another stick moving while the expected one has not is the
-  // sign the max step before it caught the wrong stick.
+  // On a min step, another stick moving while the expected one has not means
+  // the preceding max step caught the wrong stick.
   const strayChannel = stage === 'identify' && !isMax && !returned ? deflection?.channel : undefined
   const ready = stage === 'identify' && (isMax ? !!deflection : returned)
 
-  // Every sample from the first stick onward, rather than only the ones a
-  // render happens to catch, so an endpoint touched briefly still counts.
+  // Every sample from the first stick onward, not just those a render
+  // catches, so a briefly touched endpoint still counts.
   useEffect(() => {
     if ((stage !== 'identify' && stage !== 'sweep') || channels.length === 0) return
     setTravel((t) => updateTravel(t, channels))
@@ -117,7 +113,7 @@ export default function RadioCalWizard({
   }
 
   // Back undoes one step. Returning to a max step forgets what it found, so
-  // a stick it caught wrongly is asked for again rather than kept.
+  // a wrongly caught stick is asked for again.
   const back = () => {
     if (step === 0) {
       setStage('center')
@@ -133,14 +129,14 @@ export default function RadioCalWizard({
   }
 
   /**
-   * Written straight through rather than staged: a half-applied radio
-   * calibration is worse than none, so each one is ack-verified here, and a
-   * refusal keeps the dialog open to retry exactly what did not land.
+   * Written directly rather than staged, each write ack-verified. A refusal
+   * keeps the dialog open to retry only what failed, since a half-applied
+   * calibration is worse than none.
    */
   const write = async (writes: ParamWrite[]) => {
     setSaving(true)
-    // RCMAP_* is read at boot, so a restart is asked for only when the
-    // mapping actually changed -- endpoints and reversals apply as written.
+    // RCMAP_* is read at boot, so ask for a restart only if the mapping
+    // changed; endpoints and reversals apply immediately.
     const entries = useParamStore.getState().entries
     const remapped = writes.some(
       (w) => w.param.startsWith('RCMAP_') && entries.get(w.param)?.value !== w.value,
@@ -164,7 +160,7 @@ export default function RadioCalWizard({
   }
 
   const conflicts = conflictingFunctions(mapping)
-  // Exactly what Save sends, and what the results table draws, from one list.
+  // One list drives both Save and the results table.
   const writes = useMemo(
     () => (stage === 'review' ? buildWrites({ mapping, travel, centers: baseline }) : []),
     [stage, mapping, travel, baseline],
@@ -198,9 +194,8 @@ export default function RadioCalWizard({
             </LaButton>
           )}
           {stage === 'identify' && (
-            // Next, as the sweep's is, and disabled until the stick is seen:
-            // the monitor beside it highlights the channel it found, which a
-            // "Channel 3 — next" label only repeated.
+            // Disabled until the stick is seen; the monitor highlights the
+            // channel found.
             <LaButton variant="primary" disabled={!ready} onClick={acceptIdentify}>
               Next
             </LaButton>
@@ -222,14 +217,11 @@ export default function RadioCalWizard({
         </>
       }
     >
-      {/* The results take the whole width: the live monitor has nothing
-          left to show by then, and the table has a column per parameter. */}
+      {/* Results take the full width; the live monitor is no longer needed. */}
       <div className={`rc-wizard${stage === 'review' ? ' rc-wizard--results' : ''}`}>
         <div className="rc-wizard__main">
           {stage === 'intro' && (
             <>
-              {/* The checklist is the actionable part; what the wizard does
-                  is what pressing Start finds out. */}
               <ul className="rc-wizard__checklist">
                 <li>Remove the propellers, or disconnect motor power entirely.</li>
                 <li>Turn the transmitter on and check the receiver is bound.</li>
@@ -242,10 +234,7 @@ export default function RadioCalWizard({
           {stage === 'center' && (
             <>
               <h3 className="rc-wizard__step">Center the sticks</h3>
-              {/* One line, as every step's is: at two it put the diagram 20px
-                  lower here than on the steps after, so it jumped as they
-                  began. The heading already says center; this is only the
-                  stick that is the exception. */}
+              {/* One line, like every step, so the diagram does not jump. */}
               <p className="rc-wizard__lead">Hold the throttle all the way down.</p>
               <StickDiagram active={null} />
             </>
@@ -257,12 +246,10 @@ export default function RadioCalWizard({
                 Move the {spec.label.toLowerCase()} stick{' '}
                 {isMax ? spec.maxDirection : spec.minDirection}
               </h3>
-              {/* The throttle has no spring, so it stays where it is put: up
-                  through both yaw steps, which keeps them clear of the
-                  rudder-arm gesture (IDENTIFY_STEPS). A stray stick takes
-                  over this line rather than adding one: a line appearing
-                  under the diagram moved it, and the step count that once
-                  sat there went for the same reason. */}
+              {/* The throttle has no spring, so it stays up through both yaw
+                  steps, avoiding the rudder-arm gesture (IDENTIFY_STEPS). A
+                  stray-stick warning replaces this line rather than adding
+                  one, so the diagram does not move. */}
               <p className={`rc-wizard__lead${strayChannel ? ' is-bad' : ''}`}>
                 {strayChannel
                   ? `Channel ${strayChannel} moved, not ${expected?.channel}. Wrong stick? Go back.`
@@ -282,13 +269,9 @@ export default function RadioCalWizard({
 
           {stage === 'sweep' && (
             <>
-              {/* Optional, and Next says so by being enabled: a transmitter
-                  with nothing past the four sticks just goes on. */}
+              {/* Optional, so Next is always enabled. */}
               <h3 className="rc-wizard__step">Move each switch and dial through its range</h3>
-              {/* Which channels, the sticks included -- they were swept in the
-                  steps before -- so the list starts at 1, 2, 3, 4 and grows.
-                  Without them it read "none" and then jumped to a lone "5",
-                  which looked like a count. */}
+              {/* Includes the stick channels swept in the earlier steps. */}
               <p className="rc-wizard__progress">
                 Channels swept: {swept.length ? swept.join(', ') : 'none'}
               </p>
@@ -324,7 +307,6 @@ export default function RadioCalWizard({
               channels={channels}
               travel={stage === 'identify' || stage === 'sweep' ? travel : undefined}
               mapping={mapping}
-              labels={channelLabels}
               highlight={
                 stage === 'identify'
                   ? ((isMax ? deflection?.channel : expected?.channel) ?? null)
@@ -339,12 +321,9 @@ export default function RadioCalWizard({
 }
 
 /**
- * What Save will write, a row per channel, each parameter's name in the
- * sub-font the named rows use for theirs with its value beside it, as the
- * vehicle will hold it -- so the dialog's last
- * word before writing is the parameters themselves, not a summary of them.
- * Drawn from the write list, so a cell with no write is a dash, and a
- * refused write is marked where it sits.
+ * What Save will write, a row per channel, showing each parameter name with
+ * its raw value. Drawn from the write list: a cell with no write is a dash,
+ * and a refused write is marked in place.
  */
 function ResultsTable({
   writes,
@@ -368,12 +347,8 @@ function ResultsTable({
     ),
   ].sort((a, b) => a - b)
 
-  // Name and the number it will be set to, side by side: the raw value, as
-  // the parameter will hold it, rather than a word standing in for it.
-  //
-  // The names are monospace, so padding each column's to its longest in `ch`
-  // lines its values up: RCMAP_ROLL's 1 sat four characters left of
-  // RCMAP_THROTTLE's 3 otherwise.
+  // Names are monospace, so padding each column to its longest name in `ch`
+  // aligns the values.
   const widest = (suffix: string | RegExp) =>
     Math.max(
       0,

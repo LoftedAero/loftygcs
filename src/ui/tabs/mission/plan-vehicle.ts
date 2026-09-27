@@ -4,17 +4,10 @@ import { useVehicleStore } from '../../../stores/vehicle-store'
 import { vehicleClass, type VehicleClass } from '../../../protocol/modes'
 
 /**
- * The aircraft a plan is being written for.
- *
- * A connected vehicle answers this itself; with nothing connected the plan
- * still has to be for *something*, because the command set differs -- spline
- * waypoints and payload place are Copter-only and ArduPlane refuses them on
- * upload. Offering them anyway is a menu entry that can only ever fail,
- * which is the open issue Mission Planner has for exactly this.
- *
- * The stored preference is only consulted while disconnected. A connected
- * vehicle is never overridden by it: what is on the end of the link is not a
- * matter of opinion.
+ * The aircraft a plan is being written for, which decides the command set
+ * (spline waypoints and payload place are Copter-only; ArduPlane refuses them
+ * on upload). A connected vehicle answers this itself; the stored preference
+ * is used only while disconnected.
  */
 export function usePlanVehicleClass(): VehicleClass {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')

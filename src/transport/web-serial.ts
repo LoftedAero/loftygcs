@@ -1,18 +1,15 @@
-// USB serial via the Web Serial API. This one file serves both homes: the
-// browser (Chrome/Edge/Firefox 151+) and Electron, whose select-serial-port
-// handler feeds the same requestPort() call. That symmetry is the whole
-// reason the app codes to Web Serial instead of node-serialport.
+// USB serial via the Web Serial API. The same code runs in the browser
+// (Chrome/Edge/Firefox 151+) and in Electron, whose select-serial-port handler
+// answers the same requestPort() call; that is why the app uses Web Serial
+// rather than node-serialport.
 import { TransportError, type Transport, type TransportOptions } from './Transport'
 
 /**
  * Ports this origin has already been granted, newest grant last.
  *
- * `requestPort()` needs a user gesture and shows a chooser; `getPorts()`
- * needs neither, and returns whatever the browser (or Electron's device
- * permission handler) already said yes to. It is the only way to touch a
- * port without asking, which is what board detection wants -- and it is
- * best-effort by nature: a fresh profile has granted nothing, so an empty
- * list is the normal case and not an error.
+ * Unlike `requestPort()`, `getPorts()` needs no user gesture and shows no
+ * chooser, so it is how background board detection reaches a port. An empty
+ * list is normal for a fresh profile.
  */
 export async function grantedSerialPorts(): Promise<SerialPort[]> {
   if (typeof navigator === 'undefined' || !('serial' in navigator)) return []
@@ -24,14 +21,9 @@ export async function grantedSerialPorts(): Promise<SerialPort[]> {
 }
 
 /**
- * Ask for a port once and keep it.
- *
- * Every `requestPort()` is a chooser in somebody's face, so a flow that
- * needs the same device twice must acquire it once and pass it around.
- * `identifyBoard` used to let the transport ask for itself, which put the
- * *same* port chooser up twice for the *same* board -- once to probe it,
- * once to reboot it -- and that is what a flash looked like from the
- * outside.
+ * Ask for a port once and keep it. Every `requestPort()` shows a chooser, so
+ * a flow that needs the same device twice should acquire it once and pass it
+ * along.
  */
 export async function requestSerialPort(): Promise<SerialPort> {
   if (typeof navigator === 'undefined' || !('serial' in navigator)) {
@@ -47,12 +39,8 @@ export async function requestSerialPort(): Promise<SerialPort> {
 }
 
 /**
- * The chooser was dismissed without a port.
- *
- * Its own type because it is not a failure: pressing Cancel on a port picker
- * is choosing not to continue, and a caller that cannot tell it from "the
- * board did not answer" ends up asking a follow-up question to somebody who
- * has just said no.
+ * The chooser was dismissed without a port. Its own type because canceling
+ * is a choice, not a failure, and callers should treat it that way.
  */
 export class PortCancelledError extends TransportError {
   constructor() {
@@ -71,15 +59,14 @@ export class WebSerialTransport implements Transport {
   private closing = false
 
   /**
-   * @param chosen A port already in hand -- from `grantedSerialPorts()` --
-   * which skips the chooser entirely. Omit it and the user picks.
+   * @param chosen A port already in hand (from `grantedSerialPorts()`), which
+   * skips the chooser. Omit it and the user picks.
    */
   constructor(private readonly chosen?: SerialPort) {}
 
   /**
-   * The port this transport is open on, so a flow that needs the same
-   * device again can hand it to the next transport instead of asking.
-   * Null before `open` and after `close`; read it while it is open.
+   * The port this transport is open on, so a flow can hand it to the next
+   * transport instead of asking again. Null before `open` and after `close`.
    */
   get openedPort(): SerialPort | null {
     return this.port
@@ -113,9 +100,8 @@ export class WebSerialTransport implements Transport {
   }
 
   private async readLoop() {
-    // Streams-style read loop: each successful read hands the chunk to the
-    // byte pump. A device unplug surfaces as an error or a done -- both end
-    // the loop and report the close upward exactly once.
+    // A device unplug surfaces as an error or as done; either ends the loop
+    // and reports the close exactly once.
     while (this.port?.readable && !this.closing) {
       const reader = this.port.readable.getReader()
       this.reader = reader
@@ -153,7 +139,7 @@ export class WebSerialTransport implements Transport {
       this.writer?.releaseLock()
       await this.port?.close()
     } catch {
-      // Same story: a surprise-removed device cannot be closed cleanly.
+      // A surprise-removed device cannot be closed cleanly.
     }
     this.port = null
     this.reader = null

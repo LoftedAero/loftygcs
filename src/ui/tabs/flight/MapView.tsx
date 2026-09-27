@@ -18,16 +18,14 @@ import {
   type BaseLayerId,
 } from './map-layers'
 
-// Imperative Leaflet: the map, marker, and trail update outside React's
-// render cycle -- a marker that re-rendered through the virtual DOM at
-// telemetry rate would fight the map's own DOM. React owns the container
-// div; Leaflet owns everything inside it.
+// Imperative Leaflet: the map, marker and trail update outside React's
+// render cycle at telemetry rate. React owns the container div; Leaflet owns
+// everything inside it.
 
 const TRAIL_MAX_POINTS = 600
 
 function vehicleIcon(headingDeg: number): L.DivIcon {
-  // An orange track-up arrow; brand action color because the vehicle is
-  // the one thing on this map you act on.
+  // An orange track-up arrow.
   return L.divIcon({
     className: 'vehicle-marker',
     html: `<svg width="34" height="34" viewBox="-17 -17 34 34" style="transform: rotate(${headingDeg}deg)">
@@ -97,8 +95,7 @@ export default function MapView({
     const el = containerRef.current
     if (!el || mapRef.current) return
     const map = L.map(el, { zoomControl: true, attributionControl: true }).setView([0, 0], 3)
-    // Right-click is the action gesture here, so the browser's own menu must
-    // not appear on top of ours.
+    // Right-click opens our menu, so suppress the browser's.
     map.getContainer().addEventListener('contextmenu', (e) => e.preventDefault())
     map.on('contextmenu', (e: L.LeafletMouseEvent) => {
       menuRef.current({
@@ -109,17 +106,15 @@ export default function MapView({
       })
     })
     trailRef.current = L.polyline([], { color: '#4684C5', weight: 3, opacity: 0.85 }).addTo(map)
-    // Under the vehicle and its trail: the plan is context, not the subject.
+    // The plan draws under the vehicle and its trail.
     missionRef.current = createMissionOverlay(map)
     mapRef.current = map
 
-    // Leaflet caches its container's size and only watches the window, so any
-    // change to this pane -- closing the plot, dragging the divider, swapping
-    // sides -- leaves it drawing at the old size: the container grows and the
-    // map does not follow it. Watch the element itself instead.
+    // Leaflet caches its container size and only watches the window, so pane
+    // changes (the divider, closing the plot) need the element watched.
     let frame = 0
     const observer = new ResizeObserver(() => {
-      // A divider drag fires this continuously; one call per frame is plenty.
+      // Throttled to one call per frame during a divider drag.
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => map.invalidateSize({ animate: false }))
     })
@@ -145,8 +140,7 @@ export default function MapView({
     if (!map) return
     const spec = layerById(base)
     tileRef.current?.remove()
-    // Reads the offline cache first and stores what it fetches, so panning
-    // around the field before takeoff builds the cache for free.
+    // Reads the offline cache first and stores what it fetches.
     tileRef.current = createCachedTileLayer(spec).addTo(map)
     // Behind the trail and markers, whichever order they were added in.
     tileRef.current.setZIndex(0)
@@ -181,20 +175,15 @@ export default function MapView({
       }
     })
 
-    // Everything the aircraft drew comes off with the aircraft.
-    //
-    // The store's reset cannot do it: it sets the position to 0,0, and the
-    // draw above ignores 0,0 because that is also what an unfixed GPS
-    // reports -- so a disconnect left the last icon and the whole trail
-    // sitting on the map as if something were still flying them. The map
-    // keeps its view; only what belonged to that vehicle goes.
+    // Clear the vehicle's marker and trail on disconnect. The store's reset
+    // sets the position to 0,0, which the draw above ignores (an unfixed GPS
+    // reports the same), so it has to be done here. The view is kept.
     const unsubLink = useConnectionStore.subscribe((s) => {
       if (s.phase === 'connected' || s.phase === 'linkLost') return
       markerRef.current?.remove()
       markerRef.current = null
       trailRef.current?.setLatLngs([])
-      // So the next vehicle centers the map on its first fix, the way the
-      // first one did, rather than being left off screen.
+      // The next vehicle centers the map on its first fix.
       firstFix = true
     })
     return () => {
@@ -203,13 +192,10 @@ export default function MapView({
     }
   }, [])
 
-  // Traffic. Driven by the reports alone, and this vehicle's position is
-  // *read* at draw time rather than subscribed to: the marker positions do
-  // not depend on where we are, only the relative-height labels do, and
-  // subscribing to a store that ticks at telemetry rate would rebuild every
-  // marker's icon ten times a second to move a number that changes once. The
-  // engine sends a fresh picture every second for as long as anything is
-  // being heard, so the labels are never more than that stale.
+  // Traffic. Redrawn from the reports only; this vehicle's position is read
+  // at draw time rather than subscribed to, since it only affects the
+  // relative-height labels. The engine sends a fresh picture every second,
+  // so the labels are at most a second stale.
   const distanceUnit = useUnits().distance
   const showTraffic = useFlightLayoutStore((s) => s.showTraffic)
   useEffect(() => {
@@ -227,9 +213,7 @@ export default function MapView({
       unsub()
       layer.remove()
     }
-    // Rebuilt when the switch or the unit changes: the tags carry a number
-    // and a unit, and switching the preference must not leave feet on the
-    // map and meters everywhere else.
+    // Rebuilt when the switch or the unit preference changes.
   }, [distanceUnit, showTraffic])
 
   useEffect(() => {
@@ -240,8 +224,7 @@ export default function MapView({
       )
     }
     draw()
-    // Two sources, one drawing: the plan changes when it is edited or read
-    // back from the vehicle, the current item changes as it is flown.
+    // Redrawn when the plan changes or the current item advances.
     const unsubPlan = useMissionStore.subscribe(draw)
     const unsubSeq = useVehicleStore.subscribe(draw)
     return () => {

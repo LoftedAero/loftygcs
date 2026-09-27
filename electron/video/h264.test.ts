@@ -41,8 +41,7 @@ describe('parseRtp', () => {
   })
 
   it('skips CSRC entries and header extensions', () => {
-    // Both push the payload along; miscounting either feeds the decoder the
-    // tail of the header as if it were a NAL.
+    // Miscounting either feeds the tail of the header to the decoder as a NAL.
     const buf = new Uint8Array(12 + 8 + 4 + 4 + 2)
     buf[0] = 0x80 | 0x10 | 2 // extension + 2 CSRCs
     buf[1] = 96
@@ -82,8 +81,6 @@ describe('H264Depayloader', () => {
   })
 
   it('reassembles a NAL split across FU-A packets', () => {
-    // The whole reason this class exists: a keyframe is far bigger than an
-    // MTU and arrives in pieces that must go back together in order.
     const d = new H264Depayloader()
     d.setParameterSets(Uint8Array.from(SPS), Uint8Array.from(PPS))
     const ind = 0x60 | 28
@@ -123,8 +120,6 @@ describe('H264Depayloader', () => {
   })
 
   it('throws away a picture with a gap in it', () => {
-    // Half a frame decodes to a smear that persists until the next keyframe,
-    // which looks far more broken than a brief freeze.
     const d = new H264Depayloader()
     const ind = 0x60 | 28
     d.push(parseRtp(rtp([ind, 0x80 | 1, 0x11], { seq: 1 }))!)
@@ -142,8 +137,7 @@ describe('H264Depayloader', () => {
   })
 
   it('re-sends the parameter sets with every keyframe', () => {
-    // A decoder that joins mid-stream, or one restarted after a source
-    // change, has no SPS until one arrives; cameras send them rarely.
+    // A decoder joining mid-stream needs them, and cameras send them rarely.
     const d = new H264Depayloader()
     d.setParameterSets(Uint8Array.from(SPS), Uint8Array.from(PPS))
     const first = d.push(parseRtp(rtp(nal(5, 0x01), { seq: 1, marker: true }))!)[0]!
@@ -162,8 +156,6 @@ describe('H264Depayloader', () => {
   })
 
   it('ignores packet types nothing in the wild produces', () => {
-    // Emitting a mis-parsed NAL is worse than dropping it: the decoder
-    // renders garbage rather than nothing.
     const d = new H264Depayloader()
     for (const t of [25, 26, 27, 29]) {
       expect(d.push(parseRtp(rtp([0x60 | t, 1, 2, 3], { marker: true }))!)).toEqual([])
@@ -185,11 +177,8 @@ describe('access unit delimiters', () => {
   }
 
   it('keeps a delimiter first, ahead of the parameter sets', () => {
-    // x264 -- and most cameras -- put an AUD at the head of every access
-    // unit. Inserting SPS/PPS in front of it makes a stream libav still
-    // decodes but Chromium refuses, reporting that no key frame ever
-    // arrived: the picture simply never appears in the HUD. Found against
-    // a real WebCodecs decoder, so it is asserted here.
+    // x264 and most cameras put an AUD at the head of every access unit.
+    // SPS/PPS in front of it decode in libav but Chromium rejects the stream.
     const d = new H264Depayloader()
     d.setParameterSets(Uint8Array.from(SPS), Uint8Array.from(PPS))
     d.push(parseRtp(rtp(nal(9, 0x10), { seq: 0 }))!)

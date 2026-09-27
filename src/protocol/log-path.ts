@@ -1,22 +1,13 @@
-// The flight path, as something you can fly a camera along.
+// The flight path from a log, joined onto one timeline for replay.
 //
-// A log records position and attitude in separate messages at different
-// rates -- POS at about 10 Hz, ATT at about 10 Hz, neither aligned with the
-// other -- so a replay needs them joined onto one timeline. Position leads,
-// because that is what the aircraft's track *is*; attitude is sampled onto
-// each position's timestamp.
+// Position and attitude are logged in separate, unaligned messages, so
+// attitude is interpolated onto each position's timestamp.
 //
-// Which messages, and why:
+//   POS  the EKF's position estimate, what the aircraft flew on. Preferred.
+//   AHR2 position and attitude together; used when POS is absent.
+//   GPS  the raw receiver, used last: it is the EKF's input, and it jumps.
 //
-//   POS  is the EKF's own position estimate, which is what the aircraft
-//        believed and therefore what it flew on. Preferred.
-//   AHR2 carries position and attitude together, and stands in when POS is
-//        absent -- an older log, or one with the EKF unlogged.
-//   GPS  is the raw receiver, used last: it is what the EKF was fed, not
-//        what the EKF concluded, and it jumps.
-//
-// Everything here is degrees and meters, matching what the parser already
-// scaled the columns to.
+// Units are degrees and meters, as the parser scales them.
 
 import { getSeries, type ParsedLog } from './dataflash'
 
@@ -28,11 +19,8 @@ export interface PathSample {
   /** Meters above mean sea level, as the log reports it. */
   alt: number
   /**
-   * Meters above the launch point.
-   *
-   * The one to draw on a globe with no terrain, where the rendered ground
-   * sits at ellipsoid height zero: an AMSL track at a field 584 m up floats
-   * 584 m above that ground, which is exactly as wrong as it sounds.
+   * Meters above the launch point. Use this on a globe with no terrain, where
+   * the ground is at ellipsoid height zero and an AMSL track would float.
    */
   altAboveHome: number
   /** Degrees. Zero when the log carried no attitude to sample. */
@@ -95,10 +83,9 @@ export function flightPath(log: ParsedLog): FlightPath {
     }
   }
 
-  // Height above the launch point. POS logs it directly; for the other
-  // sources it is the AMSL altitude less the ground's, which the EKF origin
-  // gives when the log has one and the first fix approximates when it does
-  // not -- the aircraft was on the ground at the time either way.
+  // Height above the launch point. POS logs it directly; otherwise it is AMSL
+  // altitude less the ground's, taken from the EKF origin or else the first
+  // fix (the aircraft was on the ground for both).
   const relative = getSeries(log, source, 'RelHomeAlt')?.values ?? null
   const originAlt = getSeries(log, 'ORGN', 'Alt')?.values[0] ?? null
   let groundAlt = originAlt
@@ -125,8 +112,8 @@ export function flightPath(log: ParsedLog): FlightPath {
   for (let i = 0; i < time.length; i++) {
     const la = lat[i]!
     const lo = lon[i]!
-    // Before the EKF has an origin these read as exactly zero, which is a
-    // real place in the Atlantic and would draw the track through it.
+    // Before the EKF has an origin these are exactly zero, a real place in
+    // the Atlantic.
     if (la === 0 && lo === 0) continue
     const t = time[i]!
     let r = 0
@@ -157,10 +144,8 @@ export function flightPath(log: ParsedLog): FlightPath {
 }
 
 /**
- * Walk a cursor forward to the last sample at or before `t`.
- *
- * Both streams are in time order, so the join is a merge rather than a
- * search per sample -- which matters at a hundred thousand samples.
+ * Walk a cursor forward to the last sample at or before `t`. Both streams are
+ * in time order, so the join is a merge rather than a search per sample.
  */
 function advance(times: Float64Array, t: number, from: number): number {
   let i = from
@@ -179,11 +164,8 @@ function interpolate(times: Float64Array, values: Float64Array, t: number, i: nu
 }
 
 /**
- * Interpolate a heading the short way round.
- *
- * Yaw wraps at 360, so a plain average of 359 and 1 gives 180 -- the
- * aircraft spinning a half turn between two samples a tenth of a second
- * apart, every time it flies north.
+ * Interpolate a heading the short way round: yaw wraps at 360, and a plain
+ * average of 359 and 1 gives 180.
  */
 function interpolateAngle(times: Float64Array, values: Float64Array, t: number, i: number): number {
   const t0 = times[i]!

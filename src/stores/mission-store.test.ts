@@ -51,8 +51,8 @@ describe('adding items', () => {
   })
 
   it('puts a takeoff first, wherever it was added', () => {
-    // A takeoff after the waypoints is not a mission anyone means to fly,
-    // and ArduPilot will not start one that does not begin with it.
+    // ArduPilot will not start a mission that does not begin with the
+    // takeoff.
     store().addItem(16, { x: 1, y: 1 })
     store().addItem(16, { x: 2, y: 2 })
     store().addItem(22)
@@ -60,8 +60,8 @@ describe('adding items', () => {
   })
 
   it('leaves position at zero for commands that have none', () => {
-    // NAV_TAKEOFF climbs where the vehicle stands; a coordinate here would
-    // be carried to the vehicle and quietly ignored, or worse, honored.
+    // NAV_TAKEOFF climbs where the vehicle stands, so it carries no
+    // coordinate.
     store().addItem(22, { x: 5, y: 6 })
     expect(store().plan.items[0]).toMatchObject({ x: 0, y: 0 })
   })
@@ -109,9 +109,8 @@ describe('dirty tracking', () => {
   })
 
   it('stays clean through a read-back that renames nothing', () => {
-    // The round trip that matters: read, upload, read again. An RTL has
-    // neither a position nor an altitude, so ArduPilot stores no frame for
-    // it and reports 0 whatever went up -- that must not read as an edit.
+    // Read, upload, read again. An RTL has no position or altitude, so
+    // ArduPilot stores no frame for it and reports 0; that is not an edit.
     const downloaded = [
       wire(0, { frame: 0, z: 584 }),
       wire(1),
@@ -128,9 +127,7 @@ describe('dirty tracking', () => {
     store().setPlan(planFromItems(readBack), { synced: false })
     expect(isDirty(store())).toBe(false)
 
-    // A takeoff, by contrast, does carry an altitude -- so its frame is the
-    // difference between 40 m above home and 40 m above the sea, and a
-    // change there is a real edit that must show.
+    // A takeoff carries an altitude, so a frame change is a real edit.
     store().setPlan(planFromItems([wire(0), wire(1, { command: 22, x: 0, y: 0 })]), {
       synced: true,
     })
@@ -166,7 +163,7 @@ describe('fence editing', () => {
     store().finishFenceShape()
     expect(store().fence.shapes).toHaveLength(1)
     // The tool disarms and the draft empties, so the next click does not
-    // start extending the shape that was just committed.
+    // extend the committed shape.
     expect(store().fenceTool).toBeNull()
     expect(store().fenceDraft).toEqual([])
   })
@@ -204,8 +201,7 @@ describe('fence editing', () => {
     store().placeFencePoint(at(1, 1))
     store().placeFencePoint(at(2, 2))
     store().setEditing('rally')
-    // A two-corner polygon is not a fence, and keeping it would resurface
-    // later as a shape the vehicle rejects.
+    // A two-corner polygon is not a fence; the vehicle would reject it.
     expect(store().fenceDraft).toEqual([])
     expect(store().fenceTool).toBeNull()
   })

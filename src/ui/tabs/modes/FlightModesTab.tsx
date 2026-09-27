@@ -21,25 +21,22 @@ export function modeSlotForPwm(pwm: number): number {
   return 6
 }
 
-// Which modes the mode switch can reach. Showing the live slot turns this
-// from a form into a check you can perform: flick the switch, watch the row
-// light up, know the radio and the parameters agree.
+// Which modes the mode switch can reach. The live slot is highlighted, so
+// flicking the switch checks that the radio and the parameters agree.
 export default function FlightModesTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const entries = useParamStore((s) => s.entries)
   const ready = useParamStore((s) => s.loadState === 'ready')
   const channels = useVehicleStore((s) => s.rcChannels)
 
-  // Parameters too, not just a link: with them still arriving every FLTMODE is
-  // missing, and the empty-set branch below would announce that this vehicle
-  // has no mode switch -- which is a statement about the aircraft, made while
-  // the download that would disprove it is still running.
+  // Wait for parameters too: mid-download every FLTMODE is missing, and the
+  // empty-set branch below would wrongly report no mode switch.
   if (!connected || !ready) {
     return <NeedsVehicle title="Flight modes" />
   }
 
-  // A row reading "not on this vehicle" is what `ParamCard` existed to
-  // prevent; this card builds its own rows, so it carries the rule itself.
+  // This card builds its own rows, so it drops missing parameters itself as
+  // `ParamCard` would.
   const has = (param: string) => entries.has(param)
   const modeCh = entries.get('FLTMODE_CH')?.value ?? 5
   const pwm = channels[modeCh - 1] ?? 0
@@ -48,24 +45,16 @@ export default function FlightModesTab() {
 
   if (slots.length === 0) {
     return (
-      // Plane and Rover name these differently and some builds omit them
-      // entirely; the Parameters tab is where the full set stays reachable.
+      // Some vehicles and builds name these differently or omit them; the
+      // Parameters tab still has the full set.
       <LaCard title="Flight modes" note="This vehicle does not report mode-switch parameters." />
     )
   }
 
   return (
-    // One card, because it is one setting: a channel, the six modes it selects
-    // between, and the handful of things that qualify them. Two cards said
-    // there were two subjects here and put the mode a vehicle boots into on
-    // the far side of a card boundary from the modes it boots into.
-    //
-    // Staged rather than written on change, which is Mission Planner's own
-    // choice on this screen -- its six dropdowns sit behind one Save Modes
-    // button. Measured on Copter 4.7.1, writing the slot the switch is already
-    // sitting in does *not* move the aircraft, so either would have been safe
-    // on the ground; the deciding argument was consistency with the tool
-    // everyone arriving here has already used.
+    // One card: a channel, the six modes it selects between, and the settings
+    // that qualify them. Edits are staged behind Write rather than sent on
+    // change, like Mission Planner's Save Modes button.
     <LaCard
       title="Mode switch"
       actions={
@@ -75,11 +64,7 @@ export default function FlightModesTab() {
         />
       }
     >
-      {/* The two settings that frame the table -- which channel selects a
-          slot, and which slot the vehicle wakes up in -- side by side above
-          it with their labels stacked, the way the compass card carries the
-          settings that apply to its whole table. One row reads as one group,
-          where two rows above a table read as more of the table. */}
+      {/* Settings that apply to the whole table, side by side above it. */}
       <div className="sensor-fields">
         {has('FLTMODE_CH') && <ParamField param="FLTMODE_CH" label="Mode channel" stacked />}
         {has('INITIAL_MODE') && <ParamField param="INITIAL_MODE" label="Mode at boot" stacked />}
@@ -109,12 +94,7 @@ export default function FlightModesTab() {
           </div>
         ))}
       </div>
-      {/* The marked row is the whole check: flick the switch and it moves. A
-          line under the table spelled out the channel, its PWM, the slot and
-          the vehicle's mode -- the same fact the marker draws, plus the mode,
-          which the app bar already carries. With no reading, no row is
-          marked. Simple and super simple went with it: they are the
-          Parameters table's to carry, not this card's. */}
+      {/* The marked row follows the switch; with no reading, none is marked. */}
     </LaCard>
   )
 }

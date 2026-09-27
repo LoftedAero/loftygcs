@@ -1,15 +1,11 @@
-// Emptying a plan -- on the screen, and optionally on the aircraft.
+// Emptying a plan on the screen, and optionally on the vehicle.
 //
-// The two are genuinely different actions and the difference matters: a
-// fence cleared on screen is still being enforced by the vehicle, and a
-// mission cleared on screen is still what Auto will fly. The screen has no
-// way to show that gap once the plan is empty, because an empty plan and a
-// plan that was never read look identical -- so the choice is put to the
-// user at the moment they clear, rather than left as a hint they have to
-// notice afterwards.
+// These are different actions: a fence cleared on screen is still enforced
+// by the vehicle, and a mission cleared on screen is still what Auto will
+// fly. An empty plan cannot show which happened, so the user is asked when
+// they clear.
 //
-// One file for all three plans, because they differ only by mission_type
-// and three copies of this would drift the way the columns did.
+// Shared by all three plans, which differ only by mission_type.
 
 import { connectionService } from './connection'
 import { useMissionStore, type PlanKind } from '../stores/mission-store'
@@ -35,16 +31,11 @@ export function clearPlanHere(kind: PlanKind): void {
 /**
  * Empty it on the vehicle as well.
  *
- * MISSION_CLEAR_ALL rather than an upload of no items: it is the message the
- * protocol defines for exactly this, and it is one round trip rather than a
- * count-and-ack handshake over nothing. An empty upload does clear all three
- * on 4.6 SITL -- sitl.integration.test.ts asserts it -- but that is one
- * firmware's behavior where this is every version's documented one.
+ * Uses MISSION_CLEAR_ALL rather than an empty upload: it is the documented
+ * message for this, and one round trip.
  *
- * The screen is only emptied once the vehicle has acked, and it is then
- * marked synced -- both ends are empty, which is exactly what "matches
- * vehicle" means. A refused clear leaves the plan alone, or the screen would
- * report a vehicle with nothing on it while it still holds the old one.
+ * The screen is emptied and marked synced only once the vehicle acks. A
+ * refused clear leaves the plan alone, since the vehicle still holds it.
  */
 export async function clearPlanOnVehicle(kind: PlanKind): Promise<void> {
   const store = useMissionStore.getState()

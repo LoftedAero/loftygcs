@@ -32,9 +32,9 @@ describe('SERVO_OUTPUT_RAW', () => {
 })
 
 describe('mergeServoOutputs', () => {
-  // The case SITL cannot show: it builds with 16 channels and only sends
-  // port 0, where a board with more than 1 MB of flash builds with 32 and
-  // sends port 1 straight after it, every cycle, usually all zeros.
+  // SITL builds with 16 channels and sends only port 0. A board with more
+  // than 1 MB of flash builds with 32 and sends port 1 right after it every
+  // cycle, usually all zeros.
   it('keeps outputs 1-16 when the port-1 message follows', () => {
     const low = Array.from({ length: 16 }, () => 1000)
     const high = Array(16).fill(0)

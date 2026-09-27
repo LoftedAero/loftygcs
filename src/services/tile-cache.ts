@@ -2,15 +2,12 @@ import { tileUrl, type TileCoord } from './tile-math'
 
 // Map tiles kept on this machine, so a field with no signal still has a map.
 //
-// IndexedDB rather than the Cache API: both work in the browser and in
-// Electron, but IndexedDB gives a usable size figure and a cheap "have I got
-// this one" without materializing a Response. Tiles are Blobs keyed on
-// layer/z/x/y.
+// IndexedDB rather than the Cache API: it gives a usable size figure and a
+// cheap existence check without materializing a Response. Tiles are Blobs
+// keyed on layer/z/x/y.
 //
-// Nothing here throws at the caller. A cache that cannot open is a map that
-// fetches from the network, which is exactly the behavior before this
-// existed -- so every failure falls back to that rather than breaking a map
-// someone is flying with.
+// Nothing here throws. A cache that cannot open degrades to plain network
+// fetching rather than breaking the map.
 
 const DB_NAME = 'loftgcs-tiles'
 const DB_VERSION = 1
@@ -42,8 +39,8 @@ function openDb(): Promise<IDBDatabase | null> {
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'key' })
     }
     req.onsuccess = () => resolve(req.result)
-    // Private browsing, a corrupt database, storage denied: no cache, and
-    // every read below then answers null and every write does nothing.
+    // Private browsing, a corrupt database, storage denied: no cache. Reads
+    // then return null and writes do nothing.
     req.onerror = () => resolve(null)
     req.onblocked = () => resolve(null)
   })
@@ -74,16 +71,11 @@ function tx<T>(
 
 // --- Change notification -------------------------------------------------
 //
-// The cache is written from three places that do not know about each other
-// -- the base layer stores what it draws as you pan, the prefetch stores
-// what it is told to, the terrain loader stores what a profile needs -- and
-// cleared from a fourth. Anything that *shows* cache state (the coverage
-// overlay, the stored-tiles count, the elevation line) is therefore wrong
-// the moment it is drawn unless it is told to look again. Subscribers are
-// told after successful writes, coalesced so a download storing six tiles a
-// second does not redraw an overlay six times a second; a clear notifies
-// immediately, because it is a person's own action and the screen answering
-// a beat later reads as the clear not working.
+// The cache is written by the base layer as you pan, by the prefetch, and by
+// the terrain loader, and cleared from elsewhere. Anything that displays
+// cache state subscribes here. Writes are coalesced so a download does not
+// redraw an overlay on every tile; a clear notifies immediately because the
+// user is waiting to see it.
 
 const listeners = new Set<() => void>()
 let coalesce: ReturnType<typeof setTimeout> | null = null
@@ -122,10 +114,8 @@ export async function getTile(layerId: string, t: TileCoord): Promise<Blob | nul
 /**
  * Whether a tile is stored, without reading it.
  *
- * `getKey` answers from the index and never materializes the blob, which
- * matters because the coverage overlay asks this of every tile on screen
- * at once -- a few hundred reads of 20 kB each would be a map that stutters
- * while it tells you the map is fine.
+ * `getKey` never materializes the blob, which matters because the coverage
+ * overlay asks this of every tile on screen at once.
  */
 export async function hasTile(layerId: string, t: TileCoord): Promise<boolean> {
   const found = await tx<IDBValidKey | undefined>('readonly', (store) =>
@@ -138,8 +128,7 @@ export async function putTile(layerId: string, t: TileCoord, blob: Blob): Promis
   const stored = await tx('readwrite', (s) =>
     s.put({ key: key(layerId, t), blob, bytes: blob.size, at: Date.now() } as TileRecord),
   )
-  // Null means the write never happened (no database); announcing a change
-  // that did not occur would make every subscriber requery for nothing.
+  // Null means the write never happened (no database).
   if (stored !== null) notify()
 }
 
@@ -151,9 +140,8 @@ export interface CacheStats {
 /**
  * How much is stored.
  *
- * Walked with a cursor rather than summed from an index: the store is tens
- * of thousands of rows at most and this runs when a dialog opens, so the
- * simpler thing that needs no extra index wins.
+ * Walked with a cursor rather than an index: the store is tens of thousands
+ * of rows at most, and this runs only when a dialog opens.
  */
 export async function cacheStats(): Promise<CacheStats> {
   const db = await openDb()
@@ -180,8 +168,7 @@ export async function cacheStats(): Promise<CacheStats> {
 }
 
 export async function clearCache(): Promise<void> {
-  // clear() resolves with undefined on success, so only null -- the no-database
-  // path -- means nothing changed.
+  // clear() resolves with undefined on success; null means no database.
   const done = await tx('readwrite', (s) => s.clear())
   if (done !== null) notify(true)
 }
@@ -196,12 +183,9 @@ export interface PrefetchProgress {
 /**
  * Fetch and store a list of tiles.
  *
- * Concurrency is deliberately modest. These are public tile servers used
- * keyless and courtesy is a condition of that; six at a time saturates a
- * field laptop's connection without looking like an attack, and a server
- * that starts refusing is worse than a download that takes another minute.
- * Tiles already stored are skipped, so re-running over an area only fetches
- * what is missing.
+ * Concurrency is kept modest because these are public tile servers used
+ * without a key. Tiles already stored are skipped, so re-running over an
+ * area only fetches what is missing.
  */
 export async function prefetchTiles(
   layerId: string,

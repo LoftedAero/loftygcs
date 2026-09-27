@@ -1,7 +1,6 @@
-// Preallocated ring buffers for high-rate telemetry. These are written on
-// every worker batch and read imperatively (rAF) by the HUD and map when
-// they arrive -- high-rate data never passes through React state, which is
-// the difference between a smooth flight screen and a slideshow.
+// Preallocated ring buffers for high-rate telemetry, written on every worker
+// batch and read in requestAnimationFrame by the HUD and map. High-rate data
+// never goes through React state.
 
 export class RingBuffer {
   private buf: Float64Array

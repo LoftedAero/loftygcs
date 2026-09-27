@@ -50,23 +50,14 @@ const PHASE_LABEL: Record<string, string> = {
 const KB = 1024
 
 /**
- * Board first, then firmware.
+ * Board first, then firmware (QGroundControl's ordering). How the board is
+ * found decides how it is flashed: one that answers the ArduPilot bootloader
+ * handshake takes the `.apj` over serial; one that enumerates as the STM32
+ * DFU loader (most boards the first time, since they ship with Betaflight,
+ * INAV or nothing) takes the `_with_bl.hex` over USB.
  *
- * You cannot choose the right firmware without knowing the board, so the
- * screen asks for the board before it offers anything -- QGroundControl's
- * ordering. The way the board turns up *is* the way it gets flashed: one
- * that answers the ArduPilot bootloader handshake takes the `.apj` over its
- * port; one that enumerates as the STM32's own DFU loader -- most boards,
- * the first time, since they ship with Betaflight, INAV or nothing -- takes
- * the `_with_bl.hex` over USB. Nothing about that is a setting.
- *
- * It was firmware-first for a while, with the board identified at Flash and
- * the path chosen by sniffing for a DFU device. That left a hole for a file
- * the user brings: the builder and Open file hand over an `.apj` *or* a
- * `_with_bl.hex`, and which one fits depends on the board. With the board
- * known first, the file picker only offers the one that can work, the
- * vehicle tiles only offer builds this board has, and the target is asked
- * for once, up front, where it is obviously the thing being asked.
+ * Knowing the board first lets the file picker, the vehicle tiles and the
+ * release list offer only what fits it.
  */
 export default function FirmwareTab() {
   return (
@@ -77,16 +68,13 @@ export default function FirmwareTab() {
 }
 
 /**
- * What the card's one state line is saying, and in what voice.
- *
- * Three tones and no more: plain for what is going on, warn for a choice
- * that will work but has consequences, bad for something that failed. Green
- * is deliberately absent -- nothing here is a status verdict about an
- * aircraft, which is the only thing this app colours green.
+ * The card's state line: plain for progress, warn for a choice with
+ * consequences, bad for a failure. No green, which is reserved for aircraft
+ * status.
  */
 type Status = { text: string; tone?: 'warn' | 'bad' }
 
-/** The board in front of us, and the one way onto it. */
+/** The detected board and how it will be flashed. */
 type Board =
   { mode: 'serial'; info: BootloaderInfo; port: SerialPort } | { mode: 'dfu'; info: DfuBoardInfo }
 
@@ -102,7 +90,7 @@ function useManifest() {
   return { options, error }
 }
 
-/** How a release is named on screen: the current stable is *the* stable. */
+/** A release's channel as shown on screen. */
 function channelWord(o: ReleaseChoice): string {
   if (o.channel === 'beta') return 'beta'
   if (o.channel === 'dev') return 'dev'
@@ -130,14 +118,9 @@ function FirmwareCard() {
   const busy = BUSY_PHASES.has(phase)
 
   /**
-   * Why this board must not be rebooted right now, or null.
-   *
-   * Detecting a board **reboots it into its bootloader**, which on a vehicle
-   * in the air is the whole aircraft stopping. Armed is the hard line -- an
-   * armed vehicle is one whose motors can turn, whether or not it has left
-   * the ground -- and ArduPilot's own MAV_STATE covers the rest: ACTIVE is
-   * flying, CRITICAL and EMERGENCY are a failsafe running, and none of the
-   * three is a moment to take the flight controller away.
+   * Why this board must not be rebooted right now, or null. Detecting
+   * reboots the board into its bootloader, so it is refused while armed, and
+   * while MAV_STATE is ACTIVE (flying) or CRITICAL/EMERGENCY (failsafe).
    */
   const blocked = armed
     ? 'The vehicle is armed. Disarm before detecting a board — detecting reboots it into its bootloader.'
@@ -152,12 +135,10 @@ function FirmwareCard() {
   const [vehicle, setVehicle] = useState<string | null>(null)
   const [pinnedVersion, setPinnedVersion] = useState<string | null>(null)
 
-  // What the one button is doing right now: it does several things in a
-  // row and each of them used to be a button someone had to know to press.
+  // The current step of a multi-step action, shown on the state line.
   const [step, setStep] = useState('')
   const [loadError, setLoadError] = useState('')
-  // One line of guidance set by an action -- opening the build page -- and
-  // cleared by the next one.
+  // Guidance set by an action (opening the build page), cleared by the next.
   const [note, setNote] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -180,10 +161,8 @@ function FirmwareCard() {
 
   const dropImage = () => useFlashStore.getState().setFirmware(null)
 
-  // A board identified over serial is sitting in its bootloader, running
-  // nothing, until it is either flashed or told to boot. Leaving the screen
-  // without doing either stranded a Cube three times on the bench; so it is
-  // booted on the way out, and by "Change board".
+  // A board identified over serial sits in its bootloader running nothing
+  // until it is flashed or told to boot, so it is booted on unmount.
   const boardRef = useRef<Board | null>(null)
   boardRef.current = board
   useEffect(() => {
@@ -213,8 +192,7 @@ function FirmwareCard() {
     return set
   }, [all, vehicles, board, platform])
 
-  // The releases for *this* board and vehicle, not for the vehicle at large:
-  // the board is known now, so the list can be exact.
+  // Releases for this board and vehicle.
   const releases = useMemo<ReleaseChoice[]>(() => {
     if (!vehicle || !platform) return []
     const seen = new Map<string, ReleaseChoice>()
@@ -235,25 +213,19 @@ function FirmwareCard() {
   // ---- the board --------------------------------------------------------
 
   /**
-   * Find out what is in front of us, and which way onto it.
-   *
-   * DFU is looked for first, silently -- the desktop shell already grants
-   * `0483:DF11` -- because a board in DFU mode enumerates as that and
-   * nothing else. Then the serial path: a vehicle the app is flying is
-   * rebooted over the live link; anything else gets a port chooser and is
-   * rebooted over the port it names. A dismissed chooser gets one more try
-   * at DFU *with* a prompt, for the browser build, which has no silent look.
+   * Identify the board and how to flash it. First a silent look for a DFU
+   * device (the desktop shell pre-grants `0483:DF11`). Then serial: a
+   * connected vehicle is rebooted over the live link, otherwise the user
+   * picks a port. If serial fails, DFU is tried again with a prompt, since
+   * the browser cannot see an ungranted device silently.
    */
   const detectBoard = async () => {
     setLoadError('')
     setNote('')
-    // Pressing it again is "that was the wrong board": the old one goes back
-    // to its firmware rather than being left in its bootloader -- but only
-    // once the new detect has finished, and only if it did not end on that
-    // same board (see the `finally`). Let go first, as this used to, and the
-    // board about to be read was rebooted out of its bootloader just as its
-    // port was asked for: the bench showed the chooser up with nothing but a
-    // phantom in it, answered moments later by the firmware's SLCAN port.
+    // Detecting again releases the previous board back to its firmware, but
+    // only after the new detect finishes and only if it found a different
+    // board (see `finally`). Releasing first would reboot the board out of
+    // its bootloader just as its port is requested.
     const previous = board
     let kept: SerialPort | undefined
     try {
@@ -268,9 +240,8 @@ function FirmwareCard() {
         setLoadError(blocked)
         return
       }
-      // Connected but sitting still: this still reboots the vehicle and drops
-      // the link, so it is asked rather than done. Not a warning to read past
-      // -- the answer decides whether it happens.
+      // Connected and idle: detecting still reboots the vehicle and drops
+      // the link, so ask first.
       if (connected && !(await confirmReboot())) return
       setStep('Looking for a board in DFU mode…')
       const dfu = await identifyDfu({ askForPort: false }).catch(() => null)
@@ -290,21 +261,13 @@ function FirmwareCard() {
           onStep: setStep,
         })
       } catch (err) {
-        // The silent look for DFU above reads `getDevices()`, which lists
-        // only what this origin has **already been granted** -- so a board in
-        // DFU mode that nobody has granted yet is invisible to it, which is
-        // every first time. The ask therefore belongs here, after the serial
-        // path has failed, and not only where its chooser was cancelled: a
-        // board in DFU mode has no serial port at all, so the only route to
-        // the DFU prompt was to dismiss a chooser listing ports that had
-        // nothing to do with the board -- and the first Detect of a DFU
-        // board could not succeed. Bench: `0483:DF11` present and bound to
-        // WinUSB, and the screen reported no board.
+        // The silent DFU look only sees devices this origin was already
+        // granted, so a first-time DFU board is invisible to it. Ask here,
+        // after any serial failure: a board in DFU mode has no serial port.
         setStep('')
         const viaUsb = await identifyDfu({ askForPort: true }).catch(() => null)
         if (viaUsb) return await adoptDfu(viaUsb)
-        // A dismissed chooser is still "chose not to continue", and says so
-        // by saying nothing -- but only once DFU has been offered too.
+        // A dismissed chooser is not an error.
         if (err instanceof PortCancelledError) return
         setLoadError(
           err instanceof RebootedError
@@ -323,11 +286,9 @@ function FirmwareCard() {
       setLoadError(err instanceof Error ? err.message : 'could not identify the board')
     } finally {
       setStep('')
-      // Web Serial hands back the same SerialPort object for the same device,
-      // so identity is "the same board": a board detected again stays in its
-      // bootloader, ready to flash; one that was replaced is booted back.
-      // Measured on a Cube: the second press was answered with the same
-      // port, no chooser, and the board sat in its bootloader afterwards.
+      // Web Serial returns the same SerialPort object for the same device, so
+      // a board detected again stays in its bootloader and a replaced one is
+      // booted back.
       if (previous?.mode === 'serial' && previous.port !== kept) {
         await bootBoard(previous.port).catch(() => {})
       }
@@ -335,17 +296,9 @@ function FirmwareCard() {
   }
 
   /**
-   * DFU has no board id to read, so the target is the first thing asked --
-   * except where there is nothing to ask from.
-   *
-   * The browser cannot fetch the manifest, so `allPlatforms` is empty there
-   * and this asked a question whose dialog could only answer "No target
-   * matches that" -- untrue, and with Cancel as the only way out, which threw
-   * the board away. DFU was unreachable in the web build for that one reason.
-   * The target earns its question only when a build list exists behind it: it
-   * narrows nothing otherwise, lights no vehicle tile, and `flash` never
-   * reads `platform` once an image is loaded. So with no manifest the board
-   * is adopted untargeted and the file is the firmware.
+   * DFU has no board id, so the user picks the target. Without a manifest
+   * (the web build) there is nothing to pick from, so the board is adopted
+   * untargeted and only a file can be flashed.
    */
   const adoptDfu = async (dfu: DfuBoardInfo) => {
     setStep('')
@@ -381,8 +334,8 @@ function FirmwareCard() {
   // ---- the firmware -----------------------------------------------------
 
   /**
-   * The vehicle decides the platform for a serial board: usually outright,
-   * from the id; asked for when the id fits several builds, or none.
+   * Choosing a vehicle picks the platform for a serial board from its id,
+   * asking only when the id fits several builds or none.
    */
   const chooseVehicle = async (v: string) => {
     if (!board) return
@@ -410,10 +363,7 @@ function FirmwareCard() {
     setPlatform(p)
   }
 
-  /**
-   * A file must be the kind this board can take. The picker only offers
-   * that kind; the check here is for a file dragged past it.
-   */
+  /** Reject a file of the wrong kind for this board. */
   const openFile = async (file: File) => {
     if (!board) return
     setLoadError('')
@@ -484,8 +434,7 @@ function FirmwareCard() {
       }
       setStep('')
       if (ready.kind === 'hex') return flashOverDfu(ready)
-      // On the port the board was identified on: asking again put a third
-      // chooser up, measured with the main process traced.
+      // Reuse the port the board was identified on rather than asking again.
       if (board.mode !== 'serial') return
       await flashSerial(
         ready.apj,
@@ -497,14 +446,8 @@ function FirmwareCard() {
         },
         board.port,
       )
-      // Whichever way that went, the board is not in its bootloader any
-      // more: `flashSerial` reboots it after a successful flash *and* after a
-      // cancel at the confirm, so that a board is never left sitting with no
-      // firmware running. Only the success case used to be cleared here,
-      // which left a cancel showing "CubeOrange · id 140 · bootloader rev 5"
-      // for a board that had gone back to running ArduPilot -- with a port
-      // handle for a device that had re-enumerated, so the next Flash acted
-      // on something that was no longer there. Detect is the way back.
+      // `flashSerial` reboots the board after a flash and after a cancel, so
+      // either way it has left its bootloader and its port handle is stale.
       setBoard(null)
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'flash failed')
@@ -515,8 +458,8 @@ function FirmwareCard() {
 
   const flashOverDfu = (img: LoadedHex) => {
     // Only a with-bootloader image starts at the flash base. ArduPilot's
-    // make_intel_hex.py writes either that, or an app-only .hex at the
-    // board's reserve offset -- never both, because people confused them.
+    // make_intel_hex.py writes either that or an app-only .hex at the
+    // board's reserve offset.
     const start = img.segments[0]?.address ?? 0
     if (start !== 0x08000000) {
       setLoadError(
@@ -548,10 +491,8 @@ function FirmwareCard() {
         ? [`DFU mode`, platform || `${Math.round(board.info.totalBytes / KB)} KB flash`].join(' · ')
         : undefined
 
-  // `blocked` sits directly under the two errors, above everything
-  // informational: a vehicle that is armed or flying is the most important
-  // thing on this screen, and it was below "browsing builds needs the
-  // desktop app", which is how a safety line ends up hidden behind a notice.
+  // `blocked` ranks just below the errors and above everything
+  // informational, so a safety line is never hidden behind a notice.
   const status: Status = manifestError
     ? { text: manifestError, tone: 'bad' }
     : loadError
@@ -585,13 +526,9 @@ function FirmwareCard() {
 
   return (
     <LaCard className="fw-card" title="Firmware">
-      {/* The button that fills this row sits in it. It was at the foot with
-          the flash, which put "find out what this is" below everything that
-          depends on knowing. */}
+      {/* Detect sits in the row it fills. */}
       <Step n={1} label="Board">
-        {/* Blue, a working control: the card's one orange action is the
-            flash, which is what the whole card is for. Two orange buttons
-            in one card left neither reading as the one to press. */}
+        {/* Not orange: the card's one primary action is the flash. */}
         <LaButton
           variant={board ? 'ghost' : 'secondary'}
           disabled={busy || !!step || !!blocked}
@@ -606,12 +543,9 @@ function FirmwareCard() {
       </Step>
 
       <Step n={2} label="Vehicle" wide>
-        {/* A loaded file wins over the release, so while one is loaded no
-            vehicle is what gets flashed and none is drawn as chosen -- the
-            tile stayed lit beside a file that had nothing to do with it.
-            `vehicle` itself is kept rather than cleared: it is what the
-            release dropdown needs to still be able to offer a build to go
-            back to, and clicking a tile drops the file and returns to it. */}
+        {/* A loaded file takes precedence, so no tile shows as chosen.
+            `vehicle` is kept so clicking a tile drops the file and returns
+            to that vehicle's builds. */}
         <VehicleStrip
           vehicles={vehicles}
           enabled={enabled}
@@ -632,27 +566,10 @@ function FirmwareCard() {
         />
       </Step>
 
-      {/* Always a select, never a readout that grows a picker when clicked.
-          It carries the default already, so the common path is to leave it
-          alone and the row costs nothing it was not costing anyway.
-
-          A loaded file takes the row and closes it. `flash` takes the image
-          over the release whenever there is one, so a dropdown still reading
-          "4.7.1 · stable" was naming a build that was not going to be
-          written -- the one thing this row exists to say.
-
-          It briefly offered the releases *beside* the file, so the dropdown
-          could be the way back to a build. That only worked when a vehicle
-          had been picked first: Open file needs nothing but a board, so a
-          file opened straight away leaves this list empty and the dropdown
-          holding the file alone. One screen with two behaviours, decided by
-          history the user has no reason to remember. Step 2 is the way back
-          from a file in both cases -- clicking a tile drops it -- so it is
-          the only one. */}
-      {/* The flash sits beside the last choice rather than on a row of its
-          own: two controls and their gap is the width every other row
-          already has, so the card has one right edge rather than a short
-          last line. */}
+      {/* Preselected with the current release. A loaded file replaces the
+          list and disables it, since `flash` writes the file instead; a
+          vehicle tile is the way back. Flash sits beside it so every row
+          shares one right edge. */}
       <Step n={3} label="Release" htmlFor="fw-release">
         <LaSelect
           id="fw-release"
@@ -789,24 +706,15 @@ function FirmwareCard() {
 }
 
 /**
- * The release dropdown's value while a file is loaded, which is not a
- * version. Only ever the value of a disabled control's only option, so it
- * reaches no handler and is written nowhere that outlives the render.
+ * The release dropdown's value while a file is loaded. It is only ever the
+ * sole option of a disabled select, so no handler sees it.
  */
 const FILE_CHOICE = 'file'
 
 /**
- * One numbered step: its label, and the controls that answer it.
- *
- * Numbered because this screen genuinely *is* a sequence -- the board
- * decides which vehicles are offered, the vehicle decides the releases, and
- * only then can anything be flashed -- which is the one case where a number
- * carries information rather than decorating a heading.
- *
- * The controls share one column and one width (`--fw-control-w`), so the
- * readout, the dropdown and both buttons line up on a single left edge:
- * every control in a column is one width, derived from one token, or a
- * reworded label silently breaks the alignment.
+ * One numbered step and its controls. Numbered because each step depends on
+ * the previous one. Controls share one width (`--fw-control-w`) so they line
+ * up on a single left edge.
  */
 function Step({
   n,
@@ -837,13 +745,9 @@ function Step({
 }
 
 /**
- * Which board is this? Asked at the moment it cannot be answered.
- *
- * It is a question only when the id fits several builds, or none -- and
- * over DFU, where there is no id to ask for at all. So it is a prompt
- * rather than a row, and the list is ArduPilot's own build targets, flat
- * and searchable: nothing in the manifest narrows it further, and the
- * person holding the board is trusted to know which one it is.
+ * Asks which build target this board is, when its id fits several builds or
+ * none, or over DFU where there is no id. A flat, searchable list of
+ * ArduPilot's targets.
  */
 function TargetModal({
   target,
@@ -893,12 +797,8 @@ function TargetModal({
 }
 
 /**
- * The symbols, plus the two tiles that are actions rather than choices.
- *
- * Every tile is off until a board is known, and stays off for a vehicle
- * this board has no build for -- an AP_Periph node does not offer Copter.
- * The tiles carry no version: it is in the Release row below, and saying it
- * in both places is saying it twice.
+ * The vehicle tiles, plus two action tiles. A vehicle tile is disabled until
+ * a board is known and when the board has no build for it.
  */
 function VehicleStrip({
   vehicles,
@@ -919,9 +819,8 @@ function VehicleStrip({
 }) {
   return (
     <div className="fw-vehicles">
-      {/* `display: contents`, so the radios are the grid's own children and
-          still sit in a group of their own. The two tiles after it are
-          actions and must not be radios: a file is not a ninth aircraft. */}
+      {/* `display: contents`, so the radios lay out in the parent grid while
+          staying grouped. The action tiles after it are not radios. */}
       <div className="fw-vehicles__group" role="radiogroup" aria-label="Vehicle">
         {vehicles.map(({ vehicle: v, label }) => (
           <button
@@ -979,15 +878,11 @@ function VehicleStrip({
   )
 }
 
-// --- one line of state, in a slot that is always there ---------------
+// --- the state line ---------------------------------------------------
 
 /**
- * Status and flash progress share one row, and it is always rendered.
- *
- * These were seven conditional hints with a progress block between them, so
- * the card changed height on every probe, download and flash. A running
- * flash is the only thing that can claim the row, because it is the only
- * state worth watching while it happens.
+ * Status and flash progress share one always-rendered row, so the card does
+ * not change height. A running flash takes the row over.
  */
 function StateLine({ status }: { status: Status }) {
   const phase = useFlashStore((s) => s.phase)

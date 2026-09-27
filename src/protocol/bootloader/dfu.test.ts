@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { DfuseFlasher, parseDfuseLayout, type DfuDevice } from './dfu'
 
 // A scripted STM32 ROM bootloader: tracks erased sectors, an address
-// pointer, and written bytes, with the DNBUSY-then-poll status dance.
+// pointer, and written bytes, with the DNBUSY-then-poll status dance. It is
+// strict, stalling the requests a real ROM refuses. `writeProtected` acks
+// every erase and download and stores nothing, as AN3156 says a protected
+// board does.
 class FakeDfuDevice implements DfuDevice {
   erasedSectors: number[] = []
   written = new Map<number, Uint8Array>()
@@ -14,12 +17,6 @@ class FakeDfuDevice implements DfuDevice {
   private busyPolls = 0
   private state = 2 // dfuIDLE
 
-  /**
-   * `writeProtected` acks every erase and every download and stores nothing,
-   * which is exactly what AN3156 says a protected board does. It is the
-   * failure the verify pass exists to catch, so it is modelled here rather
-   * than assumed.
-   */
   /** Every data payload this device was handed, in order. */
   chunks: number[] = []
   /** Set when the host broke the wTransferSize contract. */
@@ -37,9 +34,8 @@ class FakeDfuDevice implements DfuDevice {
 
   async controlOut(request: number, _value: number, data?: Uint8Array): Promise<void> {
     if (request === 1) {
-      // A DNLOAD -- including every DfuSe command, which is a DNLOAD with
-      // wBlockNum 0 -- is illegal while the device is serving reads. This is
-      // what stalled `leave()` on the bench after a clean verify.
+      // A DNLOAD (including every DfuSe command, which is a DNLOAD with
+      // wBlockNum 0) is illegal while the device is serving reads.
       if (this.state === 9) throw new Error('stalled: DNLOAD from dfuUPLOAD_IDLE')
       // DNLOAD
       if (data && data.length === 5 && data[0] === 0x41) {
@@ -79,9 +75,8 @@ class FakeDfuDevice implements DfuDevice {
         this.state = 7 // zero-length: manifest / leave
       }
     } else if (request === 4) {
-      // CLRSTATUS. A strict ROM -- the STM32C5, and this fake -- STALLs this
-      // outside dfuERROR, per the DFU spec. Sending it blindly to return to
-      // idle is the bug Betaflight documents and this code had.
+      // CLRSTATUS. A strict ROM (e.g. the STM32C5) stalls this outside
+      // dfuERROR, per the DFU spec.
       if (this.state !== 10) throw new Error('stalled: CLRSTATUS outside dfuERROR')
       this.state = 2
     } else if (request === 6) {
@@ -91,13 +86,9 @@ class FakeDfuDevice implements DfuDevice {
 
   async controlIn(request: number, _value: number, length: number): Promise<Uint8Array> {
     if (request === 2) {
-      // UPLOAD. Two things a real DfuSe device insists on, both modelled
-      // because the code got both wrong against hardware:
-      //   - it must be in dfuIDLE; reading straight out of dnload-idle after
-      //     a write is what stalled on the bench;
-      //   - wBlockNum counts up from 2 and the device walks its own pointer,
-      //     rather than the host re-setting the address for every block.
-      // Legal from idle (the first read) and from upload-idle (the rest).
+      // UPLOAD. Legal only from dfuIDLE (the first read) or dfuUPLOAD_IDLE
+      // (the rest), not straight out of dnload-idle. wBlockNum counts up
+      // from 2 and the device walks its own pointer.
       if (this.state !== 2 && this.state !== 9) {
         throw new Error(`stalled: UPLOAD in state ${this.state}`)
       }
@@ -159,9 +150,7 @@ describe('DfuseFlasher', () => {
 
   it('catches a write-protected board that acked everything', async () => {
     // AN3156: "No error is returned when performing Erase operations on
-    // write protected sectors." So the run completes cleanly and the board
-    // still holds its old firmware -- the read-back is the only thing that
-    // can tell the difference.
+    // write protected sectors." Only the read-back can tell.
     const device = new FakeDfuDevice(LAYOUT, true)
     const flasher = new DfuseFlasher(device)
     const data = new Uint8Array(4096).map((_, i) => i & 0xff)
@@ -181,11 +170,8 @@ describe('DfuseFlasher', () => {
   })
 
   // DFU 1.1 §6.1.1: the host may not send a DNLOAD payload larger than the
-  // wTransferSize the device advertised in its functional descriptor. This
-  // was a hardcoded 2048 against a board that reports 1024, which stalled the
-  // first data block and left the board in dfuERROR -- refusing everything
-  // afterwards, CLRSTATUS included, across app restarts, until it was
-  // physically power-cycled. Bench-measured on an STM32H7.
+  // device's wTransferSize. An STM32H7 that gets one latches into dfuERROR
+  // and refuses everything, CLRSTATUS included, until power-cycled.
   it('never sends more in one block than the device said it can take', async () => {
     const device = new FakeDfuDevice(LAYOUT, false, 1024)
     const flasher = new DfuseFlasher(device)
@@ -196,8 +182,7 @@ describe('DfuseFlasher', () => {
   })
 
   it('uses a safe block size when the device declares none', async () => {
-    // A device that reports nothing is not an invitation to pick a big
-    // number: unknown takes the value every STM32 ROM loader accepts.
+    // 1024 is accepted by every STM32 ROM loader.
     const device = new FakeDfuDevice(LAYOUT)
     const flasher = new DfuseFlasher(device)
     await flasher.flash([{ address: 0x08000000, data: new Uint8Array(3000) }], { verify: false })

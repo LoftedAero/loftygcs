@@ -1,14 +1,9 @@
 // @vitest-environment node
 //
-// The RTSP client against a server that speaks just enough RTSP to answer it.
-// The parsing is unit-tested next door; what this covers is the part that
-// only shows up when the pieces run together -- the handshake sequence, the
-// interleaved framing that carries RTP down the same socket as the replies,
-// and whether an access unit actually comes out the far end.
-//
-// Worth having because the failure mode is silent: a client that gets SETUP
-// subtly wrong produces a connection that looks fine and never shows a
-// picture, which is the hardest kind of bug to diagnose against a drone.
+// The RTSP client against a minimal fake server: the handshake sequence, the
+// interleaved framing that carries RTP on the same socket as the replies, and
+// whether an access unit comes out. A subtly wrong SETUP connects fine and
+// never shows a picture.
 
 import net from 'node:net'
 import dgram from 'node:dgram'
@@ -157,9 +152,8 @@ describe('RTSP source', () => {
     fake = await startServer()
     const { codec, unit } = await firstUnit(`rtsp://127.0.0.1:${fake.port}/stream`)
 
-    // The codec string comes from the SDP's parameter sets, so it is known
-    // before a single packet arrives -- which is what lets the decoder be
-    // configured in time to use the very first keyframe.
+    // The codec string comes from the SDP, so the decoder can be configured
+    // before the first keyframe arrives.
     expect(codec).toBe('avc1.42e01e')
     expect(unit.keyframe).toBe(true)
     // Parameter sets ahead of the reassembled IDR.
@@ -176,8 +170,7 @@ describe('RTSP source', () => {
   })
 
   it('answers a digest challenge and carries on', async () => {
-    // Cameras almost always challenge; failing here would look to the user
-    // like the stream itself was unreachable.
+    // Cameras almost always challenge.
     fake = await startServer({ auth: true })
     const { unit } = await firstUnit(`rtsp://user:pass@127.0.0.1:${fake.port}/stream`)
     expect(unit.keyframe).toBe(true)
@@ -185,7 +178,7 @@ describe('RTSP source', () => {
   })
 
   it('reports a refused connection rather than hanging', async () => {
-    // Port 1 is reliably closed; the point is that the failure surfaces.
+    // Port 1 is reliably closed.
     await expect(firstUnit('rtsp://127.0.0.1:1/stream', 4000)).rejects.toThrow()
   })
 
@@ -196,10 +189,9 @@ describe('RTSP source', () => {
 
 describe('UDP source', () => {
   it('says so when the port is already taken', async () => {
-    // Found the hard way: with SO_REUSEADDR the second bind succeeds and the
-    // first socket keeps the datagrams, so the app reports "Listening" and
-    // then shows nothing at all, with nothing to explain why. A user running
-    // another GCS on the same video port would hit exactly this.
+    // With SO_REUSEADDR a second bind succeeds but the first socket keeps
+    // the datagrams, so the client would report "Listening" and show nothing
+    // (for example, with another GCS on the same video port).
     const held = dgram.createSocket({ type: 'udp4', reuseAddr: true })
     const port = await new Promise<number>((resolve) => {
       held.bind(0, '0.0.0.0', () => resolve(held.address().port))

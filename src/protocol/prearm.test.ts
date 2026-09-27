@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { isPrearmMessage, prearmFailures } from './prearm'
 
-// The strings are ArduPilot's own wording, taken from what SITL emits and
-// from AP_Arming's messages, not invented for the test.
+// The strings are ArduPilot's own wording, from SITL and AP_Arming.
 const NOW = 1_000_000
 
 const msg = (text: string, agoMs: number) => ({ text, at: NOW - agoMs })
 
 describe('recognizing a prearm message', () => {
   it('takes both prefixes ArduPilot uses', () => {
-    // "PreArm" runs continuously while disarmed; "Arm" only fails at the
-    // moment of the attempt. Both answer the same question.
+    // "PreArm" repeats while disarmed; "Arm" appears only at an attempt.
     expect(isPrearmMessage('PreArm: Compass not calibrated')).toBe(true)
     expect(isPrearmMessage('Arm: Motors Emergency Stopped')).toBe(true)
     expect(isPrearmMessage('prearm: gps')).toBe(true)
@@ -30,7 +28,6 @@ describe('distilling the feed into reasons', () => {
   })
 
   it('collapses the repeats ArduPilot sends every thirty seconds', () => {
-    // The same check failing four times is one thing wrong, not four.
     const out = prearmFailures(
       [
         msg('PreArm: GPS horizontal speed error', 90000),
@@ -60,8 +57,7 @@ describe('distilling the feed into reasons', () => {
 
   it('ages out a reason that has stopped being reported', () => {
     // ArduPilot repeats a failing check while it fails, so silence means it
-    // passed. Leaving a fixed problem on screen is how a checklist becomes
-    // something people learn to ignore.
+    // passed.
     const out = prearmFailures(
       [msg('PreArm: Compass not calibrated', 120000), msg('PreArm: Waiting for GPS config', 2000)],
       NOW,

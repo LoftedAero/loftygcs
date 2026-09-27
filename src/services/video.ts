@@ -1,23 +1,15 @@
-// HUD video in the renderer: take the compressed bitstream the main process
-// forwards, decode it with WebCodecs, and hand frames to whoever is drawing.
+// HUD video in the renderer: decodes the bitstream the main process forwards
+// with WebCodecs and hands frames to whoever is drawing. WebCodecs because
+// there is no container, just access units off the wire.
 //
-// WebCodecs rather than a <video> element because there is no container here
-// to give one -- just access units off the wire. VideoDecoder takes exactly
-// that, and uses the same hardware decoder the element would.
+// A dropped stream reconnects by itself: any failure that is not about the
+// request itself (video-error.ts) retries with backoff until the user presses
+// Disconnect. A stream that goes silent while playing counts as a failure,
+// since a camera that stops sending without closing its socket raises no
+// event.
 //
-// **A stream that drops comes back by itself.** A camera booting, a radio
-// link blinking, a companion computer restarting its streamer: each used to
-// leave the HUD on a dead frame until someone noticed and pressed Connect
-// again. Now any failure that is not about the request itself (video-error.ts)
-// retries, with a short backoff, until the user presses Disconnect -- and a
-// stream that goes silent while playing counts as a failure, because a
-// camera that stops sending without closing its socket is the commonest
-// drop of all and the only one no event reports.
-//
-// **An error is kept.** Every failure from the desktop side is followed by
-// its "Stopped", and treating that as a clean stop wiped the error the same
-// instant it arrived -- every failure was silent. The first report of a
-// session is the one acted on and shown; what follows it is ignored.
+// The desktop side follows every failure with a "Stopped". Only the first
+// report of a session is acted on, so that "Stopped" does not wipe the error.
 
 import { describeVideoError, isRetryable } from './video-error'
 
@@ -43,14 +35,11 @@ class VideoService {
   private frameSinks = new Set<FrameSink>()
   private statusSinks = new Set<StatusSink>()
   private status: VideoStatus = { state: 'idle', text: '' }
-  /** Frames before the first keyframe decode into nothing useful. */
+  /** Frames before the first keyframe are dropped. */
   private sawKeyframe = false
   /** The stream wanted, or null once the user has stopped it. */
   private url: string | null = null
-  /**
-   * Counts attempts, so a late event from an attempt already given up on
-   * cannot act on the one that replaced it.
-   */
+  /** Counts attempts, so a late event from an abandoned attempt is ignored. */
   private session = 0
   /** The session whose failure has been handled; its "Stopped" is ignored. */
   private failedSession = -1
@@ -117,7 +106,7 @@ class VideoService {
         if (session !== this.session) return
         if (s.error) this.failed(session, s.text)
         else if (s.closed) this.failed(session, null)
-        // Progress from the desktop side, until the first frame says more.
+        // Progress from the desktop side, until the first frame arrives.
         else if (this.status.state === 'connecting') this.setStatus('connecting', s.text)
       }),
       bridge.onReady((info) => {
@@ -133,11 +122,8 @@ class VideoService {
   }
 
   /**
-   * An attempt ended without being asked to: say why, and either try again
-   * or, for a failure repeating could not fix, stop.
-   *
-   * `raw` is null for a close with no error before it -- the far end simply
-   * went away.
+   * An attempt ended unrequested: report why, then retry unless the failure
+   * is not retryable. `raw` is null when the far end closed without an error.
    */
   private failed(session: number, raw: string | null) {
     if (session !== this.session || session === this.failedSession || this.url === null) return
@@ -174,8 +160,7 @@ class VideoService {
           this.watch(session)
         }
         if (this.frameSinks.size === 0) {
-          // Nothing is drawing; a frame that is not closed leaks its buffer
-          // and the decoder stalls once its pool is exhausted.
+          // An unclosed frame leaks its buffer and eventually stalls the decoder.
           frame.close()
           return
         }
@@ -184,8 +169,8 @@ class VideoService {
       },
       error: (err) => this.failed(session, err.message),
     })
-    // No description: the bitstream is Annex-B, which is what the
-    // depayloader produces and what VideoDecoder assumes when none is given.
+    // No description: the depayloader produces Annex-B, which VideoDecoder
+    // assumes when none is given.
     decoder.configure({ codec, optimizeForLatency: true })
     this.decoder = decoder
   }
@@ -232,7 +217,7 @@ class VideoService {
     }
   }
 
-  /** Everything an attempt holds, without saying anything about why. */
+  /** Releases everything an attempt holds, without changing the status. */
   private teardown() {
     for (const off of this.unsubscribe) off()
     this.unsubscribe = []
@@ -242,7 +227,7 @@ class VideoService {
     this.size = ''
   }
 
-  /** Stop, and stop trying: the one way a stream ends without a reason shown. */
+  /** Stops the stream and any retries, without showing a reason. */
   async close(): Promise<void> {
     this.url = null
     this.session++

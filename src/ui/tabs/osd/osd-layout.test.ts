@@ -63,8 +63,7 @@ describe('readPlacements', () => {
   })
 
   it('drops panels the firmware does not expose', () => {
-    // A build without the RC link panels should simply show fewer items
-    // rather than rendering controls that write nonexistent parameters.
+    // A build without the RC link panels shows fewer items.
     const table = entries({ OSD1_ALTITUDE_EN: 1, OSD1_ALTITUDE_X: 0, OSD1_ALTITUDE_Y: 0 })
     const got = readPlacements(table, 1, [item('ALTITUDE'), item('RC_LQ')])
     expect(got.map((p) => p.item.id)).toEqual(['ALTITUDE'])
@@ -85,9 +84,8 @@ describe('coordLimit', () => {
   })
 
   it("respects a parameter's own range where it is tighter than the grid", () => {
-    // ArduPilot widened every panel to the HD range except RPM, which still
-    // caps at 29x15. A write past a parameter's range is rejected outright,
-    // so the editor must not let one be dragged there.
+    // Every panel has the HD range except RPM, which caps at 29x15, and a
+    // write past a parameter's range is rejected.
     const metadata = {
       OSD1_RPM_X: { range: { low: 0, high: 29 } },
       OSD1_RPM_Y: { range: { low: 0, high: 15 } },
@@ -150,8 +148,7 @@ describe('findOverlaps', () => {
   })
 
   it('ignores disabled panels', () => {
-    // A panel that is off draws nothing, so a stale position underneath a
-    // live one is not a fault worth flagging.
+    // A disabled panel draws nothing, so it cannot collide.
     expect(findOverlaps([place('ALTITUDE', 0, 0), place('BAT_VOLT', 0, 0, false)]).size).toBe(0)
   })
 
@@ -176,8 +173,8 @@ describe('findOffGrid', () => {
   })
 
   it('catches panels stranded by a switch from HD back to SD', () => {
-    // Column 45 is legal on a 60-column screen and simply never drawn on a
-    // 30-column one -- the parameter keeps its value and nothing complains.
+    // Column 45 is legal on a 60-column screen but never drawn on a
+    // 30-column one.
     const layout = [place('ALTITUDE', 45, 3), place('BAT_VOLT', 2, 2)]
     expect(findOffGrid(layout, hd).size).toBe(0)
     expect([...findOffGrid(layout, sd)]).toEqual(['ALTITUDE'])
@@ -229,16 +226,14 @@ describe('the item catalog', () => {
   })
 
   it('gives every graphic panel an explicit footprint', () => {
-    // A panel with no sample text would otherwise collapse to one cell and
-    // silently under-report the space it occupies.
+    // A panel with no sample text would otherwise collapse to one cell.
     for (const i of OSD_ITEMS) {
       if (i.sample === '') expect(i.width, `${i.id} needs a width`).toBeGreaterThan(0)
     }
   })
 
   it('fits every panel on the smallest grid it can be placed on', () => {
-    // Nothing in the catalog may be wider than the analog screen, or it
-    // could never be positioned at all.
+    // Nothing in the catalog may be wider than the analog screen.
     for (const i of OSD_ITEMS) {
       const extent = itemExtent(i)
       expect(extent.width, `${i.id} is too wide for 30 columns`).toBeLessThanOrEqual(30)

@@ -13,20 +13,13 @@ import {
 } from '../../../services/geo-import'
 import type { GeoShape } from '../../../services/geo-file'
 
-// Everything that reads or writes a file, for whichever plan is on screen.
+// File import and export for whichever plan is on screen. It sits outside the
+// per-plan panels because the plan switch decides what a file means: a route
+// on Mission, a boundary on Fence, alternates on Rally.
 //
-// It sits outside the three per-plan panels on purpose. The whole design of
-// the import is that the switch above decides what a file means -- a route on
-// Mission, a boundary on Fence, alternates on Rally -- and that rule is
-// nonsense if the buttons only exist on one of them. They did at first: the
-// fence half of this was written and could not be reached, because the
-// toolbar holding it renders only while editing the mission.
-//
-// The three interchange buttons are the same three in the same place on
-// every plan; the mission's own .waypoints pair is a second section under
-// them, so it adds to the column rather than moving it. Only the mission has
-// one: ArduPilot's .fence and .rally files are not read or written yet, so
-// those two plans travel as KML.
+// The three interchange buttons are the same on every plan. The mission's
+// .waypoints pair is a separate section below them. ArduPilot's .fence and
+// .rally formats are not supported yet, so those plans travel as KML.
 
 const WORD: Record<PlanKind, string> = {
   mission: 'mission',
@@ -37,8 +30,8 @@ const WORD: Record<PlanKind, string> = {
 export default function GeoExchange() {
   const editing = useMissionStore((s) => s.editing)
   const sourceName = useMissionStore((s) => s.sourceName)
-  // Subscribed so the export buttons re-evaluate as the plans change --
-  // `exportable` reads the store itself and would otherwise go stale.
+  // Subscribed so the export buttons re-evaluate as the plans change;
+  // `exportable` reads the store directly.
   useMissionStore(
     (s) =>
       s.plan.items.length +
@@ -48,12 +41,9 @@ export default function GeoExchange() {
   const can = exportable(editing)
 
   /**
-   * The two questions an import can raise.
-   *
-   * `fence` is the polygon type, which no file records. `mismatch` is a file
-   * with nothing of the kind being imported -- where the alternative to
-   * asking is doing nothing and not saying why. Everything else applies
-   * without a word.
+   * The two questions an import can raise: `fence` asks the polygon type,
+   * which no file records; `mismatch` is a file with nothing of the kind
+   * being imported. Everything else applies directly.
    */
   const [ask, setAsk] = useState<{
     kind: 'fence' | 'mismatch'
@@ -61,11 +51,7 @@ export default function GeoExchange() {
     shapes: GeoShape[]
   } | null>(null)
   const [busy, setBusy] = useState(false)
-  /**
-   * Said here rather than through the store's transfer note, which is drawn
-   * by the mission toolbar -- and that is not on screen while a fence or the
-   * rally points are being edited, which is where half of these imports go.
-   */
+  /** The import result, shown here since this section is on every plan. */
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null)
 
   const apply = (shapes: GeoShape[], name: string, opts: Parameters<typeof applyGeoShapes>[2]) => {
@@ -113,10 +99,8 @@ export default function GeoExchange() {
         >
           Export KML
         </LaButton>
-        {/* Greyed rather than absent on a fence, where GPX has no way to
-            express an area: a button that vanishes between plans reads as a
-            feature someone lost, where a dead one reads as a format that
-            cannot do it. Its title says which. */}
+        {/* Disabled rather than hidden on a fence, since GPX cannot express
+            an area; the title says so. */}
         <LaButton
           variant="ghost"
           size="block"
@@ -130,11 +114,8 @@ export default function GeoExchange() {
         {note && <p className={`app-col__note${note.error ? ' is-error' : ''}`}>{note.text}</p>}
       </section>
 
-      {/* The mission's own format, in its own section *below* the shared one
-          rather than above it -- which is where it was, and which pushed
-          the shared group down the column on one plan out of three. Same three buttons
-          in the same place on all three is worth more here than leading with
-          the format that keeps everything. */}
+      {/* The mission's own format, below the shared section so that section
+          stays in the same place on every plan. */}
       {editing === 'mission' && (
         <section className="app-col__group">
           <h3 className="app-col__head">Load/save</h3>
@@ -202,11 +183,9 @@ export default function GeoExchange() {
 }
 
 /**
- * The file has nothing of the kind being imported.
- *
- * Rather than "nothing to import", it names what is in there and offers the
- * nearest sensible thing -- an area while planning a mission is a survey
- * boundary, a line while editing a fence is a boundary drawn open.
+ * The file has nothing of the kind being imported. Says what it does hold
+ * and offers the nearest use: an area on a mission becomes a survey area, a
+ * line on a fence becomes a boundary.
  */
 function MismatchPrompt({
   name,

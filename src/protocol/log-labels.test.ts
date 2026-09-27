@@ -10,13 +10,11 @@ const log = parseDataflash(
 
 describe('labelling channels from the log’s own parameters', () => {
   it('names the servo outputs of the aircraft that actually flew', () => {
-    // Read out of the log's PARM dump, not off a connected vehicle: this is
-    // the configuration the flight happened under.
+    // From the log's PARM dump: the configuration the flight used.
     const out = channelLabels(log.params, 'RCOU')
     expect(out.get('C1')).toBe('Motor 1')
     expect(out.get('C4')).toBe('Motor 4')
-    // A quad has four; the rest of the outputs are disabled and stay
-    // unlabelled rather than being labelled "Disabled".
+    // A quad has four; disabled outputs stay unlabeled.
     expect(out.has('C5')).toBe(false)
   })
 
@@ -54,8 +52,7 @@ describe('labelling channels from the log’s own parameters', () => {
   })
 
   it('says nothing at all when the log carried no parameters', () => {
-    // A truncated log that never reached the PARM dump. A wrong guess would
-    // be worse than the channel number the caller already has.
+    // A truncated log that never reached the PARM dump: no guess.
     expect(channelLabels(new Map(), 'RCOU').size).toBe(0)
     expect(fieldLabel(new Map(), 'RCOU', 'C1')).toBeNull()
   })

@@ -8,11 +8,9 @@ import {
 } from './terrain-math'
 import { MAX_AREA_TERRAIN_TILES, terrainTilesForArea } from './terrain'
 
-// The Terrarium encoding is fixed by the format, so the decoder is checked
-// against elevations pushed back through the *encoder* -- and against the
-// real values measured from the live tiles when this was written: Canberra's
-// CMAC field reads 585 m against a surveyed 584, and Badwater reads -80
-// against -85.
+// The decoder is checked against elevations pushed back through the encoder.
+// For reference, live tiles read CMAC at 585 m (surveyed 584) and Badwater at
+// -80 (surveyed -85).
 
 const encode = (m: number) => {
   const v = Math.round((m + 32768) * 256)
@@ -49,8 +47,7 @@ describe('sampling the grid', () => {
   const grids = rampTile((ix) => ix)
 
   it('interpolates between pixels rather than stepping', () => {
-    // Nearest-pixel sampling would answer 129 here; a 38 m staircase in a
-    // terrain profile reads as cliffs on ground that is a slope.
+    // Nearest-pixel sampling would answer 129 here, turning slopes into steps.
     expect(sampleElevation(grids, { lat: 0, lon: lonForPixel(129) }, 0)).toBeCloseTo(128.5, 4)
     expect(sampleElevation(grids, { lat: 0, lon: lonForPixel(128.5) }, 0)).toBeCloseTo(128, 4)
     expect(sampleElevation(grids, { lat: 0, lon: lonForPixel(128.75) }, 0)).toBeCloseTo(128.25, 4)
@@ -70,8 +67,8 @@ describe('sampling the grid', () => {
   })
 
   it('still answers at the edge of what was downloaded', () => {
-    // The neighbor pixel needed for interpolation is off the tile; falling
-    // back to the pixel the point is actually in beats refusing.
+    // The neighbor pixel needed for interpolation is off the tile, so the
+    // point's own pixel is used.
     const v = sampleElevation(rampTile(() => 42), { lat: 84.9, lon: -179.99 }, 0)
     expect(v).toBeCloseTo(42, 4)
   })
@@ -124,10 +121,8 @@ describe('how much terrain an area may ask for', () => {
   })
 
   it('refuses the whole world rather than trying to answer for it', () => {
-    // 341,598 tiles at this zoom: asking the cache about each one starved
-    // every other read on the page, and offering to download them was
-    // thirty gigabytes. That view is what the map shows before anyone has
-    // touched it, so this is the default case, not an edge one.
+    // The whole world is 341,598 tiles at this zoom (about 30 GB), and it is
+    // what the map shows before anyone touches it.
     expect(terrainTilesForArea({ north: 85, south: -85, east: 180, west: -180 })).toEqual([])
   })
 

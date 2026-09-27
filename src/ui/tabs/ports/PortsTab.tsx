@@ -4,10 +4,8 @@ import { NeedsVehicle } from '../../components/ParamCard'
 import CardParamActions from '../../components/CardParamActions'
 import { useParamStore } from '../../../stores/param-store'
 
-// Serial port assignment. This tab earns its place ahead of Sensors: a GPS
-// or external compass on a port whose protocol is wrong is simply not
-// detected, and every downstream calibration then fails for a reason the
-// user cannot see.
+// Serial port assignment. Ahead of Sensors because a GPS or external compass
+// on a port with the wrong protocol is not detected at all.
 const MAX_SERIAL = 8
 
 export default function PortsTab() {
@@ -32,15 +30,9 @@ export default function PortsTab() {
   }
 
   return (
-    // Which port is the USB console is said on the row itself, and the
-    // reboot a protocol change needs is raised by the write that needs it.
-    //
-    // The card spans the grid's tracks and then takes half the content area,
-    // which is a Sensors tile's width -- as one ordinary card it sat in a
-    // single 460px track with four columns squeezed into the narrowest shape
-    // they ever have to take. The rows are framed for the same reason: the
-    // compass priority table is one rail item away, and a table drawn two
-    // ways reads as two applications.
+    // The card spans the grid and takes half the content area, since four
+    // columns do not fit one card track. Rows use the same framed table as
+    // the compass priority table.
     <LaCard
       title="Serial ports"
       className="ports-card"
@@ -64,9 +56,8 @@ export default function PortsTab() {
               SERIAL{n}
               {n === 0 && <span className="ports-grid__hint">USB</span>}
             </span>
-            {/* Staged like every other curated screen -- the card's own Write
-                is what sends them, and a port half-reconfigured mid-edit is
-                not a state worth putting on the vehicle. */}
+            {/* Staged, and sent by the card's Write, so a half-edited port
+                never reaches the vehicle. */}
             <ParamField param={`SERIAL${n}_PROTOCOL`} label="Protocol" bare />
             <ParamField param={`SERIAL${n}_BAUD`} label="Baud" bare />
             <ParamField param={`SERIAL${n}_OPTIONS`} label="Options" bare />
