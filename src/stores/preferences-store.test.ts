@@ -103,3 +103,33 @@ describe('what the vehicle is commanded, whatever is displayed', () => {
     expect(fromSpeed(toSpeed(12, 'mph'), 'mph')).toBeCloseTo(12, 10)
   })
 })
+
+describe('the interface scale', () => {
+  const loaded = async (stored: unknown) => {
+    localStorage.setItem(KEY, JSON.stringify(stored))
+    vi.resetModules()
+    return (await import('./preferences-store')).usePreferencesStore.getState().uiScale
+  }
+
+  it('is 100% for a store written before it existed', async () => {
+    expect(await loaded({ version: 1, units: { distance: 'm' } })).toBe(1)
+  })
+
+  it('reads back a scale this build offers', async () => {
+    expect(await loaded({ version: 1, uiScale: 1.25 })).toBe(1.25)
+  })
+
+  it('refuses a scale it does not offer, rather than drawing the window at it', async () => {
+    expect(await loaded({ version: 1, uiScale: 3 })).toBe(1)
+    expect(await loaded({ version: 1, uiScale: '1.5' })).toBe(1)
+  })
+
+  it('is kept, and goes back to 100% with Reset', () => {
+    store().setUiScale(1.5)
+    expect(JSON.parse(localStorage.getItem(KEY)!).uiScale).toBe(1.5)
+    store().setUiScale(7)
+    expect(store().uiScale).toBe(1.5)
+    store().reset()
+    expect(store().uiScale).toBe(1)
+  })
+})

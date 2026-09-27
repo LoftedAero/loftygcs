@@ -533,6 +533,14 @@ design decisions are recorded there and in code comments.
   bumps VERSION. The dialog is sectioned for the same reason — language is a section, and a flat
   list that grows into groups later reorganizes under the user. Theme stays in `theme-store`
   because it must be applied before first paint by an inline script; the dialog edits it there.
+  **The interface scale (`uiScale`) is Chromium's page zoom**, set through the preload's
+  `webFrame` and applied in `main.tsx` before the first render, so the window never paints at
+  100% and jumps. Page zoom rather than CSS `zoom` because the map and the HUD are canvases that
+  follow the device pixel ratio, which page zoom changes and CSS zoom does not. Only the offered
+  steps are read back, so a stray value is 100% and never a window drawn at 300%. The layout's
+  pixel limits are CSS pixels and scale with it: 150% on a 1920x1080 screen lays out as 1280x720.
+  A browser cannot set its own zoom, so there the control is disabled and says to use the
+  browser's. Electron's default zoom accelerators still work and are a temporary override.
 - **Offline maps are a cache under the tile layer, not a separate map.** Leaflet's `TileLayer`
   sets `img.src` and lets the browser fetch, which leaves nowhere to consult a store — so
   `CachedTileLayer` overrides `createTile` (`ui/tabs/flight/cached-tile-layer.ts`) and both maps

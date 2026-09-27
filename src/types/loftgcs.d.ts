@@ -121,6 +121,8 @@ export interface LoftGcsBridge {
      * pauses gamepad input and slows the override stream to a crawl.
      */
     setBackgroundThrottling(allowed: boolean): void
+    /** The whole window's scale, Chromium's page zoom: 1 is 100%. */
+    setZoomFactor(factor: number): void
   }
 
   /**

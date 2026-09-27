@@ -45,7 +45,17 @@ export interface Preferences {
    * commands every time they open the app.
    */
   planFor: VehicleClass
+  /**
+   * How large the whole interface is drawn, 1 being 100%. For a laptop in
+   * sunlight, where bigger type is the difference between reading the HUD
+   * and guessing, and for a dense screen. Chromium's page zoom in the
+   * desktop app; a browser has its own zoom, which a page cannot set.
+   */
+  uiScale: number
 }
+
+/** The scales offered: steps a person can tell apart, none so far apart they skip past the one wanted. */
+export const UI_SCALES = [0.9, 1, 1.1, 1.25, 1.5] as const
 
 const DEFAULTS: Preferences = {
   units: DEFAULT_UNITS,
@@ -53,6 +63,7 @@ const DEFAULTS: Preferences = {
   // is a superset, so a wrong default costs an unused menu entry rather than
   // a missing one.
   planFor: 'copter',
+  uiScale: 1,
 }
 
 /** Read what is stored, keeping anything this build does not recognize. */
@@ -64,6 +75,7 @@ function load(): Preferences {
       version?: number
       units?: Partial<UnitPrefs>
       planFor?: string
+      uiScale?: number
     }
     if (typeof parsed !== 'object' || parsed === null) return DEFAULTS
     return {
@@ -83,6 +95,11 @@ function load(): Preferences {
       // the whole catalog, which is what those builds offered. No VERSION
       // bump: nothing is reinterpreted.
       planFor: valid(parsed.planFor, ['copter', 'plane', 'rover', 'other'], DEFAULTS.planFor),
+      // Only a scale this build offers: anything else -- an older build's,
+      // a hand-edited one -- is 100%, never a window drawn at 300%.
+      uiScale: (UI_SCALES as readonly number[]).includes(parsed.uiScale as number)
+        ? (parsed.uiScale as number)
+        : DEFAULTS.uiScale,
     }
   } catch {
     // Private mode, disabled storage, or something else's key at ours: the
@@ -117,6 +134,7 @@ interface PreferencesState extends Preferences {
   setSpeedUnit(unit: SpeedUnit): void
   setVerticalSpeedUnit(unit: VerticalSpeedUnit): void
   setPlanFor(cls: VehicleClass): void
+  setUiScale(scale: number): void
   /** Back to the shipped defaults, for a dialog that offers it. */
   reset(): void
 }
@@ -141,6 +159,12 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
 
   setPlanFor(planFor) {
     set({ planFor })
+    save(get())
+  },
+
+  setUiScale(scale) {
+    if (!(UI_SCALES as readonly number[]).includes(scale)) return
+    set({ uiScale: scale })
     save(get())
   },
 

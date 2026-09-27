@@ -1,6 +1,6 @@
 import { LaButton, LaField, LaHint, LaModal, LaSelect } from '../components/La'
 import { useUiStore } from '../../stores/ui-store'
-import { usePreferencesStore } from '../../stores/preferences-store'
+import { UI_SCALES, usePreferencesStore } from '../../stores/preferences-store'
 import { useThemeStore, type ThemeChoice } from '../../stores/theme-store'
 import {
   DISTANCE_CHOICES,
@@ -32,6 +32,10 @@ export default function PreferencesModal() {
   const setSpeedUnit = usePreferencesStore((s) => s.setSpeedUnit)
   const setVerticalSpeedUnit = usePreferencesStore((s) => s.setVerticalSpeedUnit)
   const reset = usePreferencesStore((s) => s.reset)
+  const uiScale = usePreferencesStore((s) => s.uiScale)
+  const setUiScale = usePreferencesStore((s) => s.setUiScale)
+  // Only the desktop app can scale its own window; a browser has its zoom.
+  const canScale = typeof window !== 'undefined' && !!window.loftgcs
   const themeChoice = useThemeStore((s) => s.choice)
   const setThemeChoice = useThemeStore((s) => s.setChoice)
 
@@ -111,6 +115,21 @@ export default function PreferencesModal() {
             ))}
           </LaSelect>
         </LaField>
+        <LaField label="Scale" htmlFor="pref-scale">
+          <LaSelect
+            id="pref-scale"
+            value={String(uiScale)}
+            disabled={!canScale}
+            onChange={(e) => setUiScale(Number(e.target.value))}
+          >
+            {UI_SCALES.map((s) => (
+              <option key={s} value={s}>
+                {Math.round(s * 100)}%
+              </option>
+            ))}
+          </LaSelect>
+        </LaField>
+        {!canScale && <LaHint>Use the browser’s zoom</LaHint>}
       </section>
     </LaModal>
   )
