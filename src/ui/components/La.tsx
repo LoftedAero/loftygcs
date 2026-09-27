@@ -1,6 +1,11 @@
 // Thin typed wrappers over the Lofted Aero design system. Each emits exactly
 // the markup DESIGN.md documents, so components cannot drift from it.
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+} from 'react'
 
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type BtnSize = 'sm' | 'lg' | 'block'
@@ -181,11 +186,13 @@ export function LaModal({
   return (
     <div className={cls}>
       <div
-        className={
-          ['la-modal__card', wide ? 'la-modal__card--wide' : '', narrow ? 'la-modal__card--narrow' : '']
-            .filter(Boolean)
-            .join(' ')
-        }
+        className={[
+          'la-modal__card',
+          wide ? 'la-modal__card--wide' : '',
+          narrow ? 'la-modal__card--narrow' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
       >
         <h2 className="la-modal__title">{title}</h2>
         <div className="la-modal__body">{children}</div>

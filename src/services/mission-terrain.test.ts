@@ -78,7 +78,10 @@ describe('the ground track', () => {
   })
 
   it('samples evenly along the whole route', () => {
-    const p = plan([{ x: HOME.x + 100000, y: HOME.y }, { x: HOME.x + 100000, y: HOME.y + 100000 }])
+    const p = plan([
+      { x: HOME.x + 100000, y: HOME.y },
+      { x: HOME.x + 100000, y: HOME.y + 100000 },
+    ])
     const samples = routeSamples(p, 50)
     expect(samples).toHaveLength(50)
     expect(samples[0]!.d).toBe(0)
@@ -93,7 +96,10 @@ describe('the ground track', () => {
   it('bends where the route bends', () => {
     // A sample halfway along an L-shaped route is on the second leg, not on
     // the straight line between the ends.
-    const p = plan([{ x: HOME.x + 100000, y: HOME.y }, { x: HOME.x + 100000, y: HOME.y + 100000 }])
+    const p = plan([
+      { x: HOME.x + 100000, y: HOME.y },
+      { x: HOME.x + 100000, y: HOME.y + 100000 },
+    ])
     const mid = routeSamples(p, 101)[75]!
     expect(mid.lat).toBeCloseTo((HOME.x + 100000) / 1e7, 5)
   })
@@ -166,13 +172,18 @@ describe('clearance', () => {
       { x: HOME.x + 50000, y: HOME.y, z: 100 },
     ])
     const grids = flat(584)
-    const worst = minClearance(groundProfile(routeSamples(p, 50), grids), itemAltitudes(p, 584, grids))
+    const worst = minClearance(
+      groundProfile(routeSamples(p, 50), grids),
+      itemAltitudes(p, 584, grids),
+    )
     expect(worst!.minM).toBeCloseTo(100, 6)
   })
 
   it('says nothing rather than guessing when there is no terrain', () => {
     const p = plan([{ z: 100 }])
-    expect(minClearance(groundProfile(routeSamples(p, 10), new Map()), itemAltitudes(p, 584, new Map()))).toBeNull()
+    expect(
+      minClearance(groundProfile(routeSamples(p, 10), new Map()), itemAltitudes(p, 584, new Map())),
+    ).toBeNull()
   })
 })
 

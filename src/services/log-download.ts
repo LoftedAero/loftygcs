@@ -63,16 +63,14 @@ export async function listVehicleLogs(): Promise<void> {
   try {
     const { dir, logs } = await findLogDir()
     useLogStore.getState().setVehicleLogs(logs)
-    useLogStore
-      .getState()
-      .setVehicleStatus(
-        logs.length === 0
-          ? {
-              kind: 'error',
-              text: `No logs in ${dir}. Has this vehicle flown since its last format?`,
-            }
-          : { kind: 'idle' },
-      )
+    useLogStore.getState().setVehicleStatus(
+      logs.length === 0
+        ? {
+            kind: 'error',
+            text: `No logs in ${dir}. Has this vehicle flown since its last format?`,
+          }
+        : { kind: 'idle' },
+    )
   } catch (err) {
     useLogStore.getState().setVehicleStatus({ kind: 'error', text: describe(err) })
   }

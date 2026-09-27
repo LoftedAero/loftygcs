@@ -11,9 +11,7 @@ export default function OsdTab() {
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const entries = useParamStore((s) => s.entries)
   if (!connected) {
-    return (
-      <NeedsVehicle title="OSD" />
-    )
+    return <NeedsVehicle title="OSD" />
   }
   if (!entries.has('OSD_TYPE')) {
     return (

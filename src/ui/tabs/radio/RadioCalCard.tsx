@@ -62,11 +62,7 @@ export default function RadioCalCard() {
           </>
         }
       >
-        <ChannelMonitor
-          channels={channels}
-          mapping={mapping}
-          slots={CHANNEL_SLOTS}
-        />
+        <ChannelMonitor channels={channels} mapping={mapping} slots={CHANNEL_SLOTS} />
       </LaCard>
       <RadioCalWizard
         open={wizardOpen}

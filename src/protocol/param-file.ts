@@ -74,7 +74,13 @@ export function compareParams(
 ): CompareRow[] {
   return file.map((e) => {
     const entry = current.get(e.name)
-    if (!entry) return { name: e.name, fileValue: e.value, currentValue: undefined, status: 'missing' as const }
+    if (!entry)
+      return {
+        name: e.name,
+        fileValue: e.value,
+        currentValue: undefined,
+        status: 'missing' as const,
+      }
     return {
       name: e.name,
       fileValue: e.value,

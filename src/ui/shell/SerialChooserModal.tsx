@@ -103,11 +103,7 @@ export default function SerialChooserModal() {
           >
             Cancel
           </LaButton>
-          <LaButton
-            variant="primary"
-            disabled={!selectedShown}
-            onClick={() => connect(selected)}
-          >
+          <LaButton variant="primary" disabled={!selectedShown} onClick={() => connect(selected)}>
             Connect
           </LaButton>
         </>

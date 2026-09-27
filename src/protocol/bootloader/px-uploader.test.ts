@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ByteQueue,
-  PxUploader,
-  bootloaderCrc32,
-} from './px-uploader'
+import { ByteQueue, PxUploader, bootloaderCrc32 } from './px-uploader'
 
 // A scripted ArduPilot bootloader on the far end of the link: enough state
 // machine to accept the real command sequence, remember what got
@@ -53,7 +49,8 @@ class FakeBootloader {
         if (this.rx.length < 3) return
         const param = this.rx[1]!
         this.rx.splice(0, 3)
-        if (param === 1) this.replyWord(5) // bl rev
+        if (param === 1)
+          this.replyWord(5) // bl rev
         else if (param === 2) this.replyWord(this.boardId)
         else if (param === 3) this.replyWord(0)
         else this.replyWord(this.fwSize)

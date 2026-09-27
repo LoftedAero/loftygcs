@@ -9,7 +9,8 @@
 // are pitch = ±90°, where gimbal lock makes yaw meaningless. The body rate
 // vector projected onto body-frame "down" is well defined in every attitude.
 
-export type OrientationId = 'level' | 'upsideDown' | 'noseDown' | 'tailDown' | 'leftSide' | 'rightSide'
+export type OrientationId =
+  'level' | 'upsideDown' | 'noseDown' | 'tailDown' | 'leftSide' | 'rightSide'
 
 export interface Orientation {
   id: OrientationId

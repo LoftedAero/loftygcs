@@ -18,7 +18,9 @@ export class ElectronLinkTransport implements Transport {
   async open(opts: TransportOptions): Promise<void> {
     const bridge = window.loftgcs
     if (!bridge) {
-      throw new TransportError('TCP/UDP links need the desktop app (browsers cannot open raw sockets).')
+      throw new TransportError(
+        'TCP/UDP links need the desktop app (browsers cannot open raw sockets).',
+      )
     }
     if (opts.kind !== this.kind) throw new TransportError('wrong options for link transport')
 
@@ -35,7 +37,9 @@ export class ElectronLinkTransport implements Transport {
       }
     } catch (err) {
       throw new TransportError(
-        err instanceof Error ? `Could not open ${this.kind.toUpperCase()} link: ${err.message}` : 'link open failed',
+        err instanceof Error
+          ? `Could not open ${this.kind.toUpperCase()} link: ${err.message}`
+          : 'link open failed',
       )
     }
 

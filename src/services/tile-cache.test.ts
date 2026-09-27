@@ -6,7 +6,8 @@ import type { TileCoord } from './tile-math'
 // browsing, storage denied): the cache must still fetch, report progress and
 // never throw.
 
-const grid = (n: number): TileCoord[] => Array.from({ length: n }, (_, i) => ({ z: 15, x: i, y: 0 }))
+const grid = (n: number): TileCoord[] =>
+  Array.from({ length: n }, (_, i) => ({ z: 15, x: i, y: 0 }))
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -50,7 +51,10 @@ describe('prefetching tiles', () => {
   })
 
   it('survives a network that throws', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('offline'))),
+    )
     const result = await prefetchTiles('esri', 'https://x/{z}/{y}/{x}', grid(4), () => {})
     expect(result).toMatchObject({ done: 4, failed: 4 })
   })

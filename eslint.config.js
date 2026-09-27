@@ -23,7 +23,14 @@ export default tseslint.config(
           zones: [
             {
               target: './src/protocol',
-              from: ['./src/ui', './src/transport', './src/stores', './src/services', './src/worker', './electron'],
+              from: [
+                './src/ui',
+                './src/transport',
+                './src/stores',
+                './src/services',
+                './src/worker',
+                './electron',
+              ],
               message: 'protocol/ must stay environment-agnostic: bytes in, typed messages out.',
             },
             {
@@ -35,7 +42,8 @@ export default tseslint.config(
               target: './src/ui',
               from: ['./src/protocol'],
               except: ['./types.ts'],
-              message: 'ui/ talks to the protocol through worker-client and stores, never directly.',
+              message:
+                'ui/ talks to the protocol through worker-client and stores, never directly.',
             },
           ],
         },

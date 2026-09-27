@@ -46,7 +46,11 @@ const CONCURRENCY = 8
 
 const cache = new Map()
 function fetchText(url) {
-  if (!cache.has(url)) cache.set(url, fetch(url).then((r) => (r.ok ? r.text() : null)))
+  if (!cache.has(url))
+    cache.set(
+      url,
+      fetch(url).then((r) => (r.ok ? r.text() : null)),
+    )
   return cache.get(url)
 }
 

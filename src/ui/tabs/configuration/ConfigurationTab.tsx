@@ -197,9 +197,7 @@ export default function ConfigurationTab() {
   const ready = useParamStore((s) => s.loadState === 'ready')
   const entries = useParamStore((s) => s.entries)
   if (!ready) {
-    return (
-      <NeedsVehicle title="Configuration" />
-    )
+    return <NeedsVehicle title="Configuration" />
   }
   // Only ArduPlane carries Q_ENABLE. MAV_TYPE cannot tell, since a quadplane
   // and a fixed wing both report FIXED_WING (see `takeoffStyle`).

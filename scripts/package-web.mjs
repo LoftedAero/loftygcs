@@ -9,7 +9,14 @@
 // The host must serve HTTPS (Web Serial is unavailable otherwise), and should
 // not cache index.html for long or users will keep loading a stale build.
 import { execFileSync } from 'node:child_process'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from 'node:fs'
 import path from 'node:path'
 import { createDeflateRaw } from 'node:zlib'
 

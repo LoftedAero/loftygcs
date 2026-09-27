@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  H264Depayloader,
-  codecStringFromSps,
-  nalType,
-  parseRtp,
-  toAnnexB,
-} from './h264'
+import { H264Depayloader, codecStringFromSps, nalType, parseRtp, toAnnexB } from './h264'
 
 /** Builds an RTP packet around a payload. */
 function rtp(
@@ -101,18 +95,7 @@ describe('H264Depayloader', () => {
 
   it('splits a STAP-A into its NAL units', () => {
     const d = new H264Depayloader()
-    const body = [
-      0x60 | 24,
-      0,
-      SPS.length,
-      ...SPS,
-      0,
-      PPS.length,
-      ...PPS,
-      0,
-      2,
-      ...nal(1, 0x99),
-    ]
+    const body = [0x60 | 24, 0, SPS.length, ...SPS, 0, PPS.length, ...PPS, 0, 2, ...nal(1, 0x99)]
     d.push(parseRtp(rtp(body, { marker: true }))!)
     const sets = d.parameterSets()
     expect([...(sets.sps ?? [])]).toEqual(SPS)

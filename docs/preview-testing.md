@@ -26,16 +26,16 @@ install it over the old one.
 
 ## Browser or desktop
 
-| | Browser | Desktop app |
-|---|---|---|
-| Install needed | no | yes |
-| USB flight controller | yes (Chrome, Edge, Opera, Firefox 151+) | yes |
-| Firmware flashing over DFU | Chrome, Edge and Opera only | yes |
-| WebSocket telemetry | yes | yes |
-| TCP / UDP telemetry | no | yes |
-| Built-in ArduPilot simulator | no | yes (Windows) |
-| Video in the HUD | no | yes |
-| Demo vehicle, missions, parameters, OSD | yes | yes |
+|                                         | Browser                                 | Desktop app   |
+| --------------------------------------- | --------------------------------------- | ------------- |
+| Install needed                          | no                                      | yes           |
+| USB flight controller                   | yes (Chrome, Edge, Opera, Firefox 151+) | yes           |
+| Firmware flashing over DFU              | Chrome, Edge and Opera only             | yes           |
+| WebSocket telemetry                     | yes                                     | yes           |
+| TCP / UDP telemetry                     | no                                      | yes           |
+| Built-in ArduPilot simulator            | no                                      | yes (Windows) |
+| Video in the HUD                        | no                                      | yes           |
+| Demo vehicle, missions, parameters, OSD | yes                                     | yes           |
 
 If you have a flight controller and a USB cable, the browser version is the
 quickest way to start. For the built-in simulator, a network telemetry radio,

@@ -42,10 +42,7 @@ describe('choosing fields to plot', () => {
     store().clearFields()
     store().toggleField({ message: 'RCOU', field: 'C1' })
     store().toggleField({ message: 'ATT', field: 'Roll' })
-    expect(store().selected.map((f) => `${f.message}.${f.field}`)).toEqual([
-      'RCOU.C1',
-      'ATT.Roll',
-    ])
+    expect(store().selected.map((f) => `${f.message}.${f.field}`)).toEqual(['RCOU.C1', 'ATT.Roll'])
     store().toggleField({ message: 'RCOU', field: 'C1' })
     expect(store().selected.map((f) => f.field)).toEqual(['Roll'])
   })
@@ -252,11 +249,27 @@ describe('defaultAxis', () => {
   it('takes the next free axis for each new unit', () => {
     expect(defaultAxis([], 'm')).toBe(0)
     expect(defaultAxis([{ axis: 0, unit: 'm' }], 'us')).toBe(1)
-    expect(defaultAxis([{ axis: 0, unit: 'm' }, { axis: 1, unit: 'us' }], 'deg')).toBe(2)
+    expect(
+      defaultAxis(
+        [
+          { axis: 0, unit: 'm' },
+          { axis: 1, unit: 'us' },
+        ],
+        'deg',
+      ),
+    ).toBe(2)
   })
 
   it('reuses the axis already holding that unit', () => {
-    expect(defaultAxis([{ axis: 0, unit: 'm' }, { axis: 1, unit: 'us' }], 'us')).toBe(1)
+    expect(
+      defaultAxis(
+        [
+          { axis: 0, unit: 'm' },
+          { axis: 1, unit: 'us' },
+        ],
+        'us',
+      ),
+    ).toBe(1)
   })
 
   it('treats "no unit" as no reason to share', () => {

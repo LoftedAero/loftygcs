@@ -65,7 +65,9 @@ function decodedFrameCount(annexB: Uint8Array): { frames: number; stderr: string
     ],
     {
       encoding: 'utf8',
-      env: bin ? { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } : process.env,
+      env: bin
+        ? { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` }
+        : process.env,
     },
   )
   let frames = 0

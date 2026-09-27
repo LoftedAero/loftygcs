@@ -162,7 +162,13 @@ describe('containsPoint', () => {
   })
 
   it('tests a circle', () => {
-    const c: FenceShape = { uid: 'c', kind: 'circle', inclusive: true, center: inside, radiusM: 100 }
+    const c: FenceShape = {
+      uid: 'c',
+      kind: 'circle',
+      inclusive: true,
+      center: inside,
+      radiusM: 100,
+    }
     expect(containsPoint(c, inside)).toBe(true)
     expect(containsPoint(c, outside)).toBe(false)
   })

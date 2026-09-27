@@ -26,7 +26,12 @@ export interface MessageClass {
 // Later dialects win on msgid collisions; ardupilotmega extends common.
 const REGISTRY = new Map<number, MessageClass>()
 const BY_NAME = new Map<string, MessageClass>()
-for (const dialect of [minimal.REGISTRY, standard.REGISTRY, common.REGISTRY, ardupilotmega.REGISTRY]) {
+for (const dialect of [
+  minimal.REGISTRY,
+  standard.REGISTRY,
+  common.REGISTRY,
+  ardupilotmega.REGISTRY,
+]) {
   for (const [id, cls] of Object.entries(dialect)) {
     const mc = cls as unknown as MessageClass
     REGISTRY.set(Number(id), mc)
@@ -109,10 +114,7 @@ function writeScalar(view: DataView, offset: number, type: string, value: number
   }
 }
 
-export function decodePayload(
-  cls: MessageClass,
-  payload: Uint8Array,
-): Record<string, FieldValue> {
+export function decodePayload(cls: MessageClass, payload: Uint8Array): Record<string, FieldValue> {
   // MAVLink v2 truncates trailing zero bytes; the decoder works over the
   // full-length payload so field offsets stay valid.
   let full = payload

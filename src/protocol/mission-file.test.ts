@@ -27,7 +27,12 @@ describe('waypoints files', () => {
   })
 
   it('renumbers gappy hand-edited sequences', () => {
-    const gappy = ['QGC WPL 110', '5\t1\t0\t16\t0\t0\t0\t0\t1\t2\t3\t1', '9\t0\t3\t16\t0\t0\t0\t0\t4\t5\t6\t1', ''].join('\n')
+    const gappy = [
+      'QGC WPL 110',
+      '5\t1\t0\t16\t0\t0\t0\t0\t1\t2\t3\t1',
+      '9\t0\t3\t16\t0\t0\t0\t0\t4\t5\t6\t1',
+      '',
+    ].join('\n')
     expect(parseWaypointsFile(gappy).map((i) => i.seq)).toEqual([0, 1])
   })
 
@@ -56,8 +61,20 @@ describe('.plan import', () => {
   it('imports simple items starting after home', () => {
     const { items, home } = parsePlanFile(
       plan({}, [
-        { type: 'SimpleItem', command: 22, frame: 3, autoContinue: true, params: [15, 0, 0, null, 0, 0, 50] },
-        { type: 'SimpleItem', command: 16, frame: 3, autoContinue: true, params: [0, 0, 0, 0, -35.3612, 149.164, 80] },
+        {
+          type: 'SimpleItem',
+          command: 22,
+          frame: 3,
+          autoContinue: true,
+          params: [15, 0, 0, null, 0, 0, 50],
+        },
+        {
+          type: 'SimpleItem',
+          command: 16,
+          frame: 3,
+          autoContinue: true,
+          params: [0, 0, 0, 0, -35.3612, 149.164, 80],
+        },
       ]),
     )
     expect(home).toEqual({ x: -353632621, y: 1491652374, z: 584 })

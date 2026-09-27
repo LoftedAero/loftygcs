@@ -57,10 +57,7 @@ function MoonIcon() {
     <svg width="16" height="16" viewBox="-12 -12 24 24" aria-hidden="true">
       {/* A crescent as one path (a disc with a second disc cut out), so it
           holds its shape at any size. */}
-      <path
-        d="M2.2 -8.6 A 8.6 8.6 0 1 0 6.4 5.6 A 6.9 6.9 0 0 1 2.2 -8.6 Z"
-        fill="currentColor"
-      />
+      <path d="M2.2 -8.6 A 8.6 8.6 0 1 0 6.4 5.6 A 6.9 6.9 0 0 1 2.2 -8.6 Z" fill="currentColor" />
     </svg>
   )
 }

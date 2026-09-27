@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ORIENTATIONS,
-  downInBody,
-  orientationFor,
-  verticalRate,
-} from './cal-orientation'
+import { ORIENTATIONS, downInBody, orientationFor, verticalRate } from './cal-orientation'
 
 const deg = (d: number) => (d * Math.PI) / 180
 

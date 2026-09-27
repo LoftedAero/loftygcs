@@ -74,7 +74,10 @@ describe('pointing the gimbal', () => {
   })
 
   it('sets a mount mode with the configure command', () => {
-    expect(setMountMode(3)).toEqual({ command: CMD.doMountConfigure, params: [3, 0, 0, 0, 0, 0, 0] })
+    expect(setMountMode(3)).toEqual({
+      command: CMD.doMountConfigure,
+      params: [3, 0, 0, 0, 0, 0, 0],
+    })
   })
 
   it('names the modes', () => {

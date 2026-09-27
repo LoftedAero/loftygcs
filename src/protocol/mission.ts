@@ -165,7 +165,8 @@ export class MissionClient {
           this.finish(() => (a as Upload | Clear).resolve())
         } else {
           const name = MAV_MISSION_RESULT[result] ?? `result ${result}`
-          const seq = a.kind === 'upload' && a.lastRequested >= 0 ? ` (item ${a.lastRequested})` : ''
+          const seq =
+            a.kind === 'upload' && a.lastRequested >= 0 ? ` (item ${a.lastRequested})` : ''
           this.finish(() => a.reject(new Error(`Mission transfer refused: ${name}${seq}`)))
         }
         return

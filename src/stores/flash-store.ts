@@ -17,15 +17,7 @@ export type LoadedApj = Extract<LoadedFirmware, { kind: 'apj' }>
 export type LoadedHex = Extract<LoadedFirmware, { kind: 'hex' }>
 
 export type FlashPhaseUi =
-  | 'idle'
-  | 'sync'
-  | 'erase'
-  | 'program'
-  | 'verify'
-  | 'reboot'
-  | 'leave'
-  | 'done'
-  | 'error'
+  'idle' | 'sync' | 'erase' | 'program' | 'verify' | 'reboot' | 'leave' | 'done' | 'error'
 
 /**
  * Which path the running flash is on, so only that path's panel shows the

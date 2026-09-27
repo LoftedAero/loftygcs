@@ -131,10 +131,9 @@ describe('dirty tracking', () => {
     store().setPlan(planFromItems([wire(0), wire(1, { command: 22, x: 0, y: 0 })]), {
       synced: true,
     })
-    store().setPlan(
-      planFromItems([wire(0), wire(1, { command: 22, x: 0, y: 0, frame: 0 })]),
-      { synced: false },
-    )
+    store().setPlan(planFromItems([wire(0), wire(1, { command: 22, x: 0, y: 0, frame: 0 })]), {
+      synced: false,
+    })
     expect(isDirty(store())).toBe(true)
   })
 

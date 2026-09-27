@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
-import {
-  parseDataflash,
-  getSeries,
-  plottableFields,
-  seriesStats,
-  HEAD1,
-  HEAD2,
-} from './dataflash'
+import { parseDataflash, getSeries, plottableFields, seriesStats, HEAD1, HEAD2 } from './dataflash'
 
 // Tested against a real ArduCopter SITL log rather than one this code wrote,
 // since a parser checked against its own encoder only confirms its own

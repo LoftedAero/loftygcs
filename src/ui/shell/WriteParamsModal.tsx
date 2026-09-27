@@ -58,8 +58,12 @@ export default function WriteParamsModal({
           <thead>
             <tr>
               <th scope="col">Parameter</th>
-              <th scope="col" className="mission-table__num">From</th>
-              <th scope="col" className="mission-table__num">To</th>
+              <th scope="col" className="mission-table__num">
+                From
+              </th>
+              <th scope="col" className="mission-table__num">
+                To
+              </th>
             </tr>
           </thead>
           <tbody>

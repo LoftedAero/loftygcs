@@ -111,7 +111,7 @@ export const SECTIONS: readonly (readonly Vec3[])[] = ICOSAHEDRON.flatMap((t) =>
 /** Whether section `i` is covered, given the ten-byte mask from the vehicle. */
 export function sectionCovered(mask: readonly number[], i: number): boolean {
   const byte = mask[Math.floor(i / 8)]
-  return byte !== undefined && (byte & (1 << i % 8)) !== 0
+  return byte !== undefined && (byte & (1 << (i % 8))) !== 0
 }
 
 /** How much of the sphere the mask covers, 0..1. */

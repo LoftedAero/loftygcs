@@ -7,7 +7,9 @@ import { FRAME_CLASS, FRAME_TYPE, frameLayout } from '../../../protocol/frame-la
 // draw.
 
 const steps = (cls: number, type: number) =>
-  frameLayout(cls, type)!.map((m) => m.test).sort((a, b) => a - b)
+  frameLayout(cls, type)!
+    .map((m) => m.test)
+    .sort((a, b) => a - b)
 
 describe('the motor-test keypad', () => {
   it('halves every real frame into two equal rows', () => {

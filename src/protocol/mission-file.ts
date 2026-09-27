@@ -23,7 +23,8 @@ export function parseWaypointsFile(text: string): MissionItem[] {
     const line = lines[n]!.trim()
     if (line === '' || line.startsWith('#')) continue
     const cols = line.split(/\s+/)
-    if (cols.length < 12) throw new Error(`Mission file line ${n + 1}: expected 12 columns, got ${cols.length}`)
+    if (cols.length < 12)
+      throw new Error(`Mission file line ${n + 1}: expected 12 columns, got ${cols.length}`)
     const num = cols.map(Number)
     if (num.some((v) => Number.isNaN(v))) {
       throw new Error(`Mission file line ${n + 1}: not a number where one was expected`)
@@ -105,7 +106,7 @@ export function parsePlanFile(text: string): PlanImport {
   }
 
   const complex = (root.mission.items ?? [])
-    .map((it) => (it as { type?: string; complexItemType?: string }))
+    .map((it) => it as { type?: string; complexItemType?: string })
     .filter((it) => it.type && it.type !== 'SimpleItem')
   if (complex.length > 0) {
     const kinds = [...new Set(complex.map((c) => c.complexItemType ?? c.type))].join(', ')

@@ -20,7 +20,7 @@ const RTP_HEADER = 12
 /** Returns null for anything too short or not RTP version 2. */
 export function parseRtp(buf: Uint8Array): RtpPacket | null {
   if (buf.length < RTP_HEADER) return null
-  if ((buf[0]! >> 6) !== 2) return null
+  if (buf[0]! >> 6 !== 2) return null
   const csrcCount = buf[0]! & 0x0f
   const hasExtension = (buf[0]! & 0x10) !== 0
   let offset = RTP_HEADER + csrcCount * 4

@@ -25,9 +25,7 @@ describe('the geodesic grid ArduPilot reports coverage in', () => {
 
   it('has twelve distinct icosahedron vertices', () => {
     // Catches a wrong golden-ratio term or a mistyped sign.
-    const seen = new Set(
-      ICOSAHEDRON.flat().map((v) => v.map((n) => n.toFixed(4)).join(',')),
-    )
+    const seen = new Set(ICOSAHEDRON.flat().map((v) => v.map((n) => n.toFixed(4)).join(',')))
     expect(seen.size).toBe(12)
   })
 

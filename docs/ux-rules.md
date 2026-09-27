@@ -13,6 +13,7 @@ sections after the checklist give the reasoning behind each item.
 ## Checklist
 
 Words
+
 - [ ] No sentence on the screen explains what a control does, how the app
       works, or what will happen next. Labels only.
 - [ ] Every remaining hint says why something is disabled or refused, and is
@@ -24,6 +25,7 @@ Words
 - [ ] Empty values read "-", not "0", "None yet" or a sentence.
 
 Stability
+
 - [ ] No card, tile, row or dialog changes height when a value, state or
       selection changes. Optional content is drawn disabled, not added.
 - [ ] Nothing the user reaches for moves when something else changes.
@@ -33,6 +35,7 @@ Stability
       themselves.
 
 Consistency
+
 - [ ] Every control in a column, and every button in its row, is one width.
 - [ ] Buttons with the same role are the same size everywhere on the screen.
 - [ ] The same card has the same name and place in every configuration.
@@ -43,6 +46,7 @@ Consistency
       tables, dialogs, empty states).
 
 Layout
+
 - [ ] The screen fills a full-screen window; nothing hugs one side.
 - [ ] Nothing scrolls at common full-screen sizes, in any configuration.
       Measured, not assumed.
@@ -50,6 +54,7 @@ Layout
 - [ ] No whitespace that a side-by-side arrangement would remove.
 
 Controls
+
 - [ ] Each card's actions are on its title row. One primary action per
       region.
 - [ ] Rarely used settings are behind a dialog, opened by a button labeled
@@ -62,6 +67,7 @@ Controls
 - [ ] A control that enables another sits right next to it.
 
 Process
+
 - [ ] Nothing was built that was not asked for.
 - [ ] Every change was checked in the running app, not reasoned about.
 

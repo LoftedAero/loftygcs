@@ -5,11 +5,7 @@
 import { connectionService } from './connection'
 import { useMissionStore } from '../stores/mission-store'
 import { planFromItems, planToItems } from '../protocol/mission-plan'
-import {
-  parsePlanFile,
-  parseWaypointsFile,
-  serializeWaypointsFile,
-} from '../protocol/mission-file'
+import { parsePlanFile, parseWaypointsFile, serializeWaypointsFile } from '../protocol/mission-file'
 import { useVehicleStore } from '../stores/vehicle-store'
 
 /** Read the vehicle's mission into the editor, replacing what is there. */

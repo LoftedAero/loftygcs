@@ -147,7 +147,11 @@ async function sheet(source, frame, scale) {
   model.position.sub(sphere.center)
   model.scale.setScalar(1 / (sphere.radius || 1))
   model.traverse((obj) => {
-    const materials = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : []
+    const materials = Array.isArray(obj.material)
+      ? obj.material
+      : obj.material
+        ? [obj.material]
+        : []
     for (const material of materials) {
       if (!material.color) continue
       const repaint = REPAINT[material.name]
@@ -209,9 +213,21 @@ function arrow(y, faceUp, material) {
   const a = 0.035
   return flat(
     [
-      [[0, -0.27], [-0.14, -0.02], [0.14, -0.02]],
-      [[-a, -0.02], [-a, 0.2], [a, 0.2]],
-      [[-a, -0.02], [a, 0.2], [a, -0.02]],
+      [
+        [0, -0.27],
+        [-0.14, -0.02],
+        [0.14, -0.02],
+      ],
+      [
+        [-a, -0.02],
+        [-a, 0.2],
+        [a, 0.2],
+      ],
+      [
+        [-a, -0.02],
+        [a, 0.2],
+        [a, -0.02],
+      ],
     ],
     y,
     faceUp,
@@ -222,9 +238,27 @@ function arrow(y, faceUp, material) {
 /** A flat airplane on the ground, nose forward: the vehicle the board is in. */
 function silhouette() {
   const outline = [
-    [24, 3], [25.8, 4.6], [26.9, 7.4], [27.3, 10.5], [27.6, 20], [45, 29], [45, 32.5],
-    [27.6, 28], [27.6, 37], [31.5, 41.5], [31.5, 44], [24, 41.8], [16.5, 44], [16.5, 41.5],
-    [20.4, 37], [20.4, 28], [3, 32.5], [3, 29], [20.4, 20], [20.7, 10.5], [21.1, 7.4],
+    [24, 3],
+    [25.8, 4.6],
+    [26.9, 7.4],
+    [27.3, 10.5],
+    [27.6, 20],
+    [45, 29],
+    [45, 32.5],
+    [27.6, 28],
+    [27.6, 37],
+    [31.5, 41.5],
+    [31.5, 44],
+    [24, 41.8],
+    [16.5, 44],
+    [16.5, 41.5],
+    [20.4, 37],
+    [20.4, 28],
+    [3, 32.5],
+    [3, 29],
+    [20.4, 20],
+    [20.7, 10.5],
+    [21.1, 7.4],
     [22.2, 4.6],
   ]
   const shape = new THREE.Shape()
@@ -273,7 +307,11 @@ function buildBoard() {
  */
 async function boardSheet(frame, scale) {
   const big = frame * scale
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    preserveDrawingBuffer: true,
+  })
   renderer.setPixelRatio(1)
   renderer.setSize(big, big, false)
 

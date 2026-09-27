@@ -30,10 +30,9 @@ export default function UnsavedChangesModal() {
 
   if (!pending) return null
 
-  const target =
-    pending.tab
-      ? (TABS.find((t) => t.id === pending.tab)?.label ?? 'another page')
-      : (MODES.find((m) => m.id === pending.mode)?.label ?? 'another page')
+  const target = pending.tab
+    ? (TABS.find((t) => t.id === pending.tab)?.label ?? 'another page')
+    : (MODES.find((m) => m.id === pending.mode)?.label ?? 'another page')
 
   const writeThenGo = async () => {
     setWriting(true)
@@ -89,8 +88,12 @@ export default function UnsavedChangesModal() {
           <thead>
             <tr>
               <th scope="col">Parameter</th>
-              <th scope="col" className="mission-table__num">From</th>
-              <th scope="col" className="mission-table__num">To</th>
+              <th scope="col" className="mission-table__num">
+                From
+              </th>
+              <th scope="col" className="mission-table__num">
+                To
+              </th>
             </tr>
           </thead>
           <tbody>

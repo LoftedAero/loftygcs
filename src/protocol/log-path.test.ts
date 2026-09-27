@@ -123,9 +123,7 @@ describe('joining position to attitude', () => {
 describe('choosing a position source', () => {
   it('falls back to AHR2, then to GPS', () => {
     expect(
-      flightPath(
-        logWith({ message: 'AHR2', time: [0], lat: [1], lon: [2], alt: [3] }),
-      ).source,
+      flightPath(logWith({ message: 'AHR2', time: [0], lat: [1], lon: [2], alt: [3] })).source,
     ).toBe('AHR2')
     expect(
       flightPath(logWith({ message: 'GPS', time: [0], lat: [1], lon: [2], alt: [3] })).source,
@@ -136,7 +134,13 @@ describe('choosing a position source', () => {
     // Pre-fix records sit at 0,0, which would drag the track across the
     // Atlantic.
     const path = flightPath(
-      logWith({ message: 'POS', time: [0, 1, 2], lat: [0, 0, 51], lon: [0, 0, -1], alt: [0, 0, 5] }),
+      logWith({
+        message: 'POS',
+        time: [0, 1, 2],
+        lat: [0, 0, 51],
+        lon: [0, 0, -1],
+        alt: [0, 0, 5],
+      }),
     )
     expect(path.samples).toHaveLength(1)
     expect(path.samples[0]!.lat).toBe(51)

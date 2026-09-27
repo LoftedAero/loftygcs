@@ -48,7 +48,9 @@ describe('unpacking a device ID', () => {
   it('drops the bus and address where they mean nothing', () => {
     // A DroneCAN sensor is a network node, not a device at an address, and
     // SITL is not a device at all, so neither gets an address.
-    expect(describeDevice(decodeDeviceId(pack(3, 0, 0, 0x0d), 'baro')!)).toBe('DroneCAN on DroneCAN')
+    expect(describeDevice(decodeDeviceId(pack(3, 0, 0, 0x0d), 'baro')!)).toBe(
+      'DroneCAN on DroneCAN',
+    )
     expect(describeDevice(decodeDeviceId(pack(4, 0, 0, 0x2a), 'imu')!)).toBe('SITL on SITL')
   })
 

@@ -23,8 +23,7 @@ import { get } from 'node:https'
 import path from 'node:path'
 
 const BASE = 'https://firmware.ardupilot.org/Tools/MissionPlanner/sitl/CopterStable/'
-const AUTOTEST_BASE =
-  'https://raw.githubusercontent.com/ArduPilot/ardupilot/master/Tools/autotest/'
+const AUTOTEST_BASE = 'https://raw.githubusercontent.com/ArduPilot/ardupilot/master/Tools/autotest/'
 const DIR = path.resolve('sitl')
 
 // `source` is where ArduPilot keeps each frame's bench defaults (per
@@ -140,7 +139,10 @@ const home = normalizeHome(homeArg ?? process.env.SITL_HOME ?? CMAC)
  * silently misbehaves with fewer.
  */
 function normalizeHome(text) {
-  const parts = String(text).split(/[,;\s]+/).filter(Boolean).map(Number)
+  const parts = String(text)
+    .split(/[,;\s]+/)
+    .filter(Boolean)
+    .map(Number)
   if (parts.length < 2 || parts.some((n) => !Number.isFinite(n))) {
     console.error(`bad --home "${text}" -- expected decimal degrees, like 38.9034,-77.0365`)
     process.exit(1)

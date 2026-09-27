@@ -132,7 +132,8 @@ export class PxUploader {
 
   private async expectSync(timeoutMs = REPLY_TIMEOUT_MS) {
     const reply = await this.readBytes(2, timeoutMs)
-    if (reply[0] !== INSYNC) throw new Error(`bootloader: lost sync (got 0x${reply[0]!.toString(16)})`)
+    if (reply[0] !== INSYNC)
+      throw new Error(`bootloader: lost sync (got 0x${reply[0]!.toString(16)})`)
     switch (reply[1]) {
       case OK:
         return

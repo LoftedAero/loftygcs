@@ -27,7 +27,6 @@ const BOARD_FRAME = 320
 /** Supersampling: each frame is rendered this much larger, then scaled down. */
 const SCALE = 3
 
-
 const OUT = 'src/ui/tabs/sensors'
 
 async function render() {
@@ -84,7 +83,8 @@ async function render() {
 
     const board = result.board
     const boardPng = Buffer.from(board.url.slice(board.url.indexOf(',') + 1), 'base64')
-    if (boardPng.length < 4000) throw new Error(`board sheet came back empty (${boardPng.length} bytes)`)
+    if (boardPng.length < 4000)
+      throw new Error(`board sheet came back empty (${boardPng.length} bytes)`)
     writeFileSync(path.join(root, OUT, 'board-orientations.png'), boardPng)
     console.log(
       `wrote ${OUT}/board-orientations.png  ${BOARD_FRAME * board.columns}x${BOARD_FRAME * board.rows}, ` +

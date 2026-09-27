@@ -91,9 +91,7 @@ class UdpSource extends BaseSource {
       this.emit(
         'error',
         e.code === 'EADDRINUSE'
-          ? new Error(
-              `Port ${port} is already in use -- another program is receiving video on it`,
-            )
+          ? new Error(`Port ${port} is already in use -- another program is receiving video on it`)
           : err,
       )
     })
@@ -145,7 +143,8 @@ class RtspSource extends BaseSource {
       const describe = await this.request('DESCRIBE', url, user, pass, {
         Accept: 'application/sdp',
       })
-      if (describe.status !== 200) throw new Error(`DESCRIBE failed: ${describe.status} ${describe.reason}`)
+      if (describe.status !== 200)
+        throw new Error(`DESCRIBE failed: ${describe.status} ${describe.reason}`)
       const track = parseSdp(describe.body)
       if (!track) throw new Error('The stream description has no video track')
       if (track.encoding !== 'H264') {
@@ -247,9 +246,7 @@ class RtspSource extends BaseSource {
         if (!socket) return reject(new Error('Not connected'))
         const lines = [`${method} ${uri} RTSP/1.0`, `CSeq: ${this.cseq++}`]
         if (this.session) lines.push(`Session: ${this.session}`)
-        const auth = this.challenge
-          ? authorization(this.challenge, method, uri, user, pass)
-          : null
+        const auth = this.challenge ? authorization(this.challenge, method, uri, user, pass) : null
         if (auth) lines.push(`Authorization: ${auth}`)
         for (const [k, v] of Object.entries(headers)) lines.push(`${k}: ${v}`)
         lines.push('User-Agent: LoftGCS', '', '')

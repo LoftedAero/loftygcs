@@ -51,4 +51,3 @@ describe('parseHome', () => {
     expect('home' in r && r.home).toEqual(CMAC_HOME)
   })
 })
-

@@ -69,7 +69,11 @@ describe('sampling the grid', () => {
   it('still answers at the edge of what was downloaded', () => {
     // The neighbor pixel needed for interpolation is off the tile, so the
     // point's own pixel is used.
-    const v = sampleElevation(rampTile(() => 42), { lat: 84.9, lon: -179.99 }, 0)
+    const v = sampleElevation(
+      rampTile(() => 42),
+      { lat: 84.9, lon: -179.99 },
+      0,
+    )
     expect(v).toBeCloseTo(42, 4)
   })
 })

@@ -99,7 +99,12 @@ function ensureClip(bin) {
       'filesink',
       `location=${gstPath(CLIP)}`,
     ],
-    { stdio: 'inherit', env: bin ? { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } : process.env },
+    {
+      stdio: 'inherit',
+      env: bin
+        ? { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` }
+        : process.env,
+    },
   )
   if (child.status !== 0 || !existsSync(CLIP)) {
     console.error('could not encode the test clip')

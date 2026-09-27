@@ -126,85 +126,85 @@ export default function CompassPriority() {
         <WriteFeedback prefixes={['COMPASS_PRIO']} inline />
       </h3>
       <div className="app-table">
-      <div className="app-table__row compass-prio__row app-table__head">
-        <span />
-        <span>Compass</span>
-        <span>Use</span>
-        <span>Orientation</span>
-        <span>Priority</span>
-      </div>
-      {rows.map((r, i) => (
-        <div className="app-table__row compass-prio__row" key={r.prio}>
-          <span className="compass-prio__n">{i + 1}</span>
-          <span className="compass-prio__device">
-            {r.id === 0 ? (
-              <span className="compass-prio__empty">Empty</span>
-            ) : (
-              <>
-                <span className="compass-prio__part">
-                  {(r.device && describeDevice(r.device)) || `Device ${r.id}`}
-                </span>
-                {r.external && <span className="compass-prio__tag">external</span>}
-                {r.missing && <span className="compass-prio__missing">not detected</span>}
-              </>
-            )}
-          </span>
-
-          {/* Priority-indexed: this switch belongs to the row. */}
-          <span className="compass-prio__cell">
-            {entries.has(r.use) && r.id !== 0 ? (
-              <ParamField param={r.use} label={`Use compass ${i + 1} for yaw`} bare writeNow />
-            ) : (
-              <span className="compass-prio__na">—</span>
-            )}
-          </span>
-
-          {/* State-indexed: this one belongs to the device, found by id. */}
-          <span className="compass-prio__cell">
-            {r.state && entries.has(r.state.orient) && r.external ? (
-              <ParamField
-                param={r.state.orient}
-                label={`Compass ${i + 1} orientation`}
-                bare
-                writeNow
-              />
-            ) : r.id === 0 ? (
-              <span className="compass-prio__na">—</span>
-            ) : (
-              <span className="compass-prio__na" title="An internal compass turns with the board">
-                Follows the board
-              </span>
-            )}
-          </span>
-
-          <span className="compass-prio__moves">
-            <button
-              type="button"
-              className="compass-prio__move"
-              disabled={i === 0 || r.id === 0}
-              title="Use this compass sooner"
-              aria-label={`Move compass ${i + 1} up`}
-              onClick={() => swap(i, i - 1)}
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path fill="currentColor" d={mdiArrowUp} />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="compass-prio__move"
-              disabled={i >= filled - 1 || r.id === 0}
-              title="Use this compass later"
-              aria-label={`Move compass ${i + 1} down`}
-              onClick={() => swap(i, i + 1)}
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path fill="currentColor" d={mdiArrowDown} />
-              </svg>
-            </button>
-          </span>
+        <div className="app-table__row compass-prio__row app-table__head">
+          <span />
+          <span>Compass</span>
+          <span>Use</span>
+          <span>Orientation</span>
+          <span>Priority</span>
         </div>
-      ))}
+        {rows.map((r, i) => (
+          <div className="app-table__row compass-prio__row" key={r.prio}>
+            <span className="compass-prio__n">{i + 1}</span>
+            <span className="compass-prio__device">
+              {r.id === 0 ? (
+                <span className="compass-prio__empty">Empty</span>
+              ) : (
+                <>
+                  <span className="compass-prio__part">
+                    {(r.device && describeDevice(r.device)) || `Device ${r.id}`}
+                  </span>
+                  {r.external && <span className="compass-prio__tag">external</span>}
+                  {r.missing && <span className="compass-prio__missing">not detected</span>}
+                </>
+              )}
+            </span>
+
+            {/* Priority-indexed: this switch belongs to the row. */}
+            <span className="compass-prio__cell">
+              {entries.has(r.use) && r.id !== 0 ? (
+                <ParamField param={r.use} label={`Use compass ${i + 1} for yaw`} bare writeNow />
+              ) : (
+                <span className="compass-prio__na">—</span>
+              )}
+            </span>
+
+            {/* State-indexed: this one belongs to the device, found by id. */}
+            <span className="compass-prio__cell">
+              {r.state && entries.has(r.state.orient) && r.external ? (
+                <ParamField
+                  param={r.state.orient}
+                  label={`Compass ${i + 1} orientation`}
+                  bare
+                  writeNow
+                />
+              ) : r.id === 0 ? (
+                <span className="compass-prio__na">—</span>
+              ) : (
+                <span className="compass-prio__na" title="An internal compass turns with the board">
+                  Follows the board
+                </span>
+              )}
+            </span>
+
+            <span className="compass-prio__moves">
+              <button
+                type="button"
+                className="compass-prio__move"
+                disabled={i === 0 || r.id === 0}
+                title="Use this compass sooner"
+                aria-label={`Move compass ${i + 1} up`}
+                onClick={() => swap(i, i - 1)}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" d={mdiArrowUp} />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="compass-prio__move"
+                disabled={i >= filled - 1 || r.id === 0}
+                title="Use this compass later"
+                aria-label={`Move compass ${i + 1} down`}
+                onClick={() => swap(i, i + 1)}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" d={mdiArrowDown} />
+                </svg>
+              </button>
+            </span>
+          </div>
+        ))}
       </div>
     </section>
   )

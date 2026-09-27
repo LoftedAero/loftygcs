@@ -73,7 +73,14 @@ function Servo({ s }: { s: number }) {
   const h = s * 1.2
   return (
     <g className="frame-diagram__servo">
-      <rect className="frame-diagram__servo-body" x={-w / 2} y={-h / 2} width={w} height={h} rx={2} />
+      <rect
+        className="frame-diagram__servo-body"
+        x={-w / 2}
+        y={-h / 2}
+        width={w}
+        height={h}
+        rx={2}
+      />
       <rect
         className="frame-diagram__servo-lug"
         x={w * 0.1}
@@ -104,8 +111,7 @@ export default function FrameDiagram({
    */
   labels?: 'motor' | 'test'
 }) {
-  const label = (m: FrameMotor) =>
-    labels === 'test' ? String.fromCharCode(64 + m.test) : m.n
+  const label = (m: FrameMotor) => (labels === 'test' ? String.fromCharCode(64 + m.test) : m.n)
   const ranks = coaxialRank(motors)
   const points = motors.map((m, i) => place(m, ranks[i]!))
   const { motor, arc, span } = sizeFor(points)

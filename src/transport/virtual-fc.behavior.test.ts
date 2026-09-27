@@ -48,9 +48,7 @@ describe('the demo vehicle enforces the rules SITL enforces', () => {
   }
 
   const said = () =>
-    events
-      .filter((e) => e.t === 'statustext')
-      .map((e) => (e.t === 'statustext' ? e.text : ''))
+    events.filter((e) => e.t === 'statustext').map((e) => (e.t === 'statustext' ? e.text : ''))
 
   /** Skip past the simulated EKF settling. */
   const settle = () => vi.advanceTimersByTimeAsync(4500)

@@ -54,7 +54,13 @@ describe('usbIds', () => {
       'USB 1209:5741',
     )
     expect(
-      usbIds({ portId: 'p', portName: 'COM7', vendorId: '4617', productId: '22337', serialNumber: 'ABC123' }),
+      usbIds({
+        portId: 'p',
+        portName: 'COM7',
+        vendorId: '4617',
+        productId: '22337',
+        serialNumber: 'ABC123',
+      }),
     ).toBe('USB 1209:5741 · SN ABC123')
   })
 

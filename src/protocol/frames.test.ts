@@ -32,7 +32,15 @@ describe('MAVLink framing', () => {
   it('round-trips floats and truncated payloads (ATTITUDE)', () => {
     const bytes = encodeFrame(
       'ATTITUDE',
-      { timeBootMs: 123456, roll: 0.25, pitch: -0.125, yaw: 3.0, rollspeed: 0, pitchspeed: 0, yawspeed: 0 },
+      {
+        timeBootMs: 123456,
+        roll: 0.25,
+        pitch: -0.125,
+        yaw: 3.0,
+        rollspeed: 0,
+        pitchspeed: 0,
+        yawspeed: 0,
+      },
       0,
       1,
       1,
@@ -82,7 +90,17 @@ describe('MAVLink framing', () => {
     const a = encodeFrame('HEARTBEAT', HEARTBEAT_FIELDS, 1, 1, 1)
     const b = encodeFrame(
       'GLOBAL_POSITION_INT',
-      { timeBootMs: 1, lat: -353632620, lon: 1491652370, alt: 584000, relativeAlt: 0, vx: 0, vy: 0, vz: 0, hdg: 9000 },
+      {
+        timeBootMs: 1,
+        lat: -353632620,
+        lon: 1491652370,
+        alt: 584000,
+        relativeAlt: 0,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        hdg: 9000,
+      },
       2,
       1,
       1,

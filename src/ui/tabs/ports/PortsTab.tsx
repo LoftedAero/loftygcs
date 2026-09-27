@@ -13,9 +13,7 @@ export default function PortsTab() {
   const ready = useParamStore((s) => s.loadState === 'ready')
 
   if (!ready) {
-    return (
-      <NeedsVehicle title="Ports" />
-    )
+    return <NeedsVehicle title="Ports" />
   }
 
   const ports: number[] = []
@@ -24,9 +22,7 @@ export default function PortsTab() {
   }
 
   if (ports.length === 0) {
-    return (
-      <LaCard title="Serial ports" note="This vehicle reports no serial port parameters." />
-    )
+    return <LaCard title="Serial ports" note="This vehicle reports no serial port parameters." />
   }
 
   return (

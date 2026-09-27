@@ -87,9 +87,7 @@ describe('download', () => {
     client.handleMessage('MISSION_ITEM_INT', wire(item(0)))
     // Item 1 never comes.
     await expect(done).rejects.toThrow(/no item 1 of 2/)
-    const requests = sent.filter(
-      (s) => s.msgName === 'MISSION_REQUEST_INT' && s.fields.seq === 1,
-    )
+    const requests = sent.filter((s) => s.msgName === 'MISSION_REQUEST_INT' && s.fields.seq === 1)
     expect(requests.length).toBeGreaterThan(2)
   })
 
@@ -149,9 +147,9 @@ describe('upload', () => {
     client.handleMessage('MISSION_REQUEST_INT', { seq: 1, missionType: 0 })
     client.handleMessage('MISSION_ACK', { type: 0, missionType: 0 })
     await done
-    expect(
-      sent.filter((s) => s.msgName === 'MISSION_ITEM_INT' && s.fields.seq === 0),
-    ).toHaveLength(2)
+    expect(sent.filter((s) => s.msgName === 'MISSION_ITEM_INT' && s.fields.seq === 0)).toHaveLength(
+      2,
+    )
   })
 
   it('turns a rejecting ack into the reason by name', async () => {

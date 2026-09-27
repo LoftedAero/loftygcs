@@ -199,9 +199,22 @@ describe('what the firmware will actually accept', () => {
   })
 
   it('accepts everything the firmware accepts', () => {
-    for (const t of [FRAME_TYPE.PLUS, FRAME_TYPE.X, FRAME_TYPE.V, FRAME_TYPE.H, FRAME_TYPE.VTAIL,
-      FRAME_TYPE.ATAIL, FRAME_TYPE.PLUSREV, FRAME_TYPE.Y4, FRAME_TYPE.NYT_PLUS, FRAME_TYPE.NYT_X,
-      FRAME_TYPE.BF_X, FRAME_TYPE.BF_X_REV, FRAME_TYPE.DJI_X, FRAME_TYPE.CW_X]) {
+    for (const t of [
+      FRAME_TYPE.PLUS,
+      FRAME_TYPE.X,
+      FRAME_TYPE.V,
+      FRAME_TYPE.H,
+      FRAME_TYPE.VTAIL,
+      FRAME_TYPE.ATAIL,
+      FRAME_TYPE.PLUSREV,
+      FRAME_TYPE.Y4,
+      FRAME_TYPE.NYT_PLUS,
+      FRAME_TYPE.NYT_X,
+      FRAME_TYPE.BF_X,
+      FRAME_TYPE.BF_X_REV,
+      FRAME_TYPE.DJI_X,
+      FRAME_TYPE.CW_X,
+    ]) {
       expect(frameTypeSupported(FRAME_CLASS.QUAD, t)).toBe(true)
     }
     // Deca takes CW_X as well as plus and X; the firmware shares one body.

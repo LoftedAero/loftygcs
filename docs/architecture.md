@@ -16,15 +16,15 @@ Related documents:
 
 ## Source layout and layering
 
-| Directory | Role |
-| --- | --- |
-| `src/protocol` | MAVLink encode/decode, protocol clients (parameters, missions, MAVFTP, bootloaders), pure logic. Environment-agnostic. |
-| `src/transport` | Byte links: Web Serial, WebSocket, Electron-hosted TCP/UDP, and the virtual flight controller. |
-| `src/worker` | The protocol engine runs in a Web Worker; `worker-client` is the renderer's handle to it. |
-| `src/services` | Operations that combine protocol, transport and browser APIs (connection, flashing, tile cache, terrain, video). |
-| `src/stores` | Application state (Zustand stores). |
-| `src/ui` | React components: `shell/` for the app bar and dialogs, `tabs/` for screens. |
-| `electron/` | Main process, preload, SITL management, video receiver, serial/USB choosers. |
+| Directory       | Role                                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `src/protocol`  | MAVLink encode/decode, protocol clients (parameters, missions, MAVFTP, bootloaders), pure logic. Environment-agnostic. |
+| `src/transport` | Byte links: Web Serial, WebSocket, Electron-hosted TCP/UDP, and the virtual flight controller.                         |
+| `src/worker`    | The protocol engine runs in a Web Worker; `worker-client` is the renderer's handle to it.                              |
+| `src/services`  | Operations that combine protocol, transport and browser APIs (connection, flashing, tile cache, terrain, video).       |
+| `src/stores`    | Application state (Zustand stores).                                                                                    |
+| `src/ui`        | React components: `shell/` for the app bar and dialogs, `tabs/` for screens.                                           |
+| `electron/`     | Main process, preload, SITL management, video receiver, serial/USB choosers.                                           |
 
 The layering is enforced by ESLint (`import/no-restricted-paths` in `eslint.config.*`):
 
@@ -474,10 +474,10 @@ receiver, so a stuck override is a stuck stick, and the design assumes failure.
 
 Release and "no change" values differ by channel range (MAVLink spec, verified on SITL):
 
-| Channels | No change | Release |
-| --- | --- | --- |
-| 1-8 | 65535 | 0 |
-| 9-18 | 0 (or 65535) | 65534 |
+| Channels | No change    | Release |
+| -------- | ------------ | ------- |
+| 1-8      | 65535        | 0       |
+| 9-18     | 0 (or 65535) | 65534   |
 
 Frames are built per channel from `ignoreValue` and `releaseValue`, never from a literal. A
 zeros release leaves channels 9-16 held; `sitl.integration.test.ts` checks both halves on
@@ -772,8 +772,7 @@ parameter-stream fallback), and the full parameter set.
     client.
   - Every integration test connects through `src/test-fixtures/sitl-client.ts`, which retries
     through the runner's relaunch between files instead of failing on ECONNREFUSED.
-  - `SITL_PORT` points the tests at another simulator (for example one started with `-I1` on
-    5770) when 5760 is in use.
+  - `SITL_PORT` points the tests at another simulator (for example one started with `-I1` on 5770) when 5760 is in use.
   - `SITL_HOME=... SITL=1 npm test` asserts the vehicle reports being at that home.
   - Run both Copter and Plane. The suite adapts where the vehicles genuinely differ:
     `FRAME_CLASS` is Copter-only (`FORMAT_VERSION` is present on every vehicle); Copter's
@@ -800,22 +799,22 @@ parameter-stream fallback), and the full parameter set.
 
 ## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Browser development server |
-| `npm run dev:electron` | Desktop development |
-| `npm test` | Unit tests (Vitest) |
-| `npm run typecheck` | TypeScript, renderer and Electron |
-| `npm run lint` | ESLint, including the layering rules |
-| `npm run build:web` | Production web build |
-| `npm run build:electron` | Production Electron build |
-| `npm run dist` | Installers for the current platform only; CI builds all three |
-| `npm run package:web` | The web bundle zipped for a static host |
-| `npm run build:demo` | The single-file shareable demo |
-| `npm run icon` | Regenerate `build/icon.png` from `public/icons/icon.svg` |
-| `npm run cal-art` | Re-render the compass-calibration sprite sheet from the models |
-| `npm run sitl:fetch`, `npm run sitl` | Download and run SITL |
-| `npm run video:testsrc`, `npm run video:testsrc:udp` | GStreamer video test sources |
+| Command                                              | Purpose                                                        |
+| ---------------------------------------------------- | -------------------------------------------------------------- |
+| `npm run dev`                                        | Browser development server                                     |
+| `npm run dev:electron`                               | Desktop development                                            |
+| `npm test`                                           | Unit tests (Vitest)                                            |
+| `npm run typecheck`                                  | TypeScript, renderer and Electron                              |
+| `npm run lint`                                       | ESLint, including the layering rules                           |
+| `npm run build:web`                                  | Production web build                                           |
+| `npm run build:electron`                             | Production Electron build                                      |
+| `npm run dist`                                       | Installers for the current platform only; CI builds all three  |
+| `npm run package:web`                                | The web bundle zipped for a static host                        |
+| `npm run build:demo`                                 | The single-file shareable demo                                 |
+| `npm run icon`                                       | Regenerate `build/icon.png` from `public/icons/icon.svg`       |
+| `npm run cal-art`                                    | Re-render the compass-calibration sprite sheet from the models |
+| `npm run sitl:fetch`, `npm run sitl`                 | Download and run SITL                                          |
+| `npm run video:testsrc`, `npm run video:testsrc:udp` | GStreamer video test sources                                   |
 
 ## Releasing
 

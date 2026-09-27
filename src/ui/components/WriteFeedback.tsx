@@ -33,9 +33,7 @@ export default function WriteFeedback({
   const scoped = params !== undefined || prefixes !== undefined
   const mine =
     latest &&
-    (!scoped ||
-      params?.includes(latest.param) ||
-      prefixes?.some((p) => latest.param.startsWith(p)))
+    (!scoped || params?.includes(latest.param) || prefixes?.some((p) => latest.param.startsWith(p)))
       ? latest
       : null
   const [shown, setShown] = useState(mine)

@@ -151,17 +151,13 @@ function near(a: number, b: number): boolean {
 const EARTH_R = 6371008.8
 
 /** Great-circle distance in meters between two degrees*1e7 points. */
-export function distanceM(
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-): number {
+export function distanceM(a: { x: number; y: number }, b: { x: number; y: number }): number {
   const toRad = (v: number) => ((v / 1e7) * Math.PI) / 180
   const lat1 = toRad(a.x)
   const lat2 = toRad(b.x)
   const dLat = lat2 - lat1
   const dLon = toRad(b.y) - toRad(a.y)
-  const s =
-    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
   return 2 * EARTH_R * Math.asin(Math.min(1, Math.sqrt(s)))
 }
 
