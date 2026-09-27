@@ -5915,6 +5915,23 @@ button.app-status__state--bad:hover {
   --left-w: 100cqw;
   grid-template-columns: minmax(0, 1fr);
 }
+/* A short window: the panel is height-limited below even the column's
+   floor, so capping the column at the panel's width left the divider no
+   travel at all -- measured at 1280x720 and 1366x768, every position was
+   the same 440px. Here the column follows the drag instead, and the width
+   beyond the panel goes to the controls and the lower pane, with the panel
+   centered in it.
+   Keyed on the height rather than on "is the cap below the floor": the cap
+   depends on the controls' height, which depends on the column's width, so
+   that test switched itself back and forth as the column moved. The height
+   does not move with the divider. 740px is where the cap at the floor width
+   (controls wrapped to their tallest, 233px, plus the lower pane's minimum)
+   comes out at the floor. */
+@container (max-height: 740px) {
+  .flight-grid {
+    --cap-w: 100cqw;
+  }
+}
 /* No pinned panel: its row takes nothing, and nothing caps the column. */
 .flight-grid--no-aspect {
   --cap-w: 100cqw;

@@ -1062,7 +1062,10 @@ design decisions are recorded there and in code comments.
   HUD ran off the bottom of an ultrawide. The left column is held between 440px floors on both
   sides -- below that the controls spilled out of their box and the lower pane's tabs wrapped --
   and stops at the width where the capped panel fills it, since past that the splitter only drew
-  empty bands beside the HUD. The right-click menus place themselves by their measured size.
+  empty bands beside the HUD -- except on a short window (grid under 740px tall), where that
+  width is below the floor and the stop left the divider no travel at all, so there it follows
+  the drag. That switch keys on the height, not on the cap, because the cap moves with the
+  column's width and a test on it switched itself on and off as the column moved. The right-click menus place themselves by their measured size.
 - **The lower pane is where a second thing goes, not a new panel.** Messages, Status,
   Preflight, Camera and Joystick are tabs of one pane (`LOG_PANES` in
   `stores/flight-layout-store.ts`), because they are all the same thing: something you look at
