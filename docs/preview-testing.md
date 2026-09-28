@@ -178,7 +178,7 @@ UDP.
 
 ## Reporting issues
 
-Open an issue at <https://github.com/LoftedAero/loftgcs/issues>, or email
+Open an issue at <https://github.com/LoftedAero/loftygcs/issues>, or email
 info@loftedaero.com. On preview builds, the Send feedback button in the
 first-run notice starts an email with the build and platform filled in.
 

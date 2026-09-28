@@ -6,11 +6,11 @@
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LoftedAero/loftgcs.git"
+    "url": "git+https://github.com/LoftedAero/loftygcs.git"
   },
-  "homepage": "https://github.com/LoftedAero/loftgcs",
+  "homepage": "https://github.com/LoftedAero/loftygcs",
   "bugs": {
-    "url": "https://github.com/LoftedAero/loftgcs/issues"
+    "url": "https://github.com/LoftedAero/loftygcs/issues"
   },
   "keywords": [
     "ardupilot",

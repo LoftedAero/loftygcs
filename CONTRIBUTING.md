@@ -113,7 +113,7 @@ changing a subsystem.
 
 ## Reporting bugs
 
-Open an issue at <https://github.com/LoftedAero/loftgcs/issues>. Include:
+Open an issue at <https://github.com/LoftedAero/loftygcs/issues>. Include:
 
 - what you did, and what you expected to happen
 - the app version (shown in the bottom right of the window)

@@ -13,7 +13,7 @@ export const BRAND = {
   name: 'Lofty GCS',
   tagline: 'Ground control for ArduPilot',
   iconPath: `data:image/svg+xml,${encodeURIComponent(BADGE_SVG)}`,
-  repoUrl: 'https://github.com/LoftedAero/loftgcs',
+  repoUrl: 'https://github.com/LoftedAero/loftygcs',
   /** Marks the build as a preview in the window. Set to false for a release. */
   preview: true,
   /** Where feedback goes. An empty string hides the feedback button. */
