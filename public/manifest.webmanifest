@@ -1,6 +1,6 @@
 {
-  "name": "Loft GCS",
-  "short_name": "Loft GCS",
+  "name": "Lofty GCS",
+  "short_name": "Lofty GCS",
   "description": "A modern cross-platform ground control station for ArduPilot",
   "start_url": "./",
   "display": "standalone",

@@ -1,4 +1,4 @@
-# Loft GCS
+# Lofty GCS
 
 A cross-platform ground control station for [ArduPilot](https://ardupilot.org). It aims for the
 screen-by-screen setup of configurators like Betaflight and INAV together with the depth
@@ -96,7 +96,7 @@ subsystem and the ArduPilot behaviors the code depends on.
 
 ## Scope
 
-Loft GCS is an ArduPilot ground station. PX4 support, multi-vehicle control, telemetry log
+Lofty GCS is an ArduPilot ground station. PX4 support, multi-vehicle control, telemetry log
 (tlog) recording, RTK/NTRIP injection, voice announcements and antenna tracking are out of scope
 for now.
 

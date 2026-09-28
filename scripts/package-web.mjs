@@ -2,7 +2,7 @@
 //
 //   node scripts/package-web.mjs
 //
-// Produces dist/LoftGCS_<version>_web.zip, whose contents unzip straight
+// Produces dist/LoftyGCS_<version>_web.zip, whose contents unzip straight
 // into a bucket or a Pages site. The build uses base './', so it works from a
 // domain root or any subpath.
 //
@@ -21,7 +21,7 @@ import path from 'node:path'
 import { createDeflateRaw } from 'node:zlib'
 
 const version = JSON.parse(readFileSync('package.json', 'utf8')).version
-const out = path.resolve('dist', `LoftGCS_${version}_web.zip`)
+const out = path.resolve('dist', `LoftyGCS_${version}_web.zip`)
 
 console.log(`building the web bundle for v${version}…`)
 execFileSync(process.execPath, [path.join('node_modules', 'vite', 'bin', 'vite.js'), 'build'], {

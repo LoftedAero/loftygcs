@@ -1,4 +1,4 @@
-# Loft GCS: notes for AI coding agents
+# Lofty GCS: notes for AI coding agents
 
 Cross-platform ArduPilot ground station: one React + TypeScript + Vite renderer shared by a
 browser PWA and an Electron desktop app. GPL-3.0.

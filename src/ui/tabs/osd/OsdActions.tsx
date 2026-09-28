@@ -3,6 +3,7 @@ import { LaButton, LaHint, LaModal } from '../../components/La'
 import VehicleParamActions from '../../components/VehicleParamActions'
 import ParamField from '../../components/ParamField'
 import type { ParamFieldSpec } from '../../components/ParamCard'
+import { BRAND } from '../../../brand'
 import { useParamStore } from '../../../stores/param-store'
 import { parseParamFile, sameValue } from '../../../protocol/param-file'
 
@@ -94,7 +95,7 @@ function SaveLayout() {
       return
     }
     const body = names.map((n) => `${n},${entries.get(n)?.value ?? 0}`).join('\n')
-    const text = `# Loft GCS OSD layout — ${names.length} parameters\n${body}\n`
+    const text = `# ${BRAND.name} OSD layout — ${names.length} parameters\n${body}\n`
     const blob = new Blob([text], { type: 'text/plain' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)

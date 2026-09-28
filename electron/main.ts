@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, net, shell, session } from 'electron'
+import { existsSync, readdirSync, renameSync, rmdirSync } from 'node:fs'
 import path from 'node:path'
 import { withDriverNames } from './serial-names'
 import { pickBootloaderPort } from './serial-autopick'
@@ -9,6 +10,26 @@ import { registerVideoHandlers, stopVideo } from './video'
 // The renderer is the same build the browser gets. Electron adds the window,
 // the privileged link sockets (ipc-links.ts) and the Web Serial permission
 // plumbing, all reached through preload.ts with contextIsolation and sandbox on.
+
+// Electron names the data folder after the product, and the early previews were
+// called Loft GCS. Moving the old folder once keeps settings, saved
+// simulators and the SITL download. Electron creates the new folder, empty,
+// before this runs, so an empty one counts as not there yet.
+function adoptPreRenameData(): void {
+  const current = app.getPath('userData')
+  const old = path.join(app.getPath('appData'), 'Loft GCS')
+  if (!existsSync(old)) return
+  try {
+    if (existsSync(current)) {
+      if (readdirSync(current).length > 0) return
+      rmdirSync(current)
+    }
+    renameSync(old, current)
+  } catch {
+    // Locked by a running copy of the old app, or on another volume: start fresh.
+  }
+}
+adoptPreRenameData()
 
 let mainWindow: BrowserWindow | null = null
 

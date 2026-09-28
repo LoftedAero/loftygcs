@@ -1,8 +1,8 @@
 {
-  "name": "loftgcs",
+  "name": "lofty-gcs",
   "version": "0.8.0",
   "author": "Lofted Aero <info@loftedaero.com>",
-  "description": "Loft GCS — a modern cross-platform ground control station for ArduPilot",
+  "description": "Lofty GCS — a modern cross-platform ground control station for ArduPilot",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
   "main": "dist-electron/main.cjs",
   "type": "module",
   "//desktopName": "Top level, not under build.linux: electron-builder reads it from here for the .desktop file's StartupWMClass.",
-  "desktopName": "loft-gcs.desktop",
+  "desktopName": "lofty-gcs.desktop",
   "scripts": {
     "dev": "vite",
     "dev:electron": "node scripts/dev-electron.mjs",
@@ -84,8 +84,8 @@
     "vitest": "^3.0.0"
   },
   "build": {
-    "appId": "com.loftgcs.app",
-    "productName": "Loft GCS",
+    "appId": "com.loftedaero.gcs",
+    "productName": "Lofty GCS",
     "files": [
       "dist-electron/**/*",
       "dist-web/**/*",
@@ -101,9 +101,9 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "menuCategory": "Loft GCS",
-      "uninstallDisplayName": "Loft GCS",
-      "artifactName": "LoftGCS_${version}_windows_setup.${ext}"
+      "menuCategory": "Lofty GCS",
+      "uninstallDisplayName": "Lofty GCS",
+      "artifactName": "LoftyGCS_${version}_windows_setup.${ext}"
     },
     "mac": {
       "identity": "-",
@@ -118,7 +118,7 @@
           ]
         }
       ],
-      "artifactName": "LoftGCS_${version}_mac_${arch}.${ext}"
+      "artifactName": "LoftyGCS_${version}_mac_${arch}.${ext}"
     },
     "linux": {
       "target": [
@@ -126,8 +126,8 @@
         "deb"
       ],
       "category": "Utility",
-      "artifactName": "LoftGCS_${version}_linux_${arch}.${ext}",
-      "executableName": "loft-gcs",
+      "artifactName": "LoftyGCS_${version}_linux_${arch}.${ext}",
+      "executableName": "lofty-gcs",
       "synopsis": "Ground control station for ArduPilot",
       "syncDesktopName": true
     },

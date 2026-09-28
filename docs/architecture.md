@@ -1,6 +1,6 @@
-# Loft GCS architecture
+# Lofty GCS architecture
 
-Loft GCS is a cross-platform ArduPilot ground station. One React + TypeScript + Vite
+Lofty GCS is a cross-platform ArduPilot ground station. One React + TypeScript + Vite
 renderer is shared by a browser PWA and an Electron desktop app. This document records how
 the code is organized and the rules and traps that keep it working. Each rule is stated with
 its reason so it can be argued with; code comments carry the detail for a single file.
@@ -41,8 +41,10 @@ High-rate telemetry never goes through React state. The worker's batches are wri
 preallocated ring buffers (`services/telemetry-ring.ts`) and read imperatively on
 `requestAnimationFrame` by the HUD and the map.
 
-Product identity (name, preview flag) lives only in `src/brand.ts`. "Loft GCS" is a working
-name.
+Product identity (name, preview flag) lives only in `src/brand.ts`. The desktop app id,
+`com.loftedaero.gcs` in package.json, must never change once a build has shipped: installers
+and the OS key their records on it. Electron names the data folder after the product, and
+`main.ts` moves a folder left by the old name (Loft GCS) into place on first launch.
 
 ## Electron shell
 

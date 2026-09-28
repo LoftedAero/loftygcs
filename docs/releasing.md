@@ -24,7 +24,7 @@ for every platform from one machine.
 ## 2. The web app
 
 ```sh
-npm run package:web        # -> dist/LoftGCS_<version>_web.zip
+npm run package:web        # -> dist/LoftyGCS_<version>_web.zip
 ```
 
 Unzip it onto a static host. The host must meet two requirements:
@@ -59,7 +59,7 @@ only thing that distinguishes one build from another. Bump it before every
 run, or two downloads will claim to be the same build. Tag the commit
 afterwards if you want the history; tagging does not trigger anything.
 
-Files are named `LoftGCS_<version>_<platform>...`, so they stay
+Files are named `LoftyGCS_<version>_<platform>...`, so they stay
 distinguishable side by side.
 
 ### Building one platform locally

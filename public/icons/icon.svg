@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- Placeholder Loft GCS badge: blue ring, orange climb arrow. Same visual
-       grammar as the Lofted Aero badge (round, white field, orange+blue) but
-       its own mark. Replace with real art before release. -->
-  <circle cx="32" cy="32" r="29" fill="#FFFFFF" stroke="#4684C5" stroke-width="4"/>
-  <path d="M32 14 L46 42 L32 35 L18 42 Z" fill="#F7941D"/>
-  <rect x="20" y="46" width="24" height="4" rx="2" fill="#2D2D2F"/>
+  <!-- Lofty GCS: an attitude indicator (sky, banked ground, bezel) with the
+       slanted L in place of the aircraft symbol. The in-app badge in
+       src/brand.ts is the same mark with a white bezel for the dark app bar. -->
+  <circle cx="32" cy="32" r="26" fill="#4684C5"/>
+  <path d="M6.79 38.36 L57.61 27.55 A26 26 0 0 1 6.79 38.36 Z" fill="#2D2D2F"/>
+  <polygon points="27,14 35.5,14 30.9,36.5 44.5,36.5 43,44 21,44" fill="#F7941D"/>
+  <circle cx="32" cy="32" r="28.25" fill="none" stroke="#2D2D2F" stroke-width="5.5"/>
 </svg>

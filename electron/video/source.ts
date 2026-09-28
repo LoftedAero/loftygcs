@@ -249,7 +249,7 @@ class RtspSource extends BaseSource {
         const auth = this.challenge ? authorization(this.challenge, method, uri, user, pass) : null
         if (auth) lines.push(`Authorization: ${auth}`)
         for (const [k, v] of Object.entries(headers)) lines.push(`${k}: ${v}`)
-        lines.push('User-Agent: LoftGCS', '', '')
+        lines.push('User-Agent: LoftyGCS', '', '')
         this.pending = (r) => (r ? resolve(r) : reject(new Error('Unreadable RTSP response')))
         socket.write(lines.join('\r\n'))
       })

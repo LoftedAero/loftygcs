@@ -6,6 +6,8 @@
 // Read permissively, write strictly: files come from many tools that bend
 // the spec, but output should open cleanly in Google Earth.
 
+import { BRAND } from '../brand'
+
 export interface GeoFix {
   lat: number
   lon: number
@@ -350,7 +352,7 @@ export function pointsToGpx(name: string, points: readonly ExportPoint[]): strin
     )
     .join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Loft GCS" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="${BRAND.name}" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata><name>${escapeXml(name)}</name></metadata>
 ${body}
 </gpx>
@@ -368,7 +370,7 @@ export function routeToGpx(route: ExportRoute): string {
     )
     .join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Loft GCS" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="${BRAND.name}" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata><name>${escapeXml(route.name)}</name></metadata>
   <rte>
     <name>${escapeXml(route.name)}</name>

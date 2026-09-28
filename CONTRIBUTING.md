@@ -1,6 +1,6 @@
-# Contributing to Loft GCS
+# Contributing to Lofty GCS
 
-Thanks for your interest in Loft GCS. Bug reports, fixes and new features are
+Thanks for your interest in Lofty GCS. Bug reports, fixes and new features are
 welcome. For anything larger than a small fix, please open an issue first so
 the approach can be discussed before you start.
 
@@ -126,7 +126,7 @@ a public issue.
 
 ## License
 
-Loft GCS is licensed under the GNU General Public License v3.0 only (see
+Lofty GCS is licensed under the GNU General Public License v3.0 only (see
 [LICENSE](LICENSE)). By contributing, you agree that your contributions are
 licensed under the same terms. Code ported from other GPL projects keeps its
 attribution in the file header.

@@ -1,9 +1,9 @@
-# Installing and testing Loft GCS
+# Installing and testing Lofty GCS
 
-This guide covers installing a Loft GCS build, getting past the warnings an
+This guide covers installing a Lofty GCS build, getting past the warnings an
 unsigned build triggers, and reporting what you find.
 
-Loft GCS can arm motors, change flight modes, write parameters and flash
+Lofty GCS can arm motors, change flight modes, write parameters and flash
 firmware. Preview builds are early builds shared for feedback, and have yet to
 be fully validated in the real world:
 
@@ -64,7 +64,7 @@ it. The steps below get past it on each platform.
 
 ### Windows
 
-1. Run `LoftGCS_<version>_windows_setup.exe`.
+1. Run `LoftyGCS_<version>_windows_setup.exe`.
 2. When "Windows protected your PC" appears, click More info, then Run anyway.
 
 The installer runs for the current user only. It needs no administrator
@@ -72,7 +72,7 @@ rights and writes nothing outside your profile.
 
 ### macOS
 
-1. Open the `.dmg` and drag Loft GCS to Applications. Use the `arm64` file for
+1. Open the `.dmg` and drag Lofty GCS to Applications. Use the `arm64` file for
    Apple Silicon (M1 and later) and the `x64` file for Intel Macs.
 2. The first launch reports that the app "is damaged and can't be opened".
    This is how macOS describes an app that is not notarized; the app is not
@@ -83,7 +83,7 @@ rights and writes nothing outside your profile.
 Alternatively, from a terminal:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/Loft GCS.app"
+xattr -dr com.apple.quarantine "/Applications/Lofty GCS.app"
 ```
 
 ### Linux
@@ -91,18 +91,18 @@ xattr -dr com.apple.quarantine "/Applications/Loft GCS.app"
 Two packages are provided. On Debian and Ubuntu, use the `.deb`:
 
 ```sh
-sudo apt install ./LoftGCS_<version>_linux_amd64.deb
-loft-gcs
+sudo apt install ./LoftyGCS_<version>_linux_amd64.deb
+lofty-gcs
 ```
 
-It installs to `/opt`, puts `loft-gcs` on your `PATH`, and adds an application
+It installs to `/opt`, puts `lofty-gcs` on your `PATH`, and adds an application
 menu entry.
 
 On other distributions (Fedora, Arch, openSUSE), use the AppImage:
 
 ```sh
-chmod +x LoftGCS_<version>_linux_x86_64.AppImage
-./LoftGCS_<version>_linux_x86_64.AppImage
+chmod +x LoftyGCS_<version>_linux_x86_64.AppImage
+./LoftyGCS_<version>_linux_x86_64.AppImage
 ```
 
 Two AppImage problems the `.deb` avoids:

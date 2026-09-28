@@ -65,5 +65,5 @@ The pipeline is in the commit that added it; the source CAD is not in this repo.
 ## quad_x.gltf — GPL-3.0
 
 Ships in betaflight-configurator with no separate model license, so it falls under that
-project's GPL-3.0. Loft GCS is GPL-3.0 too, which is why this is usable here; a
+project's GPL-3.0. Lofty GCS is GPL-3.0 too, which is why this is usable here; a
 permissively-licensed fork of this app could not keep it.
