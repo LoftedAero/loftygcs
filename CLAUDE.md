@@ -78,6 +78,7 @@ These must all pass before work is done; CI runs them on push:
 npm test
 npm run typecheck
 npm run lint
+npm run format:check
 ```
 
 Other checks, when the change touches their area:

@@ -763,7 +763,8 @@ parameter-stream fallback), and the full parameter set.
 
 ## Testing
 
-- `npm test`, `npm run typecheck` and `npm run lint` must all pass; CI runs them on push.
+- `npm test`, `npm run typecheck`, `npm run lint` and `npm run format:check` must all pass; CI
+  runs them on push.
 - `NET=1 npm test` also runs live checks against ardupilot.org (parameter metadata paths). It
   is the only thing that catches a server path change.
 - `SITL=1 npm test` runs the integration suite (`src/protocol/*.integration.test.ts`,

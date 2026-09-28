@@ -57,7 +57,7 @@ npm run package:web    # the web build, zipped for a static host
 npm run build:demo     # a single-file demo build
 ```
 
-All three checks (`test`, `typecheck`, `lint`) run in CI and must pass.
+These checks (`test`, `typecheck`, `lint`, `format:check`) run in CI and must pass.
 
 Protocol features are tested against ArduPilot SITL, not only the demo vehicle:
 

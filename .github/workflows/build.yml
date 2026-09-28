@@ -1,6 +1,6 @@
 # Two jobs with different economics:
 #
-#  - check: lint + typecheck + unit tests, Linux only, on every push. Cheap
+#  - check: lint + format check + typecheck + unit tests, Linux only, on every push. Cheap
 #    enough to always run, and it is what keeps the protocol layer honest.
 #
 #  - build: the three-platform installer matrix, by hand ONLY. macOS bills at
@@ -28,6 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run format:check
       - run: npm run typecheck
       - run: npm test
 

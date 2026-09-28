@@ -19,13 +19,14 @@ a simulated vehicle.
 
 ## Checks
 
-These three must pass before a pull request is merged, and CI runs them on
+These must pass before a pull request is merged, and CI runs them on
 every push:
 
 ```sh
 npm test
 npm run typecheck
 npm run lint
+npm run format:check
 ```
 
 `NET=1 npm test` also runs live checks against ardupilot.org, such as the
