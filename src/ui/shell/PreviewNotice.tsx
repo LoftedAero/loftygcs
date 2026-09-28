@@ -6,8 +6,7 @@ import { LaButton, LaModal } from '../components/La'
 // What a preview build says on first run.
 //
 // The app arms motors, changes modes, writes parameters and flashes firmware,
-// and a preview has not been validated against real hardware, so testers are
-// told once per version.
+// and a preview is not fully validated, so testers are told once per version.
 
 const STORAGE_KEY = 'loftgcs.previewAcknowledged'
 
@@ -80,27 +79,21 @@ export default function PreviewNotice() {
       }
     >
       <p className="preview-notice__lead">
-        This is an unfinished build shared for feedback. Everything in it is worth trying, but
-        nothing in it has been verified against a real aircraft.
+        This is an early build shared for feedback. Everything in it is worth trying, but has yet to
+        be fully validated in the real world.
       </p>
 
       <ul className="preview-notice__list">
         <li>
-          <strong>Do not fly an aircraft you care about on this.</strong> Arming, mode changes and
-          mission upload have been tested against ArduPilot SITL, not against hardware in the air.
+          Use caution when operating a vehicle. Maintain the ability to disconnect and take manual
+          control.
         </li>
         <li>
-          <strong>Firmware flashing has never been run on a real board.</strong> Use a board you are
-          willing to recover with a bootloader, or leave that tab alone.
+          If flashing firmware, use a board you are willing to recover with a bootloader if
+          necessary.
         </li>
-        <li>
-          Parameters are written to the vehicle for real, and take effect immediately. Keep a saved
-          copy of any configuration you rely on.
-        </li>
-        <li>
-          Missions, calibrations and the flight screen are the parts most worth your feedback — they
-          are complete enough to judge.
-        </li>
+        <li>Keep saved backups of any parameter configurations you rely on.</li>
+        <li>Please note any issues that appear or feedback that comes to mind!</li>
       </ul>
 
       {/* The address as text too, for machines with no mail client. */}

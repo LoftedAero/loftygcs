@@ -4,10 +4,14 @@ This guide covers installing a Loft GCS build, getting past the warnings an
 unsigned build triggers, and reporting what you find.
 
 Loft GCS can arm motors, change flight modes, write parameters and flash
-firmware. Preview builds have been tested against ArduPilot's simulator and on
-the bench, not in flight. Do not fly an aircraft you care about on a preview
-build, and do not flash a board you cannot recover through its bootloader or
-DFU.
+firmware. Preview builds are early builds shared for feedback, and have yet to
+be fully validated in the real world:
+
+- Use caution when operating a vehicle. Maintain the ability to disconnect and
+  take manual control.
+- If flashing firmware, use a board you are willing to recover with a
+  bootloader if necessary.
+- Keep saved backups of any parameter configurations you rely on.
 
 ## Builds and channels
 
