@@ -17,7 +17,8 @@ be fully validated in the real world:
 
 Builds come in two forms:
 
-- The web app, which runs in the browser with nothing to install.
+- The web app at <https://gcs.loftedaero.com>, which runs in the browser with
+  nothing to install.
 - Desktop installers for Windows, macOS and Linux.
 
 Preview builds are marked with an amber Preview chip next to the version
@@ -48,9 +49,9 @@ only WebSocket connections work there.
 
 ## The browser version
 
-Open the web app's address. To connect a board, plug it in, choose USB serial
-in the connection menu, press Connect, and pick the port from the browser's
-chooser.
+Open <https://gcs.loftedaero.com>. To connect a board, plug it in, choose USB
+serial in the connection menu, press Connect, and pick the port from the
+browser's chooser.
 
 If no port is listed, the board is either unpowered or held by another
 program. Mission Planner and QGroundControl keep the port open while they are

@@ -7,8 +7,9 @@ and log review.
 
 One TypeScript and React codebase runs two ways:
 
-- **In the browser** (Chrome, Edge, Firefox 151+): nothing to install. Connects to a flight
-  controller over USB with the Web Serial API, or to a WebSocket bridge.
+- **In the browser** at [gcs.loftedaero.com](https://gcs.loftedaero.com) (Chrome, Edge, Firefox
+  151+): nothing to install. Connects to a flight controller over USB with the Web Serial API,
+  or to a WebSocket bridge.
 - **As a desktop app** (Windows, macOS, Linux, built with Electron): the same interface, plus
   TCP and UDP links for SITL, telemetry radios and Wi-Fi bridges, HUD video, and a managed
   ArduPilot SITL.
