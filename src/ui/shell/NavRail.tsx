@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { LaSelect } from '../components/La'
 import { holdsVehicleTabs, useUiStore, visibleTabs } from '../../stores/ui-store'
 import { useConnectionStore } from '../../stores/connection-store'
 
@@ -34,5 +35,37 @@ export default function NavRail() {
         </Fragment>
       ))}
     </nav>
+  )
+}
+
+/**
+ * The rail as a dropdown, for compact mode, which has no room for a column.
+ * Same tabs, same groups.
+ */
+export function SetupTabSelect() {
+  const activeTab = useUiStore((s) => s.activeTab)
+  const setTab = useUiStore((s) => s.setTab)
+  const connected = useConnectionStore((s) => holdsVehicleTabs(s.phase))
+  const tabs = visibleTabs(connected)
+  const groups = [...new Set(tabs.map((t) => t.group))]
+  return (
+    <LaSelect
+      className="app-tab-select"
+      aria-label="Setup section"
+      value={activeTab}
+      onChange={(e) => setTab(e.target.value as typeof activeTab)}
+    >
+      {groups.map((g) => (
+        <optgroup key={g} label={g}>
+          {tabs
+            .filter((t) => t.group === g)
+            .map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+        </optgroup>
+      ))}
+    </LaSelect>
   )
 }

@@ -18,6 +18,7 @@ import AltitudeProfile from './AltitudeProfile'
 import Divider from '../../components/Divider'
 import { LaButton, LaModal, LaSwitch } from '../../components/La'
 import { useMissionStore } from '../../../stores/mission-store'
+import { useCompact } from '../../compact'
 
 // Mission planning: Mission Planner's shape with QGroundControl's ideas
 // where they are better.
@@ -54,6 +55,130 @@ export default function MissionTab() {
   const setSplit = useMissionStore((s) => s.setSplit)
 
   const profileVisible = showProfile && items > 0
+  const compact = useCompact()
+  // Compact mode: which drawer is open over the map.
+  const [drawer, setDrawer] = useState<'items' | 'plan' | null>(null)
+
+  const mapArea = (
+    <div className="mission-map-area">
+      {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
+      {/* The same strip for the fence tools. */}
+      {editing === 'fence' && <FencePalette />}
+      <MissionMap
+        tool={tool}
+        onPlaced={() => setTool(null)}
+        onFirstItem={setFirstAt}
+        onView={setView}
+        coverage={coverage}
+      />
+    </div>
+  )
+
+  const lower = (
+    <div className="mission-lower">
+      <div className="mission-lower__head">
+        <h3 className="mission-lower__title">
+          Items {items > 0 && <span className="mission-lower__count">{items}</span>}
+        </h3>
+        {/* Beside the rows they apply to. Shown on every plan; the
+            altitude also applies to new rally points. */}
+        <NewItemDefaults />
+        <span className="la-grow" />
+        {items > 0 && <TerrainWarning />}
+        <span className="la-grow" />
+        {items > 0 && (
+          <LaSwitch
+            label="Show altitude profile"
+            checked={showProfile}
+            onChange={(e) => setShowProfile(e.target.checked)}
+          />
+        )}
+      </div>
+      {profileVisible && <AltitudeProfile />}
+      <MissionTable />
+    </div>
+  )
+
+  const side = (
+    <aside className="app-col-shell mission-side">
+      {/* Everything that belongs to a plan scrolls. */}
+      <div className="app-col mission-side__scroll">
+        <PlanKindSwitch />
+        {/* Read, write and clear, shared by all three plans. */}
+        <PlanActions />
+        {/* Files apply to whichever plan is selected. */}
+        <GeoExchange />
+        {editing === 'mission' && (
+          <>
+            <SurveyPanel />
+            <MissionSettings />
+          </>
+        )}
+        {/* Lists come last because they are the only sections that grow. */}
+        {editing === 'fence' && <FencePanel />}
+        {editing === 'rally' && <RallyPanel />}
+      </div>
+
+      {/* Pinned to the foot: offline maps are not about the plan, so they
+          stay put when the plan switch changes the column above. */}
+      <div className="mission-side__foot">
+        <OfflineMapsPanel
+          bounds={view?.bounds ?? null}
+          zoom={view?.zoom ?? 15}
+          coverage={coverage}
+          onCoverage={setCoverage}
+        />
+      </div>
+    </aside>
+  )
+
+  const firstPrompt = (
+    <FirstItemPrompt
+      at={firstAt}
+      onClose={() => setFirstAt(null)}
+      onWaypoint={(at) => {
+        addItem(16, at)
+        setFirstAt(null)
+      }}
+      onTakeoff={(at) => {
+        // Takeoff first, then a waypoint at the point that was clicked.
+        addItem(22)
+        addItem(16, at)
+        setFirstAt(null)
+      }}
+    />
+  )
+
+  // Compact mode: the map fills the window, and the item list and the plan
+  // column open as drawers over its right side.
+  if (compact) {
+    const toggle = (d: 'items' | 'plan') => setDrawer((cur) => (cur === d ? null : d))
+    return (
+      <div className="mission-screen mission-compact">
+        {mapArea}
+        <div className="mission-compact__toggles">
+          <LaButton
+            variant={drawer === 'items' ? 'secondary' : 'ghost'}
+            onClick={() => toggle('items')}
+          >
+            {items > 0 ? `Items · ${items}` : 'Items'}
+          </LaButton>
+          <LaButton
+            variant={drawer === 'plan' ? 'secondary' : 'ghost'}
+            onClick={() => toggle('plan')}
+          >
+            Plan
+          </LaButton>
+        </div>
+        {drawer && (
+          <div className={`mission-compact__drawer mission-compact__drawer--${drawer}`}>
+            {drawer === 'items' ? lower : side}
+          </div>
+        )}
+        {firstPrompt}
+      </div>
+    )
+  }
 
   return (
     <div className="mission-screen">
@@ -68,18 +193,7 @@ export default function MissionTab() {
             } as React.CSSProperties
           }
         >
-          <div className="mission-map-area">
-            {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
-            {/* The same strip for the fence tools. */}
-            {editing === 'fence' && <FencePalette />}
-            <MissionMap
-              tool={tool}
-              onPlaced={() => setTool(null)}
-              onFirstItem={setFirstAt}
-              onView={setView}
-              coverage={coverage}
-            />
-          </div>
+          {mapArea}
 
           {/* No divider on an empty plan, so no split is stored against an
               empty table. */}
@@ -92,76 +206,13 @@ export default function MissionTab() {
             />
           )}
 
-          <div className="mission-lower">
-            <div className="mission-lower__head">
-              <h3 className="mission-lower__title">
-                Items {items > 0 && <span className="mission-lower__count">{items}</span>}
-              </h3>
-              {/* Beside the rows they apply to. Shown on every plan; the
-                  altitude also applies to new rally points. */}
-              <NewItemDefaults />
-              <span className="la-grow" />
-              {items > 0 && <TerrainWarning />}
-              <span className="la-grow" />
-              {items > 0 && (
-                <LaSwitch
-                  label="Show altitude profile"
-                  checked={showProfile}
-                  onChange={(e) => setShowProfile(e.target.checked)}
-                />
-              )}
-            </div>
-            {profileVisible && <AltitudeProfile />}
-            <MissionTable />
-          </div>
+          {lower}
         </div>
 
-        <aside className="app-col-shell mission-side">
-          {/* Everything that belongs to a plan scrolls. */}
-          <div className="app-col mission-side__scroll">
-            <PlanKindSwitch />
-            {/* Read, write and clear, shared by all three plans. */}
-            <PlanActions />
-            {/* Files apply to whichever plan is selected. */}
-            <GeoExchange />
-            {editing === 'mission' && (
-              <>
-                <SurveyPanel />
-                <MissionSettings />
-              </>
-            )}
-            {/* Lists come last because they are the only sections that grow. */}
-            {editing === 'fence' && <FencePanel />}
-            {editing === 'rally' && <RallyPanel />}
-          </div>
-
-          {/* Pinned to the foot: offline maps are not about the plan, so they
-              stay put when the plan switch changes the column above. */}
-          <div className="mission-side__foot">
-            <OfflineMapsPanel
-              bounds={view?.bounds ?? null}
-              zoom={view?.zoom ?? 15}
-              coverage={coverage}
-              onCoverage={setCoverage}
-            />
-          </div>
-        </aside>
+        {side}
       </div>
 
-      <FirstItemPrompt
-        at={firstAt}
-        onClose={() => setFirstAt(null)}
-        onWaypoint={(at) => {
-          addItem(16, at)
-          setFirstAt(null)
-        }}
-        onTakeoff={(at) => {
-          // Takeoff first, then a waypoint at the point that was clicked.
-          addItem(22)
-          addItem(16, at)
-          setFirstAt(null)
-        }}
-      />
+      {firstPrompt}
     </div>
   )
 }

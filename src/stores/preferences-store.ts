@@ -33,7 +33,14 @@ export interface Preferences {
    * in a browser the page cannot set zoom.
    */
   uiScale: number
+  /**
+   * The desktop or compact layout (src/ui/compact.ts), or `auto` to choose by
+   * window size.
+   */
+  layout: LayoutChoice
 }
+
+export type LayoutChoice = 'auto' | 'desktop' | 'compact'
 
 /** The scales offered. */
 export const UI_SCALES = [0.9, 1, 1.1, 1.25, 1.5] as const
@@ -44,6 +51,7 @@ const DEFAULTS: Preferences = {
   // entry rather than hiding one.
   planFor: 'copter',
   uiScale: 1,
+  layout: 'auto',
 }
 
 /** Reads the stored preferences, ignoring anything this build does not recognize. */
@@ -56,6 +64,7 @@ function load(): Preferences {
       units?: Partial<UnitPrefs>
       planFor?: string
       uiScale?: number
+      layout?: string
     }
     if (typeof parsed !== 'object' || parsed === null) return DEFAULTS
     return {
@@ -75,6 +84,7 @@ function load(): Preferences {
       uiScale: (UI_SCALES as readonly number[]).includes(parsed.uiScale as number)
         ? (parsed.uiScale as number)
         : DEFAULTS.uiScale,
+      layout: valid(parsed.layout, ['auto', 'desktop', 'compact'], DEFAULTS.layout),
     }
   } catch {
     // Storage unavailable or unparseable: use the defaults.
@@ -104,6 +114,7 @@ interface PreferencesState extends Preferences {
   setVerticalSpeedUnit(unit: VerticalSpeedUnit): void
   setPlanFor(cls: VehicleClass): void
   setUiScale(scale: number): void
+  setLayout(layout: LayoutChoice): void
   /** Restores the defaults. */
   reset(): void
 }
@@ -134,6 +145,11 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
   setUiScale(scale) {
     if (!(UI_SCALES as readonly number[]).includes(scale)) return
     set({ uiScale: scale })
+    save(get())
+  },
+
+  setLayout(layout) {
+    set({ layout })
     save(get())
   },
 

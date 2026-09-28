@@ -21,6 +21,8 @@ import CameraPanel from './CameraPanel'
 import JoystickPanel from './JoystickPanel'
 import VideoPane from './VideoPane'
 import ViewPane from './ViewPane'
+import { LaButton, LaModal } from '../../components/La'
+import { useCompact } from '../../compact'
 
 // The flight screen, laid out like Mission Planner's: one panel pinned left
 // at a fixed aspect ratio with the controls and messages beneath it, and the
@@ -41,6 +43,7 @@ export default function FlightTab() {
   const gridRef = useRef<HTMLDivElement>(null)
   const belowRef = useRef<HTMLDivElement>(null)
   const layout = useFlightLayoutStore()
+  const compact = useCompact()
 
   // The controls wrap as the column narrows, so their height is measured and
   // the pinned panel is capped to leave room for them and the lower pane.
@@ -53,7 +56,8 @@ export default function FlightTab() {
     )
     ro.observe(controls)
     return () => ro.disconnect()
-  }, [])
+    // Remeasured on leaving compact mode, which renders no desktop controls.
+  }, [compact])
 
   // The HUD's right-click shortcut to the video settings. Opens the lower
   // pane too, in case it is switched off.
@@ -83,6 +87,18 @@ export default function FlightTab() {
   const hudPanel = (
     <Hud horizon={layout.hudHorizon} overlays={layout.hudOverlays} onContextMenu={setHudMenu} />
   )
+
+  if (compact) {
+    return (
+      <CompactFlight
+        mapPanel={mapPanel}
+        hudPanel={hudPanel}
+        menus={menus()}
+        plotted={layout.plotFields}
+        onTogglePlot={layout.togglePlotField}
+      />
+    )
+  }
 
   const aspectIsHud = layout.aspectPanel === 'hud'
   const aspectVisible = aspectIsHud ? layout.showHud : layout.showMap
@@ -152,25 +168,123 @@ export default function FlightTab() {
         onClose={() => setPickerOpen(false)}
       />
 
-      {hudMenu && (
-        <HudContextMenu point={hudMenu} onClose={() => setHudMenu(null)} onVideo={showVideoPane} />
-      )}
+      {menus()}
+    </div>
+  )
 
-      {menu && (
-        <MapContextMenu
-          point={menu}
-          onClose={() => setMenu(null)}
-          onFlyHere={(alt) => {
-            gotoGuided(menu.lat, menu.lon, alt)
-            setTarget({ lat: menu.lat, lon: menu.lon })
-          }}
-          onPointCamera={() => void setRoi(menu.lat, menu.lon)}
-          onSetHome={() => {
-            void setHome(menu.lat, menu.lon)
-            setHomePin({ lat: menu.lat, lon: menu.lon })
-          }}
-        />
-      )}
+  // The HUD's and the map's context menus, the same in both layouts.
+  function menus() {
+    return (
+      <>
+        {hudMenu && (
+          <HudContextMenu
+            point={hudMenu}
+            onClose={() => setHudMenu(null)}
+            onVideo={showVideoPane}
+          />
+        )}
+
+        {menu && (
+          <MapContextMenu
+            point={menu}
+            onClose={() => setMenu(null)}
+            onFlyHere={(alt) => {
+              gotoGuided(menu.lat, menu.lon, alt)
+              setTarget({ lat: menu.lat, lon: menu.lon })
+            }}
+            onPointCamera={() => void setRoi(menu.lat, menu.lon)}
+            onSetHome={() => {
+              void setHome(menu.lat, menu.lon)
+              setHomePin({ lat: menu.lat, lon: menu.lon })
+            }}
+          />
+        )}
+      </>
+    )
+  }
+}
+
+/**
+ * Compact mode's Fly screen: one panel fills the window with the other as an
+ * inset (tap ⇄ to swap), and the flight actions in a column on the right,
+ * where a thumb rests on a handheld. Everything else (the adjustments and
+ * the lower pane's views) is in a sheet behind More and Messages.
+ */
+function CompactFlight({
+  mapPanel,
+  hudPanel,
+  menus,
+  plotted,
+  onTogglePlot,
+}: {
+  mapPanel: React.ReactNode
+  hudPanel: React.ReactNode
+  menus: React.ReactNode
+  plotted: readonly string[]
+  onTogglePlot: (name: string) => void
+}) {
+  const layout = useFlightLayoutStore()
+  const [sheet, setSheet] = useState(false)
+  const statusTexts = useVehicleStore((s) => s.statusTexts)
+  // Messages that arrived since the sheet was last open.
+  const [seenAt, setSeenAt] = useState(() => Date.now())
+  const unread = sheet ? 0 : statusTexts.filter((t) => t.at > seenAt).length
+
+  const open = (pane?: LogPaneId) => {
+    if (pane) layout.setLogPane(pane)
+    setSheet(true)
+  }
+  const close = () => {
+    setSeenAt(Date.now())
+    setSheet(false)
+  }
+
+  // The inset is the panel the desktop layout pins at a fixed aspect.
+  const insetIsHud = layout.aspectPanel === 'hud'
+  return (
+    <div className="flight-compact">
+      <div className="flight-compact__main">{insetIsHud ? mapPanel : hudPanel}</div>
+      <div className="flight-compact__inset">
+        {insetIsHud ? hudPanel : mapPanel}
+        <button
+          type="button"
+          className="flight-compact__swap"
+          aria-label="Swap map and HUD"
+          onClick={layout.swap}
+        >
+          ⇄
+        </button>
+      </div>
+      <div className="flight-compact__actions">
+        <FlightControls part="primary" compact />
+        <LaButton variant="ghost" onClick={() => open()}>
+          More
+        </LaButton>
+      </div>
+      <button type="button" className="flight-compact__messages" onClick={() => open('messages')}>
+        {unread > 0 ? `Messages · ${unread}` : 'Messages'}
+      </button>
+
+      <LaModal
+        open={sheet}
+        title="Flight"
+        actions={
+          <LaButton variant="primary" onClick={close}>
+            Done
+          </LaButton>
+        }
+      >
+        <div className="flight-sheet">
+          <FlightControls part="secondary" compact />
+          <LogPane
+            pane={layout.logPane}
+            onPane={layout.setLogPane}
+            plotted={plotted}
+            onTogglePlot={onTogglePlot}
+          />
+        </div>
+      </LaModal>
+      {menus}
     </div>
   )
 }

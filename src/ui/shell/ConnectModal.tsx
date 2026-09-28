@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { LaButton, LaField, LaHint, LaInput, LaModal } from '../components/La'
+import { LaButton, LaField, LaHint, LaInput, LaModal, LaSelect } from '../components/La'
 import { useConnectionStore } from '../../stores/connection-store'
 import { useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
+import type { TransportKind } from '../../transport/Transport'
+import { useCompact } from '../compact'
+import { ConnectionKindOptions } from './AppBar'
 
 // Host/port entry for the network link kinds. Serial connects straight
 // from the app bar; TCP, UDP, WebSocket and internal serial need something
@@ -23,6 +26,9 @@ export default function ConnectModal() {
   const open = useUiStore((s) => s.connectModalOpen)
   const setOpen = useUiStore((s) => s.setConnectModalOpen)
   const kind = useConnectionStore((s) => s.selectedKind)
+  const setKind = useConnectionStore((s) => s.setSelectedKind)
+  // Compact mode's app bar has no type menu, so the type is chosen here.
+  const compact = useCompact()
 
   const [host, setHost] = useState('127.0.0.1')
   const [port, setPort] = useState('5760')
@@ -35,7 +41,9 @@ export default function ConnectModal() {
 
   const connect = () => {
     setHint('')
-    if (kind === 'tcp') {
+    if (kind === 'serial') {
+      void connectionService.connect({ kind: 'serial', baudRate: 115200 })
+    } else if (kind === 'tcp') {
       const p = Number(port)
       if (!Number.isInteger(p) || p < 1 || p > 65535) {
         setHint('Port must be 1-65535.')
@@ -72,7 +80,7 @@ export default function ConnectModal() {
   return (
     <LaModal
       open={open}
-      title={TITLES[kind] ?? 'Connect'}
+      title={compact ? 'Connect' : (TITLES[kind] ?? 'Connect')}
       actions={
         <>
           <LaButton variant="ghost" onClick={() => setOpen(false)}>
@@ -85,6 +93,17 @@ export default function ConnectModal() {
       }
     >
       <div className="connect-form">
+        {compact && (
+          <LaField label="Connection" htmlFor="conn-kind">
+            <LaSelect
+              id="conn-kind"
+              value={kind}
+              onChange={(e) => setKind(e.target.value as TransportKind)}
+            >
+              <ConnectionKindOptions />
+            </LaSelect>
+          </LaField>
+        )}
         {kind === 'tcp' && (
           <>
             <LaField label="Host" htmlFor="conn-host">

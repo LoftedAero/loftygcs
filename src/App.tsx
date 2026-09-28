@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import AppBar from './ui/shell/AppBar'
-import NavRail from './ui/shell/NavRail'
+import NavRail, { SetupTabSelect } from './ui/shell/NavRail'
+import { useCompact } from './ui/compact'
 import ActionBar from './ui/shell/ActionBar'
 import ConnectModal from './ui/shell/ConnectModal'
 import PreferencesModal from './ui/shell/PreferencesModal'
@@ -93,7 +94,13 @@ export default function App() {
     const first = offline[0]
     if (first) useUiStore.setState({ activeTab: first.id })
   }, [connected, activeTab])
-  const showRail = mode === 'setup'
+  const compact = useCompact()
+  // Before paint, so a switch never shows a frame of the other layout.
+  useLayoutEffect(() => {
+    document.documentElement.toggleAttribute('data-compact', compact)
+  }, [compact])
+  // Compact mode swaps the rail for a dropdown above the content.
+  const showRail = mode === 'setup' && !compact
   // Fly and Mission always take the window; inside Setup, so do the tabs
   // that lay out their own full height rather than tiling cards.
   const flush = mode !== 'setup' || tabFills(activeTab)
@@ -104,6 +111,7 @@ export default function App() {
       <main className={showRail ? 'la-main app-main' : 'la-main app-main app-main--full'}>
         {showRail && <NavRail />}
         <div className={flush ? 'app-content app-content--flush' : 'app-content'}>
+          {mode === 'setup' && compact && <SetupTabSelect />}
           {mode === 'setup' && <SetupContent />}
           {mode === 'fly' && <FlightTab />}
           {mode === 'mission' && <MissionTab />}

@@ -1,6 +1,7 @@
 import { LaButton, LaField, LaHint, LaModal, LaSelect } from '../components/La'
+import { BRAND } from '../../brand'
 import { useUiStore } from '../../stores/ui-store'
-import { UI_SCALES, usePreferencesStore } from '../../stores/preferences-store'
+import { UI_SCALES, usePreferencesStore, type LayoutChoice } from '../../stores/preferences-store'
 import { useThemeStore, type ThemeChoice } from '../../stores/theme-store'
 import {
   DISTANCE_CHOICES,
@@ -13,6 +14,12 @@ import type { DistanceUnit, SpeedUnit, VerticalSpeedUnit } from '../../units'
 // Settings about the user rather than the aircraft. A dialog rather than a
 // rail tab because they apply in every mode and outlive any vehicle.
 // Sectioned so later additions (language, for one) slot in as sections.
+
+const LAYOUT_CHOICES: { id: LayoutChoice; label: string }[] = [
+  { id: 'auto', label: 'Automatic' },
+  { id: 'desktop', label: 'Desktop' },
+  { id: 'compact', label: 'Compact' },
+]
 
 const THEME_CHOICES: { id: ThemeChoice; label: string }[] = [
   { id: 'system', label: 'Match the system' },
@@ -30,6 +37,8 @@ export default function PreferencesModal() {
   const reset = usePreferencesStore((s) => s.reset)
   const uiScale = usePreferencesStore((s) => s.uiScale)
   const setUiScale = usePreferencesStore((s) => s.setUiScale)
+  const layout = usePreferencesStore((s) => s.layout)
+  const setLayout = usePreferencesStore((s) => s.setLayout)
   // Only the desktop app can scale its own window; a browser has its zoom.
   const canScale = typeof window !== 'undefined' && !!window.loftgcs
   const themeChoice = useThemeStore((s) => s.choice)
@@ -110,6 +119,19 @@ export default function PreferencesModal() {
             ))}
           </LaSelect>
         </LaField>
+        <LaField label="Layout" htmlFor="pref-layout">
+          <LaSelect
+            id="pref-layout"
+            value={layout}
+            onChange={(e) => setLayout(e.target.value as LayoutChoice)}
+          >
+            {LAYOUT_CHOICES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </LaSelect>
+        </LaField>
         <LaField label="Scale" htmlFor="pref-scale">
           <LaSelect
             id="pref-scale"
@@ -126,6 +148,10 @@ export default function PreferencesModal() {
         </LaField>
         {!canScale && <LaHint>Use the browser’s zoom</LaHint>}
       </section>
+      {/* The footer shows it too, but compact mode has no footer. */}
+      <p className="la-card__note">
+        {BRAND.name} v{__APP_VERSION__}
+      </p>
     </LaModal>
   )
 }

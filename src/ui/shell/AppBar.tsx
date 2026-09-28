@@ -9,6 +9,7 @@ import ParamProgress from './ParamProgress'
 import SimTray from './SimTray'
 import ThemeToggle from './ThemeToggle'
 import { hasIpLinks, hasUart, isNativeApp } from '../../env'
+import { useCompact } from '../compact'
 import type { TransportKind } from '../../transport/Transport'
 
 // Top-level mode switch. Not orange: Connect is the bar's one primary action.
@@ -33,13 +34,30 @@ function ModeSwitch() {
   )
 }
 
+/** The connection types this build can open. */
+export function ConnectionKindOptions() {
+  const ipLinks = hasIpLinks()
+  return (
+    <>
+      {/* The Android WebView has no Web Serial. */}
+      {!isNativeApp() && <option value="serial">USB serial</option>}
+      {hasUart() && <option value="uart">Internal serial</option>}
+      {/* A browser cannot open raw sockets, so TCP and UDP are desktop
+        only. WebSocket is the browser's route to the same targets. */}
+      {ipLinks && <option value="tcp">TCP</option>}
+      {ipLinks && <option value="udp">UDP</option>}
+      <option value="ws">WebSocket</option>
+    </>
+  )
+}
+
 // The app bar: brand, mode switch, vehicle status, connection controls.
 // Connect is the one orange action; the status indicators use color for
 // status only and never look pressable.
 export default function AppBar() {
   const phase = useConnectionStore((s) => s.phase)
   const selectedKind = useConnectionStore((s) => s.selectedKind)
-  const ipLinks = hasIpLinks()
+  const compact = useCompact()
   const setSelectedKind = useConnectionStore((s) => s.setSelectedKind)
   const setConnectModalOpen = useUiStore((s) => s.setConnectModalOpen)
   const setPreferencesOpen = useUiStore((s) => s.setPreferencesOpen)
@@ -50,8 +68,9 @@ export default function AppBar() {
   // (REBOOT_RETURN_MS), and Disconnect stays live to give up sooner.
   const linked = busy || phase === 'connected' || phase === 'linkLost' || phase === 'rebooting'
 
+  // Compact mode has no room for the type menu; the dialog asks instead.
   const connect = () => {
-    if (selectedKind === 'serial') {
+    if (selectedKind === 'serial' && !compact) {
       void connectionService.connect({ kind: 'serial', baudRate: 115200 })
     } else {
       setConnectModalOpen(true)
@@ -98,21 +117,18 @@ export default function AppBar() {
       <ParamProgress />
 
       <div className="app-bar__band app-bar__band--right">
-        <LaSelect
-          value={selectedKind}
-          disabled={linked}
-          onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
-          title="Connection type"
-        >
-          {/* The Android WebView has no Web Serial. */}
-          {!isNativeApp() && <option value="serial">USB serial</option>}
-          {hasUart() && <option value="uart">Internal serial</option>}
-          {/* A browser cannot open raw sockets, so TCP and UDP are desktop
-            only. WebSocket is the browser's route to the same targets. */}
-          {ipLinks && <option value="tcp">TCP</option>}
-          {ipLinks && <option value="udp">UDP</option>}
-          <option value="ws">WebSocket</option>
-        </LaSelect>
+        {/* The footer that normally carries it is gone in compact mode. */}
+        {compact && BRAND.preview && <span className="app-preview-chip">Preview</span>}
+        {!compact && (
+          <LaSelect
+            value={selectedKind}
+            disabled={linked}
+            onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
+            title="Connection type"
+          >
+            <ConnectionKindOptions />
+          </LaSelect>
+        )}
         <LaButton variant="primary" disabled={linked} onClick={connect}>
           Connect
         </LaButton>
