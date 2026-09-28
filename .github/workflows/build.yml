@@ -1,7 +1,10 @@
 # Jobs with different economics:
 #
-#  - check: lint + format check + typecheck + unit tests, Linux only, on every push. Cheap
-#    enough to always run, and it is what keeps the protocol layer honest.
+#  - check: lint + format check + typecheck + unit tests, Linux only, on every
+#    push to main and every pull request. Cheap enough to always run, and it
+#    is what keeps the protocol layer honest. Branch protection requires it,
+#    so it must run for pull requests from forks too; those runs get no
+#    secrets.
 #
 #  - release, build and web: a draft GitHub release holding the three-platform
 #    installers and the web zip, and the web app's deploy to Cloudflare
@@ -11,13 +14,14 @@
 #    "Run workflow" button only appears once this file is on the default
 #    branch.
 #
-# push is limited to branches so that pushing a tag does not re-run check on
-# a commit it has already passed on -- tags no longer trigger anything.
+# A branch is checked through its pull request rather than on every push, so
+# a pull request's commits are not checked twice. Tags trigger nothing.
 name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
+  pull_request:
   workflow_dispatch:
     inputs:
       installers:
@@ -106,6 +110,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && !failure() && !cancelled()
     needs: [check, release]
     runs-on: ubuntu-latest
+    # The Cloudflare secrets live in this environment, which only main may
+    # deploy from, so a pushed branch with an edited workflow cannot use them.
+    environment: production
     permissions:
       contents: write
     env:

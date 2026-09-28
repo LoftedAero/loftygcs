@@ -121,8 +121,9 @@ Open an issue at <https://github.com/LoftedAero/loftygcs/issues>. Include:
 - the vehicle type and firmware version, if hardware was connected
 - screenshots or logs where they help
 
-Please report security issues privately to info@loftedaero.com rather than in
-a public issue.
+Please report security issues privately rather than in a public issue: use
+**Report a vulnerability** on the repository's Security tab, or email
+info@loftedaero.com.
 
 ## License
 
