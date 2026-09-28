@@ -19,7 +19,7 @@ Related documents:
 | Directory       | Role                                                                                                                   |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `src/protocol`  | MAVLink encode/decode, protocol clients (parameters, missions, MAVFTP, bootloaders), pure logic. Environment-agnostic. |
-| `src/transport` | Byte links: Web Serial, WebSocket, Electron-hosted TCP/UDP, and the virtual flight controller.                         |
+| `src/transport` | Byte links: Web Serial, WebSocket, and Electron-hosted TCP/UDP.                                                        |
 | `src/worker`    | The protocol engine runs in a Web Worker; `worker-client` is the renderer's handle to it.                              |
 | `src/services`  | Operations that combine protocol, transport and browser APIs (connection, flashing, tile cache, terrain, video).       |
 | `src/stores`    | Application state (Zustand stores).                                                                                    |
@@ -30,8 +30,7 @@ The layering is enforced by ESLint (`import/no-restricted-paths` in `eslint.conf
 
 - `src/protocol` imports nothing from the DOM, React, Electron or Node. It must run in a Web
   Worker and in plain Node, which is what keeps it testable against SITL from a Node test.
-- `src/transport` may import from `protocol` (the virtual flight controller uses the real
-  encoder) and never from `ui`, `stores` or `services`.
+- `src/transport` may import from `protocol` and never from `ui`, `stores` or `services`.
 - `src/ui` reaches the protocol only through `src/worker/worker-client` and the stores. The
   one exception is `protocol/types.ts`.
 
@@ -609,7 +608,7 @@ on Z, because both renderers apply the same rotation. Check a new model against 
 numerically. The biplane is CC-BY-4.0 and its credit must stay visible in the app (Overview,
 under the model), and on the compass-calibration tiles, which are pre-rendered from the models
 by `npm run cal-art`. See `src/models/ATTRIBUTION.md`. The quad model is GPL-3.0. Models are
-imported with `?url`; the demo build inlines them via `assetsInlineLimit`.
+imported with `?url`.
 
 ## Firmware
 
@@ -699,7 +698,7 @@ is ported from it (GPL-3.0, as this project is).
 ## SITL
 
 SITL (ArduPilot's software-in-the-loop simulator) is the acceptance target. Every protocol
-feature is demonstrated against SITL, not only against the demo vehicle.
+feature is demonstrated against SITL, not only against unit-test fakes.
 
 ### Command-line runner (`scripts/sitl.mjs`)
 
@@ -752,15 +751,6 @@ Behavior to know:
   arrow over the runway and AMSL altitude looked up from Terrarium tiles. It renders from
   `App`, because the tray closes on any outside click.
 
-### The demo vehicle (`transport/virtual-fc.ts`)
-
-The virtual flight controller models only ArduPilot rules first observed on SITL, with
-ArduPilot's wording: it refuses arming and position modes until a simulated EKF settles,
-refuses NAV_TAKEOFF outside Guided, disarms after sitting armed on the ground, and holds at the
-first item when Auto is entered on the ground. An invented rule would teach the app something
-ArduPilot never does. Deliberately absent: flight dynamics, MAVFTP (its absence exercises the
-parameter-stream fallback), and the full parameter set.
-
 ## Testing
 
 - `npm test`, `npm run typecheck`, `npm run lint` and `npm run format:check` must all pass; CI
@@ -811,7 +801,6 @@ parameter-stream fallback), and the full parameter set.
 | `npm run build:electron`                             | Production Electron build                                      |
 | `npm run dist`                                       | Installers for the current platform only; CI builds all three  |
 | `npm run package:web`                                | The web bundle zipped for a static host                        |
-| `npm run build:demo`                                 | The single-file shareable demo                                 |
 | `npm run icon`                                       | Regenerate `build/icon.png` from `public/icons/icon.svg`       |
 | `npm run cal-art`                                    | Re-render the compass-calibration sprite sheet from the models |
 | `npm run sitl:fetch`, `npm run sitl`                 | Download and run SITL                                          |

@@ -16,7 +16,7 @@
 // the app already requests for the `Frame:` line.
 //
 // Only real hardware sends it: the base implementation returns false and
-// only the ChibiOS HAL overrides it, so SITL and the demo vehicle yield null.
+// only the ChibiOS HAL overrides it, so SITL yields null.
 // A board with no outputs configured says "RCOut: None", which parses to an
 // empty group list instead.
 

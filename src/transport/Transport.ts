@@ -2,7 +2,7 @@
 // Betaflight Configurator uses). Transports move bytes and know nothing about
 // MAVLink.
 
-export type TransportKind = 'serial' | 'tcp' | 'udp' | 'ws' | 'virtual'
+export type TransportKind = 'serial' | 'tcp' | 'udp' | 'ws'
 
 export type TransportOptions =
   /**
@@ -14,7 +14,6 @@ export type TransportOptions =
   | { kind: 'tcp'; host: string; port: number }
   | { kind: 'udp'; localPort: number; host?: string; port?: number }
   | { kind: 'ws'; url: string }
-  | { kind: 'virtual' }
 
 export interface Transport {
   readonly kind: TransportKind

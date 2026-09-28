@@ -7,9 +7,7 @@ import react from '@vitejs/plugin-react'
 
 // CesiumJS fetches its workers, shaders and widget CSS at runtime from
 // CESIUM_BASE_URL, so they cannot be bundled: they are served from
-// node_modules in dev and copied beside the output at build. The single-file
-// demo build has its own config without this; the replay is lazy-loaded, so
-// it still works there.
+// node_modules in dev and copied beside the output at build.
 const CESIUM_DIRS = ['Assets', 'ThirdParty', 'Widgets', 'Workers']
 // The prebuilt bundle, loaded by a script tag because Cesium's ESM source
 // does not survive tree-shaking (see LogReplay.tsx).
@@ -56,8 +54,7 @@ function cesiumAssets(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [react(), cesiumAssets()],
-  // glTF is not a Vite asset type by default. Models are imported with ?url
-  // so the demo build can inline them.
+  // glTF is not a Vite asset type by default. Models are imported with ?url.
   assetsInclude: ['**/*.gltf'],
   define: {
     // The version comes from package.json, which npm exposes to scripts.

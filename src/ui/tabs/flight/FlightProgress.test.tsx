@@ -6,10 +6,8 @@ import { useMissionStore } from '../../../stores/mission-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { usePreferencesStore } from '../../../stores/preferences-store'
 
-// The progress strip, given data the demo vehicle cannot produce.
-//
-// The virtual FC has no flight dynamics, so it never sends MISSION_CURRENT.
-// SITL covers the data path; this covers the rendering.
+// The progress strip, fed mission progress directly. SITL covers the data
+// path; this covers the rendering.
 
 const setPlan = (count: number) => {
   useMissionStore.getState().clear()

@@ -1,11 +1,10 @@
 node_modules/
 
-# Build output: the web bundle, the Electron main process, the single-file
-# demo, and electron-builder's installers.
+# Build output: the web bundle, the Electron main process and
+# electron-builder's installers.
 dist/
 dist-web/
 dist-electron/
-dist-demo/
 *.tsbuildinfo
 
 # Test and tool output

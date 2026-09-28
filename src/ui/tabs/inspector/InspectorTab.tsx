@@ -45,10 +45,7 @@ export default function InspectorTab() {
   if (!connected) {
     return (
       <LaCard title="MAVLink inspector">
-        <p className="app-placeholder">
-          Connect a vehicle (or start Demo mode) and this fills with what it is saying: each message
-          type, its rate, and the fields inside the latest one.
-        </p>
+        <p className="app-placeholder">Connect a vehicle to see its messages.</p>
       </LaCard>
     )
   }

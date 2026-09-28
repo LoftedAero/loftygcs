@@ -1,6 +1,6 @@
 # Hardware validation checklist
 
-These checks cover what SITL and the demo vehicle cannot prove. Run them with
+These checks cover what SITL cannot prove. Run them with
 a bench vehicle (props off) and, for the flashing section, preferably a spare
 board first. Check items off per release.
 

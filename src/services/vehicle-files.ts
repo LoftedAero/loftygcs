@@ -37,7 +37,7 @@ function describe(err: unknown): string {
   if (/FileProtected/.test(text)) return 'The vehicle refused: the file is protected'
   if (/FileExists/.test(text)) return 'Something with that name is already there'
   if (/FailErrno/.test(text)) return 'The vehicle refused the operation'
-  // The demo vehicle and some third-party autopilots have no MAVFTP.
+  // Some third-party autopilots have no MAVFTP.
   if (/timed out/.test(text)) return 'No answer — this vehicle may not support MAVFTP file access'
   return text
 }

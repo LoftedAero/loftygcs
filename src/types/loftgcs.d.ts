@@ -82,7 +82,7 @@ export interface LoftGcsBridge {
      */
     autoPickNew(opts?: { wait?: boolean }): void
   }
-  /** A locally managed ArduPilot SITL, for demos and testing without hardware. */
+  /** A locally managed ArduPilot SITL, for testing without hardware. */
   sim: {
     status(): Promise<SimStatus>
     install(vehicle: string): Promise<void>

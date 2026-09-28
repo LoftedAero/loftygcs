@@ -141,7 +141,7 @@ function describe(err: unknown): string {
   if (isMissing(err))
     return `No log directory on this vehicle (looked in ${LOG_DIRS.join(' and ')}).`
   if (/timed out/.test(err.message)) {
-    // Either the firmware lacks MAVFTP (as the demo vehicle does) or a busy
+    // Either the firmware lacks MAVFTP or a busy
     // telemetry radio drops the replies; nothing here can tell which.
     return 'No answer from the vehicle. It may not support MAVFTP, or the link may be dropping it — a telemetry radio often does. Over USB this usually works.'
   }

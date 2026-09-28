@@ -2,8 +2,7 @@
 // renderer talks MAVLink, and the one thing connection teardown terminates.
 //
 // ?worker&inline bundles the worker into the main chunk, so the same build
-// works over http, from file:// in Electron, and in the single-file demo,
-// where a separate worker chunk would have no URL.
+// works over http and from file:// in Electron.
 import ProtocolWorker from './protocol.worker?worker&inline'
 import type {
   EngineCommand,

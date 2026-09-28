@@ -44,13 +44,13 @@ export default function LiveVehiclePanel() {
             />
           ) : (
             <div className="vehicle-view vehicle-view--empty">
-              {/* Points to how to connect. SITL is desktop-only (it spawns a
-                native binary), so the browser build suggests Demo instead. */}
+              {/* Points to how to connect. SITL is desktop-only: it spawns a
+                native binary. */}
               <p className="vehicle-view__empty-title">No vehicle</p>
               <p className="vehicle-view__empty-hint">
                 {isElectron()
                   ? 'Connect one from the app bar, or start a simulator from the SITL tray.'
-                  : 'Connect one from the app bar — or choose Demo there to fly a simulated aircraft with no hardware.'}
+                  : 'Connect one from the app bar.'}
               </p>
             </div>
           )}

@@ -17,7 +17,7 @@ Status: **preview**. The app is in active development and has not had a stable r
 
 ## Features
 
-- **Connect** over USB serial, TCP, UDP or WebSocket, or to a built-in demo vehicle.
+- **Connect** over USB serial, TCP, UDP or WebSocket.
 - **Setup**, in bring-up order: firmware flashing (ArduPilot serial bootloader and STM32 DFU),
   frame and configuration, serial ports, accelerometer and compass calibration, radio
   calibration, flight modes, outputs and motor test, power, failsafes, filters, tuning and OSD
@@ -41,10 +41,8 @@ npm run dev            # browser build at the printed URL
 npm run dev:electron   # desktop app against the same dev server
 ```
 
-With no flight controller, choose **Demo** in the connection menu. The demo vehicle streams
-telemetry and answers the parameter protocol, but it is a stand-in, not ArduPilot. For the real
-firmware, use SITL: on Windows the desktop app can download and run it from the **SITL** tray in
-the app bar. On macOS and Linux, run ArduPilot's `sim_vehicle.py` and connect over TCP or UDP.
+With no flight controller, use ArduPilot SITL: on Windows the desktop app can download and run
+it from the **SITL** tray in the app bar. On macOS and Linux, run ArduPilot's `sim_vehicle.py` and connect over TCP or UDP.
 
 ## Development
 
@@ -54,12 +52,11 @@ npm run typecheck      # renderer and Electron projects
 npm run lint           # ESLint, including the layering rules
 npm run dist           # installers for this platform
 npm run package:web    # the web build, zipped for a static host
-npm run build:demo     # a single-file demo build
 ```
 
 These checks (`test`, `typecheck`, `lint`, `format:check`) run in CI and must pass.
 
-Protocol features are tested against ArduPilot SITL, not only the demo vehicle:
+Protocol features are tested against ArduPilot SITL:
 
 ```sh
 npm run sitl:fetch     # once: download the prebuilt Windows SITL
@@ -73,8 +70,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 - `src/protocol/`: the MAVLink core, environment-agnostic (no DOM, React, Electron or Node
   imports). It runs in a Web Worker in the app and in plain Node in the integration tests.
-- `src/transport/`: one `Transport` interface with Web Serial, Electron TCP/UDP, WebSocket and
-  demo-vehicle backends.
+- `src/transport/`: one `Transport` interface with Web Serial, Electron TCP/UDP and WebSocket
+  backends.
 - `src/worker/`: the protocol worker and the typed client the UI talks to.
 - `src/services/` and `src/stores/`: connection, parameters, missions, logs and other state.
 - `src/ui/`: React screens. The UI reaches the protocol only through the worker client and the

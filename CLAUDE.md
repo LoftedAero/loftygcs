@@ -54,7 +54,7 @@ user needs at that moment; reasons and background belong in code comments.
 -ize). Third-party text and external identifiers keep their spelling (`MAV_RESULT_CANCELLED`).
 
 **SITL is the acceptance target.** Every protocol feature is demonstrated against ArduPilot
-SITL, not only against the demo vehicle (`transport/virtual-fc.ts`). Run the SITL suite
+SITL, not only against unit-test fakes. Run the SITL suite
 against both Copter and Plane. Do not gate behavior on MAVLink capability bits; act on what an
 operation actually answers.
 
@@ -94,7 +94,7 @@ Other checks, when the change touches their area:
   touching the log parser or log tools.
 
 Development: `npm run dev` (browser), `npm run dev:electron` (desktop). Builds: `npm run dist`,
-`npm run package:web`, `npm run build:demo`.
+`npm run package:web`.
 
 ## Git
 

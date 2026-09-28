@@ -118,7 +118,7 @@ describe('the connection menu adapts to what the environment can do', () => {
 
   it('leaves TCP and UDP out of a browser, where sockets do not exist', () => {
     render(<AppBar />)
-    expect(options()).toEqual(['USB serial', 'WebSocket', 'Demo'])
+    expect(options()).toEqual(['USB serial', 'WebSocket'])
   })
 
   it('offers them in the desktop app, which can open sockets', () => {
@@ -139,7 +139,7 @@ describe('the connection menu adapts to what the environment can do', () => {
       },
     }
     render(<AppBar />)
-    expect(options()).toEqual(['USB serial', 'TCP', 'UDP', 'WebSocket', 'Demo'])
+    expect(options()).toEqual(['USB serial', 'TCP', 'UDP', 'WebSocket'])
   })
 
   it('holds Connect while a reboot is being waited out, and leaves Disconnect to give up', () => {

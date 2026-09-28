@@ -65,7 +65,7 @@ describe('the generated timer-group table', () => {
   })
 
   it('says nothing for a vehicle that identifies neither way', () => {
-    // SITL and the demo vehicle: no board id, no ChibiOS board name.
+    // SITL: no board id, no ChibiOS board name.
     expect(timerGroups(null, 0)).toBeNull()
     expect(timerGroups('NotARealBoard', 999999)).toBeNull()
   })

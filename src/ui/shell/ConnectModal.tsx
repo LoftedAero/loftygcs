@@ -4,8 +4,8 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
 
-// Host/port entry for the network link kinds. Serial and demo connect
-// straight from the app bar; only TCP/UDP/WebSocket need anything typed in.
+// Host/port entry for the network link kinds. Serial connects straight
+// from the app bar; only TCP/UDP/WebSocket need anything typed in.
 // Defaults are the ArduPilot conventions: SITL listens on TCP 5760, GCSes
 // listen on UDP 14550.
 //

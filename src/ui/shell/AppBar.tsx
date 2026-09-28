@@ -53,8 +53,6 @@ export default function AppBar() {
   const connect = () => {
     if (selectedKind === 'serial') {
       void connectionService.connect({ kind: 'serial', baudRate: 115200 })
-    } else if (selectedKind === 'virtual') {
-      void connectionService.connect({ kind: 'virtual' })
     } else {
       setConnectModalOpen(true)
     }
@@ -111,7 +109,6 @@ export default function AppBar() {
           {ipLinks && <option value="tcp">TCP</option>}
           {ipLinks && <option value="udp">UDP</option>}
           <option value="ws">WebSocket</option>
-          <option value="virtual">Demo</option>
         </LaSelect>
         <LaButton variant="primary" disabled={linked} onClick={connect}>
           Connect

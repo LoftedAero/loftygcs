@@ -26,21 +26,21 @@ install it over the old one.
 
 ## Browser or desktop
 
-|                                         | Browser                                 | Desktop app   |
-| --------------------------------------- | --------------------------------------- | ------------- |
-| Install needed                          | no                                      | yes           |
-| USB flight controller                   | yes (Chrome, Edge, Opera, Firefox 151+) | yes           |
-| Firmware flashing over DFU              | Chrome, Edge and Opera only             | yes           |
-| WebSocket telemetry                     | yes                                     | yes           |
-| TCP / UDP telemetry                     | no                                      | yes           |
-| Built-in ArduPilot simulator            | no                                      | yes (Windows) |
-| Video in the HUD                        | no                                      | yes           |
-| Demo vehicle, missions, parameters, OSD | yes                                     | yes           |
+|                              | Browser                                 | Desktop app   |
+| ---------------------------- | --------------------------------------- | ------------- |
+| Install needed               | no                                      | yes           |
+| USB flight controller        | yes (Chrome, Edge, Opera, Firefox 151+) | yes           |
+| Firmware flashing over DFU   | Chrome, Edge and Opera only             | yes           |
+| WebSocket telemetry          | yes                                     | yes           |
+| TCP / UDP telemetry          | no                                      | yes           |
+| Built-in ArduPilot simulator | no                                      | yes (Windows) |
+| Video in the HUD             | no                                      | yes           |
+| Missions, parameters, OSD    | yes                                     | yes           |
 
 If you have a flight controller and a USB cable, the browser version is the
 quickest way to start. For the built-in simulator, a network telemetry radio,
 or camera video, use the desktop app. Safari cannot talk to USB devices, so
-only the demo vehicle works there.
+only WebSocket connections work there.
 
 ## The browser version
 
@@ -136,8 +136,8 @@ this is the likely cause.
 
 Without hardware:
 
-1. Choose Demo in the connection menu and press Connect. A simulated vehicle
-   appears and every screen becomes available.
+1. In the desktop app on Windows, open the SITL tray in the app bar and start
+   a simulator. It connects on its own, and every screen becomes available.
 2. Fly: the HUD and map. Try the layout options in the View menu, and
    right-click the HUD and the map.
 3. Plan: press Read from vehicle, drag a waypoint, add one from the palette on

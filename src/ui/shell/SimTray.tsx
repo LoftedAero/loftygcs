@@ -116,15 +116,9 @@ function BrowserNote() {
   return (
     <>
       <h3 className="app-simtray__head">SITL</h3>
+      <p className="app-simtray__note">ArduPilot SITL requires the desktop app.</p>
       <p className="app-simtray__note">
-        The desktop app downloads and runs ArduPilot&rsquo;s software-in-the-loop simulator for you
-        — real firmware, the full parameter set, real arming checks. A browser cannot start a
-        process or open the raw TCP socket SITL listens on.
-      </p>
-      <p className="app-simtray__note">
-        You can still reach a simulator someone else is running, if it is exposed through a
-        WebSocket bridge such as mavlink-server: choose WebSocket in the connection menu. Otherwise
-        Demo mode, in the same menu, needs nothing at all.
+        You can connect to an already-running simulator if it is exposed through a network bridge.
       </p>
     </>
   )

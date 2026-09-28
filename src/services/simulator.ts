@@ -1,5 +1,5 @@
 // Driving the locally managed SITL: install it, start it, and attach the
-// app's normal TCP link to it. Unlike the demo vehicle this is real ArduPilot
+// app's normal TCP link to it. This is real ArduPilot
 // firmware, with its real parameters, arming checks and mode logic.
 import { connectionService } from './connection'
 import { useSimStore } from '../stores/sim-store'

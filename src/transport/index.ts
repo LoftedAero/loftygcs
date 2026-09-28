@@ -5,7 +5,6 @@ import type { Transport, TransportKind, TransportOptions } from './Transport'
 import { WebSerialTransport } from './web-serial'
 import { ElectronLinkTransport } from './electron-link'
 import { WebSocketTransport } from './websocket'
-import { VirtualFcTransport } from './virtual-fc'
 
 export function createTransport(kind: TransportKind, opts?: TransportOptions): Transport {
   switch (kind) {
@@ -19,8 +18,6 @@ export function createTransport(kind: TransportKind, opts?: TransportOptions): T
       return new ElectronLinkTransport('udp')
     case 'ws':
       return new WebSocketTransport()
-    case 'virtual':
-      return new VirtualFcTransport()
   }
 }
 
@@ -42,7 +39,7 @@ export class TransportManager {
     transport.onClose((reason) => {
       if (this.active === transport) onClose(reason)
     })
-    // Set active before open: some transports (virtual) emit immediately.
+    // Set active before open, so bytes that arrive during open are kept.
     this.active = transport
     try {
       await transport.open(opts)

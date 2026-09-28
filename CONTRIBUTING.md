@@ -14,8 +14,8 @@ npm run dev            # browser build at the printed URL
 npm run dev:electron   # desktop app against the same dev server
 ```
 
-With no flight controller attached, choose Demo in the connection menu to get
-a simulated vehicle.
+With no flight controller attached, run ArduPilot SITL (see below) and connect
+to it.
 
 ## Checks
 
@@ -34,8 +34,8 @@ parameter metadata paths.
 
 ## Testing against SITL
 
-The demo vehicle is a stand-in, not ArduPilot. Every protocol feature must
-also be demonstrated against ArduPilot SITL:
+Every protocol feature must be demonstrated against ArduPilot SITL, not only
+against unit-test fakes:
 
 ```sh
 npm run sitl:fetch       # once: download the prebuilt Windows Copter SITL into sitl/

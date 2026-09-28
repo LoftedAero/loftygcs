@@ -13,7 +13,7 @@ import {
   stopSimulator,
 } from '../../services/simulator'
 
-// Run real ArduPilot instead of the built-in demo vehicle. Desktop only,
+// Run ArduPilot SITL. Desktop only,
 // since a browser cannot start a process.
 //
 // The event subscription lives in SimTray because this panel unmounts

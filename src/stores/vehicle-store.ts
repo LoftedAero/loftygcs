@@ -66,7 +66,7 @@ export interface VehicleSnapshot {
   airframe: KnownAirframe | null
   /**
    * Which outputs the board drives and how, from the boot banner. Only
-   * ChibiOS builds print it, so SITL and the demo vehicle leave it null.
+   * ChibiOS builds print it, so SITL leaves it null.
    */
   rcout: RcoutBanner | null
   /**

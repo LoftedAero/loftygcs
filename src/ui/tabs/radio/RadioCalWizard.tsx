@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { LaButton, LaHint, LaModal } from '../../components/La'
 import { useVehicleStore } from '../../../stores/vehicle-store'
-import { useConnectionStore } from '../../../stores/connection-store'
 import { useParamStore } from '../../../stores/param-store'
 import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
 import { connectionService } from '../../../services/connection'
 import ChannelMonitor from './ChannelMonitor'
-import DemoTransmitter from './DemoTransmitter'
 import StickDiagram from './StickDiagram'
 import {
   IDENTIFY_STEPS,
@@ -42,7 +40,6 @@ export default function RadioCalWizard({
   onSaved?: () => void
 }) {
   const channels = useVehicleStore((s) => s.rcChannels)
-  const isDemo = useConnectionStore((s) => s.kind === 'virtual')
 
   const [stage, setStage] = useState<StageId>('intro')
   const [step, setStep] = useState(0)
@@ -302,7 +299,6 @@ export default function RadioCalWizard({
 
         {stage !== 'review' && (
           <div className="rc-wizard__side">
-            {isDemo && <DemoTransmitter />}
             <ChannelMonitor
               channels={channels}
               travel={stage === 'identify' || stage === 'sweep' ? travel : undefined}

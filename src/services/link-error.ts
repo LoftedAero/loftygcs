@@ -46,8 +46,6 @@ export function linkTarget(opts: TransportOptions): string {
       return opts.url
     case 'serial':
       return 'the serial port'
-    case 'virtual':
-      return 'the demo vehicle'
   }
 }
 

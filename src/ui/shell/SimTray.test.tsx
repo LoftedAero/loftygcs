@@ -179,10 +179,7 @@ describe('what the panel offers', () => {
   it('explains itself in a browser rather than showing dead controls', () => {
     render(<SimTray />)
     fireEvent.click(trayButton())
-    expect(screen.getByRole('dialog').textContent).toMatch(/cannot start a process/i)
-    // And points at what does work from a browser tab.
-    expect(screen.getByRole('dialog').textContent).toMatch(/WebSocket/)
-    expect(screen.getByRole('dialog').textContent).toMatch(/Demo mode/)
+    expect(screen.getByRole('dialog').textContent).toMatch(/requires the desktop app/i)
     expect(screen.queryByRole('button', { name: /launch SITL instance/i })).toBeNull()
   })
 

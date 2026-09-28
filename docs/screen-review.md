@@ -20,8 +20,8 @@ Disconnected:
 - [ ] Nothing that commands an aircraft is reachable. Arm, mode changes,
       takeoff and uploads are disabled.
 - [ ] Any route out of the empty state names a route that exists in that
-      build. The SITL tray is desktop-only, so the browser build points to
-      the Demo connection instead.
+      build. The SITL tray is desktop-only, so the browser build does not
+      mention it.
 
 Connected:
 

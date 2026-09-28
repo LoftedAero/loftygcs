@@ -34,7 +34,6 @@
     "dev:electron": "node scripts/dev-electron.mjs",
     "build:web": "vite build",
     "build:electron": "node scripts/build-electron.mjs",
-    "build:demo": "node scripts/build-artifact.mjs",
     "package:web": "node scripts/package-web.mjs",
     "icon": "electron scripts/make-icon.mjs",
     "cal-art": "electron scripts/make-cal-art.mjs",
