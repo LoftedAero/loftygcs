@@ -3,8 +3,9 @@
 #  - check: lint + format check + typecheck + unit tests, Linux only, on every push. Cheap
 #    enough to always run, and it is what keeps the protocol layer honest.
 #
-#  - build and web: the three-platform installers and the web app's deploy
-#    to Cloudflare Pages, by hand ONLY. A release is one run of both. macOS
+#  - release, build and web: a draft GitHub release holding the three-platform
+#    installers and the web zip, and the web app's deploy to Cloudflare
+#    Pages, by hand ONLY. A release is one run. macOS
 #    bills at 10x and Windows 2x while this repo is private, so a matrix that
 #    fires on its own is a bill for a commit that edited a comment. Note the
 #    "Run workflow" button only appears once this file is on the default
@@ -39,29 +40,48 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  release:
+    # The draft release the installers and the web zip are uploaded to. Its
+    # tag is created only when the draft is published. Release files do not
+    # count against the Actions storage quota that artifacts share.
+    if: github.event_name == 'workflow_dispatch' && inputs.installers
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the draft release if it does not exist
+        run: |
+          v=$(node -p "require('./package.json').version")
+          gh release view "v$v" >/dev/null 2>&1 ||
+            gh release create "v$v" --draft --target "$GITHUB_SHA" \
+              --title "Lofty GCS $v" --notes "Draft: release notes to follow."
+
   build:
     # Installers only when explicitly asked for, never automatically.
     if: github.event_name == 'workflow_dispatch' && inputs.installers
-    needs: check
+    needs: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     strategy:
       # One platform failing should not hide the others.
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            artifact: windows
             files: dist/*.exe
           - os: macos-latest
-            artifact: macos
             files: dist/*.dmg
           # Both Linux formats. The .deb is the one that works properly on
-          # current Ubuntu -- see docs/preview-testing.md for why the
-          # AppImage needs two extra steps there.
+          # current Ubuntu; docs/preview-testing.md says why the AppImage
+          # needs two extra steps there.
           - os: ubuntu-latest
-            artifact: linux
-            files: |
-              dist/*.AppImage
-              dist/*.deb
+            files: dist/*.AppImage dist/*.deb
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -72,20 +92,24 @@ jobs:
       # ci, not install: the lockfile is the point.
       - run: npm ci
       - run: npm run dist
-      # if-no-files-found: error, because a build that produces nothing while
-      # reporting success is the failure mode worth catching.
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.files }}
-          if-no-files-found: error
+      # An unmatched glob stays literal and the upload fails, so a build that
+      # produces nothing cannot report success.
+      - name: Upload to the draft release
+        shell: bash
+        run: |
+          v=$(node -p "require('./package.json').version")
+          gh release upload "v$v" ${{ matrix.files }} --clobber
 
   web:
     # The web app ships with the installers: same manual trigger, same commit.
-    if: github.event_name == 'workflow_dispatch'
-    needs: check
+    # It still runs when the installers are unticked, which skips release.
+    if: github.event_name == 'workflow_dispatch' && !failure() && !cancelled()
+    needs: [check, release]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
+      GH_TOKEN: ${{ github.token }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
@@ -96,13 +120,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run package:web
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web
-          path: dist/*_web.zip
-          if-no-files-found: error
-      # Skipped until the Cloudflare secrets exist, so the run still produces
-      # the zip. Creating the project fails harmlessly once it exists.
+      - name: Upload to the draft release
+        if: inputs.installers
+        run: |
+          v=$(node -p "require('./package.json').version")
+          gh release upload "v$v" dist/*_web.zip --clobber
+      # Skipped until the Cloudflare secrets exist. Creating the project fails
+      # harmlessly once it exists.
       - name: Deploy to Cloudflare Pages
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: |

@@ -25,8 +25,7 @@ for every platform from one machine.
 
 The web app is served from Cloudflare Pages (project `lofty-gcs`) at
 gcs.loftedaero.com. The manual CI run in section 3 builds and deploys it
-alongside the installers, and also keeps the zip as a `web` artifact for the
-release page. Deploying needs two repository secrets, `CLOUDFLARE_API_TOKEN`
+alongside the installers, and uploads the zip to the draft release. Deploying needs two repository secrets, `CLOUDFLARE_API_TOKEN`
 (a token with Account › Cloudflare Pages › Edit) and `CLOUDFLARE_ACCOUNT_ID`;
 without them the run builds the zip and skips the deploy. Untick "Build the
 installers" when starting the run to deploy only the web app. The custom domain
@@ -63,14 +62,14 @@ Windows at 2x on private repositories. The Run workflow button appears only
 once the workflow file is on the default branch. Lint, typecheck and tests
 run on every push in a separate, Linux-only job.
 
-When the run finishes, download the `windows`, `macos` and `linux` artifacts.
-Each is a zip around the real files, so unwrap them before uploading. CI
-artifacts expire after 90 days.
+The run creates a draft GitHub release, `v<version>`, and uploads the
+installers and the web zip to it. Review the draft, write the notes, and
+publish it; publishing creates the tag. Files go to the release rather than to
+workflow artifacts because artifacts count against the account's Actions
+storage quota, which a few installer runs fill.
 
-Because nothing is tagged automatically, the version in `package.json` is the
-only thing that distinguishes one build from another. Bump it before every
-run, or two downloads will claim to be the same build. Tag the commit
-afterwards if you want the history; tagging does not trigger anything.
+The version in `package.json` names the draft and every file, so bump it before
+each run. Running again at the same version replaces the draft's files.
 
 Files are named `LoftyGCS_<version>_<platform>...`, so they stay
 distinguishable side by side.
