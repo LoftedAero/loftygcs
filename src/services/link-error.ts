@@ -40,6 +40,8 @@ export function linkTarget(opts: TransportOptions): string {
   switch (opts.kind) {
     case 'tcp':
       return `${opts.host}:${opts.port}`
+    case 'uart':
+      return opts.path
     case 'udp':
       return `port ${opts.localPort}`
     case 'ws':

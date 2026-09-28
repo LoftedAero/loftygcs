@@ -16,6 +16,8 @@ export function createTransport(kind: TransportKind, opts?: TransportOptions): T
       return new ElectronLinkTransport('tcp')
     case 'udp':
       return new ElectronLinkTransport('udp')
+    case 'uart':
+      return new ElectronLinkTransport('uart')
     case 'ws':
       return new WebSocketTransport()
   }

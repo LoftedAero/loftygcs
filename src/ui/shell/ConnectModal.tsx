@@ -5,7 +5,8 @@ import { useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
 
 // Host/port entry for the network link kinds. Serial connects straight
-// from the app bar; only TCP/UDP/WebSocket need anything typed in.
+// from the app bar; TCP, UDP, WebSocket and internal serial need something
+// typed in.
 // Defaults are the ArduPilot conventions: SITL listens on TCP 5760, GCSes
 // listen on UDP 14550.
 //
@@ -15,6 +16,7 @@ const TITLES: Record<string, string> = {
   tcp: 'Connect over TCP',
   udp: 'Listen on UDP',
   ws: 'Connect to WebSocket bridge',
+  uart: 'Connect over internal serial',
 }
 
 export default function ConnectModal() {
@@ -26,6 +28,9 @@ export default function ConnectModal() {
   const [port, setPort] = useState('5760')
   const [localPort, setLocalPort] = useState('14550')
   const [wsUrl, setWsUrl] = useState('ws://127.0.0.1:5678')
+  // The Radiomaster AX12's ELRS module.
+  const [uartPath, setUartPath] = useState('/dev/ttyS1')
+  const [baud, setBaud] = useState('460800')
   const [hint, setHint] = useState('')
 
   const connect = () => {
@@ -44,6 +49,13 @@ export default function ConnectModal() {
         return
       }
       void connectionService.connect({ kind: 'udp', localPort: p })
+    } else if (kind === 'uart') {
+      const b = Number(baud)
+      if (!Number.isInteger(b) || b <= 0) {
+        setHint('Baud rate must be a whole number.')
+        return
+      }
+      void connectionService.connect({ kind: 'uart', path: uartPath, baudRate: b })
     } else if (kind === 'ws') {
       if (!/^wss?:\/\//.test(wsUrl)) {
         setHint('URL must start with ws:// or wss://.')
@@ -97,6 +109,20 @@ export default function ConnectModal() {
           <LaField label="URL" htmlFor="conn-ws">
             <LaInput id="conn-ws" value={wsUrl} onChange={(e) => setWsUrl(e.target.value)} />
           </LaField>
+        )}
+        {kind === 'uart' && (
+          <>
+            <LaField label="Port" htmlFor="conn-uart">
+              <LaInput
+                id="conn-uart"
+                value={uartPath}
+                onChange={(e) => setUartPath(e.target.value)}
+              />
+            </LaField>
+            <LaField label="Baud rate" htmlFor="conn-baud">
+              <LaInput id="conn-baud" num value={baud} onChange={(e) => setBaud(e.target.value)} />
+            </LaField>
+          </>
         )}
         <LaHint error>{hint}</LaHint>
       </div>

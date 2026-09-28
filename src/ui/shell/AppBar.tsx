@@ -8,7 +8,7 @@ import JoystickChip from './JoystickChip'
 import ParamProgress from './ParamProgress'
 import SimTray from './SimTray'
 import ThemeToggle from './ThemeToggle'
-import { hasIpLinks } from '../../env'
+import { hasIpLinks, hasUart, isNativeApp } from '../../env'
 import type { TransportKind } from '../../transport/Transport'
 
 // Top-level mode switch. Not orange: Connect is the bar's one primary action.
@@ -74,7 +74,8 @@ export default function AppBar() {
         />
         <span className="la-appbar__title">{BRAND.name}</span>
         <ModeSwitch />
-        <SimTray />
+        {/* SITL runs on a desktop; the Android app cannot start it. */}
+        {!isNativeApp() && <SimTray />}
         <button
           type="button"
           className="app-theme-toggle"
@@ -103,7 +104,9 @@ export default function AppBar() {
           onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
           title="Connection type"
         >
-          <option value="serial">USB serial</option>
+          {/* The Android WebView has no Web Serial. */}
+          {!isNativeApp() && <option value="serial">USB serial</option>}
+          {hasUart() && <option value="uart">Internal serial</option>}
           {/* A browser cannot open raw sockets, so TCP and UDP are desktop
             only. WebSocket is the browser's route to the same targets. */}
           {ipLinks && <option value="tcp">TCP</option>}
