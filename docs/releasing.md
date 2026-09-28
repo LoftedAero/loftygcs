@@ -23,6 +23,19 @@ for every platform from one machine.
 
 ## 2. The web app
 
+The web app is served from Cloudflare Pages (project `lofty-gcs`) at
+gcs.loftedaero.com. The manual CI run in section 3 builds and deploys it
+alongside the installers, and also keeps the zip as a `web` artifact for the
+release page. Deploying needs two repository secrets, `CLOUDFLARE_API_TOKEN`
+(a token with Account › Cloudflare Pages › Edit) and `CLOUDFLARE_ACCOUNT_ID`;
+without them the run builds the zip and skips the deploy. Untick "Build the
+installers" when starting the run to deploy only the web app. The custom domain
+is attached once in the Pages project, with a `gcs` CNAME to the project's
+`pages.dev` address in the loftedaero.com DNS, which Wix hosts.
+`public/_headers` lets the hashed assets be cached for good.
+
+To build it by hand for another host:
+
 ```sh
 npm run package:web        # -> dist/LoftyGCS_<version>_web.zip
 ```

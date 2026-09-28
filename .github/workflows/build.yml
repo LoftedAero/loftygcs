@@ -1,12 +1,14 @@
-# Two jobs with different economics:
+# Jobs with different economics:
 #
 #  - check: lint + format check + typecheck + unit tests, Linux only, on every push. Cheap
 #    enough to always run, and it is what keeps the protocol layer honest.
 #
-#  - build: the three-platform installer matrix, by hand ONLY. macOS bills at
-#    10x and Windows 2x while this repo is private, so a matrix that fires on
-#    its own is a bill for a commit that edited a comment. Note the "Run
-#    workflow" button only appears once this file is on the default branch.
+#  - build and web: the three-platform installers and the web app's deploy
+#    to Cloudflare Pages, by hand ONLY. A release is one run of both. macOS
+#    bills at 10x and Windows 2x while this repo is private, so a matrix that
+#    fires on its own is a bill for a commit that edited a comment. Note the
+#    "Run workflow" button only appears once this file is on the default
+#    branch.
 #
 # push is limited to branches so that pushing a tag does not re-run check on
 # a commit it has already passed on -- tags no longer trigger anything.
@@ -16,6 +18,11 @@ on:
   push:
     branches: ['**']
   workflow_dispatch:
+    inputs:
+      installers:
+        description: Build the installers (untick to deploy only the web app)
+        type: boolean
+        default: true
 
 jobs:
   check:
@@ -34,7 +41,7 @@ jobs:
 
   build:
     # Installers only when explicitly asked for, never automatically.
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.installers
     needs: check
     strategy:
       # One platform failing should not hide the others.
@@ -72,3 +79,32 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.files }}
           if-no-files-found: error
+
+  web:
+    # The web app ships with the installers: same manual trigger, same commit.
+    if: github.event_name == 'workflow_dispatch'
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run package:web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: dist/*_web.zip
+          if-no-files-found: error
+      # Skipped until the Cloudflare secrets exist, so the run still produces
+      # the zip. Creating the project fails harmlessly once it exists.
+      - name: Deploy to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          npx --yes wrangler@4 pages project create lofty-gcs --production-branch main || true
+          npx --yes wrangler@4 pages deploy dist-web --project-name lofty-gcs --branch main
