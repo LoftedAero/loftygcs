@@ -139,7 +139,7 @@ export default function JoystickPanel() {
           </div>
         }
       >
-        <p>The vehicle will fly on this gamepad's controls. Keep a transmitter to hand.</p>
+        <p>The vehicle will fly on this gamepad's controls. Keep a transmitter on hand.</p>
       </LaModal>
 
       <JoystickSetup open={setup} onClose={() => setSetup(false)} />

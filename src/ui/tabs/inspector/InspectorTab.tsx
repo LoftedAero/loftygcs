@@ -127,7 +127,7 @@ export default function InspectorTab() {
                 </tbody>
               </table>
             ) : (
-              <LaHint>Click a message to watch its latest field values here.</LaHint>
+              <LaHint>Pick a message.</LaHint>
             )}
             {/* Only messages in this app's dialect can appear: MAVLink's CRC
               folds each message's definition into the checksum, so an

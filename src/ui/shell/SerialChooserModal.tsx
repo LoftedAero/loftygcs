@@ -156,7 +156,7 @@ export function hex(id: string | undefined): string | null {
 export function describePort(p: SerialPortChoice): string | null {
   const vid = hex(p.vendorId)
   const pid = hex(p.productId)
-  if (vid === '0483' && pid === 'DF11') return 'STM32 DFU bootloader — for recovery flashing'
+  if (vid === '0483' && pid === 'DF11') return 'STM32 DFU bootloader'
   const name = p.displayName?.trim()
   if (!name || name === p.portName) return null
   return name

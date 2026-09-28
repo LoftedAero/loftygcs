@@ -67,7 +67,7 @@ export async function listVehicleLogs(): Promise<void> {
       logs.length === 0
         ? {
             kind: 'error',
-            text: `No logs in ${dir}. Has this vehicle flown since its last format?`,
+            text: `No logs in ${dir}`,
           }
         : { kind: 'idle' },
     )
@@ -143,7 +143,7 @@ function describe(err: unknown): string {
   if (/timed out/.test(err.message)) {
     // Either the firmware lacks MAVFTP or a busy
     // telemetry radio drops the replies; nothing here can tell which.
-    return 'No answer from the vehicle. It may not support MAVFTP, or the link may be dropping it — a telemetry radio often does. Over USB this usually works.'
+    return 'No answer from the vehicle. Try connecting over USB.'
   }
   return err.message
 }

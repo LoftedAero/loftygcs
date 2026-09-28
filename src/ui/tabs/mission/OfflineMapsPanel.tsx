@@ -180,7 +180,7 @@ export default function OfflineMapsPanel({
           disabled={!bounds || count === 0}
           title={
             bounds
-              ? `Zoom ${minZoom} to ${maxZoom} over this view; already-stored tiles are skipped`
+              ? `Zoom ${minZoom} to ${maxZoom} over this view`
               : 'Move the map to the area you want'
           }
           onClick={() => void start()}
@@ -233,9 +233,7 @@ export default function OfflineMapsPanel({
         variant="ghost"
         size="block"
         disabled={running || stats.count === 0}
-        onClick={() =>
-          void clearCache().then(() => setOutcome('Cleared. Tiles will come from the network.'))
-        }
+        onClick={() => void clearCache().then(() => setOutcome('Cleared.'))}
       >
         Clear stored maps
       </LaButton>

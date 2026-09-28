@@ -130,7 +130,7 @@ describe('saying what is wrong', () => {
 
   it('refuses an expression with no fields at all', () => {
     // A constant is never what was meant, and a flat line would not say so.
-    expect(fails('2 + 2')).toMatch(/nothing to plot/)
+    expect(fails('2 + 2')).toMatch(/no fields to plot/)
     expect(fails('   ')).toMatch(/Type an expression/)
   })
 

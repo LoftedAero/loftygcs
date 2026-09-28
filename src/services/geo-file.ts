@@ -140,7 +140,7 @@ export function parseGeoFile(text: string): GeoShape[] {
   const root = doc.documentElement.localName
   if (root === 'kml') return kmlShapes(doc)
   if (root === 'gpx') return gpxShapes(doc)
-  throw new Error(`Not a KML or GPX file: the document starts with <${root}>`)
+  throw new Error('Not a KML or GPX file')
 }
 
 // ------------------------------------------------------------- simplifying

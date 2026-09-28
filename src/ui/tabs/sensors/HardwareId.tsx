@@ -64,10 +64,7 @@ export default function HardwareId() {
       </table>
 
       {live.length === 0 && (
-        <p className="app-placeholder">
-          This firmware reports no detected sensors. Every device ID it has is zero, which usually
-          means the sensors are on a bus the board has not been told about.
-        </p>
+        <p className="app-placeholder">This firmware reports no detected sensors.</p>
       )}
     </div>
   )

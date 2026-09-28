@@ -56,9 +56,7 @@ export default function FencePalette() {
           type="button"
           className="mission-palette__btn"
           disabled={draft.length < 3}
-          title={
-            draft.length < 3 ? 'An area needs at least three corners' : 'Close the area and keep it'
-          }
+          title={draft.length < 3 ? 'An area needs at least three corners' : undefined}
           onClick={finish}
         >
           <FinishIcon />

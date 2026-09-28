@@ -59,7 +59,7 @@ describe('parameters opened from a file', () => {
     expect(btn(/Reload from vehicle/).disabled).toBe(true)
     // Reverting an edit to a file is still an edit to a file.
     expect(btn(/^Revert$/).disabled).toBe(false)
-    expect(screen.getByText(/came from a file/)).toBeTruthy()
+    expect(screen.getByText(/Connect a vehicle to write these/)).toBeTruthy()
   })
 
   it('still refuses once a vehicle arrives, while the file is what is shown', () => {

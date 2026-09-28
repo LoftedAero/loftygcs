@@ -115,9 +115,7 @@ export async function uploadFile(file: File): Promise<void> {
   if (file.size > MAX_UPLOAD_BYTES) {
     store.setStatus({
       kind: 'error',
-      text: `${file.name} is ${Math.round(file.size / 1024)} kB. Anything over ${
-        MAX_UPLOAD_BYTES / 1024 / 1024
-      } MB belongs on the card directly — over MAVFTP it would take hours.`,
+      text: `${file.name} is over ${MAX_UPLOAD_BYTES / 1024 / 1024} MB; copy it to the card directly.`,
     })
     return
   }

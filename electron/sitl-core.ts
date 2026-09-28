@@ -266,7 +266,7 @@ export async function installVehicle(
 ): Promise<void> {
   if (!simSupported()) {
     throw new Error(
-      'Prebuilt ArduPilot SITL binaries are published for Windows only. On macOS and Linux, run sim_vehicle.py yourself and use "Connect to a running simulator".',
+      'The simulator download does not support this platform. Run sim_vehicle.py and use "Connect to a running simulator".',
     )
   }
   mkdirSync(baseDir, { recursive: true })

@@ -164,7 +164,7 @@ export default function ItemPalette({ tool, onTool }: ItemPaletteProps) {
             disabled={!connected}
             title={
               connected
-                ? "Put home at the vehicle's position instead of clicking the map"
+                ? "Set home at the vehicle's position"
                 : 'Connect a vehicle to copy its position'
             }
             onClick={() => {

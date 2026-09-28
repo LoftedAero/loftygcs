@@ -232,7 +232,7 @@ export default function CompassCalWizard({ onClose }: { onClose: () => void }) {
           if (c.report?.calStatus === MAG_CAL_SUCCESS) {
             return (
               <LaHint key={id}>
-                {`Compass ${id + 1}: succeeded (fitness ${c.report.fitness.toFixed(1)}, lower is better).${c.report.autosaved ? ' Offsets saved.' : ''}`}
+                {`Compass ${id + 1}: succeeded (fitness ${c.report.fitness.toFixed(1)}).${c.report.autosaved ? ' Offsets saved.' : ''}`}
               </LaHint>
             )
           }

@@ -89,7 +89,7 @@ function loadCesium(): Promise<CesiumModule> {
       script.onload = () => {
         const loaded = (window as unknown as { Cesium?: CesiumModule }).Cesium
         if (loaded) resolve(loaded)
-        else reject(new Error('Cesium.js loaded but defined no Cesium global'))
+        else reject(new Error('The 3D globe did not load.'))
       }
       script.onerror = () => reject(new Error(`could not load ${script.src}`))
       document.head.appendChild(script)
@@ -396,8 +396,7 @@ export default function LogReplay() {
               {', CC-BY-4.0, recolored'}
             </>
           )}
-          {diagnostic && ` · ${diagnostic}`} · imagery © Esri, Maxar, Earthstar Geographics · tiles
-          fetched for this area; the log itself stays on this machine
+          {diagnostic && ` · ${diagnostic}`} · imagery © Esri, Maxar, Earthstar Geographics
         </p>
       )}
     </div>

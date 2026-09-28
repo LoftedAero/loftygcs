@@ -63,7 +63,7 @@ export default function VideoPane() {
           line, always rendered so nothing moves, red while the picture is
           down. */}
       {!desktop ? (
-        <LaHint error>Network video needs the desktop app.</LaHint>
+        <LaHint error>Network video requires the desktop app.</LaHint>
       ) : (
         <LaHint error={status.state === 'error' || status.state === 'retrying'}>
           {status.text || <>&nbsp;</>}

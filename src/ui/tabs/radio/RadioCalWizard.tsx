@@ -286,8 +286,7 @@ export default function RadioCalWizard({
               />
               {conflicts.length > 0 && (
                 <LaHint error>
-                  Two sticks came out on the same channel, so one of them was not moved when it was
-                  asked for. Run the calibration again.
+                  Two sticks mapped to the same channel. Run the calibration again.
                 </LaHint>
               )}
               {refused.length > 0 && (

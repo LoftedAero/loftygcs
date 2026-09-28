@@ -66,9 +66,7 @@ export default function VehicleParamActions({
       </LaButton>
       {!canReachVehicle && (
         <LaHint>
-          {fromFile
-            ? 'These came from a file. Connect a vehicle to write them to it.'
-            : 'Connect a vehicle to write or reload.'}
+          {fromFile ? 'Connect a vehicle to write these.' : 'Connect a vehicle to write or reload.'}
         </LaHint>
       )}
       {/* Failures only: success shows as the count clearing from Write, and

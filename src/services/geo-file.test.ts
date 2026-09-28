@@ -72,7 +72,9 @@ describe('reading KML', () => {
 
   it('says what is wrong rather than returning nothing', () => {
     expect(() => parseGeoFile('not xml at all <')).toThrow(/kmz|XML/i)
-    expect(() => parseGeoFile('<svg xmlns="http://www.w3.org/2000/svg"/>')).toThrow(/svg/)
+    expect(() => parseGeoFile('<svg xmlns="http://www.w3.org/2000/svg"/>')).toThrow(
+      /Not a KML or GPX file/,
+    )
   })
 })
 

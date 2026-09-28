@@ -78,10 +78,7 @@ class VideoService {
     await this.close()
     const bridge = window.loftgcs?.video
     if (!bridge) {
-      this.setStatus(
-        'error',
-        'Video needs the desktop app: the browser cannot open a network stream.',
-      )
+      this.setStatus('error', 'Video requires the desktop app.')
       return
     }
     if (!('VideoDecoder' in window)) {

@@ -4,7 +4,6 @@ import { useParamStore } from '../../stores/param-store'
 import { useUiStore } from '../../stores/ui-store'
 import { useConnectionStore } from '../../stores/connection-store'
 import { connectionService } from '../../services/connection'
-import { MODES, TABS } from '../../stores/ui-store'
 
 // Leaving a page with parameter edits that were never sent. Lists the edits
 // rather than counting them, since the one that matters is the one the user
@@ -29,10 +28,6 @@ export default function UnsavedChangesModal() {
   )
 
   if (!pending) return null
-
-  const target = pending.tab
-    ? (TABS.find((t) => t.id === pending.tab)?.label ?? 'another page')
-    : (MODES.find((m) => m.id === pending.mode)?.label ?? 'another page')
 
   const writeThenGo = async () => {
     setWriting(true)
@@ -77,11 +72,6 @@ export default function UnsavedChangesModal() {
         </>
       }
     >
-      <p className="app-placeholder">
-        These have not been sent to the vehicle. Leaving for <strong>{target}</strong> keeps them
-        staged, but nothing here will remind you they exist.
-      </p>
-
       {/* Marks this dialog for the equal-width action row in app.css. */}
       <div className="param-compare__scroll leave-prompt">
         <table className="param-compare__table">
@@ -110,11 +100,7 @@ export default function UnsavedChangesModal() {
         </table>
       </div>
 
-      {!connected && (
-        <LaHint error>
-          No vehicle connected, so these cannot be written — discard them or reconnect.
-        </LaHint>
-      )}
+      {!connected && <LaHint error>No vehicle connected.</LaHint>}
     </LaModal>
   )
 }

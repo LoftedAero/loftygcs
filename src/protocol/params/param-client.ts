@@ -149,7 +149,7 @@ export class ParamStreamClient {
         const timer = setTimeout(() => {
           this.pendingSets.delete(name)
           if (retriesLeft > 0) attempt(retriesLeft - 1).then(resolve, reject)
-          else reject(new Error(`PARAM_SET ${name}: no echo from vehicle`))
+          else reject(new Error(`${name}: no reply from the vehicle`))
         }, SET_TIMEOUT_MS)
         this.pendingSets.set(name, { resolve, timer })
         this.send('PARAM_SET', {

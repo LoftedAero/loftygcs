@@ -39,13 +39,7 @@ export default function RebootButton({ note, size = 'block', onRebooted }: Reboo
 
   return (
     <>
-      <LaButton
-        variant="ghost"
-        size={size}
-        disabled={!connected}
-        onClick={() => setAsking(true)}
-        title="Restart the flight controller"
-      >
+      <LaButton variant="ghost" size={size} disabled={!connected} onClick={() => setAsking(true)}>
         Reboot autopilot
       </LaButton>
       {note && <LaHint>{note}</LaHint>}
@@ -69,7 +63,7 @@ export default function RebootButton({ note, size = 'block', onRebooted }: Reboo
         <p>
           {armed
             ? 'This vehicle is armed. Disarm before rebooting.'
-            : 'The link drops and comes back once it has booted. Unwritten parameter edits are lost.'}
+            : 'Unwritten parameter edits are lost.'}
         </p>
       </LaModal>
     </>

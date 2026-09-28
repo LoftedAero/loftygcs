@@ -423,10 +423,9 @@ describe('choosing what to launch', () => {
     }
   })
 
-  it('keeps stored parameters when asked, and says what that means', async () => {
+  it('keeps stored parameters when asked', async () => {
     openTray()
     fireEvent.change(screen.getByLabelText('Parameters'), { target: { value: 'keep' } })
-    expect(screen.getByText(/Carries on from wherever/i)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /launch SITL instance/i }))
     await waitFor(() => expect(started).not.toBeNull())
     expect(started).toMatchObject({ params: { kind: 'keep' } })

@@ -51,8 +51,7 @@ const DO_ACTIONS: DoAction[] = [
     id: 'scripting',
     label: 'Stop and restart scripting',
     run: restartScripting,
-    confirm:
-      'Onboard Lua scripts will stop and start again. Anything they were doing is interrupted.',
+    confirm: 'Anything the Lua scripts are doing is interrupted.',
   },
   {
     id: 'reboot',
@@ -205,12 +204,7 @@ export default function FlightControls() {
               <option value={String(shownMode)}>{modeNameNow}</option>
             )}
           </LaSelect>
-          <LaButton
-            variant="secondary"
-            disabled={!connected || !modeStaged}
-            title="Send the selected flight mode"
-            onClick={applyMode}
-          >
+          <LaButton variant="secondary" disabled={!connected || !modeStaged} onClick={applyMode}>
             Set
           </LaButton>
           <LaButton
@@ -390,10 +384,7 @@ export default function FlightControls() {
           </>
         }
       >
-        <p>
-          The vehicle refused to arm, which means one of its own preflight checks failed. Forcing
-          past that skips the check rather than fixing it.
-        </p>
+        <p>A preflight check failed. Force arm skips it rather than fixing it.</p>
       </LaModal>
     </div>
   )

@@ -91,7 +91,7 @@ class UdpSource extends BaseSource {
       this.emit(
         'error',
         e.code === 'EADDRINUSE'
-          ? new Error(`Port ${port} is already in use -- another program is receiving video on it`)
+          ? new Error(`Port ${port} is already in use by another program`)
           : err,
       )
     })

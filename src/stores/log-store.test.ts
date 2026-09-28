@@ -111,7 +111,7 @@ describe('plotting an expression', () => {
 
   it('names the problem rather than adding a broken trace', () => {
     expect(store().addExpression('ATT.Nope + 1')).toMatch(/no ATT\.Nope/)
-    expect(store().addExpression('2 + 2')).toMatch(/nothing to plot/)
+    expect(store().addExpression('2 + 2')).toMatch(/no fields to plot/)
     expect(store().addExpression('   ')).toMatch(/Type an expression/)
     expect(store().selected).toEqual([])
     // And none of that opened a plot with nothing on it.

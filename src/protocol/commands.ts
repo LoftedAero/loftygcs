@@ -57,7 +57,7 @@ export class CommandClient {
         const timer = setTimeout(() => {
           this.pending.delete(command)
           if (retriesLeft > 0) attempt(retriesLeft - 1).then(resolve, reject)
-          else reject(new Error(`command ${command}: no COMMAND_ACK`))
+          else reject(new Error(`Command ${command}: no reply from the vehicle`))
         }, timeoutMs)
         this.pending.set(command, { resolve, reject, timer })
         this.send('COMMAND_LONG', {

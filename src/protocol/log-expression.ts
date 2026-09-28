@@ -208,7 +208,7 @@ function parse(tokens: Token[]): Node {
   }
 
   const tree = expression()
-  if (at < tokens.length) throw new ExpressionError('Unexpected trailing input.')
+  if (at < tokens.length) throw new ExpressionError('Unexpected text after the expression.')
   return tree
 }
 
@@ -260,7 +260,7 @@ export function evaluateExpression(log: ParsedLog, source: string): ExpressionRe
   const tree = parse(lex(text))
   const references = referencesOf(tree)
   if (references.length === 0) {
-    throw new ExpressionError('That has no fields in it, so there is nothing to plot.')
+    throw new ExpressionError('The expression has no fields to plot.')
   }
 
   const series = new Map<string, Series>()

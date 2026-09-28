@@ -192,8 +192,7 @@ export default function LogsTab() {
                       />
                       {/* Gestures are not discoverable by looking at a canvas. */}
                       <LaHint>
-                        Drag across the plot to zoom to that stretch. Shift-drag pans, the wheel
-                        zooms, a double-click puts it all back, and a click sends the replay there.
+                        Drag to zoom, Shift-drag to pan, double-click to reset, click to seek.
                       </LaHint>
                     </>
                   )}

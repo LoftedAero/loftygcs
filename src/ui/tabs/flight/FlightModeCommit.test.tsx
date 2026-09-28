@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 
@@ -38,7 +38,11 @@ const STABILIZE = 0
 const LOITER = 5
 
 const picker = () => screen.getByLabelText('Flight mode') as HTMLSelectElement
-const setBtn = () => screen.getByTitle('Send the selected flight mode') as HTMLButtonElement
+// The Set beside the mode picker; the action row has a Set of its own.
+const setBtn = () =>
+  within(picker().closest('.flight-controls__group') as HTMLElement).getByRole('button', {
+    name: 'Set',
+  }) as HTMLButtonElement
 
 beforeEach(() => {
   sent.length = 0

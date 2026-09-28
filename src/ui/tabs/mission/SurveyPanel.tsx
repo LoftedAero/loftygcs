@@ -57,9 +57,7 @@ export default function SurveyPanel() {
       </div>
 
       {survey.polygon.length < 3 ? (
-        <LaHint>
-          Click the map to drop corners — three at least. Drag one to move it, or use Undo corner.
-        </LaHint>
+        <LaHint>Click the map to drop at least three corners.</LaHint>
       ) : (
         <p className="app-col__note">
           {formatArea(areaM2)}
@@ -146,10 +144,7 @@ export default function SurveyPanel() {
       <LaButton variant="ghost" size="block" onClick={cancel}>
         Cancel survey
       </LaButton>
-      <LaHint>
-        The passes become ordinary waypoints you can edit. The area itself is not kept, so set the
-        spacing before generating.
-      </LaHint>
+      <LaHint>The area is not kept after generating.</LaHint>
     </section>
   )
 }

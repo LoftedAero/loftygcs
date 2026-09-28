@@ -165,7 +165,7 @@ export default function GeoExchange() {
             </div>
           }
         >
-          <p className="la-hint">A file cannot say which kind of fence it is.</p>
+          <p className="la-hint">Which kind of fence are these?</p>
         </LaModal>
       )}
 

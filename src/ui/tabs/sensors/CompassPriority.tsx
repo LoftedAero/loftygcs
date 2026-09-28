@@ -171,9 +171,7 @@ export default function CompassPriority() {
               ) : r.id === 0 ? (
                 <span className="compass-prio__na">—</span>
               ) : (
-                <span className="compass-prio__na" title="An internal compass turns with the board">
-                  Follows the board
-                </span>
+                <span className="compass-prio__na">Follows the board</span>
               )}
             </span>
 

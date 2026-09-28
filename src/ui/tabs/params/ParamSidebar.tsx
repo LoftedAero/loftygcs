@@ -204,7 +204,7 @@ function ImportButton() {
       >
         <p className="app-placeholder">
           {result?.opened ? (
-            `Opened ${result.applied} parameter${result.applied === 1 ? '' : 's'} from ${result.file}. These are the file's, not a vehicle's.`
+            `Opened ${result.applied} parameter${result.applied === 1 ? '' : 's'} from ${result.file}.`
           ) : (
             /* Names the column's buttons as labeled there. */
             <>

@@ -11,12 +11,12 @@ import type { FirmwareVersion } from './types'
 
 /** MAV_MOUNT_MODE. */
 export const MOUNT_MODES = [
-  { value: 0, label: 'Retracted', hint: 'Stowed in its travel position.' },
-  { value: 1, label: 'Neutral', hint: 'Held at its resting angles.' },
-  { value: 2, label: 'MAVLink', hint: 'Pointed by this station.' },
-  { value: 3, label: 'RC', hint: 'Pointed by the transmitter.' },
-  { value: 4, label: 'GPS point', hint: 'Held on a location — the region of interest.' },
-  { value: 6, label: 'Home', hint: 'Held on the launch point.' },
+  { value: 0, label: 'Retracted' },
+  { value: 1, label: 'Neutral' },
+  { value: 2, label: 'MAVLink' },
+  { value: 3, label: 'RC' },
+  { value: 4, label: 'GPS point' },
+  { value: 6, label: 'Home' },
 ] as const
 
 export function mountModeLabel(mode: number): string {

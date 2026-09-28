@@ -99,7 +99,7 @@ function channelWord(o: ReleaseChoice): string {
 
 async function fetchImage(url: string): Promise<string> {
   const bridge = window.loftgcs
-  if (!bridge) throw new Error('downloading needs the desktop app')
+  if (!bridge) throw new Error('downloading requires the desktop app')
   return new TextDecoder().decode(await bridge.app.fetchFirmware(url))
 }
 
@@ -513,7 +513,7 @@ function FirmwareCard() {
                   ? { text: 'Loading the build list…' }
                   : !board
                     ? {
-                        text: 'Detect a board to flash. A board that has never run ArduPilot must be in DFU mode.',
+                        text: 'Detect a board to flash. A board without the ArduPilot bootloader must be in DFU mode.',
                       }
                     : vehicle && !isTunedFor(vehicle)
                       ? {
@@ -560,7 +560,7 @@ function FirmwareCard() {
                 ? 'From the build page, download the _with_bl.hex — this board has no ArduPilot bootloader.'
                 : board
                   ? 'From the build page, download the .apj.'
-                  : 'Detect the board first: the build page offers an .apj and a _with_bl.hex, and which one you need depends on the board.',
+                  : 'Detect the board first; the file you need depends on it.',
             )
           }}
         />
@@ -629,10 +629,7 @@ function FirmwareCard() {
             </>
           }
         >
-          <p>
-            Detecting a board reboots it into its bootloader, so the telemetry link will drop and
-            the vehicle will stop running its firmware until it is flashed or detection is finished.
-          </p>
+          <p>The flight controller will enter bootloader mode.</p>
           <p>Nothing is erased by detecting.</p>
         </LaModal>
       )}

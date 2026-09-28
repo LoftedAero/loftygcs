@@ -32,7 +32,7 @@ export default function PlottedFields() {
     return (
       <section className="app-col__group">
         <h3 className="app-col__head">Plotted</h3>
-        <LaHint>Nothing yet. Pick fields from the list on the left.</LaHint>
+        <LaHint>None.</LaHint>
       </section>
     )
   }

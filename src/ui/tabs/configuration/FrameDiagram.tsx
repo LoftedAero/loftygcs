@@ -121,7 +121,7 @@ export default function FrameDiagram({
       className={className}
       viewBox="-112 -112 224 224"
       role="img"
-      aria-label={`${motors.filter((m) => !m.servo).length} motors, numbered as the motor test spins them`}
+      aria-label={`${motors.filter((m) => !m.servo).length} motors, labeled as the motor test spins them`}
     >
       {/* The arms, under everything. */}
       <g className="frame-diagram__arms">

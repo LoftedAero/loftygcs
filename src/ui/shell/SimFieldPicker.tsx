@@ -199,7 +199,7 @@ export default function SimFieldPicker() {
         <LaHint>
           {lookingUp
             ? 'Looking up the ground elevation…'
-            : `${home.latDeg.toFixed(6)}, ${home.lonDeg.toFixed(6)} — click or drag to move. Turn the arrow to match the runway; with RealFlight that heading is what lines its scenery up with the map.`}
+            : `${home.latDeg.toFixed(6)}, ${home.lonDeg.toFixed(6)} — click or drag to move. Turn the arrow to match the runway.`}
         </LaHint>
       </div>
     </LaModal>

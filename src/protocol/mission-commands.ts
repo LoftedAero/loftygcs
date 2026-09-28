@@ -75,7 +75,7 @@ export const MISSION_COMMANDS: readonly MissionCommandSpec[] = [
     location: false,
     altitude: true,
     params: [{ index: 1, label: 'Pitch', unit: '°', min: 0 }, YAW],
-    summary: 'Climb to altitude. Must be the first item of a mission that flies.',
+    summary: 'Climb to altitude.',
   },
   {
     id: 21,
@@ -158,7 +158,7 @@ export const MISSION_COMMANDS: readonly MissionCommandSpec[] = [
     location: true,
     altitude: true,
     params: [{ index: 1, label: 'Hold', unit: 's', min: 0 }],
-    summary: 'Fly a curve through this point rather than a straight leg.',
+    summary: 'Fly a curve through this point.',
   },
   {
     id: 189,
@@ -470,7 +470,7 @@ export const MISSION_COMMANDS: readonly MissionCommandSpec[] = [
         ],
       },
     ],
-    summary: 'Move home, which is where RTL returns to.',
+    summary: 'Move the home position.',
   },
   {
     id: 182,

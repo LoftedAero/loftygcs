@@ -357,7 +357,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     if (selected.some((f) => f.expression === text)) return 'That expression is already plotted.'
     const problem = expressionError(log, text)
     if (problem) return problem
-    if (!referencesIn(log, text)) return 'That has no fields in it, so there is nothing to plot.'
+    if (!referencesIn(log, text)) return 'The expression has no fields to plot.'
     // Expressions have no unit, so they take the next free axis.
     const existing = selected.map((f) => ({
       axis: f.axis,

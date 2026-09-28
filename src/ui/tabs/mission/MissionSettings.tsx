@@ -40,9 +40,6 @@ export default function RadiusParams() {
       {present.map((p) => (
         <RadiusField key={p.name} name={p.name} label={p.label} unit={p.unit} enabled={connected} />
       ))}
-      {present.length > 0 && (
-        <LaHint>Stored on the vehicle, not in the mission. Written when you press Enter.</LaHint>
-      )}
     </section>
   )
 }
@@ -72,7 +69,6 @@ function PlanForPicker() {
           <option value="rover">Rover</option>
         </LaSelect>
       </LaField>
-      <LaHint>Decides which commands this plan can use. A connected vehicle sets it itself.</LaHint>
     </>
   )
 }

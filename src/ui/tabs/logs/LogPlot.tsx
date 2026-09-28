@@ -148,10 +148,7 @@ export default function LogPlot() {
     // because the sizing observer attaches once on mount.
     <div className="log-plot" ref={wrapRef}>
       {series.length === 0 && (
-        <p className="log-plot__hint app-placeholder">
-          Pick a field on the left to plot it. Fields are grouped by the message that carries them,
-          and RC and servo channels are named by what they do on this aircraft.
-        </p>
+        <p className="log-plot__hint app-placeholder">Pick a field to plot.</p>
       )}
       <canvas
         ref={canvasRef}

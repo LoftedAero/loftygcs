@@ -104,7 +104,7 @@ export function manifestAvailable(): boolean {
 export async function loadFirmwareManifest(): Promise<FirmwareOption[]> {
   if (cache) return cache
   const bridge = window.loftgcs
-  if (!bridge) throw new Error('firmware browsing needs the desktop app (CORS)')
+  if (!bridge) throw new Error('Firmware browsing requires the desktop app')
   const gz = await bridge.app.fetchFirmware(MANIFEST_URL)
   const stream = new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))
   const json = (await new Response(stream).json()) as { firmware?: ManifestEntry[] }

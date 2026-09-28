@@ -175,11 +175,7 @@ function ClearPrompt({
         </div>
       }
     >
-      <p>
-        {connected
-          ? 'Clearing here does not change what the vehicle holds.'
-          : 'Not connected, so only this screen can be cleared.'}
-      </p>
+      {!connected && <p>Not connected, so only this screen can be cleared.</p>}
     </LaModal>
   )
 }

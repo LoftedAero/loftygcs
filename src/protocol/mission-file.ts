@@ -110,7 +110,7 @@ export function parsePlanFile(text: string): PlanImport {
     .filter((it) => it.type && it.type !== 'SimpleItem')
   if (complex.length > 0) {
     const kinds = [...new Set(complex.map((c) => c.complexItemType ?? c.type))].join(', ')
-    throw new Error(`This .plan uses items Loft GCS cannot import yet: ${kinds}`)
+    throw new Error(`This .plan has items that cannot be imported: ${kinds}`)
   }
 
   const items: MissionItem[] = []

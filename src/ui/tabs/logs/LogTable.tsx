@@ -57,10 +57,7 @@ export default function LogTable() {
       </div>
 
       {!table ? (
-        <p className="app-placeholder">
-          Pick a message to see its records. Each message type has its own columns, which is why
-          they are shown one at a time rather than interleaved.
-        </p>
+        <p className="app-placeholder">Pick a message to see its records.</p>
       ) : (
         <div className="log-table__scroll" ref={scrollRef}>
           <table className="log-table__grid">

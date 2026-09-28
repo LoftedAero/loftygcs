@@ -23,7 +23,7 @@ export default function PlotPresets() {
       <h3 className="app-col__head">Presets</h3>
 
       {names.length === 0 ? (
-        <LaHint>None saved. Set the plot up, name it, and it comes back next time.</LaHint>
+        <LaHint>None saved.</LaHint>
       ) : (
         names.map((n) => (
           <div key={n} className="preset">

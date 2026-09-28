@@ -119,7 +119,7 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
       <p className="app-simtray__note">
         {status?.supported
           ? 'Real ArduPilot firmware, running locally.'
-          : 'Prebuilt SITL binaries are published for Windows only. Run sim_vehicle.py yourself and connect to it below.'}
+          : 'No prebuilt SITL for this platform. Run sim_vehicle.py and connect below.'}
       </p>
 
       {status?.supported && (
@@ -211,14 +211,6 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
               <option value="pick">Select from file</option>
             </LaSelect>
           </LaField>
-          {/* A chosen file needs no hint; its name is in the field. */}
-          {!paramsFile && (
-            <LaHint>
-              {params.kind === 'wipe'
-                ? 'Every launch starts from the same known vehicle.'
-                : 'Carries on from wherever the last session left the vehicle.'}
-            </LaHint>
-          )}
           {/* Home is read at boot, so it is disabled while running. It is
               picked on the map rather than typed: a mistyped coordinate still
               parses, and the heading only means anything against the runway
@@ -310,17 +302,14 @@ export default function SimulatorControls({ onStarted }: { onStarted?: () => voi
               {progress.file} ({progress.done}/{progress.total})
             </LaHint>
           )}
-          {!isInstalled && !busy && (
-            <LaHint>About 20 MB, downloaded once from firmware.ardupilot.org.</LaHint>
-          )}
+          {!isInstalled && !busy && <LaHint>About 20 MB.</LaHint>}
           {connected && !running && (
             <LaHint>Disconnect the current vehicle before starting the simulator.</LaHint>
           )}
           {waitingForRealFlight && (
             <LaHint>
-              The simulator is running and waiting for RealFlight. It sends no telemetry until
-              RealFlight is exchanging data, so connect once RealFlight is up with Simulation
-              &rsaquo; Settings &rsaquo; Physics &rsaquo; &ldquo;RealFlight Link enabled&rdquo;.
+              Waiting for RealFlight: Simulation &rsaquo; Settings &rsaquo; Physics &rsaquo;
+              &ldquo;RealFlight Link enabled&rdquo;.
             </LaHint>
           )}
         </>
