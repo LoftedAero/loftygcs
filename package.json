@@ -101,7 +101,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "menuCategory": "Lofty GCS",
+      "menuCategory": "Lofted Aero",
       "uninstallDisplayName": "Lofty GCS",
       "artifactName": "LoftyGCS_${version}_windows_setup.${ext}"
     },

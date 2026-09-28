@@ -68,8 +68,9 @@ it. The steps below get past it on each platform.
 1. Run `LoftyGCS_<version>_windows_setup.exe`.
 2. When "Windows protected your PC" appears, click More info, then Run anyway.
 
-The installer runs for the current user only. It needs no administrator
-rights and writes nothing outside your profile.
+The installer asks whether to install for you only or for everyone on the
+computer. For you only needs no administrator rights and installs under your
+profile; for everyone installs to `C:\Program Files\Lofted Aero\Lofty GCS`.
 
 ### macOS
 
