@@ -112,6 +112,81 @@ describe('ProtocolEngine', () => {
       expect(stats.stats.heartbeatAgeMs).toBeGreaterThanOrEqual(0)
     }
   })
+
+  describe('telemetry requests', () => {
+    const planeHeartbeat = () =>
+      encodeFrame(
+        'HEARTBEAT',
+        { type: 1, autopilot: 3, baseMode: 81, customMode: 0, systemStatus: 3, mavlinkVersion: 3 },
+        0,
+        1,
+        1,
+      )
+    const txFrames = () =>
+      outputs
+        .filter((o) => o.t === 'tx')
+        .map((o) => {
+          const msgid = o.bytes[7]! | (o.bytes[8]! << 8) | (o.bytes[9]! << 16)
+          return decodeFrameFields(msgid, o.bytes.subarray(10, o.bytes.length - 2))!
+        })
+    const intervalRequests = () =>
+      txFrames()
+        .filter((f) => f.msgName === 'COMMAND_LONG' && f.fields.command === 511)
+        .map((f) => [f.fields._param1, f.fields._param2])
+    const ack = (command: number, result: number) =>
+      engine.pushBytes(encodeFrame('COMMAND_ACK', { command, result }, 0, 1, 1))
+
+    it('asks a plane for each message by interval and never for saved streams', async () => {
+      engine.start()
+      engine.pushBytes(planeHeartbeat())
+      for (let i = 0; i < 10; i++) {
+        ack(511, 0)
+        await vi.advanceTimersByTimeAsync(0)
+      }
+      expect(txMessages()).not.toContain('REQUEST_DATA_STREAM')
+      const reqs = intervalRequests()
+      expect(reqs[0]).toEqual([30, 250000]) // ATTITUDE at 4 Hz
+      expect(reqs).toHaveLength(10)
+    })
+
+    it('falls back to the stream request on firmware without SET_MESSAGE_INTERVAL', async () => {
+      engine.start()
+      engine.pushBytes(planeHeartbeat())
+      ack(511, 3) // UNSUPPORTED
+      await vi.advanceTimersByTimeAsync(0)
+      expect(txMessages()).toContain('REQUEST_DATA_STREAM')
+      expect(intervalRequests()).toHaveLength(1)
+    })
+
+    it('halves the rates on a slow link', async () => {
+      engine.start()
+      engine.pushBytes(planeHeartbeat())
+      await vi.advanceTimersByTimeAsync(800) // the first ack takes 800 ms
+      ack(511, 0)
+      await vi.advanceTimersByTimeAsync(0)
+      const reqs = intervalRequests()
+      expect(reqs[1]).toEqual([30, 500000]) // ATTITUDE again, at 2 Hz
+    })
+
+    it('times the link with TIMESYNC', async () => {
+      engine.start()
+      engine.pushBytes(vehicleHeartbeat())
+      await vi.advanceTimersByTimeAsync(2000)
+      const req = txFrames().find((f) => f.msgName === 'TIMESYNC')!
+      expect(req.fields.tc1).toBe(0n)
+      await vi.advanceTimersByTimeAsync(600)
+      engine.pushBytes(
+        encodeFrame('TIMESYNC', { tc1: 123456789n, ts1: req.fields.ts1 as bigint }, 0, 1, 1),
+      )
+      // After a measured 600 ms round trip, a command with a 200 ms timeout
+      // is not resent at 300 ms.
+      const sent = () =>
+        txFrames().filter((f) => f.msgName === 'COMMAND_LONG' && f.fields.command === 400)
+      void engine.runCommand(400, [1], 200).catch(() => {})
+      await vi.advanceTimersByTimeAsync(300)
+      expect(sent()).toHaveLength(1)
+    })
+  })
 })
 
 describe('the inspector', () => {

@@ -194,6 +194,44 @@ report no `MAV_PROTOCOL_CAPABILITY_FTP` while serving MAVFTP. The bits are decod
 `vehicle-store` for display only; act on what an operation answers (an ack, a listing, a NAK).
 Likewise, an unrecognized value is not an absent one.
 
+### Telemetry requests (`requestTelemetry` in `protocol/engine.ts`)
+
+ArduPlane (and Rover before 4.7) saves a `REQUEST_DATA_STREAM` into its stream-rate parameters
+(`SRn_*`, renamed `MAVn_*` in 4.7), so a GCS that sends one overwrites rates the user chose for
+the link, such as the reduced ones an ELRS link needs. Copter, Sub, Blimp and Tracker do not
+save it, and Copter's defaults are 0, so the request is what makes it stream at all.
+
+- Vehicles that save it (fixed wing, the VTOL types, rover, boat) get one
+  `SET_MESSAGE_INTERVAL` per message the app displays (`MESSAGE_RATES_HZ`), which is never
+  saved. The rest keep the all-streams request at 4 Hz.
+- If the first interval request is refused or unanswered, the firmware predates it and gets the
+  all-streams request after all.
+- On a link slower than `SLOW_LINK_RTT_MS` the interval rates are halved.
+- `sitl.integration.test.ts` checks that connecting to Plane SITL leaves `SR0_*`/`MAV1_*` at 1.
+
+### Slow links (`protocol/link-timing.ts`)
+
+A radio link can answer in seconds where USB answers in milliseconds: ELRS in MAVLink mode at
+333 Hz carries about 46 messages a second and answers a request in about 0.5 s, at 150 Hz about
+10 messages and 2.5 s. Every request/response client takes its timeout from one `RttEstimator`
+(the TCP method, RFC 6298), with its old constant as a floor so fast links behave as before.
+
+- The estimate comes from TIMESYNC (sent on the first heartbeat, then every 2 s; ArduPilot
+  echoes `ts1`) and from first-attempt replies to commands and parameter writes. A reply to a
+  resend is ambiguous about which send it answers, so it is not sampled.
+- Each retry waits twice as long as the one before, capped at 10 s: on a radio a missed reply is
+  usually queued behind telemetry, not lost. Replies to earlier attempts are accepted (MAVFTP
+  keeps every attempt's sequence number registered until the request settles).
+- A parameter download waits up to 3 s for the first measurement before trying MAVFTP, whose
+  500 ms floor would otherwise give up on a slow link before it was measured.
+- Missing parameters are refetched a few at a time (`REFETCH_WINDOW`), each index on its own
+  timeout, rather than a flood of requests that queues behind telemetry.
+- `slow-link.integration.test.ts` runs parameters and a mission through `SlowLink`
+  (`src/test-fixtures/slow-link.ts`), which models ELRS at 333 Hz: 1.8 kB/s down, latency, loss,
+  and the receiver's 1 kB buffer, reported to ArduPilot in RADIO_STATUS so it throttles its
+  streams as it would on the real link. Measured: Plane's 1,419 parameters in about 64 s and a
+  40-item mission up and back in about 39 s; Copter 74 s and 58 s.
+
 ### Airframe banner (`protocol/airframe.ts`)
 
 ArduPilot announces its frame at boot ("QuadPlane Frame: F-35B") to STATUSTEXT and to a MSG log
@@ -288,6 +326,10 @@ faded; the switch changes what clicks mean.
   screen is still enforced. The vehicle half is `MISSION_CLEAR_ALL` (`services/plan-clear.ts`),
   covered for all three types in `sitl.integration.test.ts`. A refused clear leaves the screen
   unchanged.
+- During an upload ArduPilot answers an item it did not ask for with a MISSION_ACK of
+  INVALID_SEQUENCE and keeps waiting for the one it wants. On a slow link that is our resend
+  crossing its next request, so the client ignores that ack during an upload rather than
+  failing the transfer.
 
 ### Geofence (`protocol/geofence.ts`)
 
@@ -573,6 +615,11 @@ sequential.
   TerminateSession ack arrives only after the burst in flight (~0.6 s), which is also why the
   next request after a cancel waits about that long. A canceled read never falls back to
   sequential reads and ends quietly.
+- ArduPilot paces a burst by its serial port's baud, not the radio's air rate. Behind ELRS
+  (460800 baud, about 1.8 kB/s on air) the receiver's buffer overflows and each burst loses all
+  but its first few packets, which made a 15 kB `param.pck` take four minutes. Two short bursts
+  in a row (`WEAK_BURST_BYTES`) switch the read to sequential requests, resuming where the
+  bursts left off.
 
 ### Writing (`services/vehicle-files.ts`)
 
@@ -784,6 +831,10 @@ Behavior to know:
     two packets. `avdec_h264` conceals truncated slices unless `output-corrupt=false` is set.
   - The size assertions are calibrated against measured values. If one fails, check the
     fixture before the client.
+- `slow-link.integration.test.ts` (part of `SITL=1`) runs parameters and a mission through an
+  ELRS-like link; see [Slow links](#slow-links-protocollink-timingts). It takes about two minutes.
+- `electron/sitl-core.test.ts` launches its own simulator on port 5760, so run it with no other
+  SITL on that port.
 - `LOG_SWEEP=<dir> npx vitest run log-sweep.test.ts` runs the log pipeline over a directory of
   real logs.
 - Test fakes should be strict. The MAVLink encoder accepts any field name, so a fake that

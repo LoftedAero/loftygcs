@@ -204,6 +204,8 @@ export interface LinkStats {
   badFrames: number
   /** ms since the last vehicle HEARTBEAT, or -1 before the first one. */
   heartbeatAgeMs: number
+  /** Smoothed request-to-reply time, or null before it has been measured. */
+  rttMs: number | null
 }
 
 export interface ParamRecord {

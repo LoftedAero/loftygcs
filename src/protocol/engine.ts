@@ -11,6 +11,7 @@ import { decodeParamPck } from './params/pck'
 import { ParamStreamClient } from './params/param-client'
 import { CommandClient } from './commands'
 import { MissionClient } from './mission'
+import { RttEstimator } from './link-timing'
 import type {
   DecodedMessage,
   EngineOutput,
@@ -36,6 +37,39 @@ const FIELDS_FLUSH_MS = 100
 const LINKSTATS_INTERVAL_MS = 1000
 // 4 Hz for every stream: plenty for readouts, gentle on telemetry radios.
 const STREAM_RATE_HZ = 4
+
+const MAV_CMD_SET_MESSAGE_INTERVAL = 511
+/**
+ * MAV_TYPEs of the vehicles that save a REQUEST_DATA_STREAM into their SRn_
+ * parameters (ArduPlane, and Rover before 4.7): fixed wing, the VTOL types a
+ * quadplane can report, ground rover and boat. Saving would overwrite rates
+ * the user chose for the link, such as the reduced ones an ELRS link needs,
+ * so these get SET_MESSAGE_INTERVAL, which is never saved.
+ */
+const SAVES_STREAM_RATES = new Set([1, 10, 11, 19, 20, 21, 22, 23, 24, 25])
+/** The messages the app displays, as [msgid, Hz], most important first. */
+const MESSAGE_RATES_HZ: readonly [number, number][] = [
+  [30, 4], // ATTITUDE
+  [33, 4], // GLOBAL_POSITION_INT
+  [74, 4], // VFR_HUD
+  [1, 2], // SYS_STATUS
+  [24, 2], // GPS_RAW_INT
+  [147, 1], // BATTERY_STATUS
+  [65, 2], // RC_CHANNELS
+  [36, 2], // SERVO_OUTPUT_RAW
+  [62, 2], // NAV_CONTROLLER_OUTPUT
+  [42, 1], // MISSION_CURRENT
+]
+/** A link with a longer round trip gets half the message rates. */
+const SLOW_LINK_RTT_MS = 400
+/** How often the link round trip is measured with TIMESYNC. */
+const TIMESYNC_INTERVAL_MS = 2000
+/**
+ * How long a parameter download waits for the first round-trip measurement.
+ * MAVFTP's short timeouts would otherwise give up on a slow link before it
+ * was measured, and the stream fallback is several times slower.
+ */
+const FIRST_RTT_WAIT_MS = 3000
 
 /** Smallest gap between file-transfer progress events, in milliseconds. */
 const PROGRESS_INTERVAL_MS = 100
@@ -85,20 +119,35 @@ export class ProtocolEngine {
   /** Whether the last flush said anything, so "now empty" is still said once. */
   private trafficSent = false
 
+  /** Measured link round trip; every client below takes its timeouts from it. */
+  private rtt = new RttEstimator()
+  /** Bumped on stop, so work started for one connection never runs on the next. */
+  private linkGen = 0
+  /** TIMESYNC requests awaiting their echo: ts1 as sent, and when. */
+  private timesyncSent = new Map<bigint, number>()
+  private timesyncSeq = 0
+
   // MAVFTP is a fast path, not a requirement: a short op timeout lets
   // firmware without it fall back quickly instead of stalling.
-  private ftp = new MavFtpClient((payload) => this.sendFtpPayload(payload), 500)
+  private ftp = new MavFtpClient(
+    (payload) => this.sendFtpPayload(payload),
+    () => this.rtt.timeout(500),
+  )
   private paramStream = new ParamStreamClient(
     (msgName, fields) => this.send(msgName, fields),
     () => ({ sysid: this.vehicleSysid ?? 1, compid: this.vehicleCompid }),
+    this.rtt,
   )
   private commands = new CommandClient(
     (msgName, fields) => this.send(msgName, fields),
     () => ({ sysid: this.vehicleSysid ?? 1, compid: this.vehicleCompid }),
+    this.rtt,
   )
   private mission = new MissionClient(
     (msgName, fields) => this.send(msgName, fields),
     () => ({ sysid: this.vehicleSysid ?? 1, compid: this.vehicleCompid }),
+    1500,
+    this.rtt,
   )
 
   constructor(private emit: (out: EngineOutput) => void) {}
@@ -113,6 +162,7 @@ export class ProtocolEngine {
     this.timers.push(setInterval(() => this.flushFields(), FIELDS_FLUSH_MS))
     this.timers.push(setInterval(() => this.reportLinkStats(), LINKSTATS_INTERVAL_MS))
     this.timers.push(setInterval(() => this.flushTraffic(), TRAFFIC_FLUSH_MS))
+    this.timers.push(setInterval(() => this.sendTimesync(), TIMESYNC_INTERVAL_MS))
     this.sendHeartbeat()
   }
 
@@ -124,6 +174,9 @@ export class ProtocolEngine {
     this.lastHeartbeatAt = -1
     this.vehicleSysid = null
     this.streamsRequested = false
+    this.linkGen++
+    this.rtt.reset()
+    this.timesyncSent.clear()
     this.setInspecting(false)
     this.inspectRows.clear()
     this.ftp.abort('link closed')
@@ -236,7 +289,8 @@ export class ProtocolEngine {
         })
         if (!this.streamsRequested) {
           this.streamsRequested = true
-          this.requestStreams()
+          this.sendTimesync()
+          void this.requestTelemetry(msg.fields.type as number)
           this.requestVersion()
           this.requestBanner()
         }
@@ -288,6 +342,17 @@ export class ProtocolEngine {
       case 'PARAM_VALUE':
         this.paramStream.handleParamValue(msg.fields)
         return
+      case 'TIMESYNC': {
+        // A reply carries the vehicle's clock in tc1 and echoes our ts1. The
+        // vehicle's own requests (tc1 = 0) are not ours to time.
+        if (BigInt(msg.fields.tc1 as bigint) === 0n) return
+        const ts1 = BigInt(msg.fields.ts1 as bigint)
+        const sentAt = this.timesyncSent.get(ts1)
+        if (sentAt === undefined) return
+        this.timesyncSent.delete(ts1)
+        this.rtt.sample(Date.now() - sentAt)
+        return
+      }
       case 'FILE_TRANSFER_PROTOCOL':
         this.ftp.handlePayload(msg.fields.payload as number[])
         return
@@ -368,7 +433,53 @@ export class ProtocolEngine {
     })
   }
 
-  private requestStreams() {
+  /**
+   * Ask for the telemetry the app displays. Vehicles that save stream
+   * requests get one SET_MESSAGE_INTERVAL per message, at half rate on a slow
+   * link; the rest get the classic all-streams request. Firmware that refuses
+   * SET_MESSAGE_INTERVAL gets the classic request too, saved or not.
+   */
+  private async requestTelemetry(vehicleType: number) {
+    if (!SAVES_STREAM_RATES.has(vehicleType)) {
+      this.requestAllStreams()
+      return
+    }
+    const gen = this.linkGen
+    let scale = 1
+    let scaled = false
+    for (let i = 0; i < MESSAGE_RATES_HZ.length; i++) {
+      const [msgid, hz] = MESSAGE_RATES_HZ[i]!
+      let result: number
+      try {
+        result = await this.commands.run(MAV_CMD_SET_MESSAGE_INTERVAL, [
+          msgid,
+          Math.round(1e6 / (hz * scale)),
+          0,
+          0,
+          0,
+          0,
+          0,
+        ])
+      } catch {
+        result = -1
+      }
+      if (gen !== this.linkGen) return
+      if (i > 0) continue
+      if (result !== 0) {
+        this.requestAllStreams()
+        return
+      }
+      // The first exchange has measured the link; halve everything on a slow
+      // one, including the message already requested.
+      if (!scaled && (this.rtt.rttMs ?? 0) > SLOW_LINK_RTT_MS) {
+        scaled = true
+        scale = 0.5
+        i = -1
+      }
+    }
+  }
+
+  private requestAllStreams() {
     if (this.vehicleSysid === null) return
     // Legacy stream request: one message, and it works on every ArduPilot version.
     this.send('REQUEST_DATA_STREAM', {
@@ -401,6 +512,24 @@ export class ProtocolEngine {
     void this.commands.run(42428, [0, 0, 0, 0, 0, 0, 0]).catch(() => {})
   }
 
+  /** Time the link: the vehicle echoes ts1, so the reply's age is the round trip. */
+  private sendTimesync() {
+    if (this.vehicleSysid === null) return
+    const now = Date.now()
+    for (const [ts, at] of this.timesyncSent) {
+      if (now - at > 30000) this.timesyncSent.delete(ts)
+    }
+    // Unique per request, so a late echo never matches the wrong one.
+    const ts1 = BigInt(now) * 1000000n + BigInt(this.timesyncSeq++ % 1000000)
+    this.timesyncSent.set(ts1, now)
+    this.send('TIMESYNC', {
+      tc1: 0n,
+      ts1,
+      targetSystem: this.vehicleSysid,
+      targetComponent: this.vehicleCompid,
+    })
+  }
+
   private sendFtpPayload(payload: number[]) {
     this.send('FILE_TRANSFER_PROTOCOL', {
       targetNetwork: 0,
@@ -412,6 +541,10 @@ export class ProtocolEngine {
 
   /** MAVFTP fast path with automatic fallback to the message stream. */
   async downloadParams(): Promise<ParamDownloadResult> {
+    const until = Date.now() + FIRST_RTT_WAIT_MS
+    while (this.rtt.rttMs === null && Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 50))
+    }
     try {
       const blob = await this.ftp.readFile('@PARAM/param.pck', (got, total) =>
         this.emit({ t: 'evt', evt: { t: 'paramProgress', got, total, source: 'ftp' } }),
@@ -545,6 +678,7 @@ export class ProtocolEngine {
           droppedBytes: s.droppedBytes - this.lastStats.droppedBytes,
           badFrames: s.badFrames - this.lastStats.badFrames,
           heartbeatAgeMs: this.lastHeartbeatAt < 0 ? -1 : Date.now() - this.lastHeartbeatAt,
+          rttMs: this.rtt.rttMs,
         },
       },
     })

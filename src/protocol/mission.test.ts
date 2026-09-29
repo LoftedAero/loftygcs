@@ -128,6 +128,19 @@ describe('upload', () => {
     expect(sent.filter((s) => s.msgName === 'MISSION_ITEM_INT')).toHaveLength(3)
   })
 
+  it('survives the vehicle rejecting a resend that crossed its next request', async () => {
+    const { client } = harness()
+    const items = [item(0), item(1), item(2)]
+    const done = client.upload(items)
+    client.handleMessage('MISSION_REQUEST_INT', { seq: 0, missionType: 0 })
+    client.handleMessage('MISSION_REQUEST_INT', { seq: 1, missionType: 0 })
+    // Our late resend of item 0 arrives after the vehicle moved on to 1.
+    client.handleMessage('MISSION_ACK', { type: 13, missionType: 0 })
+    client.handleMessage('MISSION_REQUEST_INT', { seq: 2, missionType: 0 })
+    client.handleMessage('MISSION_ACK', { type: 0, missionType: 0 })
+    await expect(done).resolves.toBeUndefined()
+  })
+
   it('answers the deprecated MISSION_REQUEST with MISSION_ITEM_INT', async () => {
     // Older firmware asks with the float-era message; the spec's upgrade path
     // is to answer with the INT item regardless.

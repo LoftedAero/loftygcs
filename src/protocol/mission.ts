@@ -8,6 +8,7 @@
 //
 // Parameterized by mission_type because geofences and rally points use the
 // same handshake with a different type value.
+import { backoff, type RttEstimator } from './link-timing'
 import type { FieldValue, MissionItem } from './types'
 
 /** MAV_MISSION_RESULT names, for turning a rejected upload into a sentence. */
@@ -66,7 +67,9 @@ interface Clear {
 
 type Active = (Download | Upload | Clear) & { missionType: number; retries: number }
 
-const STEP_RETRIES = 4
+// Timeouts per step grow with the measured link round trip (link-timing);
+// stepTimeoutMs is the floor.
+const STEP_RETRIES = 5
 
 export class MissionClient {
   private active: Active | null = null
@@ -76,6 +79,7 @@ export class MissionClient {
     private send: SendFn,
     private target: () => { sysid: number; compid: number },
     private stepTimeoutMs = 1500,
+    private rtt?: RttEstimator,
   ) {}
 
   /**
@@ -161,6 +165,10 @@ export class MissionClient {
         // Downloads are acked by us, not the vehicle, but an error ack is the
         // vehicle refusing to serve the list at all.
         if (a.kind === 'download' && result === 0) return
+        // ArduPilot answers an item it did not ask for, such as our resend
+        // crossing its next request on a slow link, with INVALID_SEQUENCE and
+        // keeps waiting for the one it wants. The upload is still alive.
+        if (a.kind === 'upload' && result === 13) return
         if (result === 0) {
           this.finish(() => (a as Upload | Clear).resolve())
         } else {
@@ -287,7 +295,11 @@ export class MissionClient {
 
   private bumpStep() {
     if (this.stepTimer) clearTimeout(this.stepTimer)
-    this.stepTimer = setTimeout(() => this.onStepTimeout(), this.stepTimeoutMs)
+    this.stepTimer = setTimeout(
+      () => this.onStepTimeout(),
+      this.rtt?.timeout(this.stepTimeoutMs, this.active?.retries ?? 0) ??
+        backoff(this.stepTimeoutMs, this.active?.retries ?? 0),
+    )
   }
 
   private finish(deliver: () => void) {

@@ -78,12 +78,13 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       expect(hb.autopilot).toBe(3) // MAV_AUTOPILOT_ARDUPILOTMEGA: this is really ArduPilot
       expect(hb.sysid).toBe(1)
 
-      // Our REQUEST_DATA_STREAM must make SITL stream attitude/position.
-      await waitFor(() => events.some((e) => e.t === 'telemetry'), 15000, 'telemetry stream')
-      const kinds = new Set(
-        events.flatMap((e) => (e.t === 'telemetry' ? e.batch.map((d) => d.k) : [])),
+      // Our telemetry request (streams on Copter, message intervals on Plane)
+      // must make SITL send attitude.
+      await waitFor(
+        () => events.some((e) => e.t === 'telemetry' && e.batch.some((d) => d.k === 'attitude')),
+        15000,
+        'attitude telemetry',
       )
-      expect(kinds.has('attitude')).toBe(true)
 
       // The firmware version picks the parameter metadata. Field names come
       // from the decoder, so this catches a renamed or mis-cased key, which
@@ -123,6 +124,17 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
       // current firmware; FORMAT_VERSION, the storage format marker, is
       // always present.
       expect(result.params.find((p) => p.name === 'FORMAT_VERSION')).toBeDefined()
+
+      // ArduPlane saves a REQUEST_DATA_STREAM into its stream rates, so
+      // connecting to a plane must leave them as they were (1 Hz by default).
+      // 4.7 renamed SR0_ to MAV1_ (the first MAVLink port, numbered from 1).
+      if (hb.vehicleType === 1) {
+        const rate = (suffix: string) =>
+          result.params.find((p) => p.name === `SR0_${suffix}` || p.name === `MAV1_${suffix}`)
+            ?.value
+        expect(rate('EXTRA1')).toBe(1)
+        expect(rate('POSITION')).toBe(1)
+      }
 
       // Write, verify and restore a harmless parameter. Copter 4.7 renamed
       // LOIT_SPEED (cm/s) to LOIT_SPEED_MS (m/s), and Plane has neither

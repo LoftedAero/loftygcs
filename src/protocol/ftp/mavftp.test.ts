@@ -121,11 +121,13 @@ describe('reading a directory listing', () => {
  */
 function burstDevice(
   file: Uint8Array,
-  mode: 'good' | 'unsupported' | 'silent' | 'duplicates' | 'gap' = 'good',
+  mode: 'good' | 'unsupported' | 'silent' | 'duplicates' | 'gap' | 'overrun' = 'good',
 ) {
   // Which opcodes the device was asked for. Without this a burst test could
   // pass through the sequential fallback.
   const saw: number[] = []
+  /** Offsets of plain reads, to see where the sequential path started. */
+  const reads: number[] = []
   let gapDropped = false
   const client: MavFtpClient = new MavFtpClient((payload) => {
     const req = decodeFtpPacket(payload)
@@ -168,6 +170,9 @@ function burstDevice(
             dropAt = -1
             continue
           }
+          // 'overrun' is a radio whose buffer holds three packets: the rest
+          // of every burst is lost.
+          if (mode === 'overrun' && at >= req.offset + step * 3) break
           send({
             seq,
             session: req.session,
@@ -192,6 +197,7 @@ function burstDevice(
         return
       }
       case FtpOp.ReadFile: {
+        reads.push(req.offset)
         if (req.offset >= file.length) {
           return send({
             seq,
@@ -211,7 +217,7 @@ function burstDevice(
       }
     }
   }, 30)
-  return { client, saw }
+  return { client, saw, reads }
 }
 
 describe('burst reads', () => {
@@ -261,6 +267,18 @@ describe('burst reads', () => {
     // It tried the fast path first, then did it the slow way.
     expect(saw).toContain(FtpOp.BurstReadFile)
     expect(saw).toContain(FtpOp.ReadFile)
+  })
+
+  it('reads the rest one packet at a time when bursts keep overrunning the link', async () => {
+    // A radio slower than the flight controller's serial port loses most of
+    // every burst; after two short bursts, plain reads are faster.
+    const big = new Uint8Array(64 * 60).map((_, i) => (i * 11) & 0xff)
+    const { client, saw, reads } = burstDevice(big, 'overrun')
+    const out = await client.readFile('@PARAM/param.pck')
+    expect(out).toEqual(big)
+    expect(saw.filter((op) => op === FtpOp.BurstReadFile)).toHaveLength(2)
+    // It resumed where the bursts left off instead of starting over.
+    expect(reads[0]).toBe(64 * 6)
   })
 
   it('falls back when bursts are simply never answered', async () => {
