@@ -152,11 +152,16 @@ public class LinkPlugin extends Plugin {
     // A UART is a device node: set the line with the system's stty, then read
     // and write it as a file. "min 0 time 1" makes a read return after 100 ms
     // without data, so closing never waits on a read that nothing will end.
+    // Android 9's toybox stty scrambles the input flags when given "-echo"
+    // (and some other local and control flags), turning on XON/XOFF, case
+    // folding and parity marking that rewrite, swallow and double binary
+    // bytes. "raw" rewrites the input flags cleanly but leaves echo on, so
+    // "-echo" must come before it.
     private void openUart(PluginCall call, int id, Link link) throws Exception {
         String path = call.getString("path", "/dev/ttyS1");
         int baud = call.getInt("baudRate", 460800);
         Process stty = new ProcessBuilder(
-                "stty", "-F", path, String.valueOf(baud), "raw", "-echo", "min", "0", "time", "1")
+                "stty", "-F", path, "-echo", String.valueOf(baud), "raw", "min", "0", "time", "1")
                 .redirectErrorStream(true)
                 .start();
         String output = readAll(stty.getInputStream());
