@@ -108,6 +108,9 @@ Dark mode is an app-local override because the shared sheet is frozen.
 - A flyout from a scrolling strip must be `position: fixed`, placed from the button's
   `getBoundingClientRect()`, or the `overflow: auto` ancestor clips it. The symptom is an
   element that measures correctly while `elementFromPoint` returns something else.
+- `LaModal` is not portaled; it is `position: fixed`. An ancestor with a `transform` (or
+  `filter`) becomes its containing block and clips it to that box, so center overlays with
+  margins or grid, not `translate`.
 - A Leaflet popup holding controls must stop click, wheel and keydown propagation. Plan edits
   rebuild the marker layer, so an open popup is reopened after the rebuild.
 
@@ -175,6 +178,28 @@ mechanisms behind them.
 - A screen that cannot be used yet is drawn disabled, not replaced. The OSD screen with
   `OSD_TYPE` at 0 disables everything (`osdOff`); replacing it would also remove the Display
   card where `OSD_TYPE` is set.
+
+### Compact Setup
+
+Compact mode (`ui/compact.ts`, `data-compact` on the root) keeps every Setup screen and
+changes how each is laid out. The rules are in the compact block at the end of `app.css`.
+
+- There is no rail. The mode switch's Setup button names the current screen and opens the
+  rail's groups as a panel (`SetupScreenPicker` in `NavRail.tsx`). It has one width for every
+  screen name, and the bar's grid becomes `auto 1fr auto` with the status anchored beside the
+  link, so nothing moves when the screen or the mode changes.
+- Cards lose the title's rule and some padding. A curated row hides its ArduPilot name by
+  collapsing that track of `--app-named-tracks` to zero rather than removing it, so rows built
+  by hand on the same tracks keep their columns.
+- An actions column is a drawer (`ColumnShell`, `.app-drawer`) opened by `ColumnToggle` in the
+  pane's toolbar. It stays mounted while closed, because its buttons own hidden file inputs
+  and dialogs, and it is `position: fixed` so no screen's grid or scroll container can move
+  it. Write moves to the toolbar (`ToolbarWrite`) and the column's own is hidden
+  (`.app-col__primary`). Log Review has a drawer on each side once a log is open, and keeps
+  its column in place before that. Inspector opens its drawer when a message is picked.
+- A table too wide for the window keeps what is watched in the row and opens the rest beneath
+  it (Outputs: function and position, then travel). The frame picker is one row of thumbnails
+  that scrolls sideways.
 
 ## Links and messages
 
@@ -448,6 +473,31 @@ the capped panel fills it, except on a short window (grid under 740px tall), whe
 falls below the floor and the column follows the drag. The switch keys on height, because the
 cap moves with the column width. Context menus place themselves by their measured size.
 
+### Compact layout (`CompactFlight` in `FlightTab.tsx`)
+
+After QGroundControl's Fly view: the map or the video (with the HUD) fills the window and the
+other sits in a picture-in-picture inset; a tap on the inset swaps them. It shares
+`aspectPanel` with the desktop layout, whose pinned panel is the inset.
+
+- The app bar's readings (`ui/shell/CompactStatus.tsx`) each open a panel (`BarPopover`) with
+  the detail: preflight, mode picker, battery, GPS, messages, and the link with Disconnect. The
+  logo opens Preferences, which holds the theme.
+- There is no actions column. `CommandStrip`, over the bottom center, holds Arm or Disarm and
+  Takeoff while armed on the ground; everything else is a mode, picked from the bar. Each is
+  confirmed by `SlideConfirm`, which withdraws when its command stops applying, and after 10 s.
+  Commands and their reporting are shared with the desktop controls through `useFlightActions`.
+- More (top-left) opens `FlightSheet` over the Fly area, leaving the app bar in view: one
+  section at a time (Controls, Camera, Video, Joystick, Status, Display). Messages and
+  Preflight are left out because the bar's items open them. The map's zoom buttons sit below
+  More.
+- The HUD's layers are switched from its context menu, which a long press opens on a touch
+  screen; its HUD video item opens the sheet's Video view. In the inset the HUD draws no
+  overlay, and no horizon either while video plays. Over the full-screen HUD, the inset (or
+  the Map button that replaces it when hidden), More and the command row are measured and
+  passed as `HudState.avoid`. GPS moves under the link line on the right, the left readings
+  stack below More, the speed tape fits above the inset, and the center chips move clear of
+  the inset and above the row.
+
 ### Lower pane (`LOG_PANES` in `stores/flight-layout-store.ts`)
 
 Messages, Status, Preflight, Camera and Joystick are tabs of one pane. A pane is mounted only
@@ -598,6 +648,17 @@ fallback). Traps:
   accepts any key, so the wrong one sends a well-formed request for side zero.
 - Sides are walked in order and the step only counts up, so the requested side shows how far
   the run has got.
+
+### OSD grid (`ui/tabs/osd/osd-layout.ts`)
+
+Over MSP DisplayPort, ArduPilot does not clip to `OSDn_TXT_RES`. It writes each panel at its
+stored column and row, and the goggles draw what lands on their own canvas, whose size the
+vehicle never learns; positions accept columns 0-59 and rows 0-21 whatever the setting says.
+A layout made for DJI O3 or Walksnail goggles (53x20, which `TXT_RES` has no value for) often
+leaves `TXT_RES` at 0 and works. So `editorGrid` draws the smallest canvas (30x16, 50x18,
+53x20, 60x22) that holds every enabled panel, never smaller than the declared grid, and
+outlines the declared one. Only an analog OSD, which really is 30x16, reports panels outside
+the grid and offers to bring them back.
 
 ## MAVFTP, files and logs
 

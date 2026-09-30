@@ -4,6 +4,8 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
 import AppStatus from './AppStatus'
+import CompactStatus, { CompactLink } from './CompactStatus'
+import { SetupScreenPicker } from './NavRail'
 import JoystickChip from './JoystickChip'
 import ParamProgress from './ParamProgress'
 import SimTray from './SimTray'
@@ -14,22 +16,29 @@ import type { TransportKind } from '../../transport/Transport'
 
 // Top-level mode switch. Not orange: Connect is the bar's one primary action.
 // The active segment inverts to a light surface instead.
-function ModeSwitch() {
+/** In compact mode, Setup's button also picks the screen (see SetupScreenPicker). */
+function ModeSwitch({ compact = false }: { compact?: boolean }) {
   const mode = useUiStore((s) => s.mode)
   const setMode = useUiStore((s) => s.setMode)
   return (
     <div className="app-modes" role="tablist" aria-label="Mode">
-      {MODES.map((m) => (
-        <button
-          key={m.id}
-          role="tab"
-          aria-selected={m.id === mode}
-          className={m.id === mode ? 'app-modes__item app-modes__item--active' : 'app-modes__item'}
-          onClick={() => setMode(m.id)}
-        >
-          {m.label}
-        </button>
-      ))}
+      {MODES.map((m) =>
+        compact && m.id === 'setup' && mode === 'setup' ? (
+          <SetupScreenPicker key={m.id} />
+        ) : (
+          <button
+            key={m.id}
+            role="tab"
+            aria-selected={m.id === mode}
+            className={
+              m.id === mode ? 'app-modes__item app-modes__item--active' : 'app-modes__item'
+            }
+            onClick={() => setMode(m.id)}
+          >
+            {m.label}
+          </button>
+        ),
+      )}
     </div>
   )
 }
@@ -68,13 +77,43 @@ export default function AppBar() {
   // (REBOOT_RETURN_MS), and Disconnect stays live to give up sooner.
   const linked = busy || phase === 'connected' || phase === 'linkLost' || phase === 'rebooting'
 
-  // Compact mode has no room for the type menu; the dialog asks instead.
   const connect = () => {
-    if (selectedKind === 'serial' && !compact) {
+    if (selectedKind === 'serial') {
       void connectionService.connect({ kind: 'serial', baudRate: 115200 })
     } else {
       setConnectModalOpen(true)
     }
+  }
+
+  // Compact mode's bar, after QGroundControl's: the logo opens Preferences
+  // (theme included), the readings open their detail, and one control shows
+  // the link. The SITL tray is desktop-sized; the Layout preference restores
+  // it.
+  if (compact) {
+    return (
+      <header className="la-appbar">
+        <div className="app-bar__band">
+          <button
+            type="button"
+            className="app-bar__logo-btn"
+            aria-label="Preferences"
+            title="Preferences"
+            onClick={() => setPreferencesOpen(true)}
+          >
+            <img className="la-appbar__logo la-appbar__logo--badge" src={BRAND.iconPath} alt="" />
+          </button>
+          <ModeSwitch compact />
+        </div>
+        <div className="app-bar__band app-bar__band--center">
+          <CompactStatus />
+          <JoystickChip />
+        </div>
+        <ParamProgress />
+        <div className="app-bar__band app-bar__band--right">
+          <CompactLink />
+        </div>
+      </header>
+    )
   }
 
   return (
@@ -117,18 +156,14 @@ export default function AppBar() {
       <ParamProgress />
 
       <div className="app-bar__band app-bar__band--right">
-        {/* The footer that normally carries it is gone in compact mode. */}
-        {compact && BRAND.preview && <span className="app-preview-chip">Preview</span>}
-        {!compact && (
-          <LaSelect
-            value={selectedKind}
-            disabled={linked}
-            onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
-            title="Connection type"
-          >
-            <ConnectionKindOptions />
-          </LaSelect>
-        )}
+        <LaSelect
+          value={selectedKind}
+          disabled={linked}
+          onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
+          title="Connection type"
+        >
+          <ConnectionKindOptions />
+        </LaSelect>
         <LaButton variant="primary" disabled={linked} onClick={connect}>
           Connect
         </LaButton>

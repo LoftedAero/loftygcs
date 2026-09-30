@@ -5,6 +5,7 @@ import {
   clamp,
   clampPlacement,
   coordLimit,
+  editorGrid,
   findOffGrid,
   findOverlaps,
   paramName,
@@ -155,6 +156,51 @@ describe('findOverlaps', () => {
   it('detects overlap across the rows of a multi-row panel', () => {
     const hit = findOverlaps([place('HORIZON', 0, 0), place('ALTITUDE', 2, 5)])
     expect([...hit].sort()).toEqual(['ALTITUDE', 'HORIZON'])
+  })
+})
+
+describe('editorGrid', () => {
+  const place = (id: string, x: number, y: number, enabled = true): Placement => ({
+    item: item(id),
+    x,
+    y,
+    enabled,
+  })
+  const size = (g: { cols: number; rows: number }) => `${g.cols}x${g.rows}`
+
+  it('draws the declared grid when every panel fits it', () => {
+    const { grid, declared } = editorGrid(5, 0, [place('ALTITUDE', 20, 9), place('RSSI', 1, 1)])
+    expect(size(grid)).toBe('30x16')
+    expect(size(declared)).toBe('30x16')
+  })
+
+  it('grows to the smallest canvas that holds a DisplayPort layout', () => {
+    // A layout made for 53x20 goggles with TXT_RES left at 0: the vehicle
+    // draws all of it, so the editor must not call these panels lost.
+    const layout = [place('ALTITUDE', 47, 9), place('GPSLONG', 0, 18), place('RSSI', 1, 1)]
+    const { grid, declared } = editorGrid(5, 0, layout)
+    expect(size(grid)).toBe('53x20')
+    expect(size(declared)).toBe('30x16')
+    expect(findOffGrid(layout, grid).size).toBe(0)
+  })
+
+  it('stops at 50x18 when nothing reaches past it', () => {
+    expect(size(editorGrid(5, 0, [place('ALTITUDE', 45, 17)]).grid)).toBe('50x18')
+  })
+
+  it('never draws less than the declared grid', () => {
+    expect(size(editorGrid(5, 2, [place('RSSI', 1, 1)]).grid)).toBe('60x22')
+  })
+
+  it('ignores disabled panels', () => {
+    expect(size(editorGrid(5, 0, [place('ALTITUDE', 47, 9, false)]).grid)).toBe('30x16')
+  })
+
+  it('leaves an analog OSD at its own grid, where panels outside it are lost', () => {
+    const layout = [place('ALTITUDE', 47, 9)]
+    const { grid } = editorGrid(1, 0, layout)
+    expect(size(grid)).toBe('30x16')
+    expect([...findOffGrid(layout, grid)]).toEqual(['ALTITUDE'])
   })
 })
 

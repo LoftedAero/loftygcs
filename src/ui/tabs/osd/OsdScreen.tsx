@@ -30,6 +30,11 @@ export interface OsdScreenProps {
   emptyText?: string | null
   /** Highlight the rows an NTSC frame cuts off. Analog grids only. */
   showNtscGuide: boolean
+  /**
+   * The grid the screen declares, outlined when the editor draws a larger one
+   * (see `editorGrid`).
+   */
+  declared?: Grid | undefined
   onSelect: (id: string) => void
   onMove: (id: string, x: number, y: number) => void
 }
@@ -57,6 +62,7 @@ export default function OsdScreen({
   overlaps,
   offGrid,
   showNtscGuide,
+  declared,
   disabled,
   emptyText = 'Nothing is on this screen. Turn panels on from the list to place them.',
   onSelect,
@@ -123,6 +129,19 @@ export default function OsdScreen({
             aria-hidden="true"
           >
             <span className="osd-screen__ntsc-label">NTSC cuts here</span>
+          </div>
+        )}
+
+        {declared && (declared.cols < grid.cols || declared.rows < grid.rows) && (
+          <div
+            className="osd-screen__declared"
+            style={{
+              width: `${(declared.cols / grid.cols) * 100}%`,
+              height: `${(declared.rows / grid.rows) * 100}%`,
+            }}
+            aria-hidden="true"
+          >
+            <span className="osd-screen__declared-label">{declared.label}</span>
           </div>
         )}
 

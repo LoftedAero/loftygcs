@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { LaButton, LaCard, LaModal, LaReadout, LaSelect, LaSwitch } from '../../components/La'
-import OsdActions, { OsdSettings } from './OsdActions'
+import OsdActions, { isOsdParam, OsdSettings, OSD_REBOOT_REASON } from './OsdActions'
+import { ColumnToggle } from '../../components/ColumnShell'
+import { ToolbarWrite } from '../../components/VehicleParamActions'
 import CardParamActions from '../../components/CardParamActions'
 import ParamField from '../../components/ParamField'
 import WriteFeedback from '../../components/WriteFeedback'
@@ -14,12 +16,13 @@ import {
   TEXT_RESOLUTIONS,
   TYPE_MSP_DISPLAYPORT,
   clampPlacement,
+  editorGrid,
   findOffGrid,
   findOverlaps,
   paramName,
   readPlacements,
-  screenGrid,
 } from './osd-layout'
+import { useCompact } from '../../compact'
 
 // The OSD tab: panel toggles left, screen preview center, settings right,
 // Betaflight's arrangement for fitting everything on one screen. The list
@@ -46,8 +49,8 @@ export default function OsdWorkspace() {
   const osdType = entries.get('OSD_TYPE')?.value
   const txtResParam = `OSD${screen}_TXT_RES`
   const txtRes = entries.get(txtResParam)?.value
-  const grid = screenGrid(osdType, txtRes)
   const hdWanted = txtRes !== undefined && txtRes > 0
+  const compact = useCompact()
 
   // A disabled screen's panels are not reported. With OSD2_ENABLE at 0,
   // ArduPlane 4.7.1 still reports Link quality (it sits outside the table the
@@ -58,6 +61,11 @@ export default function OsdWorkspace() {
   const placements = useMemo(
     () => (screenOff ? [] : readPlacements(entries, screen)),
     [entries, screen, screenOff],
+  )
+  // The grid drawn, which on DisplayPort can be larger than the one declared.
+  const { grid, declared } = useMemo(
+    () => editorGrid(osdType, txtRes, placements),
+    [osdType, txtRes, placements],
   )
   const overlaps = useMemo(() => findOverlaps(placements), [placements])
   const offGrid = useMemo(() => findOffGrid(placements, grid), [placements, grid])
@@ -111,6 +119,91 @@ export default function OsdWorkspace() {
           ? 'HD grid needs the MSP DisplayPort OSD type'
           : ''
 
+  const pickScreen = (n: number) => {
+    setScreen(n)
+    setSelectedId(null)
+  }
+  const screens = OSD_SCREENS.filter((n) => entries.has(`OSD${n}_ENABLE`)).map((n) => ({
+    n,
+    on: (entries.get(`OSD${n}_ENABLE`)?.value ?? 0) !== 0,
+  }))
+  const enable = entries.has(enableParam) && <ScreenEnable param={enableParam} disabled={osdOff} />
+  // ArduPilot draws the HD grids only over MSP DisplayPort, so the resolution
+  // is a choice only there. A stored HD value on another backend is reported
+  // by the status.
+  const gridControl =
+    entries.has(txtResParam) && osdType === TYPE_MSP_DISPLAYPORT ? (
+      <label className="la-row osd-toolbar__res">
+        <span className="la-field__label">Grid</span>
+        <LaSelect
+          value={String(txtRes ?? 0)}
+          disabled={osdOff}
+          className={entries.get(txtResParam)?.dirty ? 'is-dirty' : ''}
+          onChange={(e) => edit(txtResParam, Number(e.target.value))}
+        >
+          {TEXT_RESOLUTIONS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.grid.label}
+            </option>
+          ))}
+        </LaSelect>
+      </label>
+    ) : (
+      // Same shape as the selectable case: a label and a value.
+      <span className="la-row osd-toolbar__res">
+        <span className="la-field__label">Grid</span>
+        <LaReadout placeholder="—" value={grid.label} />
+      </span>
+    )
+  const status = (
+    <>
+      {layoutStatus && (
+        <span className="card-status card-status--bad" role="status" title={layoutStatus}>
+          {layoutStatus}
+        </span>
+      )}
+      {/* The fix for off-grid panels. */}
+      {offGrid.size > 0 && (
+        <LaButton variant="secondary" disabled={osdOff} onClick={bringBack}>
+          Bring panels on screen
+        </LaButton>
+      )}
+    </>
+  )
+  const preview = (
+    // The box the preview is fitted into; see `.osd-screen-fit`.
+    <div className="osd-screen-fit">
+      <OsdScreen
+        grid={grid}
+        declared={declared}
+        placements={placements}
+        selectedId={selectedId}
+        overlaps={overlaps}
+        offGrid={offGrid}
+        showNtscGuide={osdType !== TYPE_MSP_DISPLAYPORT}
+        disabled={osdOff || screenOff}
+        // With nothing to lay out, the Panels card explains why.
+        {...(osdOff || screenOff ? { emptyText: null } : {})}
+        onSelect={setSelectedId}
+        onMove={move}
+      />
+    </div>
+  )
+  const selection = (
+    <SelectionDetail
+      compact={compact}
+      selected={selected}
+      grid={grid}
+      osdType={osdType}
+      disabled={osdOff}
+      onMove={move}
+      onDisable={(id) => {
+        setEnabled(id, false)
+        setSelectedId(null)
+      }}
+    />
+  )
+
   // Alphabetical within each group, to make one of sixty-five easy to find.
   const byGroup = new Map<OsdGroup, typeof placements>()
   for (const p of placements) {
@@ -154,42 +247,50 @@ export default function OsdWorkspace() {
         </div>
       </LaCard>
 
-      <LaCard
-        title="Screen layout"
-        className="osd-workspace__screen"
-        actions={
-          <>
-            {layoutStatus && (
-              <span className="card-status card-status--bad" role="status" title={layoutStatus}>
-                {layoutStatus}
-              </span>
-            )}
-            {/* The fix for off-grid panels. */}
-            {offGrid.size > 0 && (
-              <LaButton variant="secondary" disabled={osdOff} onClick={bringBack}>
-                Bring panels on screen
-              </LaButton>
-            )}
-          </>
-        }
-      >
-        <div className="la-row la-row--between la-row--wrap osd-toolbar">
-          <div className="la-radio-group" role="radiogroup" aria-label="OSD screen">
-            {OSD_SCREENS.map((n) => {
-              const present = entries.has(`OSD${n}_ENABLE`)
-              if (!present) return null
-              const on = (entries.get(`OSD${n}_ENABLE`)?.value ?? 0) !== 0
-              return (
+      {compact ? (
+        // One bar of controls, then the preview at the card's full height
+        // with the selected panel's controls beside it.
+        <LaCard className="osd-workspace__screen">
+          <div className="osd-bar">
+            <LaSelect
+              className="osd-bar__screen"
+              aria-label="OSD screen"
+              value={String(screen)}
+              disabled={osdOff}
+              onChange={(e) => pickScreen(Number(e.target.value))}
+            >
+              {screens.map(({ n, on }) => (
+                <option key={n} value={n}>
+                  Screen {n}
+                  {on ? '' : ' (off)'}
+                </option>
+              ))}
+            </LaSelect>
+            {enable}
+            {gridControl}
+            <div className="osd-bar__end">
+              {status}
+              <ToolbarWrite owns={isOsdParam} reason={OSD_REBOOT_REASON} />
+              <ColumnToggle />
+            </div>
+          </div>
+          <div className="osd-stage">
+            {preview}
+            {selection}
+          </div>
+        </LaCard>
+      ) : (
+        <LaCard title="Screen layout" className="osd-workspace__screen" actions={status}>
+          <div className="la-row la-row--between la-row--wrap osd-toolbar">
+            <div className="la-radio-group" role="radiogroup" aria-label="OSD screen">
+              {screens.map(({ n, on }) => (
                 <label key={n} className="la-radio">
                   <input
                     type="radio"
                     name="osd-screen"
                     checked={screen === n}
                     disabled={osdOff}
-                    onChange={() => {
-                      setScreen(n)
-                      setSelectedId(null)
-                    }}
+                    onChange={() => pickScreen(n)}
                   />
                   <span className="la-radio__mark"></span>
                   <span className="la-radio__text">
@@ -198,70 +299,16 @@ export default function OsdWorkspace() {
                     {!on && <span className="la-muted"> off</span>}
                   </span>
                 </label>
-              )
-            })}
-            {/* Beside the picker, since it applies to the screen picked there. */}
-            {entries.has(enableParam) && <ScreenEnable param={enableParam} disabled={osdOff} />}
+              ))}
+              {/* Beside the picker, since it applies to the screen picked there. */}
+              {enable}
+            </div>
+            <div className="la-row osd-toolbar__right">{gridControl}</div>
           </div>
-          <div className="la-row osd-toolbar__right">
-            {/* ArduPilot draws the HD grids only over MSP DisplayPort, so the
-                resolution is a choice only there. A stored HD value on another
-                backend is reported by the title row's status. */}
-            {entries.has(txtResParam) && osdType === TYPE_MSP_DISPLAYPORT ? (
-              <label className="la-row osd-toolbar__res">
-                <span className="la-field__label">Grid</span>
-                <LaSelect
-                  value={String(txtRes ?? 0)}
-                  disabled={osdOff}
-                  className={entries.get(txtResParam)?.dirty ? 'is-dirty' : ''}
-                  onChange={(e) => edit(txtResParam, Number(e.target.value))}
-                >
-                  {TEXT_RESOLUTIONS.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.grid.label}
-                    </option>
-                  ))}
-                </LaSelect>
-              </label>
-            ) : (
-              // Same shape as the selectable case: a label and a value.
-              <span className="la-row osd-toolbar__res">
-                <span className="la-field__label">Grid</span>
-                <LaReadout placeholder="—" value={grid.label} />
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* The box the preview is fitted into; see `.osd-screen-fit`. */}
-        <div className="osd-screen-fit">
-          <OsdScreen
-            grid={grid}
-            placements={placements}
-            selectedId={selectedId}
-            overlaps={overlaps}
-            offGrid={offGrid}
-            showNtscGuide={osdType !== TYPE_MSP_DISPLAYPORT}
-            disabled={osdOff || screenOff}
-            // With nothing to lay out, the Panels card explains why.
-            {...(osdOff || screenOff ? { emptyText: null } : {})}
-            onSelect={setSelectedId}
-            onMove={move}
-          />
-        </div>
-
-        <SelectionDetail
-          selected={selected}
-          grid={grid}
-          osdType={osdType}
-          disabled={osdOff}
-          onMove={move}
-          onDisable={(id) => {
-            setEnabled(id, false)
-            setSelectedId(null)
-          }}
-        />
-      </LaCard>
+          {preview}
+          {selection}
+        </LaCard>
+      )}
 
       <OsdActions>
         <OsdSettings
@@ -443,6 +490,7 @@ function ScreenEnable({ param, disabled }: { param: string; disabled: boolean })
  * selection. With nothing selected the controls are disabled.
  */
 function SelectionDetail({
+  compact,
   selected,
   grid,
   osdType,
@@ -450,6 +498,7 @@ function SelectionDetail({
   onMove,
   onDisable,
 }: {
+  compact: boolean
   selected: ReturnType<typeof readPlacements>[number] | null
   grid: { cols: number; rows: number }
   osdType: number | undefined
@@ -462,6 +511,47 @@ function SelectionDetail({
   const y = selected?.y ?? 0
   const off = disabled || !item
   const mspGap = item?.mspOnly && osdType !== undefined && !MSP_TYPES.has(osdType)
+  const coord = (axis: 'Column' | 'Row') => (
+    <label className="osd-selection__coord">
+      <span className="la-field__label">{axis}</span>
+      <input
+        className="la-input la-input--num"
+        type="number"
+        min={0}
+        max={(axis === 'Column' ? grid.cols : grid.rows) - 1}
+        value={axis === 'Column' ? x : y}
+        disabled={off}
+        onChange={(e) =>
+          item &&
+          (axis === 'Column'
+            ? onMove(item.id, Number(e.target.value), y)
+            : onMove(item.id, x, Number(e.target.value)))
+        }
+      />
+    </label>
+  )
+  const remove = (
+    <LaButton variant="ghost" disabled={off} onClick={() => item && onDisable(item.id)}>
+      Remove
+    </LaButton>
+  )
+
+  // Compact mode's strip beside the preview: the boxes for an exact value,
+  // and a pad of arrows for a finger, which cannot use the arrow keys and
+  // drags a small panel less precisely than a mouse.
+  if (compact) {
+    return (
+      <div className="osd-selection osd-selection--pad">
+        <strong className="osd-selection__name">{item ? item.label : 'No panel selected'}</strong>
+        <div className="osd-selection__coords">
+          {coord('Column')}
+          {coord('Row')}
+        </div>
+        <NudgePad disabled={off} onNudge={(dx, dy) => item && onMove(item.id, x + dx, y + dy)} />
+        {remove}
+      </div>
+    )
+  }
   return (
     <div className="osd-selection">
       <div className="la-row la-row--between la-row--wrap">
@@ -471,35 +561,87 @@ function SelectionDetail({
           {mspGap && <span className="la-muted"> · drawn only on an MSP OSD</span>}
         </strong>
         <div className="la-row">
-          <label className="osd-selection__coord">
-            <span className="la-field__label">Column</span>
-            <input
-              className="la-input la-input--num"
-              type="number"
-              min={0}
-              max={grid.cols - 1}
-              value={x}
-              disabled={off}
-              onChange={(e) => item && onMove(item.id, Number(e.target.value), y)}
-            />
-          </label>
-          <label className="osd-selection__coord">
-            <span className="la-field__label">Row</span>
-            <input
-              className="la-input la-input--num"
-              type="number"
-              min={0}
-              max={grid.rows - 1}
-              value={y}
-              disabled={off}
-              onChange={(e) => item && onMove(item.id, x, Number(e.target.value))}
-            />
-          </label>
-          <LaButton variant="ghost" disabled={off} onClick={() => item && onDisable(item.id)}>
-            Remove
-          </LaButton>
+          {coord('Column')}
+          {coord('Row')}
+          {remove}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** How long a held arrow waits before repeating, and then how often. */
+const REPEAT_DELAY_MS = 400
+const REPEAT_EVERY_MS = 90
+
+const NUDGE_ARROWS = [
+  { dir: 'up', label: 'Move up', dx: 0, dy: -1, d: 'M1 6l5-5 5 5' },
+  { dir: 'left', label: 'Move left', dx: -1, dy: 0, d: 'M6 1L1 6l5 5' },
+  { dir: 'right', label: 'Move right', dx: 1, dy: 0, d: 'M1 1l5 5-5 5' },
+  { dir: 'down', label: 'Move down', dx: 0, dy: 1, d: 'M1 1l5 5 5-5' },
+] as const
+
+/**
+ * Four arrows that move the selected panel a cell at a time, repeating while
+ * held as a key does.
+ */
+function NudgePad({
+  disabled,
+  onNudge,
+}: {
+  disabled: boolean
+  onNudge: (dx: number, dy: number) => void
+}) {
+  // The latest callback, since it closes over the panel's position, which
+  // changes with every step of a repeat.
+  const nudgeRef = useRef(onNudge)
+  nudgeRef.current = onNudge
+  const timer = useRef<number | undefined>(undefined)
+  const stop = () => {
+    window.clearTimeout(timer.current)
+    timer.current = undefined
+  }
+  useEffect(() => stop, [])
+
+  const start = (dx: number, dy: number) => {
+    stop()
+    nudgeRef.current(dx, dy)
+    const repeat = () => {
+      nudgeRef.current(dx, dy)
+      timer.current = window.setTimeout(repeat, REPEAT_EVERY_MS)
+    }
+    timer.current = window.setTimeout(repeat, REPEAT_DELAY_MS)
+  }
+
+  return (
+    <div className="osd-nudge" role="group" aria-label="Move panel">
+      {NUDGE_ARROWS.map((a) => (
+        <button
+          key={a.dir}
+          type="button"
+          className={`osd-nudge__btn osd-nudge__btn--${a.dir}`}
+          aria-label={a.label}
+          disabled={disabled}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return
+            start(a.dx, a.dy)
+          }}
+          onPointerUp={stop}
+          onPointerLeave={stop}
+          onPointerCancel={stop}
+          // Keyboard activation gets one step per press.
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              nudgeRef.current(a.dx, a.dy)
+            }
+          }}
+        >
+          <svg viewBox="0 0 12 12" aria-hidden="true">
+            <path d={a.d} />
+          </svg>
+        </button>
+      ))}
     </div>
   )
 }

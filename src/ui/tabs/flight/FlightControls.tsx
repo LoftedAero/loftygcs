@@ -11,27 +11,17 @@ import {
   speedLabel,
 } from '../../../units'
 import { LaButton, LaModal, LaSelect } from '../../components/La'
-import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
-import { useParamStore } from '../../../stores/param-store'
-import { MAV_RESULT } from '../../../protocol/commands'
-import { useHudNoteStore } from '../../../stores/hud-note-store'
-import { HUD_MESSAGE_SEVERITY } from './hud-draw'
-import { modeNumberByName, modeTable, vehicleClass } from '../../../protocol/modes'
 import {
-  arm,
   changeSpeed,
-  disarm,
   preflightCalibration,
   rebootAutopilot,
   restartScripting,
   setCurrentMissionItem,
   setGuidedAltitude,
-  setModeConfirmed,
-  takeoff,
-  takeoffStyle,
   triggerCamera,
 } from '../../../services/flight'
+import { TAKEOFF_ALT_M, useFlightActions } from './useFlightActions'
 
 // Every command you give the vehicle, in one place, ordered by how often they
 // are used: flying, then adjusting, then occasional commands behind a picker.
@@ -62,11 +52,6 @@ const DO_ACTIONS: DoAction[] = [
   },
 ]
 
-const TAKEOFF_ALT_M = 20
-
-/** How recent a vehicle warning has to be to count as a refusal's reason. */
-const REASON_WINDOW_MS = 4000
-
 /**
  * `part` renders one tier alone, for compact mode, which puts the flight
  * actions in a column beside the map and the adjustments in a sheet; `compact`
@@ -77,11 +62,10 @@ export default function FlightControls({
   part,
   compact = false,
 }: { part?: 'primary' | 'secondary'; compact?: boolean } = {}) {
-  const connected = useConnectionStore((s) => s.phase === 'connected')
-  const vehicleType = useVehicleStore((s) => s.vehicleType)
+  const actions = useFlightActions()
+  const { connected, armed, modes, takeoffVia, report, fail, clearNote } = actions
   const customMode = useVehicleStore((s) => s.customMode)
   const modeNameNow = useVehicleStore((s) => s.modeName)
-  const armed = useVehicleStore((s) => s.armed)
   const relAltM = useVehicleStore((s) => s.relAltM)
   const groundspeedMs = useVehicleStore((s) => s.groundspeedMs)
   const units = useUnits()
@@ -89,23 +73,12 @@ export default function FlightControls({
   const wpDistM = useVehicleStore((s) => s.wpDistM)
   const planItems = useMissionStore((s) => s.plan.items)
   const progress = missionProgress(missionSeq, planItems, wpDistM, groundspeedMs)
-  const isCopter = vehicleClass(vehicleType) === 'copter'
-  // How this airframe takes off, from the same function the command uses so
-  // the tooltip matches. A quadplane climbs vertically like a copter; only a
-  // fixed wing takes off by mode.
-  const qEnable = useParamStore((s) => s.entries.get('Q_ENABLE')?.value)
-  const takeoffVia = takeoffStyle(vehicleType, qEnable)
 
-  const say = useHudNoteStore((s) => s.say)
-  const clearNote = useHudNoteStore((s) => s.clear)
   const [speed, setSpeed] = useState('')
   const [alt, setAlt] = useState('')
   const [wp, setWp] = useState('')
   const [action, setAction] = useState(DO_ACTIONS[0]!.id)
   const [pending, setPending] = useState<DoAction | null>(null)
-  const [confirmForce, setConfirmForce] = useState(false)
-
-  const modes = modeTable(vehicleType)
 
   // The mode picked but not yet sent; null shows the vehicle's actual mode.
   const [pendingMode, setPendingMode] = useState<number | null>(null)
@@ -115,70 +88,10 @@ export default function FlightControls({
   // clears the staged one.
   useEffect(() => setPendingMode(null), [customMode])
   const applyMode = () => {
-    if (pendingMode === null) return
-    void setModeConfirmed(pendingMode).then(report('Mode')).catch(fail('Mode'))
+    if (pendingMode !== null) actions.setMode(pendingMode)
   }
 
-  /**
-   * Whether the vehicle has explained a refusal itself. MAV_RESULT only says
-   * FAILED; the reason ("Arm: Need Position Estimate") arrives just after the
-   * ack as a warning, which the HUD already shows.
-   */
-  const explained = () =>
-    useVehicleStore
-      .getState()
-      .statusTexts.some(
-        (t) => t.severity <= HUD_MESSAGE_SEVERITY && Date.now() - t.at < REASON_WINDOW_MS,
-      )
-
-  // Results go to the HUD beside the vehicle's own warnings. Success says
-  // nothing (the vehicle state is the confirmation) but clears any earlier
-  // refusal.
-  const report = (what: string) => async (result: number) => {
-    if (result === 0) return clearNote()
-    // The vehicle usually explains itself just after the ack, not with it.
-    await new Promise((r) => setTimeout(r, 400))
-    if (!explained()) say(`${what}: ${MAV_RESULT[result] ?? result}`)
-  }
-  const fail = (what: string) => (err: unknown) =>
-    say(`${what}: ${err instanceof Error ? err.message : 'no answer'}`)
-
-  const jump = (name: string) => {
-    const num = modeNumberByName(vehicleType, name)
-    if (num === undefined) {
-      say(`${name} is not a mode on this vehicle`)
-      return
-    }
-    void setModeConfirmed(num)
-      .then(async (r) => {
-        await report(name)(r)
-        // Copter will not start an Auto takeoff from the ground until the
-        // throttle stick is raised, which a GCS without a transmitter cannot
-        // do; otherwise it sits armed in Auto until it auto-disarms.
-        if (r === 0 && name === 'Auto' && isCopter && relAltM < 1) {
-          say('Copter will not start an Auto takeoff from the ground')
-        }
-      })
-      .catch(fail(name))
-  }
-
-  const onArmClick = () => {
-    if (armed) {
-      void disarm().then(report('Disarm')).catch(fail('Disarm'))
-      return
-    }
-    void arm()
-      .then((result) => {
-        if (result === 0) clearNote()
-        else {
-          // Refused: the vehicle's reason is on the HUD; offer force-arm
-          // behind an explicit danger confirm.
-          if (!explained()) say(`Arm: ${MAV_RESULT[result] ?? result}`)
-          setConfirmForce(true)
-        }
-      })
-      .catch(fail('Arm'))
-  }
+  const onArmClick = () => (armed ? actions.disarm() : actions.arm())
 
   const run = (a: DoAction) => {
     if (a.confirm) setPending(a)
@@ -238,18 +151,18 @@ export default function FlightControls({
                   : 'Switch to Takeoff mode and climb to the vehicle’s TKOFF_ALT'
               }
               disabled={!connected || !armed || takeoffVia === 'unsupported'}
-              onClick={() => {
-                // A copter's EKF refuses Guided for a few seconds after boot; the
-                // vehicle's reason ("requires position") shows on the HUD.
-                void takeoff(TAKEOFF_ALT_M).then(report('Takeoff')).catch(fail('Takeoff'))
-              }}
+              onClick={actions.takeoff}
             >
               Takeoff
             </LaButton>
-            <LaButton variant="secondary" disabled={!connected} onClick={() => jump('Auto')}>
+            <LaButton
+              variant="secondary"
+              disabled={!connected}
+              onClick={() => actions.jump('Auto')}
+            >
               Auto
             </LaButton>
-            <LaButton variant="secondary" disabled={!connected} onClick={() => jump('RTL')}>
+            <LaButton variant="secondary" disabled={!connected} onClick={() => actions.jump('RTL')}>
               RTL
             </LaButton>
           </div>
@@ -382,28 +295,7 @@ export default function FlightControls({
         <p>{pending?.confirm}</p>
       </LaModal>
 
-      <LaModal
-        open={confirmForce}
-        title="Force arm?"
-        actions={
-          <>
-            <LaButton variant="ghost" onClick={() => setConfirmForce(false)}>
-              Cancel
-            </LaButton>
-            <LaButton
-              variant="danger"
-              onClick={() => {
-                setConfirmForce(false)
-                void arm(true).then(report('Force arm')).catch(fail('Force arm'))
-              }}
-            >
-              Force arm
-            </LaButton>
-          </>
-        }
-      >
-        <p>A preflight check failed. Force arm skips it rather than fixing it.</p>
-      </LaModal>
+      {actions.forceArmDialog}
     </div>
   )
 }

@@ -407,6 +407,46 @@ frame, header band, row rule, row metrics and monospace identifier column. A
 table declares only its `grid-template-columns`. The header reuses
 `.la-card__subtitle`'s type settings rather than defining its own.
 
+## Compact mode
+
+For a window too small for the desktop layout, such as a handheld ground
+station at 732×412. The mechanisms are in
+[architecture.md](architecture.md#compact-setup).
+
+### A screen keeps everything and rearranges it
+
+Compact mode never drops a setting or an action. It moves what does not fit
+behind one tap: a drawer, an expanding row, a row that scrolls sideways.
+
+### Navigation lives in the app bar
+
+The content area is too short to give a row to a selector. The mode switch's
+Setup button names the screen and opens the list, at one width for every name.
+
+### The column is a drawer; Write stays in view
+
+An actions column opens over the pane from a More button that ends the pane's
+toolbar. Write sits beside it with its count, because a staged edit nobody can
+see is an edit nobody writes. The column's own Write is hidden, so there is
+still one.
+
+### A wide table shows what is watched and opens the rest
+
+A row keeps the columns read at a glance (a servo's function and position) and
+a chevron opens the ones set once (its travel) in a row beneath. Columns are
+never squeezed until their controls overlap.
+
+### A finger nudges with arrows
+
+Where a desktop moves a selection with the arrow keys, a touch screen gets a
+pad of arrow buttons at touch size, stepping once per tap and repeating while
+held. The number boxes stay for an exact value.
+
+### A set of pictures is one scrolling row
+
+Thumbnails side by side, with the last one cut off so the row reads as
+scrollable, instead of full-size pictures stacked down the page.
+
 ## See also
 
 - [architecture.md](architecture.md): the design-system rules for

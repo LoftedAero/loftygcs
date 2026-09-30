@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import {
@@ -8,7 +8,8 @@ import {
 } from '../../../stores/flight-layout-store'
 import { gotoGuided, setHome, setRoi } from '../../../services/flight'
 import MapView from './MapView'
-import Hud from './Hud'
+import Hud, { type HudProps } from './Hud'
+import type { HudAvoid } from './hud-paint'
 import Divider from '../../components/Divider'
 import FlightControls from './FlightControls'
 import MapContextMenu, { type MapMenuPoint } from './MapContextMenu'
@@ -21,8 +22,11 @@ import CameraPanel from './CameraPanel'
 import JoystickPanel from './JoystickPanel'
 import VideoPane from './VideoPane'
 import ViewPane from './ViewPane'
-import { LaButton, LaModal } from '../../components/La'
+import { LaButton } from '../../components/La'
 import { useCompact } from '../../compact'
+import CommandStrip from './CommandStrip'
+import FlightSheet, { type SheetSection } from './FlightSheet'
+import { videoService, type VideoStatus } from '../../../services/video'
 
 // The flight screen, laid out like Mission Planner's: one panel pinned left
 // at a fixed aspect ratio with the controls and messages beneath it, and the
@@ -87,17 +91,18 @@ export default function FlightTab() {
   const hudPanel = (
     <Hud horizon={layout.hudHorizon} overlays={layout.hudOverlays} onContextMenu={setHudMenu} />
   )
+  // Compact mode draws the HUD differently in the inset and full screen.
+  const hud = (props: Partial<HudProps>) => (
+    <Hud
+      horizon={layout.hudHorizon}
+      overlays={layout.hudOverlays}
+      onContextMenu={setHudMenu}
+      {...props}
+    />
+  )
 
   if (compact) {
-    return (
-      <CompactFlight
-        mapPanel={mapPanel}
-        hudPanel={hudPanel}
-        menus={menus()}
-        plotted={layout.plotFields}
-        onTogglePlot={layout.togglePlotField}
-      />
-    )
+    return <CompactFlight mapPanel={mapPanel} hud={hud} menus={menus} />
   }
 
   const aspectIsHud = layout.aspectPanel === 'hud'
@@ -173,15 +178,11 @@ export default function FlightTab() {
   )
 
   // The HUD's and the map's context menus, the same in both layouts.
-  function menus() {
+  function menus(onVideo = showVideoPane) {
     return (
       <>
         {hudMenu && (
-          <HudContextMenu
-            point={hudMenu}
-            onClose={() => setHudMenu(null)}
-            onVideo={showVideoPane}
-          />
+          <HudContextMenu point={hudMenu} onClose={() => setHudMenu(null)} onVideo={onVideo} />
         )}
 
         {menu && (
@@ -205,86 +206,142 @@ export default function FlightTab() {
 }
 
 /**
- * Compact mode's Fly screen: one panel fills the window with the other as an
- * inset (tap ⇄ to swap), and the flight actions in a column on the right,
- * where a thumb rests on a handheld. Everything else (the adjustments and
- * the lower pane's views) is in a sheet behind More and Messages.
+ * Compact mode's Fly screen, after QGroundControl's: the map or the video
+ * fills the window and the other sits in a picture-in-picture inset that a
+ * tap swaps in. Arm sits over the bottom and More over the top-left corner;
+ * modes, readings and messages are in the app bar. Adjustments, camera,
+ * video, joystick and the rest are in a sheet behind More.
+ *
+ * The desktop layout's pinned panel is the inset, so the two layouts share
+ * `aspectPanel`: pinning the HUD on the desktop means the map fills here.
  */
 function CompactFlight({
   mapPanel,
-  hudPanel,
+  hud,
   menus,
-  plotted,
-  onTogglePlot,
 }: {
   mapPanel: React.ReactNode
-  hudPanel: React.ReactNode
-  menus: React.ReactNode
-  plotted: readonly string[]
-  onTogglePlot: (name: string) => void
+  hud: (props: Partial<HudProps>) => React.ReactNode
+  /** The context menus, given what their HUD video item opens. */
+  menus: (onVideo: () => void) => React.ReactNode
 }) {
   const layout = useFlightLayoutStore()
   const [sheet, setSheet] = useState(false)
-  const statusTexts = useVehicleStore((s) => s.statusTexts)
-  // Messages that arrived since the sheet was last open.
-  const [seenAt, setSeenAt] = useState(() => Date.now())
-  const unread = sheet ? 0 : statusTexts.filter((t) => t.at > seenAt).length
+  const [section, setSection] = useState<SheetSection>('controls')
+  const [insetShown, setInsetShown] = useState(true)
+  const [video, setVideo] = useState<VideoStatus>(videoService.current)
+  useEffect(() => videoService.onStatus(setVideo), [])
 
-  const open = (pane?: LogPaneId) => {
-    if (pane) layout.setLogPane(pane)
+  const open = (s?: SheetSection) => {
+    if (s) setSection(s)
     setSheet(true)
   }
-  const close = () => {
-    setSeenAt(Date.now())
-    setSheet(false)
-  }
 
-  // The inset is the panel the desktop layout pins at a fixed aspect.
-  const insetIsHud = layout.aspectPanel === 'hud'
+  const closeSheet = useCallback(() => setSheet(false), [])
+
+  const videoMain = layout.aspectPanel === 'map'
+  const hudOn = layout.hudHorizon || layout.hudOverlays
+
+  // What lies over the full-screen HUD, measured so it keeps its readings
+  // clear: the map inset or the button that brings it back, More, and Arm.
+  const mainRef = useRef<HTMLDivElement>(null)
+  const insetRef = useRef<HTMLDivElement>(null)
+  const insetShowRef = useRef<HTMLButtonElement>(null)
+  const toolsRef = useRef<HTMLDivElement>(null)
+  const commandsRef = useRef<HTMLDivElement>(null)
+  const [avoid, setAvoid] = useState<HudAvoid | null>(null)
+  // The command row comes and goes with these, and the measurement below has
+  // to see it do so.
+  useConnectionStore((s) => s.phase === 'connected')
+  useVehicleStore((s) => s.armed)
+  useEffect(() => {
+    const main = mainRef.current
+    if (!videoMain || !main) {
+      setAvoid(null)
+      return
+    }
+    const measure = () => {
+      const m = main.getBoundingClientRect()
+      const box = (el: HTMLElement | null) => el?.getBoundingClientRect() ?? null
+      const inset = box(insetRef.current ?? insetShowRef.current)
+      const tools = box(toolsRef.current)
+      const commands = box(commandsRef.current)
+      const next: HudAvoid = {
+        bottomLeft: inset && { w: inset.right - m.left, h: m.bottom - inset.top },
+        topLeft: tools && { w: tools.right - m.left, h: tools.bottom - m.top },
+        bottomCenter: commands && { w: commands.width, h: m.bottom - commands.top },
+      }
+      // Only a change re-renders, since this runs after every render.
+      setAvoid((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
+    }
+    const ro = new ResizeObserver(measure)
+    const covering = [insetRef.current, insetShowRef.current, toolsRef.current, commandsRef.current]
+    for (const el of [main, ...covering]) {
+      if (el) ro.observe(el)
+    }
+    measure()
+    return () => ro.disconnect()
+    // The command row mounts and unmounts with the link and arm state; its
+    // observer is renewed with each re-run.
+  })
+
+  // Too small for the overlay to be read; video alone, or the horizon when
+  // there is no video.
+  const insetHud = hud({ overlays: false, horizon: video.state !== 'playing' })
   return (
-    <div className="flight-compact">
-      <div className="flight-compact__main">{insetIsHud ? mapPanel : hudPanel}</div>
-      <div className="flight-compact__inset">
-        {insetIsHud ? hudPanel : mapPanel}
-        <button
-          type="button"
-          className="flight-compact__swap"
-          aria-label="Swap map and HUD"
-          onClick={layout.swap}
-        >
-          ⇄
+    <div className={`flight-compact${videoMain ? ' flight-compact--video' : ''}`}>
+      <div className="flight-compact__main" ref={mainRef}>
+        {videoMain ? hud({ avoid }) : mapPanel}
+      </div>
+
+      <div className="flight-compact__tools" ref={toolsRef}>
+        <button type="button" className="flight-compact__tool" onClick={() => open()}>
+          More
         </button>
       </div>
-      <div className="flight-compact__actions">
-        <FlightControls part="primary" compact />
-        <LaButton variant="ghost" onClick={() => open()}>
-          More
-        </LaButton>
-      </div>
-      <button type="button" className="flight-compact__messages" onClick={() => open('messages')}>
-        {unread > 0 ? `Messages · ${unread}` : 'Messages'}
-      </button>
-
-      <LaModal
-        open={sheet}
-        title="Flight"
-        actions={
-          <LaButton variant="primary" onClick={close}>
-            Done
+      {videoMain && !hudOn && video.state !== 'playing' && (
+        <div className="flight-compact__novideo">
+          <p>{video.text || 'No video'}</p>
+          <LaButton variant="secondary" onClick={() => open('video')}>
+            Video settings
           </LaButton>
-        }
-      >
-        <div className="flight-sheet">
-          <FlightControls part="secondary" compact />
-          <LogPane
-            pane={layout.logPane}
-            onPane={layout.setLogPane}
-            plotted={plotted}
-            onTogglePlot={onTogglePlot}
-          />
         </div>
-      </LaModal>
-      {menus}
+      )}
+
+      {insetShown ? (
+        <div className="flight-compact__inset" ref={insetRef}>
+          {videoMain ? mapPanel : insetHud}
+          {/* Over the panel, so a tap swaps rather than reaching the map. */}
+          <button
+            type="button"
+            className="flight-compact__inset-tap"
+            aria-label={videoMain ? 'Show the map' : 'Show the video'}
+            onClick={layout.swap}
+          />
+          <button
+            type="button"
+            className="flight-compact__inset-hide"
+            aria-label="Hide the inset"
+            onClick={() => setInsetShown(false)}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="flight-compact__inset-show"
+          ref={insetShowRef}
+          onClick={() => setInsetShown(true)}
+        >
+          {videoMain ? 'Map' : 'Video'}
+        </button>
+      )}
+
+      <CommandStrip ref={commandsRef} />
+
+      {sheet && <FlightSheet section={section} onSection={setSection} onClose={closeSheet} />}
+      {menus(() => open('video'))}
     </div>
   )
 }

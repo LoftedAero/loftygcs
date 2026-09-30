@@ -206,7 +206,7 @@ function Item({
  * draws an empty cell. Color comes from the item's tone, which follows the
  * vehicle's BATT_LOW_VOLT and BATT_CRT_VOLT.
  */
-function BatteryIcon({ fill }: { fill: number | null }) {
+export function BatteryIcon({ fill }: { fill: number | null }) {
   return (
     <svg className="app-status__icon" viewBox="0 0 20 20" aria-hidden="true">
       <rect
@@ -238,7 +238,7 @@ function BatteryIcon({ fill }: { fill: number | null }) {
  * A globe rather than the conventional satellite, which is illegible at the
  * small size this is drawn at.
  */
-function GpsIcon() {
+export function GpsIcon() {
   return (
     <svg className="app-status__icon" viewBox="0 0 20 20" aria-hidden="true">
       <g fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -257,7 +257,7 @@ function GpsIcon() {
  * `null` (no RSSI reported) lights none; the value beside it then shows the
  * packet rate.
  */
-function SignalIcon({ bars }: { bars: number | null }) {
+export function SignalIcon({ bars }: { bars: number | null }) {
   return (
     <svg className="app-status__icon" viewBox="0 0 20 20" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => {

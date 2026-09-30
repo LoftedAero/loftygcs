@@ -14,6 +14,8 @@ import LogTable from './LogTable'
 import LogReplay from './LogReplay'
 import FieldPicker from './FieldPicker'
 import Divider from '../../components/Divider'
+import ColumnShell, { ColumnToggle } from '../../components/ColumnShell'
+import { useCompact } from '../../compact'
 
 // Reviewing a flight log.
 //
@@ -45,6 +47,7 @@ export default function LogsTab() {
   const clear = useLogStore((s) => s.clear)
   const bytes = useLogStore((s) => s.rawBytes)
   const [busy, setBusy] = useState(false)
+  const compact = useCompact()
 
   const open = async () => {
     setBusy(true)
@@ -61,14 +64,21 @@ export default function LogsTab() {
         {/* Shown whenever a log is open, since picking a field is how the
             plot opens. */}
         {log && (
-          <aside className="log-fields">
+          <ColumnShell name="fields" side="left" base="log-fields">
             <h3 className="app-col__head">Fields</h3>
             <FieldPicker />
             <ExpressionInput />
-          </aside>
+          </ColumnShell>
         )}
 
         <div className="log-main">
+          {/* Compact mode: both columns are drawers once a log is open. */}
+          {compact && log && (
+            <div className="log-toolbar">
+              <ColumnToggle label="Fields" target="fields" />
+              <ColumnToggle />
+            </div>
+          )}
           {!log ? (
             <Welcome status={status} />
           ) : upper === 'none' ? (
@@ -98,7 +108,8 @@ export default function LogsTab() {
           )}
         </div>
 
-        <aside className="app-col-shell">
+        {/* With no log open the column is the screen, so it stays in place. */}
+        <ColumnShell drawer={Boolean(log)}>
           <div className="app-col">
             <section className="app-col__group">
               <h3 className="app-col__head">Log</h3>
@@ -203,7 +214,7 @@ export default function LogsTab() {
               </>
             )}
           </div>
-        </aside>
+        </ColumnShell>
       </div>
     </div>
   )

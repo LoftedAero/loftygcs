@@ -3,18 +3,20 @@ import { fieldRegistry } from '../../../services/telemetry-fields'
 import { fixed } from '../../../units'
 
 // Every telemetry field the vehicle is sending, with its live value, as a
-// filterable list. Clicking a row toggles it on the plot.
+// filterable list. Where there is a plot, clicking a row toggles it there;
+// without one the rows are read-only.
 
 /** 4 Hz. */
 const REFRESH_MS = 250
 
 export interface StatusListProps {
   /** Fields currently plotted, so the list can show which are on. */
-  plotted: readonly string[]
-  onTogglePlot: (name: string) => void
+  plotted?: readonly string[]
+  /** Omitted where there is no plot. */
+  onTogglePlot?: (name: string) => void
 }
 
-export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
+export default function StatusList({ plotted = [], onTogglePlot }: StatusListProps) {
   const [filter, setFilter] = useState('')
   const [, tick] = useState(0)
   const version = useRef(-1)
@@ -85,6 +87,24 @@ export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
       <div className="status-list__rows" ref={rowsRef}>
         {shown.map((name) => {
           const v = fieldRegistry.latest(name)
+          // The message prefix repeats down a column, so it is dimmed and the
+          // field name carries the weight.
+          const cells = (
+            <>
+              <span className="status-row__name" title={name}>
+                <span className="status-row__msg">{prefixOf(name)}</span>
+                {leafOf(name)}
+              </span>
+              <span className="status-row__value">{format(v)}</span>
+            </>
+          )
+          if (!onTogglePlot) {
+            return (
+              <div key={name} className="status-row status-row--static">
+                {cells}
+              </div>
+            )
+          }
           const on = plottedSet.has(name)
           return (
             <button
@@ -94,13 +114,7 @@ export default function StatusList({ plotted, onTogglePlot }: StatusListProps) {
               onClick={() => onTogglePlot(name)}
               title={on ? 'Remove from the plot' : 'Add to the plot'}
             >
-              {/* The message prefix repeats down a column, so it is dimmed
-                  and the field name carries the weight. */}
-              <span className="status-row__name" title={name}>
-                <span className="status-row__msg">{prefixOf(name)}</span>
-                {leafOf(name)}
-              </span>
-              <span className="status-row__value">{format(v)}</span>
+              {cells}
             </button>
           )
         })}

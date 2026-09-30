@@ -5,8 +5,36 @@ import { useFlightLayoutStore } from '../../../stores/flight-layout-store'
 // the command bar leaves that bar for commands to the vehicle, and the pane
 // has room for the groups to sit side by side.
 
-export default function ViewPane() {
+/** `compact` keeps only the layers; compact Fly has no panels to arrange. */
+export default function ViewPane({ compact = false }: { compact?: boolean }) {
   const layout = useFlightLayoutStore()
+  if (compact) {
+    return (
+      <div className="view-pane">
+        <section className="view-pane__group">
+          <h4 className="view-pane__head">HUD layers</h4>
+          <LaSwitch
+            label="Horizon"
+            checked={layout.hudHorizon}
+            onChange={() => layout.toggle('hudHorizon')}
+          />
+          <LaSwitch
+            label="Instruments"
+            checked={layout.hudOverlays}
+            onChange={() => layout.toggle('hudOverlays')}
+          />
+        </section>
+        <section className="view-pane__group">
+          <h4 className="view-pane__head">Map layers</h4>
+          <LaSwitch
+            label="ADS-B traffic"
+            checked={layout.showTraffic}
+            onChange={() => layout.toggle('showTraffic')}
+          />
+        </section>
+      </div>
+    )
+  }
   return (
     <div className="view-pane">
       <section className="view-pane__group">

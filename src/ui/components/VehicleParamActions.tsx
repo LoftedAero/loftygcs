@@ -4,6 +4,7 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { connectionService } from '../../services/connection'
 import { useParamWrite } from './CardParamActions'
 import RebootButton from './RebootButton'
+import { useCompact } from '../compact'
 
 // Write, Revert and Reload for a screen's actions column, shared so the
 // columns stay consistent.
@@ -40,9 +41,12 @@ export default function VehicleParamActions({
     <section className="app-col__group">
       {w.modal}
       <h3 className="app-col__head">{title}</h3>
+      {/* In compact mode Write is on the pane's toolbar (ToolbarWrite), where
+          it stays in view while the column is a closed drawer. */}
       <LaButton
         variant="primary"
         size="block"
+        className="app-col__primary"
         disabled={w.dirtyCount === 0 || w.writeBusy || !canReachVehicle}
         onClick={w.confirm}
       >
@@ -78,5 +82,33 @@ export default function VehicleParamActions({
       )}
       <RebootButton />
     </section>
+  )
+}
+
+/**
+ * The column's Write, for the pane's toolbar in compact mode, where the column
+ * is a drawer. Pass the same scope as the column's VehicleParamActions.
+ */
+export function ToolbarWrite({
+  owns,
+  reason = 'Parameter changes take effect after a restart',
+}: Pick<VehicleParamActionsProps, 'owns' | 'reason'>) {
+  const compact = useCompact()
+  const connected = useConnectionStore((s) => s.phase === 'connected')
+  const fromFile = useParamStore((s) => s.source === 'file')
+  const w = useParamWrite({ reason, owns })
+  if (!compact) return null
+  return (
+    <>
+      {w.modal}
+      <LaButton
+        variant="primary"
+        className="app-toolbar-write"
+        disabled={w.dirtyCount === 0 || w.writeBusy || !connected || fromFile}
+        onClick={w.confirm}
+      >
+        {w.label}
+      </LaButton>
+    </>
   )
 }

@@ -76,7 +76,33 @@ export interface HudState {
    * symbology (line, ladder, bank scale) and no sky or ground fill.
    */
   videoBehind: boolean
+  /** Areas covered by compact Fly's controls, kept clear (see HudAvoid). */
+  avoid?: HudAvoid | null
 }
+
+/** A covered area's width and height, in CSS pixels from its canvas edges. */
+export interface HudBox {
+  w: number
+  h: number
+}
+
+/**
+ * What compact Fly lays over the HUD, measured from the canvas's own edges.
+ *
+ * - `bottomLeft`, the map inset: the left column's readings move up under the
+ *   GPS line, the speed tape fits between them and the inset, and the center
+ *   chips slide clear of it.
+ * - `topLeft`, the More and HUD buttons: the GPS line and what stacks under it
+ *   start below them.
+ * - `bottomCenter`, the Arm button: the center chips rise above it.
+ */
+export interface HudAvoid {
+  bottomLeft?: HudBox | null
+  topLeft?: HudBox | null
+  bottomCenter?: HudBox | null
+}
+
+const covers = (b: HudBox | null | undefined): b is HudBox => !!b && b.w > 0 && b.h > 0
 
 interface Text {
   size?: number
@@ -192,18 +218,48 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   // Converted once here so the tapes, readouts and labels agree.
   const spd = st.units.speed
   const dst = st.units.distance
-  paintTape(
-    ctx,
-    gap,
-    tapeTop,
-    tapeW,
-    tapeH,
-    toSpeed(st.airspeedMs, spd),
-    tapeStep('speed', spd),
-    s,
-    'left',
-    write,
-  )
+  const left = gap
+  const right = w - gap
+  const corner = 13 * s
+  const bottomLeft = covers(st.avoid?.bottomLeft) ? st.avoid.bottomLeft : null
+  const topLeft = covers(st.avoid?.topLeft) ? st.avoid.topLeft : null
+  const bottomCenter = covers(st.avoid?.bottomCenter) ? st.avoid.bottomCenter : null
+  const avoid = bottomLeft
+  // The link's line, with GPS opposite it. With buttons over the top-left
+  // corner GPS moves under the link, and the left column starts below them.
+  const linkLine = ribbonH + 18 * s
+  const topLine = topLeft ? Math.max(linkLine, topLeft.h + 14 * s) : linkLine
+  const gpsRight = topLeft !== null
+  // The first line of the left column's stack when the corner is covered.
+  const stackTop = gpsRight ? topLine : topLine + 16 * s
+  const clearTop = avoid ? h - avoid.h : h
+  // The lowest a center chip's bottom edge may sit.
+  const chipFloor = bottomCenter ? h - bottomCenter.h - gap : h
+
+  // The left column. Normally the tape is beside the horizon with the speeds
+  // under it and the battery in the corner; with the corner covered the
+  // battery and speeds stack under GPS and the tape takes the room between.
+  let leftTapeTop = tapeTop
+  let leftTapeH = tapeH
+  if (avoid) {
+    const stackBottom = stackTop + 17 * s + 15 * s
+    leftTapeTop = stackBottom + gap
+    leftTapeH = Math.min(tapeH, clearTop - gap - leftTapeTop)
+  }
+  if (leftTapeH >= 40 * s) {
+    paintTape(
+      ctx,
+      gap,
+      leftTapeTop,
+      tapeW,
+      leftTapeH,
+      toSpeed(st.airspeedMs, spd),
+      tapeStep('speed', spd),
+      s,
+      'left',
+      write,
+    )
+  }
   paintTape(
     ctx,
     w - tapeW - gap,
@@ -223,10 +279,10 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   // speed and throttle.
   const u1 = tapeBottom + 17 * s
   const u2 = u1 + 15 * s
-  const left = gap
-  const right = w - gap
-  pair('AS', `${formatSpeed(st.airspeedMs, spd)} ${speedLabel(spd)}`, left, u1, 'left')
-  pair('GS', `${formatSpeed(st.groundspeedMs, spd)} ${speedLabel(spd)}`, left, u2, 'left')
+  const l1 = avoid ? stackTop + 17 * s : u1
+  const l2 = l1 + 15 * s
+  pair('AS', `${formatSpeed(st.airspeedMs, spd)} ${speedLabel(spd)}`, left, l1, 'left')
+  pair('GS', `${formatSpeed(st.groundspeedMs, spd)} ${speedLabel(spd)}`, left, l2, 'left')
   const vs = formatVerticalSpeed(st.climbMs, st.units)
   pair(
     'V/S',
@@ -239,8 +295,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
 
   // The corners: battery bottom left, mode bottom right, link top right,
   // GPS top left, all at the same weight as the readouts above them.
-  const corner = 13 * s
-  write(st.batteryText, left, h - 8 * s, { size: corner })
+  write(st.batteryText, left, avoid ? stackTop : h - 8 * s, { size: corner })
   write(st.modeName || '—', right, h - 8 * s, {
     size: corner,
     weight: '600',
@@ -248,13 +303,20 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     spacing: 0.5,
     align: 'right',
   })
-  write(st.linkText, right, ribbonH + 18 * s, { size: corner, align: 'right' })
-  // GPS opposite the link on the same line. Red without a usable fix, since
-  // position modes are then refused.
-  write(st.gpsText, left, ribbonH + 18 * s, {
+  write(st.linkText, right, linkLine, { size: corner, align: 'right' })
+  // GPS opposite the link on the same line, or under it. Red without a
+  // usable fix, since position modes are then refused.
+  write(st.gpsText, gpsRight ? right : left, gpsRight ? linkLine + 16 * s : topLine, {
     size: corner,
+    ...(gpsRight ? { align: 'right' as const } : {}),
     ...(st.gpsUsable ? {} : { color: RED, weight: '600' }),
   })
+
+  /** A centered chip's x, moved right when its line runs beside the covered corner. */
+  const chipX = (width: number, bottom: number) =>
+    avoid && bottom > clearTop ? Math.max(cx, avoid.w + gap + width / 2) : cx
+  /** A center chip's baseline, raised so its bottom edge clears the Arm button. */
+  const chipY = (y: number, below: number) => Math.min(y, chipFloor - below)
 
   // State, centered above the aircraft symbol.
   const stateY = cy - Math.min(w, h) * 0.17
@@ -293,7 +355,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   // pane has the full text.
   if (st.message) {
     const size = 12 * s
-    const y = cy + Math.min(w, h) * 0.17
+    const y = chipY(cy + Math.min(w, h) * 0.17, 6 * s)
     const room = w - 2 * (tapeW + gap) - 24 * s
     ctx.save()
     ctx.font = `600 ${Math.round(size)}px ${SANS}`
@@ -301,32 +363,34 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     while (text.length > 4 && ctx.measureText(text).width > room) text = text.slice(0, -2)
     if (text !== st.message) text = `${text.trimEnd()}…`
     const tw = ctx.measureText(text).width + 20 * s
+    const mx = chipX(tw, y + 6 * s)
     ctx.beginPath()
-    ctx.roundRect(cx - tw / 2, y - 14 * s, tw, 20 * s, 8 * s)
+    ctx.roundRect(mx - tw / 2, y - 14 * s, tw, 20 * s, 8 * s)
     ctx.fillStyle = CHIP
     ctx.fill()
     ctx.restore()
-    write(text, cx, y, { size, weight: '600', font: SANS, align: 'center', color: RED })
+    write(text, mx, y, { size, weight: '600', font: SANS, align: 'center', color: RED })
   }
 
   if (st.readiness === 'ready' || st.readiness === 'notReady') {
     const ready = st.readiness === 'ready'
     const label = ready ? 'READY TO ARM' : 'NOT READY TO ARM'
-    const y = h - 25 * s
+    const y = chipY(h - 25 * s, 5 * s)
     // On a chip so ladder rungs do not run through the words.
     ctx.save()
     ctx.font = `600 ${Math.round(11 * s)}px ${SANS}`
     // measureText ignores letter-spacing, so the chip allows for it.
     const tw = ctx.measureText(label).width + label.length * 1.1 * s + 20 * s
     ctx.restore()
+    const rx = chipX(tw, y + 5 * s)
     ctx.save()
     ctx.beginPath()
-    ctx.roundRect(cx - tw / 2, y - 12 * s, tw, 17 * s, 8 * s)
+    ctx.roundRect(rx - tw / 2, y - 12 * s, tw, 17 * s, 8 * s)
     ctx.fillStyle = CHIP
     ctx.fill()
     ctx.restore()
     // Its own line above the corners, clear of the battery and mode.
-    write(label, cx, y, {
+    write(label, rx, y, {
       size: 11 * s,
       weight: '600',
       font: SANS,

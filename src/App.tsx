@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect } from 'react'
 import AppBar from './ui/shell/AppBar'
-import NavRail, { SetupTabSelect } from './ui/shell/NavRail'
+import NavRail from './ui/shell/NavRail'
 import { useCompact } from './ui/compact'
 import ActionBar from './ui/shell/ActionBar'
 import ConnectModal from './ui/shell/ConnectModal'
@@ -99,7 +99,7 @@ export default function App() {
   useLayoutEffect(() => {
     document.documentElement.toggleAttribute('data-compact', compact)
   }, [compact])
-  // Compact mode swaps the rail for a dropdown above the content.
+  // Compact mode picks the screen from the app bar instead (SetupScreenPicker).
   const showRail = mode === 'setup' && !compact
   // Fly and Mission always take the window; inside Setup, so do the tabs
   // that lay out their own full height rather than tiling cards.
@@ -111,7 +111,6 @@ export default function App() {
       <main className={showRail ? 'la-main app-main' : 'la-main app-main app-main--full'}>
         {showRail && <NavRail />}
         <div className={flush ? 'app-content app-content--flush' : 'app-content'}>
-          {mode === 'setup' && compact && <SetupTabSelect />}
           {mode === 'setup' && <SetupContent />}
           {mode === 'fly' && <FlightTab />}
           {mode === 'mission' && <MissionTab />}

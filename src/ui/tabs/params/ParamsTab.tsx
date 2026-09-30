@@ -5,6 +5,8 @@ import { useParamStore } from '../../../stores/param-store'
 import ParamSidebar from './ParamSidebar'
 import { useConnectionStore } from '../../../stores/connection-store'
 import ParamRow from './ParamRow'
+import ColumnShell, { ColumnToggle } from '../../components/ColumnShell'
+import { ToolbarWrite } from '../../components/VehicleParamActions'
 
 // The full parameter table, behind the curated setup screens. Virtualized:
 // a Copter has about 1400 parameters and only the visible slice is rendered.
@@ -82,6 +84,8 @@ export default function ParamsTab() {
               onChange={(e) => setFilter(e.target.value)}
               className="la-grow"
             />
+            <ToolbarWrite />
+            <ColumnToggle />
           </div>
           <div className="params-scroll" ref={scrollRef}>
             {/* Empty state for both an unloaded set and a filter with no
@@ -119,9 +123,9 @@ export default function ParamsTab() {
           </p>
         </div>
 
-        <aside className="app-col-shell">
+        <ColumnShell>
           <ParamSidebar />
-        </aside>
+        </ColumnShell>
       </div>
     </div>
   )

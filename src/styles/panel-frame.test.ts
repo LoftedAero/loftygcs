@@ -95,7 +95,8 @@ function tsxFiles(dir: string): string[] {
 
 /** `app-col` as a container class, not `app-col__group` and friends. */
 const COLUMN = /className="[^"]*\bapp-col\b(?!__|-shell)/
-const SHELL = /\bapp-col-shell\b/
+/** The shell's class, or ColumnShell, which renders it. */
+const SHELL = /\bapp-col-shell\b|<ColumnShell\b/
 
 /**
  * The one file allowed to render a column without its shell, because the
