@@ -54,6 +54,42 @@ export function tilesForBounds(
   return out
 }
 
+/**
+ * The tiles an offline download fetches for a view shown at `zoom`: the view
+ * itself from that level to `maxZoom`, and `outLevels` levels below it, each
+ * covering a screen the size of the view, centered on it. So
+ * zooming out over the field offline still fills the screen, where the view's
+ * own bounds would give a single tile at the lowest level.
+ */
+export function offlineTiles(
+  bounds: LatLonBounds,
+  zoom: number,
+  maxZoom: number,
+  outLevels: number,
+): TileCoord[] {
+  const top = Math.min(Math.floor(zoom), maxZoom)
+  const out = tilesForBounds(bounds, top, maxZoom)
+  // The view's extent in tiles at its own level, which is the same on screen
+  // at every level; each lower level covers that extent around the center.
+  const width = lonToTileX(bounds.east, top) - lonToTileX(bounds.west, top)
+  const height = latToTileY(bounds.south, top) - latToTileY(bounds.north, top)
+  const centerLon = (bounds.east + bounds.west) / 2
+  const centerLat = (bounds.north + bounds.south) / 2
+  for (let z = Math.max(1, top - outLevels); z < top; z++) {
+    const max = 2 ** z - 1
+    const cx = lonToTileX(centerLon, z)
+    const cy = latToTileY(centerLat, z)
+    const x0 = Math.max(0, Math.floor(cx - width / 2))
+    const x1 = Math.min(max, Math.floor(cx + width / 2))
+    const y0 = Math.max(0, Math.floor(cy - height / 2))
+    const y1 = Math.min(max, Math.floor(cy + height / 2))
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) out.push({ z, x, y })
+    }
+  }
+  return out
+}
+
 /** How many tiles that would be, without building the list. */
 export function countTiles(bounds: LatLonBounds, minZoom: number, maxZoom: number): number {
   let total = 0

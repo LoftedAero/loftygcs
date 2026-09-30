@@ -27,6 +27,10 @@
   --app-slide-w: 400px;
   /* Compact app bar: the widest a status panel grows. */
   --app-pop-w: 360px;
+  /* Compact Plan: the item sheet's height, leaving the upper part of the
+     AX12's map in view, and one field's narrowest width in the editor. */
+  --app-plan-sheet-h: 210px;
+  --app-item-field-w: 150px;
   /* Compact Configuration: a frame picker thumbnail. Five fit the AX12's
      width, with the sixth cut off to show the row scrolls. */
   --app-frame-thumb-w: 124px;
@@ -7911,27 +7915,27 @@ body.is-splitting .flight-map {
     padding-block: var(--la-space-2);
   }
 
-  /* An actions column (ColumnShell) becomes a drawer along the window's right
-     edge, opened from the pane's toolbar, and the pane takes the width. Fixed
-     rather than absolute, so no screen's grid or scrolling can move it. The
-     column's Write moves to the toolbar (ToolbarWrite). */
+  /* A side panel (ColumnShell) floats over the pane, hanging under the row
+     that holds its button (its top is measured from the button), so that row,
+     with the button and a screen's Write, stays usable. The bar popovers'
+     frame. Fixed, so no screen's grid or scrolling moves it. The column's
+     Write moves to the toolbar (ToolbarWrite). */
   & .app-drawer {
     position: fixed;
     top: var(--la-appbar-h);
-    bottom: 0;
+    bottom: var(--la-space-2);
     z-index: 5;
     width: var(--app-col-w);
     display: none;
-    border-radius: 0;
+    margin-top: var(--la-space-2);
+    border-color: var(--la-line-strong);
     box-shadow: var(--la-shadow-2);
   }
   & .app-drawer--right {
-    right: 0;
-    border-width: 0 0 0 1px;
+    right: var(--la-space-2);
   }
   & .app-drawer--left {
-    left: 0;
-    border-width: 0 1px 0 0;
+    left: var(--la-space-2);
   }
   & .app-drawer.is-open {
     display: flex;
@@ -7941,18 +7945,30 @@ body.is-splitting .flight-map {
   & .log-body--fields {
     grid-template-columns: minmax(0, 1fr);
   }
-  & .log-toolbar .app-col-toggle:first-child {
-    margin-left: 0;
+  & .log-toolbar {
+    justify-content: space-between;
   }
   & .app-col__primary {
     display: none;
   }
+  /* A toolbar holding the side panel's button: its controls are the button's
+     height, so the row reads as one set. */
+  & .params-toolbar .la-input,
+  & .files__bar .la-btn,
+  & .inspector__bar .la-input,
+  & .osd-bar .la-select,
+  & .osd-bar .la-readout,
+  & .log-toolbar .la-btn,
+  & .app-toolbar-write {
+    height: var(--app-touch);
+    min-height: var(--app-touch);
+  }
   /* The toggle ends its toolbar, whatever else the bar holds. */
-  & .app-col-toggle {
+  & .app-panel-toggle {
     margin-left: auto;
   }
-  /* A title row already ends its buttons on the right. */
-  & .la-card__actions .app-col-toggle {
+  & .la-card__actions .app-panel-toggle,
+  & .log-toolbar .app-panel-toggle {
     margin-left: 0;
   }
   /* Title-row buttons keep one width, a narrower one. */
@@ -7969,9 +7985,19 @@ body.is-splitting .flight-map {
   & .osd-workspace {
     grid-template-rows: 100% auto;
     overflow-y: auto;
+    /* Scrolled by touch; a scrollbar would narrow the card and move the side
+       panel's button off the line every other screen puts it on. */
+    scrollbar-width: none;
+  }
+  /* The shared sheet's scrollbar is a WebKit one, which the property above
+     does not reach in the Android WebView. */
+  & .osd-workspace::-webkit-scrollbar {
+    width: 0;
   }
   & .osd-workspace__screen {
     grid-area: 1 / 1;
+    /* Puts the side panel's button where the other screens' toolbars do. */
+    padding: var(--la-space-2);
   }
   & .osd-workspace__panels {
     grid-area: 2 / 1;
@@ -7980,6 +8006,28 @@ body.is-splitting .flight-map {
     flex: none;
     overflow: visible;
     padding-right: 0;
+  }
+
+  /* Map controls a finger can hit, on both maps. */
+  & .leaflet-control-zoom a {
+    width: var(--app-touch);
+    height: var(--app-touch);
+    line-height: var(--app-touch);
+  }
+  & .map-controls .la-btn,
+  & .map-controls button {
+    min-height: var(--app-touch);
+  }
+  /* The attribution on one line; a tap shows the rest. */
+  & .leaflet-control-attribution {
+    max-width: 60vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .leaflet-control-attribution:hover {
+    max-width: none;
+    white-space: normal;
   }
 
   /* Ports' table takes the card's full width; half the window is too narrow
@@ -8310,6 +8358,46 @@ button.compact-status__item:hover,
   text-align: center;
 }
 
+/* The side panel's button (ColumnShell's ColumnToggle): one square, the same
+   on every screen, blue while its panel is open. */
+.app-panel-toggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--app-touch);
+  height: var(--app-touch);
+  padding: 0;
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  color: var(--la-ink-2);
+  box-shadow: var(--la-shadow-1);
+  cursor: pointer;
+}
+.app-panel-toggle:hover {
+  color: var(--la-ink);
+}
+.app-panel-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+.app-panel-toggle.is-on {
+  border-color: var(--la-blue);
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
+.app-panel-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.app-panel-toggle__pane {
+  fill: currentColor;
+  stroke: none;
+}
+
 /* Compact Setup's screen picker (NavRail's SetupScreenPicker): the mode
    switch's Setup button names the screen, at one width for every name so
    nothing beside it moves, and opens the rail's groups side by side. */
@@ -8550,62 +8638,266 @@ button.compact-status__item:hover,
   min-width: 0;
   isolation: isolate;
 }
-.mission-compact__toggles {
+/* The side panel's button, in the map's top-right corner. The base-layer
+   switch moves in beside it rather than below. */
+.mission-compact__corner {
   position: absolute;
   top: var(--la-space-2);
   right: var(--la-space-2);
   z-index: 2;
-  display: flex;
-  gap: var(--la-space-2);
 }
-.mission-compact__toggles .la-btn {
-  min-height: var(--app-touch);
-  background: var(--la-surface);
+.mission-compact .map-controls {
+  right: calc(var(--app-touch) + var(--la-space-2) * 2);
 }
-.mission-compact__toggles .la-btn--secondary {
-  background: var(--la-blue);
+/* Plan has no toolbar: the row the panel hangs under is the map's own
+   floating controls, which would sit on the panel's top edge. They belong to
+   the map the panel covers, so they step aside while it is open. */
+.mission-compact.has-panel .map-controls {
+  visibility: hidden;
 }
-.mission-compact__drawer {
-  position: absolute;
-  top: calc(var(--app-touch) + var(--la-space-4));
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  background: var(--la-surface);
-  border-left: 1px solid var(--la-line);
-  box-shadow: var(--la-shadow-2);
+/* Plan's side panel (ColumnShell): the plan column. */
+.mission-panel {
+  overflow: hidden;
 }
-/* The table's rows are wide, so the list takes the width; the plan column
-   keeps its own width and leaves the map beside it. */
-.mission-compact__drawer--items {
-  left: 0;
-}
-.mission-compact__drawer--plan {
-  width: var(--app-col-w);
-}
-.mission-compact__drawer > * {
+/* In the panel the plan column scrolls as one, foot included. */
+.mission-panel .mission-side {
   flex: 1;
   min-height: 0;
-}
-/* In the drawer the plan column scrolls as one, foot included: a drawer this
-   short would leave the pinned foot no room above it. The desktop column's
-   narrow-window cap does not apply either. */
-.mission-compact__drawer .mission-side {
+  display: flex;
+  flex-direction: column;
   max-height: none;
   overflow-y: auto;
 }
-.mission-compact__drawer .mission-side__scroll {
+.mission-panel .mission-side__scroll {
   flex: none;
   overflow: visible;
 }
-.mission-compact__drawer .mission-side__foot {
+.mission-panel .mission-side__foot {
   border-top: 0;
 }
-/* The map's base-layer switch moves below the drawer buttons. */
-.mission-compact .map-controls {
-  top: calc(var(--app-touch) + var(--la-space-4));
+/* Everything in the panel and the sheet is a finger tall. */
+.mission-panel .la-btn,
+.mission-panel .la-input,
+.mission-panel .la-select,
+.mission-panel .plan-switch__btn,
+.plan-sheet .la-btn,
+.plan-sheet .la-input,
+.plan-sheet .la-select {
+  min-height: var(--app-touch);
+}
+
+/* Compact Plan's item sheet: rises from the bottom, so the route stays in view
+   above it. Its handle rides on its top edge and closes it again, as the side
+   panel's button does. Only the handle and the body take touches; the map
+   around them stays live. */
+.plan-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.plan-sheet__handle {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  min-height: var(--app-touch);
+  /* Clear of the map's attribution line while the sheet is closed. */
+  margin-bottom: var(--la-space-5);
+  padding: 0 var(--la-space-5);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  color: var(--la-ink);
+  font: 600 var(--la-size-md) / 1 var(--la-font);
+  box-shadow: var(--la-shadow-2);
+  cursor: pointer;
+}
+.plan-sheet__handle svg {
+  width: 10px;
+  height: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+/* Open, the handle is the sheet's tab: joined to its top edge. */
+.plan-sheet.is-open .plan-sheet__handle {
+  position: relative;
+  z-index: 1;
+  margin-bottom: -1px;
+  border-bottom-color: var(--la-surface);
+  border-radius: var(--la-radius-sm) var(--la-radius-sm) 0 0;
+  box-shadow: none;
+}
+.plan-sheet.is-open .plan-sheet__handle svg {
+  transform: rotate(180deg);
+}
+.plan-sheet__body {
+  pointer-events: auto;
+  align-self: stretch;
+  height: var(--app-plan-sheet-h);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--la-line-strong);
+  background: var(--la-surface);
+  box-shadow: var(--la-shadow-2);
+}
+.plan-sheet__body > * {
+  flex: 1;
+  min-height: 0;
+}
+.plan-sheet .mission-lower {
+  border: 0;
+  border-radius: 0;
+}
+/* The editor across the sheet's width: its heading and actions share one
+   row, and the fields tile beneath. */
+.plan-sheet .item-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.plan-sheet .item-editor__head {
+  grid-area: 1 / 1;
+}
+.plan-sheet .item-editor__foot {
+  grid-area: 1 / 2;
+  grid-template-columns: repeat(3, var(--app-sheet-set-w));
+  border-top: 0;
+  border-bottom: 1px solid var(--la-line);
+}
+.plan-sheet .item-editor__body {
+  grid-area: 2 / 1 / 3 / 3;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--app-item-field-w), 1fr));
+  align-content: start;
+}
+/* Two columns of tools, so the whole palette fits the window's height with
+   Finish in view, where one column ran past the attribution. */
+.mission-compact .mission-palette {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  max-height: none;
+  overflow: visible;
+}
+
+/* The item list (ItemEditor's ItemList): a line per item, each opening the
+   editor. */
+.item-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.item-list__row {
+  display: grid;
+  grid-template-columns: var(--app-touch) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--la-space-2);
+  min-height: var(--app-touch);
+  padding: 0 var(--la-space-3) 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--la-line);
+  background: none;
+  color: var(--la-ink);
+  font: 400 var(--la-size-md) / 1.2 var(--la-font);
+  text-align: left;
+}
+.item-list__row.is-selected {
+  background: var(--la-blue-soft);
+}
+.item-list__seq {
+  justify-self: center;
+  color: var(--la-ink-3);
+  font-family: var(--la-font-mono);
+}
+.item-list__cmd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-list__alt {
+  color: var(--la-ink-2);
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.item-list__foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-space-3);
+  padding: var(--la-space-2) var(--la-space-3);
+}
+
+/* One item's editor (ItemEditor), in the side panel's Items tab. */
+.item-editor {
+  display: flex;
+  flex-direction: column;
+}
+.item-editor__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  padding: var(--la-space-1) var(--la-space-2) var(--la-space-1) var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+}
+.item-editor__title {
+  margin: 0;
+  font-size: var(--la-size-md);
+}
+.item-editor__leg {
+  color: var(--la-ink-3);
+  font-size: var(--la-size-sm);
+}
+.item-editor__close {
+  margin-left: auto;
+}
+.item-editor__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-3);
+  padding: var(--la-space-3);
+}
+.item-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.item-editor .la-btn,
+.item-editor .la-input,
+.item-editor .la-select {
+  min-height: var(--app-touch);
+}
+.item-editor__alt {
+  display: grid;
+  grid-template-columns: var(--app-touch) minmax(0, 1fr) var(--app-touch);
+  gap: var(--la-space-2);
+}
+.item-editor__alt .la-input {
+  width: 100%;
+}
+.item-editor__alt .la-btn {
+  padding: 0;
+  font-size: var(--la-size-lg);
+}
+.item-editor__foot {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--la-space-2);
+  padding: var(--la-space-2) var(--la-space-3);
+  border-top: 1px solid var(--la-line);
 }
 /* One label width in compact Fly's sheet, so the controls line up. */
 .flight-sheet .flight-controls__field > .la-field__label,

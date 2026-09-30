@@ -191,12 +191,25 @@ changes how each is laid out. The rules are in the compact block at the end of `
 - Cards lose the title's rule and some padding. A curated row hides its ArduPilot name by
   collapsing that track of `--app-named-tracks` to zero rather than removing it, so rows built
   by hand on the same tracks keep their columns.
-- An actions column is a drawer (`ColumnShell`, `.app-drawer`) opened by `ColumnToggle` in the
-  pane's toolbar. It stays mounted while closed, because its buttons own hidden file inputs
-  and dialogs, and it is `position: fixed` so no screen's grid or scroll container can move
-  it. Write moves to the toolbar (`ToolbarWrite`) and the column's own is hidden
-  (`.app-col__primary`). Log Review has a drawer on each side once a log is open, and keeps
-  its column in place before that. Inspector opens its drawer when a message is picked.
+- A screen's column is a side panel (`ColumnShell`, `.app-drawer`) opened by `ColumnToggle`,
+  the same square button at the top-right of the pane's toolbar (or the map) on every screen.
+  The panel floats over the pane, hanging under the row that holds the button (its top is
+  measured from the button), so that row stays usable: the button closes it, and Write beside
+  it stays in reach. Plan has no toolbar, so its map's floating controls, which would sit on the
+  panel's top edge, are hidden while it is open. It stays mounted while closed, because its
+  buttons own hidden file inputs and dialogs, and it is `position: fixed` so no screen's grid
+  or scroll container can move it. Write moves to the toolbar (`ToolbarWrite`) and the
+  column's own is hidden (`.app-col__primary`). Log Review has a panel on each side once a log
+  is open, and keeps its column in place before that. Inspector opens its panel when a message
+  is picked.
+- Plan's side panel holds the plan's actions. Its items rise from the bottom in a sheet
+  (`.plan-sheet`) opened by an Items handle at the bottom center, which rides on the sheet's
+  top edge to close it, as the side panel's button does; one of the two is open at a time. The
+  sheet is a list (`ItemList`) in place of the table; tapping a line or a marker opens that
+  item's editor (`ItemEditor`) in the sheet, laid out across its width, and the map pans the
+  item above the sheet once the sheet has drawn.
+- Controls sharing a row with the side panel's button are the button's height (44px). The palettes are two columns so every tool, fence
+  Finish included, fits a 412px window.
 - A table too wide for the window keeps what is watched in the row and opens the rest beneath
   it (Outputs: function and position, then travel). The frame picker is one row of thumbnails
   that scrolls sideways.
@@ -415,6 +428,15 @@ the cache and the prefetch only fills gaps.
   terrain loader, and cleared elsewhere.
 - The download's outcome message is composed from the returned `PrefetchProgress`, never from
   the request.
+- A download (`offlineTiles` in `services/tile-math.ts`) covers the view from its own zoom up,
+  and four levels below it a screen the size of the view around its center, so zooming out over
+  the field offline still fills the screen. Each lower level costs about as many tiles as the
+  view.
+- The cache asks for persistent storage when it opens. Android's WebView refuses, but gives a
+  quota of tens of gigabytes. An app update that reinstalls the app (the AX12's OTA did) deletes
+  the stored maps with the rest of its data.
+- Checked on the AX12: a field stored over home WiFi drew at every stored zoom, on Plan and Fly,
+  after a reload on the ELRS Backpack's network, which has no internet.
 
 ### Terrain (`services/terrain.ts`, `services/mission-terrain.ts`)
 

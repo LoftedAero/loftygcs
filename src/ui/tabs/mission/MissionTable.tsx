@@ -311,7 +311,7 @@ function Row({
  * things per command (a hold time of 15 would become 15 loiter turns).
  * Position is kept.
  */
-function commandChange(command: number): Partial<Omit<PlanItem, 'uid'>> {
+export function commandChange(command: number): Partial<Omit<PlanItem, 'uid'>> {
   const spec = commandSpec(command)
   return {
     command,

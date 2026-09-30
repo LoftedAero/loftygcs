@@ -15,10 +15,12 @@ import GeoExchange from './GeoExchange'
 import ItemPalette from './ItemPalette'
 import FencePalette from './FencePalette'
 import AltitudeProfile from './AltitudeProfile'
+import ItemEditor, { ItemList, useItemEditor } from './ItemEditor'
 import Divider from '../../components/Divider'
 import { LaButton, LaModal, LaSwitch } from '../../components/La'
 import { useMissionStore } from '../../../stores/mission-store'
 import { useCompact } from '../../compact'
+import ColumnShell, { ColumnToggle, closeColumn, useColumnOpen } from '../../components/ColumnShell'
 
 // Mission planning: Mission Planner's shape with QGroundControl's ideas
 // where they are better.
@@ -56,8 +58,27 @@ export default function MissionTab() {
 
   const profileVisible = showProfile && items > 0
   const compact = useCompact()
-  // Compact mode: which drawer is open over the map.
-  const [drawer, setDrawer] = useState<'items' | 'plan' | null>(null)
+  // Compact mode: the item sheet that rises from the bottom, whether it shows
+  // the profile, and the side panel with the plan's actions. One of the two
+  // is open at a time.
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [compactProfile, setCompactProfile] = useState(false)
+  const editorUid = useItemEditor((s) => s.uid)
+  const closeEditor = useItemEditor((s) => s.close)
+  const panelOpen = useColumnOpen()
+  // Tapping an item opens the sheet on its editor; closing the sheet ends the
+  // edit.
+  useEffect(() => {
+    if (editorUid) setSheetOpen(true)
+  }, [editorUid])
+  useEffect(() => {
+    if (sheetOpen) closeColumn()
+    else closeEditor()
+  }, [sheetOpen, closeEditor])
+  useEffect(() => {
+    if (panelOpen) setSheetOpen(false)
+  }, [panelOpen])
+  useEffect(() => closeEditor, [closeEditor])
 
   const mapArea = (
     <div className="mission-map-area">
@@ -99,8 +120,8 @@ export default function MissionTab() {
     </div>
   )
 
-  const side = (
-    <aside className="app-col-shell mission-side">
+  const sideContent = (
+    <>
       {/* Everything that belongs to a plan scrolls. */}
       <div className="app-col mission-side__scroll">
         <PlanKindSwitch />
@@ -129,8 +150,9 @@ export default function MissionTab() {
           onCoverage={setCoverage}
         />
       </div>
-    </aside>
+    </>
   )
+  const side = <aside className="app-col-shell mission-side">{sideContent}</aside>
 
   const firstPrompt = (
     <FirstItemPrompt
@@ -152,29 +174,56 @@ export default function MissionTab() {
   // Compact mode: the map fills the window, and the item list and the plan
   // column open as drawers over its right side.
   if (compact) {
-    const toggle = (d: 'items' | 'plan') => setDrawer((cur) => (cur === d ? null : d))
     return (
-      <div className="mission-screen mission-compact">
+      <div className={`mission-screen mission-compact${panelOpen ? ' has-panel' : ''}`}>
         {mapArea}
-        <div className="mission-compact__toggles">
-          <LaButton
-            variant={drawer === 'items' ? 'secondary' : 'ghost'}
-            onClick={() => toggle('items')}
+        {/* The screen's side panel, as on every screen with a column: the
+            plan's actions. */}
+        <div className="mission-compact__corner">
+          <ColumnToggle label="Plan panel" />
+        </div>
+        <ColumnShell base="app-col-shell mission-panel">
+          <div className="mission-side">{sideContent}</div>
+        </ColumnShell>
+        {/* The items rise from the bottom, where the route stays in view
+            above them; the handle rides on the sheet's top edge. */}
+        <div className={`plan-sheet${sheetOpen ? ' is-open' : ''}`}>
+          <button
+            type="button"
+            className="plan-sheet__handle"
+            aria-expanded={sheetOpen}
+            onClick={() => setSheetOpen(!sheetOpen)}
           >
             {items > 0 ? `Items · ${items}` : 'Items'}
-          </LaButton>
-          <LaButton
-            variant={drawer === 'plan' ? 'secondary' : 'ghost'}
-            onClick={() => toggle('plan')}
-          >
-            Plan
-          </LaButton>
+            <svg viewBox="0 0 10 6" aria-hidden="true">
+              <path d="M1 5l4-4 4 4" />
+            </svg>
+          </button>
+          {sheetOpen && (
+            <div className="plan-sheet__body">
+              {editorUid ? (
+                <ItemEditor />
+              ) : (
+                <div className="mission-lower">
+                  <div className="mission-lower__head">
+                    <NewItemDefaults />
+                    <span className="la-grow" />
+                    {items > 0 && (
+                      <LaSwitch
+                        label="Profile"
+                        checked={compactProfile}
+                        onChange={(e) => setCompactProfile(e.target.checked)}
+                      />
+                    )}
+                  </div>
+                  {items > 0 && <TerrainWarning />}
+                  {compactProfile && items > 0 && <AltitudeProfile />}
+                  <ItemList />
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        {drawer && (
-          <div className={`mission-compact__drawer mission-compact__drawer--${drawer}`}>
-            {drawer === 'items' ? lower : side}
-          </div>
-        )}
         {firstPrompt}
       </div>
     )

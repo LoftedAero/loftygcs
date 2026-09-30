@@ -5,6 +5,7 @@ import {
   latToTileY,
   lonToTileX,
   MAX_LAT,
+  offlineTiles,
   tileUrl,
   tilesForBounds,
 } from './tile-math'
@@ -113,5 +114,41 @@ describe('presenting it', () => {
     expect(formatBytes(2048)).toBe('2 KB')
     expect(formatBytes(50 * 1024 * 1024)).toBe('50 MB')
     expect(formatBytes(3 * 1024 * 1024 * 1024)).toBe('3.0 GB')
+  })
+})
+
+describe('offlineTiles', () => {
+  // A small field at zoom 16, about a screen of a handheld.
+  const field = { north: -35.358, south: -35.368, east: 149.175, west: 149.155 }
+
+  it('covers the view at its own level and above, as tilesForBounds does', () => {
+    const got = offlineTiles(field, 16, 18, 0)
+    expect(got).toEqual(tilesForBounds(field, 16, 18))
+  })
+
+  it('gives each level below a screen the size of the view, around its center', () => {
+    const got = offlineTiles(field, 16, 18, 4)
+    // The view's extent in tiles at zoom 16; a screen that size at a lower
+    // level spans at most one more tile each way.
+    const w = lonToTileX(field.east, 16) - lonToTileX(field.west, 16)
+    const h = latToTileY(field.south, 16) - latToTileY(field.north, 16)
+    for (const z of [12, 13, 14, 15]) {
+      const level = got.filter((t) => t.z === z)
+      const xs = new Set(level.map((t) => t.x))
+      const ys = new Set(level.map((t) => t.y))
+      expect(xs.size).toBeLessThanOrEqual(Math.ceil(w) + 1)
+      expect(ys.size).toBeLessThanOrEqual(Math.ceil(h) + 1)
+      // Both edges of that screen around the center are covered.
+      const cx = lonToTileX(149.165, z)
+      const cy = latToTileY(-35.363, z)
+      expect(xs.has(Math.floor(cx - w / 2)) && xs.has(Math.floor(cx + w / 2))).toBe(true)
+      expect(ys.has(Math.floor(cy - h / 2)) && ys.has(Math.floor(cy + h / 2))).toBe(true)
+    }
+    expect(got.some((t) => t.z === 11)).toBe(false)
+  })
+
+  it('stops at zoom 1 and stays on the tile grid', () => {
+    const got = offlineTiles({ north: 80, south: -80, east: 179, west: -179 }, 2, 3, 4)
+    expect(got.every((t) => t.z >= 1 && t.x >= 0 && t.x < 2 ** t.z && t.y >= 0)).toBe(true)
   })
 })

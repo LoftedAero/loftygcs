@@ -75,7 +75,7 @@ export default function LogsTab() {
           {/* Compact mode: both columns are drawers once a log is open. */}
           {compact && log && (
             <div className="log-toolbar">
-              <ColumnToggle label="Fields" target="fields" />
+              <ColumnToggle label="Fields" target="fields" side="left" />
               <ColumnToggle />
             </div>
           )}

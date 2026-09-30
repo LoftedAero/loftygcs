@@ -1,16 +1,18 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { create } from 'zustand'
 import { useCompact } from '../compact'
-import { LaButton } from './La'
 
-// A screen's actions column. On the desktop it is the framed column beside the
-// pane. In compact mode there is no room for it, so it becomes a drawer over
-// the pane, opened by ColumnToggle in the pane's toolbar. It stays mounted
-// while closed, because its buttons own hidden file inputs and dialogs that
-// must outlive a click.
+// A screen's side panel: its actions column. On the desktop it is the framed
+// column beside the pane. In compact mode there is no room for it, so it
+// floats over the pane, hanging under the row that holds the ColumnToggle
+// that opens it. That row stays usable: the button closes the panel again, and
+// a screen's Write beside it stays in reach. Every screen with a column uses this, so
+// the button and the panel look and sit the same everywhere.
 //
-// A screen may have a drawer on each side (Log Review's fields and actions);
-// they are told apart by name, and one is open at a time.
+// It stays mounted while closed, because its buttons own hidden file inputs
+// and dialogs that must outlive a click. A screen may have a panel on each
+// side (Log Review's fields and actions); they are told apart by name, and
+// one is open at a time.
 
 const useDrawer = create<{ open: string | null; setOpen: (open: string | null) => void }>(
   (set) => ({
@@ -21,34 +23,63 @@ const useDrawer = create<{ open: string | null; setOpen: (open: string | null) =
 
 const ACTIONS = 'actions'
 
-/** Opens a drawer from the toolbar in compact mode; nothing on the desktop. */
+/** Whether the named panel is open. */
+export function useColumnOpen(name: string = ACTIONS): boolean {
+  return useDrawer((s) => s.open === name)
+}
+
+/** Closes a panel from code, such as when another panel opens in its place. */
+export function closeColumn(name: string = ACTIONS): void {
+  if (useDrawer.getState().open === name) useDrawer.getState().setOpen(null)
+}
+
+/** Opens a panel from code, such as when a selection has detail to show. */
+export function openColumn(name: string = ACTIONS): void {
+  useDrawer.getState().setOpen(name)
+}
+
+/** The button that opens and closes a panel, in compact mode only. */
 export function ColumnToggle({
-  label = 'More',
   target = ACTIONS,
+  side = 'right',
+  label = 'Side panel',
 }: {
-  label?: string
   target?: string
+  side?: 'left' | 'right'
+  /** What the panel holds, for its accessible name. */
+  label?: string
 }) {
   const compact = useCompact()
-  const open = useDrawer((s) => s.open === target)
+  const open = useColumnOpen(target)
   const setOpen = useDrawer((s) => s.setOpen)
   if (!compact) return null
   return (
-    <LaButton
-      variant="ghost"
-      className="app-col-toggle"
-      aria-expanded={open}
-      data-column-toggle=""
+    <button
+      type="button"
+      className={`app-panel-toggle${open ? ' is-on' : ''}`}
+      aria-label={label}
+      aria-pressed={open}
+      title={label}
+      data-column-toggle={target}
       onClick={() => setOpen(open ? null : target)}
     >
-      {label}
-    </LaButton>
+      {/* A window with the panel's side filled in. */}
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+        {side === 'right' ? (
+          <path
+            className="app-panel-toggle__pane"
+            d="M12 3.5h3.5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H12z"
+          />
+        ) : (
+          <path
+            className="app-panel-toggle__pane"
+            d="M8 3.5H4.5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2H8z"
+          />
+        )}
+      </svg>
+    </button>
   )
-}
-
-/** Opens the drawer from code, such as when a selection has detail to show. */
-export function openColumn(target: string = ACTIONS): void {
-  useDrawer.getState().setOpen(target)
 }
 
 export default function ColumnShell({
@@ -58,7 +89,7 @@ export default function ColumnShell({
   drawer = true,
   children,
 }: {
-  /** Which drawer this is, where a screen has two. */
+  /** Which panel this is, where a screen has two. */
   name?: string
   side?: 'left' | 'right'
   /** The column's own class, which draws its frame. */
@@ -68,9 +99,23 @@ export default function ColumnShell({
   children: ReactNode
 }) {
   const compact = useCompact()
-  const open = useDrawer((s) => s.open === name)
+  const open = useColumnOpen(name)
   const setOpen = useDrawer((s) => s.setOpen)
   const ref = useRef<HTMLElement>(null)
+  const floating = drawer && compact
+  // Just under the button that opened it.
+  const [top, setTop] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    if (!floating || !open) return
+    const place = () => {
+      const btn = document.querySelector(`[data-column-toggle="${name}"]`)
+      setTop(btn ? btn.getBoundingClientRect().bottom : null)
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [floating, open, name])
 
   // Leaving the screen closes it, so the next screen opens with its pane.
   useEffect(
@@ -80,15 +125,17 @@ export default function ColumnShell({
     [name, setOpen],
   )
 
-  // A tap outside the drawer or Escape closes it. Capture phase, as for the
+  // A tap outside the panel or Escape closes it. Capture phase, as for the
   // bar's panels, so a control that stops propagation still counts.
   useEffect(() => {
-    if (!compact || !open) return
+    if (!floating || !open) return
     const onDown = (e: MouseEvent) => {
       const t = e.target as Element
       if (ref.current?.contains(t) || t.closest?.('[data-column-toggle]')) return
-      // A dialog opened from the column is part of it wherever it renders.
+      // A dialog opened from the panel is part of it wherever it renders.
       if (t.closest?.('.la-modal')) return
+      // So is the map's content on Plan, where tapping an item edits it here.
+      if (t.closest?.('.leaflet-marker-icon')) return
       setOpen(null)
     }
     const onKey = (e: KeyboardEvent) => {
@@ -100,7 +147,7 @@ export default function ColumnShell({
       document.removeEventListener('mousedown', onDown, true)
       document.removeEventListener('keydown', onKey)
     }
-  }, [compact, open, setOpen])
+  }, [floating, open, setOpen])
 
   return (
     <aside
@@ -108,10 +155,11 @@ export default function ColumnShell({
       className={[
         base,
         drawer ? `app-drawer app-drawer--${side}` : '',
-        drawer && compact && open ? 'is-open' : '',
+        floating && open ? 'is-open' : '',
       ]
         .filter(Boolean)
         .join(' ')}
+      style={floating && open && top !== null ? { top } : undefined}
     >
       {children}
     </aside>

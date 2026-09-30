@@ -423,12 +423,24 @@ behind one tap: a drawer, an expanding row, a row that scrolls sideways.
 The content area is too short to give a row to a selector. The mode switch's
 Setup button names the screen and opens the list, at one width for every name.
 
-### The column is a drawer; Write stays in view
+### The column is a side panel; Write stays in view
 
-An actions column opens over the pane from a More button that ends the pane's
-toolbar. Write sits beside it with its count, because a staged edit nobody can
-see is an edit nobody writes. The column's own Write is hidden, so there is
-still one.
+Every screen's column opens the same way: one square button with a side-panel
+icon at the top-right of the pane, blue while open, and a floating panel
+hanging under the row that holds it. That row stays usable: the button that
+opened the panel closes it, and Write stays beside it. Anything else floating
+in that row over the panel's side (Plan's map controls) steps aside while the
+panel is open. A screen never has two different buttons for its panels on one side. Controls
+in the same row as the button are its height, so the row reads as one set.
+
+### A list of things on a map rises from below
+
+Plan's items open as a sheet from the bottom, under an Items handle that rides
+on its top edge and closes it again. The route stays in view above the list,
+and a wide sheet suits the altitude profile and an item's fields laid out
+across. The side panel and the sheet are one at a time. Write sits beside the button with its
+count, because a staged edit nobody can see is an edit nobody writes. The
+column's own Write is hidden, so there is still one.
 
 ### A wide table shows what is watched and opens the rest
 

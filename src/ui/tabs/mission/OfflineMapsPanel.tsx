@@ -9,9 +9,8 @@ import {
 } from '../../../services/tile-cache'
 import {
   BYTES_PER_TILE,
-  countTiles,
   formatBytes,
-  tilesForBounds,
+  offlineTiles,
   type LatLonBounds,
 } from '../../../services/tile-math'
 import { layerById, loadBaseLayer } from '../flight/map-layers'
@@ -32,6 +31,12 @@ import {
 
 /** Holds an empty slot's line open, so the box never changes height. */
 const BLANK = ' '
+
+/**
+ * Levels below the current view fetched as well, so zooming out over the field
+ * offline still has a map: a screenful each, a few tiles per level.
+ */
+const ZOOM_OUT_LEVELS = 4
 
 /** How far past the current view to fetch, so a small pan stays covered. */
 const ZOOM_CHOICES = [
@@ -100,15 +105,15 @@ export default function OfflineMapsPanel({
   const layer = layerById(loadBaseLayer())
   // Never past the imagery's native zoom.
   const maxZoom = Math.min(layer.maxNativeZoom, Math.floor(zoom) + extra)
-  const minZoom = Math.max(1, Math.min(Math.floor(zoom), maxZoom))
-  const count = bounds ? countTiles(bounds, minZoom, maxZoom) : 0
+  const minZoom = Math.max(1, Math.min(Math.floor(zoom), maxZoom) - ZOOM_OUT_LEVELS)
+  const tiles = bounds ? offlineTiles(bounds, zoom, maxZoom, ZOOM_OUT_LEVELS) : []
+  const count = tiles.length
   // Zero past the terrain area cap.
   const terrainForArea = bounds ? terrainTilesForArea(bounds).length : 0
   const running = progress !== null
 
   const start = async () => {
     if (!bounds) return
-    const tiles = tilesForBounds(bounds, minZoom, maxZoom)
     const terrain = terrainTilesForArea(bounds)
     const total = tiles.length + terrain.length
     const controller = new AbortController()
