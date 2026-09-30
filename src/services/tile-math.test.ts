@@ -151,4 +151,13 @@ describe('offlineTiles', () => {
     const got = offlineTiles({ north: 80, south: -80, east: 179, west: -179 }, 2, 3, 4)
     expect(got.every((t) => t.z >= 1 && t.x >= 0 && t.x < 2 ** t.z && t.y >= 0)).toBe(true)
   })
+
+  it('covers a whole screen below a view zoomed past the imagery', () => {
+    // Shown at 20 with imagery ending at 19: the levels below must still
+    // span the view's extent, measured at 20.
+    const small = { north: -35.3625, south: -35.3635, east: 149.1665, west: 149.1645 }
+    const w = lonToTileX(small.east, 20) - lonToTileX(small.west, 20)
+    const level = offlineTiles(small, 20, 19, 2).filter((t) => t.z === 17)
+    expect(new Set(level.map((t) => t.x)).size).toBeGreaterThanOrEqual(Math.floor(w))
+  })
 })

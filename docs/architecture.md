@@ -108,9 +108,15 @@ Dark mode is an app-local override because the shared sheet is frozen.
 - A flyout from a scrolling strip must be `position: fixed`, placed from the button's
   `getBoundingClientRect()`, or the `overflow: auto` ancestor clips it. The symptom is an
   element that measures correctly while `elementFromPoint` returns something else.
-- `LaModal` is not portaled; it is `position: fixed`. An ancestor with a `transform` (or
-  `filter`) becomes its containing block and clips it to that box, so center overlays with
-  margins or grid, not `translate`.
+- `LaModal` is portaled to `document.body`, so a dialog opened from a floating side panel is
+  not clipped or buried by the panel's stacking context. A click-away that tests containment
+  must count `.la-modal` as inside, since the dialog is no longer inside what opened it. React
+  events still bubble to the component that rendered it.
+- An ancestor with a `transform` (or `filter`) becomes the containing block of a
+  `position: fixed` descendant, so center overlays with margins or grid, not `translate`.
+- Compact panels close on `onOutsidePress` (`ui/components/outside-press.ts`): pointerdown in
+  the capture phase, because Leaflet stops mousedown. A press on the map that closes a panel
+  also swallows the click that follows, or Plan would take it as a new waypoint.
 - A Leaflet popup holding controls must stop click, wheel and keydown propagation. Plan edits
   rebuild the marker layer, so an open popup is reopened after the rebuild.
 
@@ -182,7 +188,8 @@ mechanisms behind them.
 ### Compact Setup
 
 Compact mode (`ui/compact.ts`, `data-compact` on the root) keeps every Setup screen and
-changes how each is laid out. The rules are in the compact block at the end of `app.css`.
+changes how each is laid out. The rules are in the compact block at the end of `app.css`, which
+redefines `--la-appbar-h` so everything placed below the bar follows its shorter height.
 
 - There is no rail. The mode switch's Setup button names the current screen and opens the
   rail's groups as a panel (`SetupScreenPicker` in `NavRail.tsx`). It has one width for every
@@ -191,25 +198,36 @@ changes how each is laid out. The rules are in the compact block at the end of `
 - Cards lose the title's rule and some padding. A curated row hides its ArduPilot name by
   collapsing that track of `--app-named-tracks` to zero rather than removing it, so rows built
   by hand on the same tracks keep their columns.
-- A screen's column is a side panel (`ColumnShell`, `.app-drawer`) opened by `ColumnToggle`,
-  the same square button at the top-right of the pane's toolbar (or the map) on every screen.
-  The panel floats over the pane, hanging under the row that holds the button (its top is
-  measured from the button), so that row stays usable: the button closes it, and Write beside
-  it stays in reach. Plan has no toolbar, so its map's floating controls, which would sit on the
-  panel's top edge, are hidden while it is open. It stays mounted while closed, because its
-  buttons own hidden file inputs and dialogs, and it is `position: fixed` so no screen's grid
-  or scroll container can move it. Write moves to the toolbar (`ToolbarWrite`) and the
-  column's own is hidden (`.app-col__primary`). Log Review has a panel on each side once a log
-  is open, and keeps its column in place before that. Inspector opens its panel when a message
-  is picked.
-- Plan's side panel holds the plan's actions. Its items rise from the bottom in a sheet
-  (`.plan-sheet`) opened by an Items handle at the bottom center, which rides on the sheet's
-  top edge to close it, as the side panel's button does; one of the two is open at a time. The
-  sheet is a list (`ItemList`) in place of the table; tapping a line or a marker opens that
-  item's editor (`ItemEditor`) in the sheet, laid out across its width, and the map pans the
-  item above the sheet once the sheet has drawn.
-- Controls sharing a row with the side panel's button are the button's height (44px). The palettes are two columns so every tool, fence
-  Finish included, fits a 412px window.
+- A screen's column is a side panel (`ColumnShell`, `.app-side-panel`) opened by
+  `ColumnToggle`, the same square button at the top-right of the pane's toolbar, or in the
+  corner of Plan's map (`.app-panel-corner`), on every screen. The panel floats over the pane,
+  hanging under the row that holds the button (its top is measured from the button, and never
+  above the app bar), so that row stays usable: the button closes it, and Write beside it stays
+  in reach. On Plan the map's floating controls, which would sit on the panel's top edge, are
+  hidden while it is open. It stays mounted while closed, because
+  its buttons own hidden file inputs and dialogs, and it is `position: fixed` so no screen's
+  grid or scroll container can move it. One panel is open at a time, and leaving the screen
+  closes it.
+- Write moves to the toolbar (`ToolbarWrite`) and the column's own is hidden
+  (`.app-col__primary`). A failed write, or a transfer running in the closed panel (Files),
+  puts a dot on the panel's button (`alert`). Log Review has a panel on each side once a log is
+  open, and keeps its column in place before that. Inspector opens its panel when a message is
+  picked.
+- Plan's side panel holds the plan's actions; Plan writes from there, since a mission write is
+  a transfer with its own status, not a staged parameter. Its items rise from the bottom in a
+  sheet (`BottomSheet`, shared with Fly) opened by an Items handle at the bottom center, which
+  rides on the sheet's top edge to close it, as the side panel's button does; one of the two is
+  open at a time, and the sheet exists only while the mission is being edited. A tap on the map
+  does not close the sheet, so items can be placed with it up. The sheet is a list
+  (`ItemList`) in place of the table; tapping a line or a marker opens that item's editor
+  (`ItemEditor`, open item in `item-editor-store`) in the sheet, laid out across its width,
+  and the map pans the item above the sheet once the sheet has drawn. Changing an item's
+  command goes through `changeCommand` in `mission-store`, shared with the desktop table.
+  While the sheet is up the palette scrolls in the map above it (`has-sheet`).
+- In compact mode every control is at least 44px on its short side (`--app-touch`); a control
+  whose visible size must stay smaller (the inset's hide button) gets the hit area from a
+  `::before`. Controls sharing a row with the side panel's button are its height. The palettes
+  are two columns so every tool, fence Finish included, fits a 412px window.
 - A table too wide for the window keeps what is watched in the row and opens the rest beneath
   it (Outputs: function and position, then travel). The frame picker is one row of thumbnails
   that scrolls sideways.
@@ -432,11 +450,12 @@ the cache and the prefetch only fills gaps.
   and four levels below it a screen the size of the view around its center, so zooming out over
   the field offline still fills the screen. Each lower level costs about as many tiles as the
   view.
-- The cache asks for persistent storage when it opens. Android's WebView refuses, but gives a
+- Lower levels are measured at the view's whole zoom (`Math.floor`), since a view zoomed past
+  the imagery's native zoom would otherwise measure a smaller area than it shows.
+- A download asks for persistent storage, since the press is what shows the user wants the maps
+  kept; a browser grants it more readily after a gesture. Android's WebView refuses, but gives a
   quota of tens of gigabytes. An app update that reinstalls the app (the AX12's OTA did) deletes
   the stored maps with the rest of its data.
-- Checked on the AX12: a field stored over home WiFi drew at every stored zoom, on Plan and Fly,
-  after a reload on the ELRS Backpack's network, which has no internet.
 
 ### Terrain (`services/terrain.ts`, `services/mission-terrain.ts`)
 
@@ -502,27 +521,44 @@ other sits in a picture-in-picture inset; a tap on the inset swaps them. It shar
 `aspectPanel` with the desktop layout, whose pinned panel is the inset.
 
 - The app bar's readings (`ui/shell/CompactStatus.tsx`) each open a panel (`BarPopover`) with
-  the detail: preflight, mode picker, battery, GPS, messages, and the link with Disconnect. The
-  logo opens Preferences, which holds the theme.
+  the detail: preflight, mode picker, battery, GPS, messages, and the link with Disconnect. Each
+  reading has a fixed slot (`--app-cbar-*`), so a changing value moves nothing. A mode is
+  changed with one tap in the picker, as on the desktop; the mode picker and Arm share
+  `useModeChange` and `useFlightActions` with the desktop controls. The logo opens Preferences,
+  which holds the theme.
 - There is no actions column. `CommandStrip`, over the bottom center, holds Arm or Disarm and
-  Takeoff while armed on the ground; everything else is a mode, picked from the bar. Each is
-  confirmed by `SlideConfirm`, which withdraws when its command stops applying, and after 10 s.
-  Commands and their reporting are shared with the desktop controls through `useFlightActions`.
-- More (top-left) opens `FlightSheet` over the Fly area, leaving the app bar in view: one
-  section at a time (Controls, Camera, Video, Joystick, Status, Display). Messages and
-  Preflight are left out because the bar's items open them. The map's zoom buttons sit below
-  More.
+  Takeoff; everything else is a mode, picked from the bar. Takeoff sits beside Disarm, outside
+  the row's centered width so Disarm never moves, from arming until the vehicle has climbed 2 m
+  (`AIRBORNE_M`, latched until disarm), so it is never offered to something already flying.
+  Each is confirmed by `SlideConfirm`, which withdraws when its command stops applying, and
+  after 10 s. A refused arm puts up a force-arm slider in the same place, never a one-tap
+  button.
+- `SlideConfirm` follows one pointer: a second finger is ignored, a `pointercancel` (the
+  system taking the gesture) resets the knob rather than confirming, the 10 s timeout waits
+  while a finger is on the knob, and unmounting mid-drag detaches its listeners so it can never
+  confirm afterwards.
+- Everything else (`FlightSheet`) rises from the bottom in a sheet, as Plan's items do
+  (`BottomSheet`): its sections are whole panes, wider than they are tall. One section shows at
+  a time (Controls, Camera, Video, Joystick, Status, View). Messages and Preflight are left out
+  because the bar's items open them. The command row is on the handle's row and rides up with
+  the sheet, so Disarm stays in reach; the handle sits to the right, since Arm has the middle.
+  It is a caret alone on a dark wash, like the inset's buttons, named for assistive technology
+  by the section it opens on.
+- The sheet's body scrolls. Its sections keep their height (`flex-shrink: 0`): the controls
+  clip their own overflow, so as a shrinking flex item they were cut off with nothing to
+  scroll.
 - The HUD's layers are switched from its context menu, which a long press opens on a touch
-  screen; its HUD video item opens the sheet's Video view. In the inset the HUD draws no
-  overlay, and no horizon either while video plays. Over the full-screen HUD, the inset (or
-  the Map button that replaces it when hidden), More and the command row are measured and
-  passed as `HudState.avoid`. GPS moves under the link line on the right, the left readings
-  stack below More, the speed tape fits above the inset, and the center chips move clear of
-  the inset and above the row.
+  screen; its HUD video item opens the sheet's Video section. In the inset the HUD draws no
+  overlay, and no horizon either while video plays; neither does the full-screen HUD while the
+  sheet is up, since its readings would lie half under the sheet. Over the full-screen HUD, the
+  inset (or the button that shows it again), the sheet's handle and the command row are
+  measured and passed as `HudState.avoid`. Each side column's readings stack under the top line
+  when its bottom corner is covered (the inset on the left, the handle on the right), the tape
+  fitting between, and the center chips move clear of the inset and above the row.
 
 ### Lower pane (`LOG_PANES` in `stores/flight-layout-store.ts`)
 
-Messages, Status, Preflight, Camera and Joystick are tabs of one pane. A pane is mounted only
+Messages, Status, Preflight, Camera, Joystick, Video and View are tabs of one pane. A pane is mounted only
 while showing, so anything that must outlive it (the joystick read loop) lives in the app. A
 saved pane name is validated on load.
 
@@ -679,7 +715,8 @@ vehicle never learns; positions accept columns 0-59 and rows 0-21 whatever the s
 A layout made for DJI O3 or Walksnail goggles (53x20, which `TXT_RES` has no value for) often
 leaves `TXT_RES` at 0 and works. So `editorGrid` draws the smallest canvas (30x16, 50x18,
 53x20, 60x22) that holds every enabled panel, never smaller than the declared grid, and
-outlines the declared one. Only an analog OSD, which really is 30x16, reports panels outside
+outlines the declared one. It fits both the staged and the stored placements, so moving a
+panel inward does not shrink the canvas under the finger. Only an analog OSD, which really is 30x16, reports panels outside
 the grid and offers to bring them back.
 
 ## MAVFTP, files and logs

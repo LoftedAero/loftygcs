@@ -69,12 +69,18 @@ export function editorGrid(
   osdType: number | undefined,
   txtRes: number | undefined,
   placements: readonly Placement[],
+  stored: readonly Placement[] = placements,
 ): { grid: Grid; declared: Grid } {
   const declared = screenGrid(osdType, txtRes)
   if (osdType !== TYPE_MSP_DISPLAYPORT) return { grid: declared, declared }
   const holds = CANVASES.filter((c) => c.cols >= declared.cols && c.rows >= declared.rows)
-  const grid =
-    holds.find((c) => findOffGrid(placements, c).size === 0) ?? holds[holds.length - 1] ?? declared
+  const fit = (list: readonly Placement[]) =>
+    holds.findIndex((c) => findOffGrid(list, c).size === 0)
+  // The larger of what the vehicle's layout and the staged one need, so
+  // moving the last outlying panel inward does not shrink the canvas under
+  // it and stop it going back.
+  const at = [fit(placements), fit(stored)].map((i) => (i < 0 ? holds.length - 1 : i))
+  const grid = holds[Math.max(...at)] ?? declared
   return { grid, declared }
 }
 

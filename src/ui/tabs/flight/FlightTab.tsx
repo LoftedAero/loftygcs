@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import {
@@ -25,7 +25,8 @@ import ViewPane from './ViewPane'
 import { LaButton } from '../../components/La'
 import { useCompact } from '../../compact'
 import CommandStrip from './CommandStrip'
-import FlightSheet, { type SheetSection } from './FlightSheet'
+import FlightSheet, { sectionLabel, type SheetSection } from './FlightSheet'
+import BottomSheet from '../../components/BottomSheet'
 import { videoService, type VideoStatus } from '../../../services/video'
 
 // The flight screen, laid out like Mission Planner's: one panel pinned left
@@ -208,9 +209,9 @@ export default function FlightTab() {
 /**
  * Compact mode's Fly screen, after QGroundControl's: the map or the video
  * fills the window and the other sits in a picture-in-picture inset that a
- * tap swaps in. Arm sits over the bottom and More over the top-left corner;
- * modes, readings and messages are in the app bar. Adjustments, camera,
- * video, joystick and the rest are in a sheet behind More.
+ * tap swaps in. Arm sits over the bottom; modes, readings and messages are in
+ * the app bar. Adjustments, camera, video, joystick and the rest are in a
+ * sheet that rises from the bottom.
  *
  * The desktop layout's pinned panel is the inset, so the two layouts share
  * `aspectPanel`: pinning the HUD on the desktop means the map fills here.
@@ -237,17 +238,16 @@ function CompactFlight({
     setSheet(true)
   }
 
-  const closeSheet = useCallback(() => setSheet(false), [])
-
   const videoMain = layout.aspectPanel === 'map'
   const hudOn = layout.hudHorizon || layout.hudOverlays
 
   // What lies over the full-screen HUD, measured so it keeps its readings
-  // clear: the map inset or the button that brings it back, More, and Arm.
+  // clear: the map inset or the button that brings it back, the sheet's
+  // handle, and the command row.
   const mainRef = useRef<HTMLDivElement>(null)
   const insetRef = useRef<HTMLDivElement>(null)
   const insetShowRef = useRef<HTMLButtonElement>(null)
-  const toolsRef = useRef<HTMLDivElement>(null)
+  const handleRef = useRef<HTMLButtonElement>(null)
   const commandsRef = useRef<HTMLDivElement>(null)
   const [avoid, setAvoid] = useState<HudAvoid | null>(null)
   // The command row comes and goes with these, and the measurement below has
@@ -264,18 +264,23 @@ function CompactFlight({
       const m = main.getBoundingClientRect()
       const box = (el: HTMLElement | null) => el?.getBoundingClientRect() ?? null
       const inset = box(insetRef.current ?? insetShowRef.current)
-      const tools = box(toolsRef.current)
+      const handle = box(handleRef.current)
       const commands = box(commandsRef.current)
       const next: HudAvoid = {
         bottomLeft: inset && { w: inset.right - m.left, h: m.bottom - inset.top },
-        topLeft: tools && { w: tools.right - m.left, h: tools.bottom - m.top },
+        bottomRight: handle && { w: m.right - handle.left, h: m.bottom - handle.top },
         bottomCenter: commands && { w: commands.width, h: m.bottom - commands.top },
       }
       // Only a change re-renders, since this runs after every render.
       setAvoid((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
     }
     const ro = new ResizeObserver(measure)
-    const covering = [insetRef.current, insetShowRef.current, toolsRef.current, commandsRef.current]
+    const covering = [
+      insetRef.current,
+      insetShowRef.current,
+      handleRef.current,
+      commandsRef.current,
+    ]
     for (const el of [main, ...covering]) {
       if (el) ro.observe(el)
     }
@@ -288,17 +293,20 @@ function CompactFlight({
   // Too small for the overlay to be read; video alone, or the horizon when
   // there is no video.
   const insetHud = hud({ overlays: false, horizon: video.state !== 'playing' })
+  // With the sheet up the readings would lie half under it, with Arm and the
+  // handle over the rest, so the full-screen HUD draws its horizon alone, as
+  // the inset does. The app bar still has the readings that matter.
+  const mainHud = hud(sheet ? { overlays: false } : { avoid })
   return (
-    <div className={`flight-compact${videoMain ? ' flight-compact--video' : ''}`}>
+    <div
+      className={['flight-compact', videoMain ? 'flight-compact--video' : '']
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="flight-compact__main" ref={mainRef}>
-        {videoMain ? hud({ avoid }) : mapPanel}
+        {videoMain ? mainHud : mapPanel}
       </div>
 
-      <div className="flight-compact__tools" ref={toolsRef}>
-        <button type="button" className="flight-compact__tool" onClick={() => open()}>
-          More
-        </button>
-      </div>
       {videoMain && !hudOn && video.state !== 'playing' && (
         <div className="flight-compact__novideo">
           <p>{video.text || 'No video'}</p>
@@ -334,13 +342,27 @@ function CompactFlight({
           ref={insetShowRef}
           onClick={() => setInsetShown(true)}
         >
-          {videoMain ? 'Map' : 'Video'}
+          {videoMain ? 'Show map' : 'Show video'}
         </button>
       )}
 
-      <CommandStrip ref={commandsRef} />
-
-      {sheet && <FlightSheet section={section} onSection={setSection} onClose={closeSheet} />}
+      {/* The rest rises from the bottom, as Plan's items do. The command
+          row rides up with the sheet, so Disarm stays in reach; the handle, a
+          caret alone so it stays out of the view's way, sits to its right,
+          since Arm has the middle. The sections mount only while open, since
+          they poll and subscribe. */}
+      <BottomSheet
+        id="flight-sheet-body"
+        className="flight-dock"
+        align="right"
+        name={sectionLabel(section)}
+        open={sheet}
+        onOpen={setSheet}
+        handleRef={handleRef}
+        row={<CommandStrip ref={commandsRef} />}
+      >
+        <FlightSheet section={section} onSection={setSection} />
+      </BottomSheet>
       {menus(() => open('video'))}
     </div>
   )

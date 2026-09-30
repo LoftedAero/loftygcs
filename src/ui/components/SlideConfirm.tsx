@@ -16,11 +16,14 @@ const KEY_STEP = 0.25
 export default function SlideConfirm({
   label,
   danger = false,
+  primary = false,
   onConfirm,
   onCancel,
 }: {
   label: string
   danger?: boolean
+  /** The screen's primary action (Arm): the knob takes the primary color. */
+  primary?: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -30,13 +33,26 @@ export default function SlideConfirm({
   const [pos, setPos] = useState(0)
   const [dragging, setDragging] = useState(false)
 
-  // The parent re-renders with telemetry; a ref keeps the timeout from
+  // The parent re-renders with telemetry; refs keep the timeout from
   // restarting with every new callback.
   const cancelRef = useRef(onCancel)
   cancelRef.current = onCancel
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const arm = () => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => cancelRef.current(), TIMEOUT_MS)
+  }
+  // The drag in progress: one pointer, followed through window listeners
+  // that are removed however the drag ends, unmounting included, so a
+  // slider that has been withdrawn can never confirm.
+  const drag = useRef<{ id: number; detach: () => void } | null>(null)
   useEffect(() => {
-    const t = setTimeout(() => cancelRef.current(), TIMEOUT_MS)
-    return () => clearTimeout(t)
+    arm()
+    return () => {
+      clearTimeout(timer.current)
+      drag.current?.detach()
+    }
+    // `arm` only touches refs.
   }, [])
 
   useEffect(() => knob.current?.focus(), [])
@@ -53,30 +69,52 @@ export default function SlideConfirm({
       onConfirm()
     } else {
       setPos(0)
+      arm()
     }
   }
 
   const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault()
+    // One finger at a time, and only the primary button of a mouse; a palm
+    // or a second thumb elsewhere on the screen does not move the knob.
+    if (drag.current || e.button !== 0 || e.isPrimary === false) return
+    const id = e.pointerId
     const startX = e.clientX
     const startPos = pos
     const width = span()
     let at = startPos
+    // The timeout waits while a finger is on the knob.
+    clearTimeout(timer.current)
     setDragging(true)
     const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return
       at = Math.min(1, Math.max(0, startPos + (ev.clientX - startX) / width))
       setPos(at)
     }
-    const up = () => {
+    const detach = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', up)
+      window.removeEventListener('pointercancel', cancel)
+      drag.current = null
+    }
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return
+      detach()
       setDragging(false)
       finish(at)
     }
+    // The system took the touch (a gesture, palm rejection): not a release.
+    const cancel = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return
+      detach()
+      setDragging(false)
+      setPos(0)
+      arm()
+    }
+    drag.current = { id, detach }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
-    window.addEventListener('pointercancel', up)
+    window.addEventListener('pointercancel', cancel)
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -94,7 +132,9 @@ export default function SlideConfirm({
   }
 
   return (
-    <div className={`slide-confirm${danger ? ' slide-confirm--danger' : ''}`}>
+    <div
+      className={`slide-confirm${danger ? ' slide-confirm--danger' : ''}${primary ? ' slide-confirm--primary' : ''}`}
+    >
       <div className="slide-confirm__track" ref={track}>
         <span className="slide-confirm__label">{label}</span>
         <div

@@ -53,8 +53,8 @@ const DO_ACTIONS: DoAction[] = [
 ]
 
 /**
- * `part` renders one tier alone, for compact mode, which puts the flight
- * actions in a column beside the map and the adjustments in a sheet; `compact`
+ * `part="secondary"` renders the adjustments alone, for compact Fly's panel;
+ * its flight commands are the command row over the view (CommandStrip). `compact`
  * gives the number fields steppers, since a touch screen's keyboard covers half
  * of it.
  */

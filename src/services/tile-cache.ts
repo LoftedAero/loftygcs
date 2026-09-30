@@ -38,13 +38,7 @@ function openDb(): Promise<IDBDatabase | null> {
       const db = req.result
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'key' })
     }
-    req.onsuccess = () => {
-      resolve(req.result)
-      // Ask that stored maps not be evicted under storage pressure: a field
-      // with no signal depends on them. Best effort; a refusal changes
-      // nothing else.
-      void navigator.storage?.persist?.().catch(() => false)
-    }
+    req.onsuccess = () => resolve(req.result)
     // Private browsing, a corrupt database, storage denied: no cache. Reads
     // then return null and writes do nothing.
     req.onerror = () => resolve(null)

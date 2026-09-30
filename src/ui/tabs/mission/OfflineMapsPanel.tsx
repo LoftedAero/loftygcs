@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { LaButton, LaField, LaHint, LaSelect, LaSwitch } from '../../components/La'
 import {
   cacheStats,
@@ -106,7 +106,11 @@ export default function OfflineMapsPanel({
   // Never past the imagery's native zoom.
   const maxZoom = Math.min(layer.maxNativeZoom, Math.floor(zoom) + extra)
   const minZoom = Math.max(1, Math.min(Math.floor(zoom), maxZoom) - ZOOM_OUT_LEVELS)
-  const tiles = bounds ? offlineTiles(bounds, zoom, maxZoom, ZOOM_OUT_LEVELS) : []
+  // Rebuilt when the view changes, not on each tile of a download's progress.
+  const tiles = useMemo(
+    () => (bounds ? offlineTiles(bounds, zoom, maxZoom, ZOOM_OUT_LEVELS) : []),
+    [bounds, zoom, maxZoom],
+  )
   const count = tiles.length
   // Zero past the terrain area cap.
   const terrainForArea = bounds ? terrainTilesForArea(bounds).length : 0
@@ -114,6 +118,9 @@ export default function OfflineMapsPanel({
 
   const start = async () => {
     if (!bounds) return
+    // Stored maps are what a field without signal depends on, so ask that
+    // they not be evicted, from the press that asked for them. Best effort.
+    void navigator.storage?.persist?.().catch(() => false)
     const terrain = terrainTilesForArea(bounds)
     const total = tiles.length + terrain.length
     const controller = new AbortController()

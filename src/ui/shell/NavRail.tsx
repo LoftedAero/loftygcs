@@ -56,6 +56,8 @@ export function SetupScreenPicker() {
       panelClassName="app-screens"
       label="Setup screens"
       title="Setup screens"
+      // It is the mode switch's Setup tab as well.
+      buttonProps={{ role: 'tab', 'aria-selected': true }}
       button={
         <>
           <span className="app-screen-pick__name">{current?.label ?? 'Setup'}</span>

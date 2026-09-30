@@ -144,6 +144,13 @@ export interface MissionState {
   /** Insert after the item at `index` (the row's + button). -1 appends. */
   addItemAfter(index: number, command?: number): string
   updateItem(uid: string, patch: Partial<Omit<PlanItem, 'uid'>>): void
+  /**
+   * Change an item's command. The parameters are cleared, since they mean
+   * different things per command (a hold time of 15 would become 15 loiter
+   * turns). An item that gains a position is placed between its neighbors,
+   * and one that gains an altitude takes the default.
+   */
+  changeCommand(uid: string, command: number): void
   removeItem(uid: string): void
   moveItem(uid: string, toIndex: number): void
   setHome(home: PlanHome | null): void
@@ -465,6 +472,30 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         items: plan.items.map((it) => (it.uid === uid ? { ...it, ...patch } : it)),
       },
     })
+  },
+
+  changeCommand(uid, command) {
+    const { plan, defaults, mapCenter } = get()
+    const index = plan.items.findIndex((it) => it.uid === uid)
+    const it = plan.items[index]
+    if (!it) return
+    const spec = commandSpec(command)
+    const was = commandSpec(it.command)
+    const patch: Partial<PlanItem> = {
+      command,
+      param1: 0,
+      param2: 0,
+      param3: 0,
+      param4: 0,
+    }
+    if (spec && !spec.location) Object.assign(patch, { x: 0, y: 0 })
+    else if (spec?.location && !hasCoords(it)) {
+      const at = insertPosition(plan, index, mapCenter)
+      Object.assign(patch, { x: at.x, y: at.y })
+    }
+    if (spec?.altitude === false) patch.z = 0
+    else if (spec?.altitude && was?.altitude === false) patch.z = defaults.altM
+    get().updateItem(uid, patch)
   },
 
   removeItem(uid) {

@@ -148,9 +148,10 @@ export default function PreferencesModal() {
         </LaField>
         {!canScale && <LaHint>Use the browser’s zoom</LaHint>}
       </section>
-      {/* The footer shows it too, but compact mode has no footer. */}
-      <p className="la-card__note">
+      {/* The footer shows these too, but compact mode has no footer. */}
+      <p className="la-card__note prefs__version">
         {BRAND.name} v{__APP_VERSION__}
+        {BRAND.preview && <span className="app-preview-chip">Preview</span>}
       </p>
     </LaModal>
   )

@@ -11,12 +11,22 @@ import { BatteryIcon, GpsIcon, SignalIcon } from './AppStatus'
 import { barStatus, batteryFill, batteryTone, reports, signalBars } from './app-status'
 import { gpsKind, gpsUsable, HUD_MESSAGE_SEVERITY } from '../tabs/flight/hud-draw'
 import PreflightPanel from '../tabs/flight/PreflightPanel'
-import { useFlightActions } from '../tabs/flight/useFlightActions'
+import { useModeChange } from '../tabs/flight/useFlightActions'
+import { useMissionStore } from '../../stores/mission-store'
+import { useUnits } from '../../stores/preferences-store'
+import { distanceLabel, formatDistance } from '../../units'
+import { formatEta, missionProgress } from '../tabs/flight/mission-progress'
 
 // Compact mode's app bar status, following QGroundControl's toolbar: short
 // readings that each open a panel with the detail behind them, so the bar
 // stays one row on a handheld. The desktop bar (AppStatus) shows the same
 // readings inline.
+
+/**
+ * Shorter forms for the few mode names too long for the mode's slot; the full
+ * name is in the hover text.
+ */
+const SHORT_MODE: Record<string, string> = { 'Loiter to QLand': 'Loiter QLand' }
 
 /** How many recent messages the messages panel lists. */
 const MESSAGE_LIST = 40
@@ -78,31 +88,51 @@ export default function CompactStatus() {
 }
 
 function ModeItem() {
-  const a = useFlightActions()
+  const m = useModeChange()
+  // Mission progress: the desktop shows it beside the flight controls, which
+  // compact Fly has no room for, so it rides on the mode while one is flown.
+  const missionSeq = useVehicleStore((s) => s.missionSeq)
+  const wpDistM = useVehicleStore((s) => s.wpDistM)
+  const groundspeedMs = useVehicleStore((s) => s.groundspeedMs)
+  const planItems = useMissionStore((s) => s.plan.items)
+  const units = useUnits()
+  const progress = missionProgress(missionSeq, planItems, wpDistM, groundspeedMs)
+  const name = m.modeName ? (SHORT_MODE[m.modeName] ?? m.modeName) : '—'
   return (
     <BarPopover
       className="compact-status__item compact-status__mode"
       label="Flight mode"
-      title="Flight mode"
-      button={a.modeName || '—'}
+      title={m.modeName || 'Flight mode'}
+      button={progress.position !== null ? `${name} · ${progress.position}` : name}
     >
       {(close) => (
-        <div className="bar-pop__modes">
-          {Object.entries(a.modes).map(([num, name]) => (
-            <button
-              key={num}
-              type="button"
-              className={`bar-pop__mode${name === a.modeName ? ' is-current' : ''}`}
-              disabled={!a.connected || name === a.modeName}
-              onClick={() => {
-                close()
-                a.setMode(Number(num), name)
-              }}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
+        <>
+          {progress.position !== null && (
+            <p className="bar-pop__progress">
+              Item {progress.position}
+              {progress.commandName && ` ${progress.commandName}`}
+              {wpDistM !== null &&
+                ` · ${formatDistance(wpDistM, units.distance, 0)} ${distanceLabel(units.distance)}`}
+              {progress.etaS !== null && ` · ${formatEta(progress.etaS)}`}
+            </p>
+          )}
+          <div className="bar-pop__modes">
+            {Object.entries(m.modes).map(([num, mode]) => (
+              <button
+                key={num}
+                type="button"
+                className={`bar-pop__mode${mode === m.modeName ? ' is-current' : ''}`}
+                disabled={!m.connected || mode === m.modeName}
+                onClick={() => {
+                  close()
+                  m.setMode(Number(num), mode)
+                }}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </BarPopover>
   )
@@ -120,7 +150,7 @@ function BatteryItem() {
   const value = pct >= 0 ? `${Math.round(pct)}%` : volts > 0 ? `${volts.toFixed(1)}V` : '—'
   return (
     <BarPopover
-      className={`compact-status__item${tone ? ` app-status__item--${tone}` : ''}`}
+      className={`compact-status__item compact-status__battery${tone ? ` app-status__item--${tone}` : ''}`}
       label="Battery"
       title="Battery"
       button={
@@ -134,11 +164,11 @@ function BatteryItem() {
         reports(sensorsPresent, SENSOR_BITS.battery) ? (
           <Rows
             rows={[
-              ['Voltage', volts > 0 ? `${volts.toFixed(2)} V` : '—'],
-              ['Current', amps >= 0 ? `${amps.toFixed(1)} A` : 'Not measured'],
-              ['Remaining', pct >= 0 ? `${Math.round(pct)} %` : 'No estimate'],
-              ['Low at', lowVolt ? `${lowVolt} V` : 'Not set'],
-              ['Critical at', critVolt ? `${critVolt} V` : 'Not set'],
+              ['Voltage', volts > 0 ? `${volts.toFixed(2)}V` : '—'],
+              ['Current', amps >= 0 ? `${amps.toFixed(1)}A` : '—'],
+              ['Remaining', pct >= 0 ? `${Math.round(pct)}%` : '—'],
+              ['Low at', lowVolt ? `${lowVolt}V` : '—'],
+              ['Critical at', critVolt ? `${critVolt}V` : '—'],
             ]}
           />
         ) : (
@@ -157,7 +187,7 @@ function GpsItem() {
   const lon = useVehicleStore((s) => s.lonDeg)
   return (
     <BarPopover
-      className={`compact-status__item${gpsUsable(fix) ? '' : ' app-status__item--warn'}`}
+      className={`compact-status__item compact-status__gps${gpsUsable(fix) ? '' : ' app-status__item--warn'}`}
       label="GPS"
       title="GPS"
       button={
@@ -171,7 +201,7 @@ function GpsItem() {
         <Rows
           rows={[
             ['Fix', gpsKind(fix)],
-            ['Satellites', String(sats)],
+            ['Satellites', sats > 0 ? String(sats) : '—'],
             ['HDOP', hdop > 0 ? hdop.toFixed(2) : '—'],
             ['Position', lat !== 0 || lon !== 0 ? `${lat.toFixed(6)}, ${lon.toFixed(6)}` : '—'],
           ]}
@@ -246,7 +276,9 @@ export function CompactLink() {
     ? '…'
     : rcRssi >= 0
       ? `${Math.round((rcRssi / 254) * 100)}%`
-      : `${stats?.rxCount ?? 0}/s`
+      : stats
+        ? `${stats.rxCount}/s`
+        : '—'
   return (
     <BarPopover
       className={`compact-status__item compact-status__link${phase === 'linkLost' ? ' app-status__item--bad' : ''}`}
@@ -263,8 +295,8 @@ export function CompactLink() {
         <>
           <Rows
             rows={[
-              ['Receiver signal', rcRssi >= 0 ? `${Math.round((rcRssi / 254) * 100)} %` : '—'],
-              ['Messages', stats ? `${stats.rxCount} /s` : '—'],
+              ['Receiver signal', rcRssi >= 0 ? `${Math.round((rcRssi / 254) * 100)}%` : '—'],
+              ['Messages', stats ? `${stats.rxCount}/s` : '—'],
               ['Round trip', stats?.rttMs != null ? `${Math.round(stats.rttMs)} ms` : '—'],
               [
                 'Last heartbeat',

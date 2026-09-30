@@ -1,5 +1,3 @@
-import { useEffect } from 'react'
-import { LaButton } from '../../components/La'
 import FlightControls from './FlightControls'
 import StatusList from './StatusList'
 import CameraPanel from './CameraPanel'
@@ -7,66 +5,57 @@ import JoystickPanel from './JoystickPanel'
 import VideoPane from './VideoPane'
 import ViewPane from './ViewPane'
 
-// Compact Fly's More sheet. It covers the Fly area but not the app bar, so the
-// readings stay in view, and shows one section at a time. Messages and
-// preflight are not here: the app bar's items open them.
+// Compact Fly's sheet: what the desktop's controls and lower pane hold that
+// the full-screen view has no room for, one section at a time, in a sheet
+// rising from the bottom (BottomSheet). Messages and preflight are not here:
+// the app bar's items open them.
 
-export const SHEET_SECTIONS = [
+const SECTIONS = [
   { id: 'controls', label: 'Controls' },
   { id: 'camera', label: 'Camera' },
   { id: 'video', label: 'Video' },
   { id: 'joystick', label: 'Joystick' },
   { id: 'status', label: 'Status' },
-  { id: 'display', label: 'Display' },
+  { id: 'view', label: 'View' },
 ] as const
 
-export type SheetSection = (typeof SHEET_SECTIONS)[number]['id']
+export type SheetSection = (typeof SECTIONS)[number]['id']
+
+/** The handle's accessible name: the section it opens on. */
+export function sectionLabel(s: SheetSection): string {
+  return SECTIONS.find((t) => t.id === s)?.label ?? ''
+}
 
 export default function FlightSheet({
   section,
   onSection,
-  onClose,
 }: {
   section: SheetSection
   onSection: (s: SheetSection) => void
-  onClose: () => void
 }) {
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', esc)
-    return () => window.removeEventListener('keydown', esc)
-  }, [onClose])
-
   return (
-    <div className="flight-sheet" role="dialog" aria-label="Flight">
-      <div className="flight-sheet__head">
-        <div className="flight-sheet__tabs" role="tablist" aria-label="Flight">
-          {SHEET_SECTIONS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={section === t.id}
-              className={`log-pane__tab${section === t.id ? ' is-active' : ''}`}
-              onClick={() => onSection(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <LaButton variant="ghost" onClick={onClose}>
-          Done
-        </LaButton>
+    <div className="flight-sheet">
+      <div className="flight-sheet__tabs" role="tablist" aria-label="Flight sheet">
+        {SECTIONS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={section === t.id}
+            className={`log-pane__tab${section === t.id ? ' is-active' : ''}`}
+            onClick={() => onSection(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
-      <div className={`flight-sheet__body flight-sheet__body--${section}`}>
+      <div className={`flight-sheet__body flight-sheet__body--${section}`} role="tabpanel">
         {section === 'controls' && <FlightControls part="secondary" compact />}
         {section === 'camera' && <CameraPanel />}
         {section === 'video' && <VideoPane />}
         {section === 'joystick' && <JoystickPanel />}
         {section === 'status' && <StatusList />}
-        {section === 'display' && <ViewPane compact />}
+        {section === 'view' && <ViewPane compact />}
       </div>
     </div>
   )

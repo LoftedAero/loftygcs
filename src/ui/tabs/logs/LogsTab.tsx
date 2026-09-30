@@ -72,7 +72,7 @@ export default function LogsTab() {
         )}
 
         <div className="log-main">
-          {/* Compact mode: both columns are drawers once a log is open. */}
+          {/* Compact mode: both columns are side panels once a log is open. */}
           {compact && log && (
             <div className="log-toolbar">
               <ColumnToggle label="Fields" target="fields" side="left" />
@@ -109,7 +109,7 @@ export default function LogsTab() {
         </div>
 
         {/* With no log open the column is the screen, so it stays in place. */}
-        <ColumnShell drawer={Boolean(log)}>
+        <ColumnShell floats={Boolean(log)}>
           <div className="app-col">
             <section className="app-col__group">
               <h3 className="app-col__head">Log</h3>

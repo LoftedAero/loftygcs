@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { onOutsidePress } from '../components/outside-press'
 
 // A button in the app bar that opens a panel of detail beneath it (compact
 // mode's status items). As with the SITL tray, the panel is portaled to the
@@ -14,6 +15,7 @@ export default function BarPopover({
   button,
   children,
   onToggle,
+  buttonProps,
 }: {
   className: string
   /** Added to the panel's own class, for a panel laid out differently. */
@@ -26,6 +28,8 @@ export default function BarPopover({
   children: (close: () => void) => ReactNode
   /** Told when the panel opens or closes. */
   onToggle?: (open: boolean) => void
+  /** Extra attributes for the button, such as a role it plays in a group. */
+  buttonProps?: ButtonHTMLAttributes<HTMLButtonElement>
 }) {
   const [open, setOpenState] = useState(false)
   const toggleRef = useRef(onToggle)
@@ -60,21 +64,19 @@ export default function BarPopover({
     }
   }, [open])
 
-  // Dismiss on click-away and Escape. Capture phase, because Leaflet stops
-  // mousedown propagation on the map.
+  // Dismiss on a press outside (see outside-press.ts) and on Escape.
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as Node
-      if (!btn.current?.contains(t) && !panel.current?.contains(t)) setOpen(false)
-    }
+    const offPress = onOutsidePress(
+      (t) => !!btn.current?.contains(t) || !!panel.current?.contains(t),
+      () => setOpen(false),
+    )
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('mousedown', onDown, true)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onDown, true)
+      offPress()
       document.removeEventListener('keydown', onKey)
     }
     // setOpen only wraps the state setter and a ref, so it is not a dependency.
@@ -83,6 +85,7 @@ export default function BarPopover({
   return (
     <>
       <button
+        {...buttonProps}
         ref={btn}
         type="button"
         className={`${className}${open ? ' is-open' : ''}`}

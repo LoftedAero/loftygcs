@@ -5,7 +5,7 @@ import { createCoverageLayer } from '../flight/coverage-layer'
 import { TERRAIN_ATTRIBUTION } from '../../../services/terrain'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useItemEditor } from './ItemEditor'
+import { useItemEditor } from '../../../stores/item-editor-store'
 import { useMissionStore } from '../../../stores/mission-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useUnits } from '../../../stores/preferences-store'
@@ -304,7 +304,7 @@ export default function MissionMap({
     let frame = 0
     let tries = 30
     const pan = () => {
-      const sheet = document.querySelector('.plan-sheet.is-open .plan-sheet__body')
+      const sheet = document.querySelector('.plan-sheet.is-open .app-sheet__body')
       if (!sheet) {
         if (--tries > 0) frame = requestAnimationFrame(pan)
         return
@@ -315,10 +315,13 @@ export default function MissionMap({
       const size = map.getSize()
       const bottom = sheet.getBoundingClientRect().top - box.top
       const pt = map.latLngToContainerPoint([it.x / 1e7, it.y / 1e7])
-      // Clear of the sheet's edge and the window's by a marker's height.
+      // Clear of the sheet's edge, the palette and the window's edges by a
+      // marker's size, into the middle of what is left.
       const margin = 48
+      const palette = document.querySelector('.mission-palette')?.getBoundingClientRect()
+      const left = palette ? palette.right - box.left : 0
       const dy = pt.y > bottom - margin || pt.y < margin ? pt.y - bottom / 2 : 0
-      const dx = pt.x < margin || pt.x > size.x - margin ? pt.x - size.x / 2 : 0
+      const dx = pt.x < left + margin || pt.x > size.x - margin ? pt.x - (left + size.x) / 2 : 0
       if (dx || dy) map.panBy([dx, dy])
     }
     frame = requestAnimationFrame(pan)
@@ -382,9 +385,14 @@ export default function MissionMap({
         draggable: true,
       })
         .on('click', () => {
-          useMissionStore.getState().select(it.uid)
-          // Compact mode's editor; the desktop edits in the table.
-          useItemEditor.getState().open(it.uid)
+          const store = useMissionStore.getState()
+          store.select(it.uid)
+          // Compact mode's editor, while the mission is what is being edited;
+          // the desktop edits in the table. The layout is marked on the root.
+          const compact = document.documentElement.hasAttribute('data-compact')
+          if (compact && store.editing === 'mission' && !store.survey) {
+            useItemEditor.getState().open(it.uid)
+          }
         })
         .on('dragend', (e) => {
           const p = (e.target as L.Marker).getLatLng()

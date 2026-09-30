@@ -196,6 +196,24 @@ describe('editorGrid', () => {
     expect(size(editorGrid(5, 0, [place('ALTITUDE', 47, 9, false)]).grid)).toBe('30x16')
   })
 
+  it('does not shrink under a staged move of the last outlying panel', () => {
+    // The vehicle has ALTITUDE at column 47; staged, it has moved inward.
+    const stored = [place('ALTITUDE', 47, 9)]
+    const staged = [place('ALTITUDE', 20, 9)]
+    expect(size(editorGrid(5, 0, staged, stored).grid)).toBe('53x20')
+    // And grows for a staged move outward that the stored layout lacks.
+    expect(
+      size(
+        editorGrid(
+          5,
+          0,
+          stored.map((p) => ({ ...p, x: 55 })),
+          staged,
+        ).grid,
+      ),
+    ).toBe('60x22')
+  })
+
   it('leaves an analog OSD at its own grid, where panels outside it are lost', () => {
     const layout = [place('ALTITUDE', 47, 9)]
     const { grid } = editorGrid(1, 0, layout)

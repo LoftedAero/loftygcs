@@ -20,12 +20,12 @@ export function isOsdParam(name: string): boolean {
   return /^OSD\d?_/.test(name)
 }
 
+export const OSD_REBOOT_REASON = 'OSD changes take effect after a restart'
+
 /**
  * The OSD's actions column: vehicle actions and the layout file first, then
  * settings groups (`children`).
  */
-export const OSD_REBOOT_REASON = 'OSD changes take effect after a restart'
-
 export default function OsdActions({ children }: { children?: ReactNode }) {
   return (
     <ColumnShell>

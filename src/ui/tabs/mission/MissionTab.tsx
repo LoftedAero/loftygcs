@@ -15,12 +15,14 @@ import GeoExchange from './GeoExchange'
 import ItemPalette from './ItemPalette'
 import FencePalette from './FencePalette'
 import AltitudeProfile from './AltitudeProfile'
-import ItemEditor, { ItemList, useItemEditor } from './ItemEditor'
+import ItemEditor, { ItemList } from './ItemEditor'
+import { useItemEditor } from '../../../stores/item-editor-store'
 import Divider from '../../components/Divider'
 import { LaButton, LaModal, LaSwitch } from '../../components/La'
 import { useMissionStore } from '../../../stores/mission-store'
 import { useCompact } from '../../compact'
 import ColumnShell, { ColumnToggle, closeColumn, useColumnOpen } from '../../components/ColumnShell'
+import BottomSheet from '../../components/BottomSheet'
 
 // Mission planning: Mission Planner's shape with QGroundControl's ideas
 // where they are better.
@@ -79,6 +81,10 @@ export default function MissionTab() {
     if (panelOpen) setSheetOpen(false)
   }, [panelOpen])
   useEffect(() => closeEditor, [closeEditor])
+  // The items are the mission's: the fence and rally lists are in the panel.
+  useEffect(() => {
+    if (editing !== 'mission') setSheetOpen(false)
+  }, [editing])
 
   const mapArea = (
     <div className="mission-map-area">
@@ -171,15 +177,19 @@ export default function MissionTab() {
     />
   )
 
-  // Compact mode: the map fills the window, and the item list and the plan
-  // column open as drawers over its right side.
+  // Compact mode: the map fills the window; the plan's actions are the side
+  // panel, and the items rise from the bottom in a sheet.
   if (compact) {
     return (
-      <div className={`mission-screen mission-compact${panelOpen ? ' has-panel' : ''}`}>
+      <div
+        className={`mission-screen mission-compact${panelOpen ? ' has-panel' : ''}${
+          sheetOpen && editing === 'mission' ? ' has-sheet' : ''
+        }`}
+      >
         {mapArea}
         {/* The screen's side panel, as on every screen with a column: the
             plan's actions. */}
-        <div className="mission-compact__corner">
+        <div className="app-panel-corner">
           <ColumnToggle label="Plan panel" />
         </div>
         <ColumnShell base="app-col-shell mission-panel">
@@ -187,43 +197,38 @@ export default function MissionTab() {
         </ColumnShell>
         {/* The items rise from the bottom, where the route stays in view
             above them; the handle rides on the sheet's top edge. */}
-        <div className={`plan-sheet${sheetOpen ? ' is-open' : ''}`}>
-          <button
-            type="button"
-            className="plan-sheet__handle"
-            aria-expanded={sheetOpen}
-            onClick={() => setSheetOpen(!sheetOpen)}
+        {editing === 'mission' && (
+          <BottomSheet
+            id="plan-sheet-body"
+            className="plan-sheet"
+            label={items > 0 ? `Items · ${items}` : 'Items'}
+            open={sheetOpen}
+            onOpen={setSheetOpen}
           >
-            {items > 0 ? `Items · ${items}` : 'Items'}
-            <svg viewBox="0 0 10 6" aria-hidden="true">
-              <path d="M1 5l4-4 4 4" />
-            </svg>
-          </button>
-          {sheetOpen && (
-            <div className="plan-sheet__body">
-              {editorUid ? (
-                <ItemEditor />
-              ) : (
-                <div className="mission-lower">
-                  <div className="mission-lower__head">
-                    <NewItemDefaults />
-                    <span className="la-grow" />
-                    {items > 0 && (
-                      <LaSwitch
-                        label="Profile"
-                        checked={compactProfile}
-                        onChange={(e) => setCompactProfile(e.target.checked)}
-                      />
-                    )}
-                  </div>
+            {editorUid ? (
+              <ItemEditor />
+            ) : (
+              <div className="mission-lower">
+                <div className="mission-lower__head">
+                  <NewItemDefaults />
+                  <span className="la-grow" />
+                  {/* In the header, as on the desktop, so the list below
+                        does not move when terrain loads. */}
                   {items > 0 && <TerrainWarning />}
-                  {compactProfile && items > 0 && <AltitudeProfile />}
-                  <ItemList />
+                  {items > 0 && (
+                    <LaSwitch
+                      label="Profile"
+                      checked={compactProfile}
+                      onChange={(e) => setCompactProfile(e.target.checked)}
+                    />
+                  )}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+                {compactProfile && items > 0 && <AltitudeProfile />}
+                <ItemList />
+              </div>
+            )}
+          </BottomSheet>
+        )}
         {firstPrompt}
       </div>
     )

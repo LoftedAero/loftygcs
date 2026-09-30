@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useParamStore } from '../../../stores/param-store'
@@ -23,21 +23,14 @@ export const TAKEOFF_ALT_M = 20
 /** How recent a vehicle warning has to be to count as a refusal's reason. */
 const REASON_WINDOW_MS = 4000
 
-export function useFlightActions() {
-  const connected = useConnectionStore((s) => s.phase === 'connected')
-  const vehicleType = useVehicleStore((s) => s.vehicleType)
-  const armed = useVehicleStore((s) => s.armed)
-  const relAltM = useVehicleStore((s) => s.relAltM)
-  const modeName = useVehicleStore((s) => s.modeName)
-  const isCopter = vehicleClass(vehicleType) === 'copter'
-  // How this airframe takes off, from the same function the command uses. A
-  // quadplane climbs vertically like a copter; only a fixed wing takes off by
-  // mode.
-  const qEnable = useParamStore((s) => s.entries.get('Q_ENABLE')?.value)
-  const takeoffVia = takeoffStyle(vehicleType, qEnable)
+/**
+ * How a command's result is reported: success says nothing (the vehicle state
+ * is the confirmation) but clears an earlier refusal; a refusal goes to the
+ * HUD beside the vehicle's own warnings, unless the vehicle explained it.
+ */
+function useReporting() {
   const say = useHudNoteStore((s) => s.say)
   const clearNote = useHudNoteStore((s) => s.clear)
-  const [forceArmOpen, setForceArmOpen] = useState(false)
 
   /**
    * Whether the vehicle has explained a refusal itself. MAV_RESULT only says
@@ -51,9 +44,6 @@ export function useFlightActions() {
         (t) => t.severity <= HUD_MESSAGE_SEVERITY && Date.now() - t.at < REASON_WINDOW_MS,
       )
 
-  // Results go to the HUD beside the vehicle's own warnings. Success says
-  // nothing (the vehicle state is the confirmation) but clears any earlier
-  // refusal.
   const report = (what: string) => async (result: number) => {
     if (result === 0) return clearNote()
     // The vehicle usually explains itself just after the ack, not with it.
@@ -62,6 +52,47 @@ export function useFlightActions() {
   }
   const fail = (what: string) => (err: unknown) =>
     say(`${what}: ${err instanceof Error ? err.message : 'no answer'}`)
+
+  return { say, clearNote, explained, report, fail }
+}
+
+/**
+ * Just the mode change, for the app bar's mode item: narrow subscriptions,
+ * since the bar is on every screen and the full set re-renders with telemetry.
+ */
+export function useModeChange() {
+  const connected = useConnectionStore((s) => s.phase === 'connected')
+  const vehicleType = useVehicleStore((s) => s.vehicleType)
+  const modeName = useVehicleStore((s) => s.modeName)
+  const { report, fail } = useReporting()
+  const setMode = (num: number, label = 'Mode') =>
+    void setModeConfirmed(num).then(report(label)).catch(fail(label))
+  return { connected, modeName, modes: modeTable(vehicleType), setMode }
+}
+
+export function useFlightActions() {
+  const connected = useConnectionStore((s) => s.phase === 'connected')
+  const vehicleType = useVehicleStore((s) => s.vehicleType)
+  const armed = useVehicleStore((s) => s.armed)
+  const relAltM = useVehicleStore((s) => s.relAltM)
+  const modeName = useVehicleStore((s) => s.modeName)
+  const isCopter = vehicleClass(vehicleType) === 'copter'
+  // How this airframe takes off, from the same function the command uses. A
+  // quadplane climbs vertically like a copter; only a fixed wing takes off by
+  // mode.
+  const qEnable = useParamStore((s) => s.entries.get('Q_ENABLE')?.value)
+  const takeoffVia = takeoffStyle(vehicleType, qEnable)
+  const { say, clearNote, explained, report, fail } = useReporting()
+  const [forceArmOpen, setForceArmOpen] = useState(false)
+  // The offer answers one refusal: it goes with the link, and once the
+  // vehicle is armed by any means.
+  useEffect(() => {
+    if (!connected || armed) setForceArmOpen(false)
+  }, [connected, armed])
+  const forceArm = () => {
+    setForceArmOpen(false)
+    void arm(true).then(report('Force arm')).catch(fail('Force arm'))
+  }
 
   const setMode = (num: number, label = 'Mode') =>
     void setModeConfirmed(num).then(report(label)).catch(fail(label))
@@ -115,13 +146,7 @@ export function useFlightActions() {
           <LaButton variant="ghost" onClick={() => setForceArmOpen(false)}>
             Cancel
           </LaButton>
-          <LaButton
-            variant="danger"
-            onClick={() => {
-              setForceArmOpen(false)
-              void arm(true).then(report('Force arm')).catch(fail('Force arm'))
-            }}
-          >
+          <LaButton variant="danger" onClick={forceArm}>
             Force arm
           </LaButton>
         </>
@@ -149,5 +174,9 @@ export function useFlightActions() {
     disarm: disarmVehicle,
     takeoff,
     forceArmDialog,
+    /** A refused arm offers force-arm; compact mode confirms it by sliding. */
+    forceArmOffered: forceArmOpen,
+    forceArm,
+    dismissForceArm: () => setForceArmOpen(false),
   }
 }

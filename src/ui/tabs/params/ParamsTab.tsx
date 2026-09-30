@@ -6,7 +6,7 @@ import ParamSidebar from './ParamSidebar'
 import { useConnectionStore } from '../../../stores/connection-store'
 import ParamRow from './ParamRow'
 import ColumnShell, { ColumnToggle } from '../../components/ColumnShell'
-import { ToolbarWrite } from '../../components/VehicleParamActions'
+import { ToolbarWrite, useWriteFailed } from '../../components/VehicleParamActions'
 
 // The full parameter table, behind the curated setup screens. Virtualized:
 // a Copter has about 1400 parameters and only the visible slice is rendered.
@@ -21,6 +21,8 @@ export default function ParamsTab() {
   const offline = phase !== 'connected' && phase !== 'linkLost'
   const metadataSource = useParamStore((s) => s.metadataSource)
   const [filter, setFilter] = useState('')
+  // The failed names are in the side panel; its button says there is news.
+  const writeFailed = useWriteFailed()
 
   const names = useMemo(() => {
     const f = filter.trim().toUpperCase()
@@ -85,7 +87,7 @@ export default function ParamsTab() {
               className="la-grow"
             />
             <ToolbarWrite />
-            <ColumnToggle />
+            <ColumnToggle alert={writeFailed} />
           </div>
           <div className="params-scroll" ref={scrollRef}>
             {/* Empty state for both an unloaded set and a filter with no

@@ -416,7 +416,7 @@ station at 732×412. The mechanisms are in
 ### A screen keeps everything and rearranges it
 
 Compact mode never drops a setting or an action. It moves what does not fit
-behind one tap: a drawer, an expanding row, a row that scrolls sideways.
+behind one tap: a side panel, an expanding row, a row that scrolls sideways.
 
 ### Navigation lives in the app bar
 
@@ -425,22 +425,53 @@ Setup button names the screen and opens the list, at one width for every name.
 
 ### The column is a side panel; Write stays in view
 
-Every screen's column opens the same way: one square button with a side-panel
-icon at the top-right of the pane, blue while open, and a floating panel
-hanging under the row that holds it. That row stays usable: the button that
-opened the panel closes it, and Write stays beside it. Anything else floating
-in that row over the panel's side (Plan's map controls) steps aside while the
-panel is open. A screen never has two different buttons for its panels on one side. Controls
-in the same row as the button are its height, so the row reads as one set.
+Every screen's column opens the same way, Plan's included: one square
+button with a side-panel icon at the top-right of the pane, blue while open,
+and a floating panel hanging under the row that holds it. That row stays
+usable: the button that opened the panel closes it. Anything else floating in
+that row over the panel's side (a map's controls) steps aside while the panel
+is open. A screen never has two different buttons for its panels on one side.
+Controls in the same row as the button are its height, so the row reads as one
+set.
 
-### A list of things on a map rises from below
-
-Plan's items open as a sheet from the bottom, under an Items handle that rides
-on its top edge and closes it again. The route stays in view above the list,
-and a wide sheet suits the altitude profile and an item's fields laid out
-across. The side panel and the sheet are one at a time. Write sits beside the button with its
+On a screen that stages parameters, Write sits beside the button with its
 count, because a staged edit nobody can see is an edit nobody writes. The
-column's own Write is hidden, so there is still one.
+column's own Write is hidden, so there is still one. Plan writes from its
+panel, since a mission write is a transfer with its own status.
+
+Something in a closed panel that needs seeing (a failed write, a transfer
+under way) puts a dot on its button.
+
+### What is wide and short rises from below
+
+Over a full-window view (Plan's map, Fly's map or video), content that is
+wider than it is tall opens as a sheet from the bottom, under a handle that
+rides on its top edge and closes it again: Plan's items, and Fly's controls,
+camera, video, joystick, status and view. The view stays in sight above it,
+and the sheet's width suits the altitude profile, an item's fields and Fly's
+panes laid out across. Controls that share the bottom edge with the handle
+(Fly's Arm) ride up with it, so they stay in reach. The handle is in the middle
+unless something else owns the middle, then at the right. Over a view that is
+itself read (Fly's HUD), the handle is a caret alone, quiet like the inset's
+buttons; over a map it carries its name (Items). On Plan the side panel and the
+sheet are one at a time.
+
+### A command that moves the aircraft is slid, not tapped
+
+On a handheld a tap lands by accident. Arm, Disarm, Takeoff and force-arm are
+confirmed by sliding; the slider takes the buttons' place and withdraws when
+its command stops applying. A mode change is one tap in the mode picker, as on
+the desktop, because the picker is already a deliberate second step.
+
+### Every control is a finger wide
+
+Every control is at least 44px on its short side. Where something must look
+smaller (the inset's hide button), its hit area is still 44px.
+
+### Tapping the map to close a panel only closes it
+
+A tap outside a panel closes it and does nothing else; it never also drops a
+waypoint.
 
 ### A wide table shows what is watched and opens the rest
 

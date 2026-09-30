@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { LaCard, LaHint, LaInput, LaSwitch } from '../../components/La'
 import ColumnShell, { ColumnToggle, openColumn } from '../../components/ColumnShell'
+import { useCompact } from '../../compact'
 import { connectionService } from '../../../services/connection'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { rowKey, useInspectorStore } from '../../../stores/inspector-store'
@@ -14,6 +15,7 @@ import type { FieldValue } from '../../../protocol/types'
 // is mounted.
 
 export default function InspectorTab() {
+  const compact = useCompact()
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const rows = useInspectorStore((s) => s.rows)
   const selectedKey = useInspectorStore((s) => s.selectedKey)
@@ -91,8 +93,8 @@ export default function InspectorTab() {
                     className={key === selectedKey ? 'is-selected' : undefined}
                     onClick={() => {
                       select(key === selectedKey ? null : key)
-                      // In compact mode the fields are in a drawer.
-                      if (key !== selectedKey) openColumn()
+                      // In compact mode the fields are in the side panel.
+                      if (key !== selectedKey && compact) openColumn()
                     }}
                   >
                     <td>{r.msgName}</td>

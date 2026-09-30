@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { LaButton, LaCard, LaModal, LaReadout, LaSelect, LaSwitch } from '../../components/La'
 import OsdActions, { isOsdParam, OsdSettings, OSD_REBOOT_REASON } from './OsdActions'
 import { ColumnToggle } from '../../components/ColumnShell'
-import { ToolbarWrite } from '../../components/VehicleParamActions'
+import { ToolbarWrite, useWriteFailed } from '../../components/VehicleParamActions'
 import CardParamActions from '../../components/CardParamActions'
 import ParamField from '../../components/ParamField'
 import WriteFeedback from '../../components/WriteFeedback'
@@ -51,6 +51,7 @@ export default function OsdWorkspace() {
   const txtRes = entries.get(txtResParam)?.value
   const hdWanted = txtRes !== undefined && txtRes > 0
   const compact = useCompact()
+  const writeFailed = useWriteFailed()
 
   // A disabled screen's panels are not reported. With OSD2_ENABLE at 0,
   // ArduPlane 4.7.1 still reports Link quality (it sits outside the table the
@@ -62,10 +63,16 @@ export default function OsdWorkspace() {
     () => (screenOff ? [] : readPlacements(entries, screen)),
     [entries, screen, screenOff],
   )
-  // The grid drawn, which on DisplayPort can be larger than the one declared.
+  // The grid drawn, which on DisplayPort can be larger than the one declared:
+  // it holds both the staged layout and the one the vehicle has.
+  const stored = useMemo(() => {
+    if (screenOff) return []
+    const vehicle = new Map([...entries].map(([k, e]) => [k, { value: e.origValue }]))
+    return readPlacements(vehicle, screen)
+  }, [entries, screen, screenOff])
   const { grid, declared } = useMemo(
-    () => editorGrid(osdType, txtRes, placements),
-    [osdType, txtRes, placements],
+    () => editorGrid(osdType, txtRes, placements, stored),
+    [osdType, txtRes, placements, stored],
   )
   const overlaps = useMemo(() => findOverlaps(placements), [placements])
   const offGrid = useMemo(() => findOffGrid(placements, grid), [placements, grid])
@@ -271,7 +278,7 @@ export default function OsdWorkspace() {
             <div className="osd-bar__end">
               {status}
               <ToolbarWrite owns={isOsdParam} reason={OSD_REBOOT_REASON} />
-              <ColumnToggle />
+              <ColumnToggle alert={writeFailed} />
             </div>
           </div>
           <div className="osd-stage">
@@ -542,7 +549,9 @@ function SelectionDetail({
   if (compact) {
     return (
       <div className="osd-selection osd-selection--pad">
-        <strong className="osd-selection__name">{item ? item.label : 'No panel selected'}</strong>
+        <strong className="osd-selection__name" title={item?.label}>
+          {item ? item.label : 'No panel selected'}
+        </strong>
         <div className="osd-selection__coords">
           {coord('Column')}
           {coord('Row')}

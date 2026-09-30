@@ -42,7 +42,7 @@ export default function VehicleParamActions({
       {w.modal}
       <h3 className="app-col__head">{title}</h3>
       {/* In compact mode Write is on the pane's toolbar (ToolbarWrite), where
-          it stays in view while the column is a closed drawer. */}
+          it stays in view while the column is a closed side panel. */}
       <LaButton
         variant="primary"
         size="block"
@@ -85,19 +85,28 @@ export default function VehicleParamActions({
   )
 }
 
+/** Whether the last write left parameters unwritten, shown only in the column. */
+export function useWriteFailed(): boolean {
+  return useParamStore((s) => (s.lastWrite?.failed.length ?? 0) > 0)
+}
+
 /**
  * The column's Write, for the pane's toolbar in compact mode, where the column
- * is a drawer. Pass the same scope as the column's VehicleParamActions.
+ * is a side panel. Pass the same scope as the column's VehicleParamActions.
+ * Nothing on the desktop, where its scope would still be counted on every
+ * parameter change.
  */
-export function ToolbarWrite({
+export function ToolbarWrite(props: Pick<VehicleParamActionsProps, 'owns' | 'reason'>) {
+  return useCompact() ? <ToolbarWriteButton {...props} /> : null
+}
+
+function ToolbarWriteButton({
   owns,
   reason = 'Parameter changes take effect after a restart',
 }: Pick<VehicleParamActionsProps, 'owns' | 'reason'>) {
-  const compact = useCompact()
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const fromFile = useParamStore((s) => s.source === 'file')
   const w = useParamWrite({ reason, owns })
-  if (!compact) return null
   return (
     <>
       {w.modal}

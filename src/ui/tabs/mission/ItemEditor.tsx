@@ -1,11 +1,10 @@
-import type { ReactNode } from 'react'
-import { create } from 'zustand'
+import { useEffect, useRef, useState } from 'react'
 import { LaButton, LaInput, LaSelect } from '../../components/La'
 import { useUnits } from '../../../stores/preferences-store'
 import { distanceLabel, formatDistance, fromDistance, toDistance } from '../../../units'
 import { useMissionStore } from '../../../stores/mission-store'
+import { useItemEditor } from '../../../stores/item-editor-store'
 import { usePlanVehicleClass } from './plan-vehicle'
-import { commandChange } from './MissionTable'
 import { legStats, hasCoords, type PlanItem } from '../../../protocol/mission-plan'
 import {
   MAV_FRAMES,
@@ -14,22 +13,11 @@ import {
   commandLabel,
 } from '../../../protocol/mission-commands'
 
-// Compact Plan's editor for one mission item, in the side panel's Items tab,
-// opened by tapping its marker or its line in the item list; Done goes back
-// to the list. It holds what a table row holds on the desktop,
-// stacked for a narrow panel and sized for a finger, so no table has to
-// scroll sideways on a small screen.
-
-/** Which item the editor shows; null when it is closed. */
-export const useItemEditor = create<{
-  uid: string | null
-  open: (uid: string) => void
-  close: () => void
-}>((set) => ({
-  uid: null,
-  open: (uid) => set({ uid }),
-  close: () => set({ uid: null }),
-}))
+// Compact Plan's editor for one mission item, in the item sheet across its
+// width, opened by tapping the item's marker or its line in the list; "All
+// items" goes back to the list. It holds what a table row holds on the
+// desktop, sized for a finger, so no table scrolls sideways on a small
+// screen.
 
 /** Altitude steps, in the display unit: five meters or ten feet. */
 const ALT_STEP = { m: 5, ft: 10 } as const
@@ -39,36 +27,59 @@ export default function ItemEditor() {
   const close = useItemEditor((s) => s.close)
   const plan = useMissionStore((s) => s.plan)
   const update = useMissionStore((s) => s.updateItem)
+  const changeCommand = useMissionStore((s) => s.changeCommand)
   const remove = useMissionStore((s) => s.removeItem)
   const move = useMissionStore((s) => s.moveItem)
   const planClass = usePlanVehicleClass()
   const units = useUnits()
+  const title = useRef<HTMLHeadingElement>(null)
 
   const index = plan.items.findIndex((it) => it.uid === uid)
   const item = index >= 0 ? plan.items[index] : undefined
+
+  // An item that disappears (a read from the vehicle replaces the plan)
+  // closes the editor rather than leaving it empty.
+  useEffect(() => {
+    if (uid && !item) close()
+  }, [uid, item, close])
+  // Focus follows the editor in, since the row that opened it is gone.
+  useEffect(() => title.current?.focus(), [uid])
+
   if (!item) return null
 
   const seq = index + 1
   const spec = commandSpec(item.command)
   const params = spec?.params ?? []
-  const legM = legStats(plan)[index]?.legM ?? 0
   const change = (patch: Partial<Omit<PlanItem, 'uid'>>) => update(item.uid, patch)
   const unit = distanceLabel(units.distance)
-  const alt = round(toDistance(item.z, units.distance))
+  const alt = toDistance(item.z, units.distance)
   const step = units.distance === 'ft' ? ALT_STEP.ft : ALT_STEP.m
   const setAlt = (v: number) => change({ z: fromDistance(v, units.distance) })
+
+  // The leg is measured from the last item with a position, or from home.
+  let from: string | null = null
+  if (hasCoords(item)) {
+    for (let j = index - 1; j >= 0 && from === null; j--) {
+      const prev = plan.items[j]
+      if (prev && hasCoords(prev)) from = String(j + 1)
+    }
+    if (from === null && plan.home) from = 'home'
+  }
+  const legM = legStats(plan)[index]?.legM ?? 0
 
   return (
     <section className="item-editor" aria-label={`Item ${seq}`}>
       <div className="item-editor__head">
-        <h3 className="item-editor__title">Item {seq}</h3>
-        {hasCoords(item) && index > 0 && (
+        <h3 className="item-editor__title" ref={title} tabIndex={-1}>
+          Item {seq}
+        </h3>
+        {from !== null && (
           <span className="item-editor__leg">
-            {formatDistance(legM, units.distance, 0)} {unit} from {seq - 1}
+            {formatDistance(legM, units.distance, 0)} {unit} from {from}
           </span>
         )}
-        <LaButton variant="ghost" className="item-editor__close" onClick={close}>
-          Done
+        <LaButton variant="ghost" className="item-editor__back" onClick={close}>
+          All items
         </LaButton>
       </div>
 
@@ -77,7 +88,7 @@ export default function ItemEditor() {
           <span className="la-field__label">Command</span>
           <LaSelect
             value={item.command}
-            onChange={(e) => change(commandChange(Number(e.target.value)))}
+            onChange={(e) => changeCommand(item.uid, Number(e.target.value))}
           >
             {!spec && <option value={item.command}>{commandLabel(item.command)}</option>}
             {commandsFor(planClass).map((c) => (
@@ -97,13 +108,7 @@ export default function ItemEditor() {
               <LaButton variant="ghost" aria-label="Lower" onClick={() => setAlt(alt - step)}>
                 −
               </LaButton>
-              <LaInput
-                num
-                type="number"
-                aria-label={`Item ${seq} altitude`}
-                value={alt}
-                onChange={(e) => setAlt(Number(e.target.value))}
-              />
+              <NumberField label={`Item ${seq} altitude`} value={alt} onValue={setAlt} />
               <LaButton variant="ghost" aria-label="Higher" onClick={() => setAlt(alt + step)}>
                 +
               </LaButton>
@@ -146,14 +151,12 @@ export default function ItemEditor() {
                   ))}
                 </LaSelect>
               ) : (
-                <LaInput
-                  num
-                  type="number"
-                  step={p.integer ? 1 : 'any'}
+                <NumberField
+                  value={item[key]}
+                  integer={p.integer ?? false}
                   {...(p.min !== undefined ? { min: p.min } : {})}
                   {...(p.max !== undefined ? { max: p.max } : {})}
-                  value={round(item[key])}
-                  onChange={(e) => change({ [key]: Number(e.target.value) })}
+                  onValue={(v) => change({ [key]: v })}
                 />
               )}
             </label>
@@ -187,10 +190,54 @@ export default function ItemEditor() {
 }
 
 /**
- * The item list for compact mode: one line per item, a finger wide, each
- * opening the editor. The desktop table's columns do not fit a small window.
+ * A number box that keeps what is typed until it is a number. Clearing it on
+ * a touch keyboard, or typing a lone minus, would otherwise write 0 at once
+ * and put the item on the ground; the field goes back to the stored value when
+ * it loses focus.
  */
-export function ItemList({ foot }: { foot?: ReactNode }) {
+function NumberField({
+  value,
+  onValue,
+  label,
+  integer = false,
+  min,
+  max,
+}: {
+  value: number
+  onValue: (v: number) => void
+  label?: string
+  integer?: boolean
+  min?: number
+  max?: number
+}) {
+  const shown = String(round(value))
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <LaInput
+      num
+      type="number"
+      step={integer ? 1 : 'any'}
+      {...(label ? { 'aria-label': label } : {})}
+      {...(min !== undefined ? { min } : {})}
+      {...(max !== undefined ? { max } : {})}
+      value={draft ?? shown}
+      onChange={(e) => {
+        const text = e.target.value
+        setDraft(text)
+        const v = Number(text)
+        if (text.trim() !== '' && Number.isFinite(v)) onValue(v)
+      }}
+      onBlur={() => setDraft(null)}
+    />
+  )
+}
+
+/**
+ * The item list for compact mode: one line per item, a finger tall, each
+ * opening the editor. Add sits under the list, outside its scrolling, so it
+ * stays in the same place however many items there are.
+ */
+export function ItemList() {
   const plan = useMissionStore((s) => s.plan)
   const selected = useMissionStore((s) => s.selected)
   const select = useMissionStore((s) => s.select)
@@ -201,26 +248,31 @@ export function ItemList({ foot }: { foot?: ReactNode }) {
 
   return (
     <div className="item-list">
-      {plan.items.map((it, i) => {
-        const spec = commandSpec(it.command)
-        return (
-          <button
-            key={it.uid}
-            type="button"
-            className={`item-list__row${selected === it.uid ? ' is-selected' : ''}`}
-            onClick={() => {
-              select(it.uid)
-              open(it.uid)
-            }}
-          >
-            <span className="item-list__seq">{i + 1}</span>
-            <span className="item-list__cmd">{spec?.name ?? commandLabel(it.command)}</span>
-            <span className="item-list__alt">
-              {spec?.altitude === false ? '' : `${formatDistance(it.z, units.distance, 0)} ${unit}`}
-            </span>
-          </button>
-        )
-      })}
+      <div className="item-list__rows">
+        {plan.items.map((it, i) => {
+          const spec = commandSpec(it.command)
+          return (
+            <button
+              key={it.uid}
+              type="button"
+              className={`item-list__row${selected === it.uid ? ' is-selected' : ''}`}
+              onClick={() => {
+                select(it.uid)
+                open(it.uid)
+              }}
+            >
+              <span className="item-list__seq">{i + 1}</span>
+              {/* ArduPilot's names, as in the editor and the desktop table. */}
+              <span className="item-list__cmd">{spec?.mavName ?? commandLabel(it.command)}</span>
+              <span className="item-list__alt">
+                {spec?.altitude === false
+                  ? '—'
+                  : `${formatDistance(it.z, units.distance, 0)} ${unit}`}
+              </span>
+            </button>
+          )
+        })}
+      </div>
       <div className="item-list__foot">
         <LaButton
           variant="secondary"
@@ -231,7 +283,6 @@ export function ItemList({ foot }: { foot?: ReactNode }) {
         >
           Add waypoint
         </LaButton>
-        {foot}
       </div>
     </div>
   )

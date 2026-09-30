@@ -73,7 +73,8 @@ export default function FilesTab() {
           >
             Up
           </LaButton>
-          <ColumnToggle />
+          {/* The transfer and its result are in the side panel. */}
+          <ColumnToggle alert={!!transfer || status.kind === 'error'} />
         </div>
 
         <div className="files__scroll">

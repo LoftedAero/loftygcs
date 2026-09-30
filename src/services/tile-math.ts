@@ -69,10 +69,13 @@ export function offlineTiles(
 ): TileCoord[] {
   const top = Math.min(Math.floor(zoom), maxZoom)
   const out = tilesForBounds(bounds, top, maxZoom)
-  // The view's extent in tiles at its own level, which is the same on screen
-  // at every level; each lower level covers that extent around the center.
-  const width = lonToTileX(bounds.east, top) - lonToTileX(bounds.west, top)
-  const height = latToTileY(bounds.south, top) - latToTileY(bounds.north, top)
+  // The view's extent in tiles at the zoom it is shown at: a screen shows as
+  // many tiles at every level, so each lower level covers that many around
+  // the center. Measured at the view's zoom, not the imagery's last level, or
+  // a view zoomed past the imagery would count half a screen.
+  const at = Math.floor(zoom)
+  const width = lonToTileX(bounds.east, at) - lonToTileX(bounds.west, at)
+  const height = latToTileY(bounds.south, at) - latToTileY(bounds.north, at)
   const centerLon = (bounds.east + bounds.west) / 2
   const centerLat = (bounds.north + bounds.south) / 2
   for (let z = Math.max(1, top - outLevels); z < top; z++) {

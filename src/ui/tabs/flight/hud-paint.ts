@@ -92,13 +92,15 @@ export interface HudBox {
  * - `bottomLeft`, the map inset: the left column's readings move up under the
  *   GPS line, the speed tape fits between them and the inset, and the center
  *   chips slide clear of it.
- * - `topLeft`, the More and HUD buttons: the GPS line and what stacks under it
- *   start below them.
- * - `bottomCenter`, the Arm button: the center chips rise above it.
+ * - `bottomRight`, the sheet's handle: the right column's readings move up
+ *   under the link line, mirroring the left, and the altitude tape fits
+ *   between them and the handle.
+ * - `bottomCenter`, the command row (Arm or Disarm, or its slider): the
+ *   center chips rise above it.
  */
 export interface HudAvoid {
   bottomLeft?: HudBox | null
-  topLeft?: HudBox | null
+  bottomRight?: HudBox | null
   bottomCenter?: HudBox | null
 }
 
@@ -222,29 +224,33 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   const right = w - gap
   const corner = 13 * s
   const bottomLeft = covers(st.avoid?.bottomLeft) ? st.avoid.bottomLeft : null
-  const topLeft = covers(st.avoid?.topLeft) ? st.avoid.topLeft : null
+  const bottomRight = covers(st.avoid?.bottomRight) ? st.avoid.bottomRight : null
   const bottomCenter = covers(st.avoid?.bottomCenter) ? st.avoid.bottomCenter : null
   const avoid = bottomLeft
-  // The link's line, with GPS opposite it. With buttons over the top-left
-  // corner GPS moves under the link, and the left column starts below them.
-  const linkLine = ribbonH + 18 * s
-  const topLine = topLeft ? Math.max(linkLine, topLeft.h + 14 * s) : linkLine
-  const gpsRight = topLeft !== null
-  // The first line of the left column's stack when the corner is covered.
-  const stackTop = gpsRight ? topLine : topLine + 16 * s
+  // The GPS line, with the link opposite it.
+  const topLine = ribbonH + 18 * s
+  // The first line of a column's stack when its bottom corner is covered.
+  const stackTop = topLine + 16 * s
+  const stackBottom = stackTop + 17 * s + 15 * s
   const clearTop = avoid ? h - avoid.h : h
   // The lowest a center chip's bottom edge may sit.
   const chipFloor = bottomCenter ? h - bottomCenter.h - gap : h
 
-  // The left column. Normally the tape is beside the horizon with the speeds
-  // under it and the battery in the corner; with the corner covered the
-  // battery and speeds stack under GPS and the tape takes the room between.
+  // Each side column. Normally the tape is beside the horizon with two
+  // readings under it and a corner item below; with the corner covered the
+  // corner item and readings stack under the top line and the tape takes the
+  // room between.
   let leftTapeTop = tapeTop
   let leftTapeH = tapeH
   if (avoid) {
-    const stackBottom = stackTop + 17 * s + 15 * s
     leftTapeTop = stackBottom + gap
     leftTapeH = Math.min(tapeH, clearTop - gap - leftTapeTop)
+  }
+  let rightTapeTop = tapeTop
+  let rightTapeH = tapeH
+  if (bottomRight) {
+    rightTapeTop = stackBottom + gap
+    rightTapeH = Math.min(tapeH, h - bottomRight.h - gap - rightTapeTop)
   }
   if (leftTapeH >= 40 * s) {
     paintTape(
@@ -260,27 +266,30 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
       write,
     )
   }
-  paintTape(
-    ctx,
-    w - tapeW - gap,
-    tapeTop,
-    tapeW,
-    tapeH,
-    toDistance(st.relAltM, dst),
-    tapeStep('altitude', dst),
-    s,
-    'right',
-    write,
-  )
+  if (rightTapeH >= 40 * s) {
+    paintTape(
+      ctx,
+      w - tapeW - gap,
+      rightTapeTop,
+      tapeW,
+      rightTapeH,
+      toDistance(st.relAltM, dst),
+      tapeStep('altitude', dst),
+      s,
+      'right',
+      write,
+    )
+  }
 
   paintAircraft(ctx, cx, cy, s)
 
   // Under the speed tape: the two speeds. Under the altitude tape: vertical
   // speed and throttle.
   const u1 = tapeBottom + 17 * s
-  const u2 = u1 + 15 * s
   const l1 = avoid ? stackTop + 17 * s : u1
   const l2 = l1 + 15 * s
+  const r1 = bottomRight ? stackTop + 17 * s : u1
+  const r2 = r1 + 15 * s
   pair('AS', `${formatSpeed(st.airspeedMs, spd)} ${speedLabel(spd)}`, left, l1, 'left')
   pair('GS', `${formatSpeed(st.groundspeedMs, spd)} ${speedLabel(spd)}`, left, l2, 'left')
   const vs = formatVerticalSpeed(st.climbMs, st.units)
@@ -288,34 +297,33 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     'V/S',
     `${st.climbMs >= 0 ? '+' : ''}${vs} ${verticalSpeedLabel(st.units)}`,
     right,
-    u1,
+    r1,
     'right',
   )
-  pair('THR', `${st.throttlePct.toFixed(0)}%`, right, u2, 'right')
+  pair('THR', `${st.throttlePct.toFixed(0)}%`, right, r2, 'right')
 
   // The corners: battery bottom left, mode bottom right, link top right,
   // GPS top left, all at the same weight as the readouts above them.
   write(st.batteryText, left, avoid ? stackTop : h - 8 * s, { size: corner })
-  write(st.modeName || '—', right, h - 8 * s, {
+  write(st.modeName || '—', right, bottomRight ? stackTop : h - 8 * s, {
     size: corner,
     weight: '600',
     font: SANS,
     spacing: 0.5,
     align: 'right',
   })
-  write(st.linkText, right, linkLine, { size: corner, align: 'right' })
-  // GPS opposite the link on the same line, or under it. Red without a
-  // usable fix, since position modes are then refused.
-  write(st.gpsText, gpsRight ? right : left, gpsRight ? linkLine + 16 * s : topLine, {
+  write(st.linkText, right, topLine, { size: corner, align: 'right' })
+  // GPS opposite the link. Red without a usable fix, since position modes
+  // are then refused.
+  write(st.gpsText, left, topLine, {
     size: corner,
-    ...(gpsRight ? { align: 'right' as const } : {}),
     ...(st.gpsUsable ? {} : { color: RED, weight: '600' }),
   })
 
   /** A centered chip's x, moved right when its line runs beside the covered corner. */
   const chipX = (width: number, bottom: number) =>
     avoid && bottom > clearTop ? Math.max(cx, avoid.w + gap + width / 2) : cx
-  /** A center chip's baseline, raised so its bottom edge clears the Arm button. */
+  /** A center chip's baseline, raised so its bottom edge clears the command row. */
   const chipY = (y: number, below: number) => Math.min(y, chipFloor - below)
 
   // State, centered above the aircraft symbol.
