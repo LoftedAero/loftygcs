@@ -28,6 +28,15 @@ The first targets are Android handheld ground stations:
     Its transmit pin (GPIO47, correctly muxed as UART1 TX) reads low only
     15–20% of the time while zeros are streamed, where 90% is expected:
     something on the board holds the line high. Reported to Radiomaster.
+    Unchanged after the September 2026 OTA (Android
+    `RADIOMASTER_OTA_202606291403`, app 26.09.08, radio firmware 01.36.3000
+    build 260917, ELRS 3.6.3), after a reboot, and with the ELRS
+    Backpack switched off: 15–23% low while streaming, and no reply to
+    TIMESYNC or parameter requests from Lofty GCS or Radiomaster's QGC,
+    while the downlink carries about 1.5 kB/s (31 messages a second, 0.3%
+    bad frames). The OTA reinstalls the Radiomaster app, deleting its models
+    (`files/rcModel/*.rcm`, restorable from a copy), and uninstalls this
+    app.
   - The module forwards MAVLink to that port only with its Link Mode set to
     MAVLink, and ELRS accepts that change only while no receiver is
     connected. With a receiver linked, Radiomaster's ELRS page accepts the
