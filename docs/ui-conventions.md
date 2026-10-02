@@ -407,6 +407,22 @@ frame, header band, row rule, row metrics and monospace identifier column. A
 table declares only its `grid-template-columns`. The header reuses
 `.la-card__subtitle`'s type settings rather than defining its own.
 
+## Sound
+
+### Speak what is needed without looking; beep for what the screen explains
+
+A voice callout is for something a pilot must know with eyes on the aircraft:
+a mode change, a failsafe, telemetry lost. A beep is for something the screen
+already explains, such as a refused arm right after pressing Arm. There are two
+beeps, info and warning, and a row's beep follows its priority, so each sound
+keeps one meaning everywhere.
+
+### Say a change once, and repeat only what is still true
+
+A running value is never read out unasked; a crossing is said once. Only an
+alert that is still true repeats, at the user's interval and only while flying.
+A callout that has waited too long is dropped rather than said late.
+
 ## Compact mode
 
 For a window too small for the desktop layout, such as a handheld ground

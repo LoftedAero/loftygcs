@@ -22,6 +22,12 @@
   --app-compact-badge: 28px;
   /* A touch target: the smallest a thumb hits reliably. */
   --app-touch: 44px;
+  /* Voice callouts: a mode dropdown fits "Warning beep" and its chevron; a
+     threshold fits "10000". */
+  --app-callout-mode-w: 136px;
+  --app-callout-value-w: 76px;
+  /* The words either side of a threshold: "beyond", "V/cell". */
+  --app-callout-word-w: 48px;
   /* Compact Fly: the picture-in-picture inset and the slide-to-confirm bar. */
   --app-compact-inset-w: 168px;
   --app-slide-w: 400px;
@@ -992,6 +998,52 @@
   grid-auto-columns: 1fr;
   width: max-content;
   margin-left: auto;
+}
+
+/* Test and Configure share the column's width, as one control. */
+.prefs__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--la-space-2);
+  width: var(--app-prefs-control-w);
+}
+
+/* Voice callouts (VoiceCalloutsModal): one grid for every group, so the
+   thresholds and the mode dropdowns line up down the whole dialog. */
+.callouts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--app-callout-mode-w);
+  gap: var(--la-space-2) var(--la-space-3);
+  align-items: center;
+}
+.callouts__row {
+  display: contents;
+}
+.callouts__head {
+  grid-column: 1 / -1;
+  margin-top: var(--la-space-3);
+}
+.callouts__head:first-child {
+  margin-top: 0;
+}
+.callouts__label {
+  font-size: var(--la-size-md);
+  color: var(--la-ink);
+}
+.callouts__threshold {
+  display: grid;
+  grid-template-columns: var(--app-callout-word-w) var(--app-callout-value-w) var(
+      --app-callout-word-w
+    );
+  align-items: center;
+  gap: var(--la-space-1);
+}
+/* "below 50 %": the word right against the box, so every box lines up. */
+.callouts__threshold > :first-child {
+  text-align: right;
+}
+.callouts__threshold .la-input {
+  width: 100%;
 }
 
 .prefs__head {
@@ -8586,6 +8638,11 @@ button.compact-status__item:hover,
 .bar-pop__note {
   margin: 0;
   color: var(--la-ink-2);
+}
+/* A sentence on its own, kept to a readable measure. */
+.bar-pop__detail {
+  max-width: 36ch;
+  color: var(--la-ink);
 }
 .bar-pop__actions {
   display: flex;

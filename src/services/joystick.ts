@@ -4,6 +4,7 @@ import { useJoystickStore } from '../stores/joystick-store'
 import { useVehicleStore } from '../stores/vehicle-store'
 import { setModeConfirmed } from './flight'
 import { modeNumberByName } from '../protocol/modes'
+import { announce } from './voice/announcer'
 import {
   OVERRIDE_FIELDS,
   RELEASE,
@@ -172,7 +173,11 @@ export function stop(reason?: string): void {
   store.setActive(false)
   flyingOn = null
   shell()?.app.setBackgroundThrottling(true)
-  if (reason) store.setMessage(reason)
+  if (reason) {
+    store.setMessage(reason)
+    // Released by itself (unplugged, replaced, link dropped), not by the user.
+    announce({ t: 'joystick' })
+  }
   // Repeated: a lost release leaves the vehicle holding the last position.
   for (let i = 0; i < RELEASE_REPEATS; i++) {
     setTimeout(() => sendChannels(RELEASE), i * 60)

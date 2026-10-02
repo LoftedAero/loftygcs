@@ -139,14 +139,17 @@ describe('ProtocolEngine', () => {
     it('asks a plane for each message by interval and never for saved streams', async () => {
       engine.start()
       engine.pushBytes(planeHeartbeat())
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 13; i++) {
         ack(511, 0)
         await vi.advanceTimersByTimeAsync(0)
       }
       expect(txMessages()).not.toContain('REQUEST_DATA_STREAM')
       const reqs = intervalRequests()
       expect(reqs[0]).toEqual([30, 250000]) // ATTITUDE at 4 Hz
-      expect(reqs).toHaveLength(10)
+      // The ten displayed messages, then the voice callouts' fence, landed
+      // state and home.
+      expect(reqs).toHaveLength(13)
+      expect(reqs.slice(10).map(([id]) => id)).toEqual([162, 245, 242])
     })
 
     it('falls back to the stream request on firmware without SET_MESSAGE_INTERVAL', async () => {

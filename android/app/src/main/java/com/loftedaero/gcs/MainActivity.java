@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(LinkPlugin.class);
+        registerPlugin(SpeechPlugin.class);
         super.onCreate(savedInstanceState);
         // A ground station is watched, not touched, for minutes at a time.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

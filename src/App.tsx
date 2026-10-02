@@ -32,6 +32,7 @@ import FlightTab from './ui/tabs/flight/FlightTab'
 import MissionTab from './ui/tabs/mission/MissionTab'
 import SimFieldPicker from './ui/shell/SimFieldPicker'
 import { startReading } from './services/joystick'
+import { announcer } from './services/voice/announcer'
 
 function SetupContent() {
   const activeTab = useUiStore((s) => s.activeTab)
@@ -82,6 +83,12 @@ export default function App() {
   // open: control taken on the Fly screen stays taken on every other one.
   useEffect(() => {
     startReading()
+  }, [])
+
+  // Voice callouts watch the vehicle on every screen.
+  useEffect(() => {
+    announcer.start()
+    return () => announcer.stop()
   }, [])
 
   // Losing the link while on a vehicle-only tab drops to the first tab that

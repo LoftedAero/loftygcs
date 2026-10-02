@@ -38,11 +38,17 @@ describe('the app bar status word', () => {
   })
 
   it('keeps a failed connection on screen', () => {
-    // "Connection refused" separates a simulator that is not running from a
-    // mistyped port.
-    expect(at({ phase: 'error', error: 'connect ECONNREFUSED 127.0.0.1:5760' })).toEqual({
-      text: 'connect ECONNREFUSED 127.0.0.1:5760',
+    // "Nothing is listening" separates a simulator that is not running from
+    // a mistyped port, so the sentence is kept behind the short word.
+    expect(at({ phase: 'error', error: 'Nothing is listening at 127.0.0.1:5760.' })).toEqual({
+      text: 'Connection failed',
       tone: 'bad',
+      detail: 'Nothing is listening at 127.0.0.1:5760.',
+    })
+    expect(at({ phase: 'error', error: 'No heartbeat received. Check the settings.' })).toEqual({
+      text: 'No heartbeat',
+      tone: 'bad',
+      detail: 'No heartbeat received. Check the settings.',
     })
     expect(at({ phase: 'error', error: null })).toEqual({
       text: 'Connection failed',

@@ -290,9 +290,9 @@ function CompactFlight({
     // observer is renewed with each re-run.
   })
 
-  // Too small for the overlay to be read; video alone, or the horizon when
-  // there is no video.
-  const insetHud = hud({ overlays: false, horizon: video.state !== 'playing' })
+  // Too small for the overlay to be read: a faint horizon (none over video,
+  // which shows the real one) and the speed and altitude.
+  const insetHud = hud({ mini: true, horizon: video.state !== 'playing' })
   // With the sheet up the readings would lie half under it, with Arm and the
   // handle over the rest, so the full-screen HUD draws its horizon alone, as
   // the inset does. The app bar still has the readings that matter.

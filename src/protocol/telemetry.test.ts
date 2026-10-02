@@ -78,9 +78,26 @@ describe('BATTERY_STATUS', () => {
           voltagesExt: [0, 0, 0, 0],
           currentBattery: -1,
           batteryRemaining: -1,
+          chargeState: 2,
         }),
       ),
-    ).toEqual([{ k: 'batteryStatus', id: 1, voltageV: 12.6, currentA: -1, remainingPct: -1 }])
+    ).toEqual([
+      {
+        k: 'batteryStatus',
+        id: 1,
+        voltageV: 12.6,
+        currentA: -1,
+        remainingPct: -1,
+        chargeState: 2,
+      },
+    ])
+  })
+
+  it('reads a charge state the vehicle left out as undefined', () => {
+    const [d] = messageToDeltas(
+      status({ id: 0, voltages: [U, U, U, U, U, U, U, U, U, U], currentBattery: 0 }),
+    )
+    expect(d).toMatchObject({ chargeState: 0 })
   })
 
   it('adds up a total ArduPilot carried past what one slot holds', () => {
@@ -96,5 +113,36 @@ describe('BATTERY_STATUS', () => {
 
   it('says nothing was measured rather than zero volts', () => {
     expect(packVoltage(Array(10).fill(U), [0, 0, 0, 0])).toBeNull()
+  })
+})
+
+describe('the voice callouts’ messages', () => {
+  const msg = (msgName: string, fields: Record<string, number>) => ({
+    msgid: 0,
+    msgName,
+    sysid: 1,
+    compid: 1,
+    seq: 0,
+    fields,
+  })
+
+  it('reads home in degrees and meters', () => {
+    expect(
+      messageToDeltas(
+        msg('HOME_POSITION', { latitude: -353632621, longitude: 1491652374, altitude: 584090 }),
+      ),
+    ).toEqual([{ k: 'home', latDeg: -35.3632621, lonDeg: 149.1652374, altMslM: 584.09 }])
+  })
+
+  it('reads the landed state', () => {
+    expect(messageToDeltas(msg('EXTENDED_SYS_STATE', { landedState: 2, vtolState: 0 }))).toEqual([
+      { k: 'flightState', landed: 2, vtol: 0 },
+    ])
+  })
+
+  it('reads a fence breach and which fence', () => {
+    expect(
+      messageToDeltas(msg('FENCE_STATUS', { breachStatus: 1, breachType: 2, breachCount: 1 })),
+    ).toEqual([{ k: 'fence', breached: true, breachType: 2 }])
   })
 })

@@ -59,6 +59,19 @@ const MESSAGE_RATES_HZ: readonly [number, number][] = [
   [36, 2], // SERVO_OUTPUT_RAW
   [62, 2], // NAV_CONTROLLER_OUTPUT
   [42, 1], // MISSION_CURRENT
+  // For the voice callouts: battery state rides on BATTERY_STATUS above.
+  [162, 1], // FENCE_STATUS
+  [245, 1], // EXTENDED_SYS_STATE
+  [242, 0.2], // HOME_POSITION
+]
+/**
+ * Requested by interval even from vehicles that get the all-streams request,
+ * which does not include them. An interval request is never saved.
+ */
+const EXTRA_MESSAGE_RATES_HZ: readonly [number, number][] = [
+  [162, 1], // FENCE_STATUS
+  [245, 1], // EXTENDED_SYS_STATE
+  [242, 0.2], // HOME_POSITION
 ]
 /** A link with a longer round trip gets half the message rates. */
 const SLOW_LINK_RTT_MS = 400
@@ -466,7 +479,8 @@ export class ProtocolEngine {
       if (gen !== this.linkGen) return
       if (i > 0) continue
       if (result !== 0) {
-        this.requestAllStreams()
+        // Firmware that refuses the interval request would refuse the extras too.
+        this.requestAllStreams(false)
         return
       }
       // The first exchange has measured the link; halve everything on a slow
@@ -479,7 +493,7 @@ export class ProtocolEngine {
     }
   }
 
-  private requestAllStreams() {
+  private requestAllStreams(extras = true) {
     if (this.vehicleSysid === null) return
     // Legacy stream request: one message, and it works on every ArduPilot version.
     this.send('REQUEST_DATA_STREAM', {
@@ -489,6 +503,28 @@ export class ProtocolEngine {
       reqMessageRate: STREAM_RATE_HZ,
       startStop: 1,
     })
+    if (extras) void this.requestExtras()
+  }
+
+  /** The messages the stream request leaves out, one interval request each. */
+  private async requestExtras() {
+    const gen = this.linkGen
+    for (const [msgid, hz] of EXTRA_MESSAGE_RATES_HZ) {
+      try {
+        await this.commands.run(MAV_CMD_SET_MESSAGE_INTERVAL, [
+          msgid,
+          Math.round(1e6 / hz),
+          0,
+          0,
+          0,
+          0,
+          0,
+        ])
+      } catch {
+        // Older firmware without the command: those callouts stay silent.
+      }
+      if (gen !== this.linkGen) return
+    }
   }
 
   /**

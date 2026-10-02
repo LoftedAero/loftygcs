@@ -525,7 +525,8 @@ other sits in a picture-in-picture inset; a tap on the inset swaps them. It shar
   reading has a fixed slot (`--app-cbar-*`), so a changing value moves nothing. A mode is
   changed with one tap in the picker, as on the desktop; the mode picker and Arm share
   `useModeChange` and `useFlightActions` with the desktop controls. The logo opens Preferences,
-  which holds the theme.
+  which holds the theme. A failed connection is one short phrase ("No heartbeat", "Connection
+  failed") whose panel holds the sentence, which in the bar pushed it past the window.
 - There is no actions column. `CommandStrip`, over the bottom center, holds Arm or Disarm and
   Takeoff; everything else is a mode, picked from the bar. Takeoff sits beside Disarm, outside
   the row's centered width so Disarm never moves, from arming until the vehicle has climbed 2 m
@@ -548,9 +549,12 @@ other sits in a picture-in-picture inset; a tap on the inset swaps them. It shar
   clip their own overflow, so as a shrinking flex item they were cut off with nothing to
   scroll.
 - The HUD's layers are switched from its context menu, which a long press opens on a touch
-  screen; its HUD video item opens the sheet's Video section. In the inset the HUD draws no
-  overlay, and no horizon either while video plays; neither does the full-screen HUD while the
-  sheet is up, since its readings would lie half under the sheet. Over the full-screen HUD, the
+  screen; its HUD video item opens the sheet's Video section. The inset draws its own reduced
+  HUD (`HudState.mini`), whatever the layers say: a faint horizon and short pitch bars, a bank
+  pointer without its scale, and airspeed and altitude in the bottom corners, with no horizon
+  while video plays. It is a glance, so nothing in it competes with the main view. The
+  full-screen HUD draws no overlay while the sheet is up, since its readings would lie half
+  under the sheet. Over the full-screen HUD, the
   inset (or the button that shows it again), the sheet's handle and the command row are
   measured and passed as `HudState.avoid`. Each side column's readings stack under the top line
   when its bottom corner is covered (the inset on the left, the handle on the right), the tape
@@ -672,6 +676,49 @@ joysticks use RawInput with `RIDEV_INPUTSINK` (background delivery); Xbox-type p
 Windows.Gaming.Input, which is undocumented for this and untested. Reading them through XInput
 in the main process would settle it. In a browser, losing focus releases control; a hidden page
 releases in both.
+
+## Voice callouts (`services/voice/`)
+
+Spoken callouts and two beeps, after Yaapu Telemetry and QGroundControl. Every row in
+`catalog.ts` is voice, a beep, or off; its default was chosen by the project's owner, and
+Preferences stores only the rows changed from it, so a new callout needs no migration. A beep
+is for what the screen already explains (a refused arm), a voice callout for what a pilot needs
+without looking.
+
+- **The rules** (`rules.ts`) are pure logic over snapshots and an injected clock, so each is
+  unit-tested without a vehicle. They say crossings, never running values: battery steps only
+  go down, and a battery state is said only when it gets worse than what was last said. A
+  mode is said once it has held for 0.5 s. Alerts still true repeat at the user's interval,
+  only while flying. The first `SETTLE_MS` after connecting are taken as found.
+- **PreArm.** ArduPilot repeats each failing check every 30 s while disarmed; those go only to
+  their own row (off by default). A refused arm says the reason from the `Arm:` message that
+  arrives just before the ack, so the announcer reads the message feed before the event.
+- **GPS 3D fix** is said from a reported no-fix (fix type 1 or 2), never from 0, which is also
+  what a vehicle looks like before its first GPS report; on a slow link that report comes many
+  seconds after the heartbeat, behind the parameter download. The SITL runner boots a fresh
+  simulator for every connection, so there the callout on connecting is real.
+- **Battery state** comes from BATTERY_STATUS's `charge_state`, which ArduPilot sets from the
+  vehicle's own BATT_LOW/BATT_CRT thresholds, but only evaluates while armed (measured on
+  Copter SITL 4.7: charge state stays OK on the ground with BATT_LOW_VOLT above the pack). The
+  vehicle's own "Battery 1 is low" message is not said a second time.
+- **The queue** (`queue.ts`) plays one sound at a time. Critical interrupts anything less,
+  warnings go ahead of information, and an item that has waited too long (5 s for
+  information) is dropped rather than said late.
+- **Speech.** The desktop app and the web app use `speechSynthesis`; Electron on Windows has
+  local voices, so it works with no network. Android's WebView has no `speechSynthesis` at all,
+  so the Android app speaks through `SpeechPlugin.java` (the system engine, as navigation
+  guidance so other audio ducks). It waits for the engine to bind, which QGroundControl 5.1
+  did not, and Android 11 and later need the `TTS_SERVICE` query in the manifest.
+- **Beeps** (`tones.ts`) are synthesized with Web Audio everywhere, after cockpit sounds and
+  the FAA's guidance for flight-deck aural alerts (AC 25.1322-1): one tone for caution and one
+  for warning, 200-4500 Hz, soft onsets. The AX12's WebView starts an AudioContext without a
+  tap.
+- **Telemetry it needs:** HOME_POSITION, EXTENDED_SYS_STATE (landed state) and FENCE_STATUS,
+  requested by SET_MESSAGE_INTERVAL from every vehicle (after the all-streams request on
+  Copter), except from firmware that refused the interval request.
+- **Testing in the running app:** hook `speechSynthesis.speak` and `AudioContext` in the main
+  world (`webContents.executeJavaScript`; `page.evaluate` runs in an isolated world) to log
+  each phrase and oscillator, muted.
 
 ## Video (`services/video.ts`, `electron/video/`)
 

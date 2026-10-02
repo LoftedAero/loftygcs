@@ -35,6 +35,8 @@ export interface HudProps {
   overlays: boolean
   /** Areas covered by compact Fly's controls, kept clear (see HudAvoid). */
   avoid?: HudAvoid | null
+  /** The picture-in-picture inset's reduced HUD (see HudState.mini). */
+  mini?: boolean
   /** Screen position of a right-click on the HUD, for its own menu. */
   onContextMenu?: (p: { x: number; y: number }) => void
 }
@@ -42,12 +44,18 @@ export interface HudProps {
 /** How long "ARMED" stays on screen after the transition. */
 const ARMED_BANNER_MS = 4000
 
-export default function Hud({ horizon, overlays, avoid = null, onContextMenu }: HudProps) {
+export default function Hud({
+  horizon,
+  overlays,
+  avoid = null,
+  mini = false,
+  onContextMenu,
+}: HudProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Read inside the animation frame rather than closed over, so toggling a
   // layer does not have to tear down and restart the loop.
-  const flags = useRef({ horizon, overlays, avoid })
-  flags.current = { horizon, overlays, avoid }
+  const flags = useRef({ horizon, overlays, avoid, mini })
+  flags.current = { horizon, overlays, avoid, mini }
   // When the armed state last changed, so the ARMED banner can time out.
   // DISARMED stays up.
   const armedAt = useRef({ armed: false, at: 0 })
@@ -105,6 +113,7 @@ export default function Hud({ horizon, overlays, avoid = null, onContextMenu }: 
         overlays: flags.current.overlays,
         videoBehind: videoBehind.current,
         avoid: flags.current.avoid,
+        mini: flags.current.mini,
       })
     }
     raf = requestAnimationFrame(draw)

@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+// The version in package.json is the only thing that tells one build from
+// another (docs/releasing.md), so the app takes its name and code from it.
+// The code must grow with every release for Android to install an update:
+// 1.2.3 is 10203.
+def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def appVersionCode = appVersion.tokenize('.-')[0..2].collect { it as int }.with { it[0] * 10000 + it[1] * 100 + it[2] }
+
 android {
     namespace = "com.loftedaero.gcs"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +14,8 @@ android {
         applicationId "com.loftedaero.gcs"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -113,6 +113,26 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           ),
           currentA: (f.currentBattery as number) < 0 ? -1 : (f.currentBattery as number) / 100,
           remainingPct: f.batteryRemaining as number,
+          chargeState: (f.chargeState as number | undefined) ?? 0,
+        },
+      ]
+    case 'HOME_POSITION':
+      return [
+        {
+          k: 'home',
+          latDeg: (f.latitude as number) / 1e7,
+          lonDeg: (f.longitude as number) / 1e7,
+          altMslM: (f.altitude as number) / 1000,
+        },
+      ]
+    case 'EXTENDED_SYS_STATE':
+      return [{ k: 'flightState', landed: f.landedState as number, vtol: f.vtolState as number }]
+    case 'FENCE_STATUS':
+      return [
+        {
+          k: 'fence',
+          breached: (f.breachStatus as number) !== 0,
+          breachType: f.breachType as number,
         },
       ]
     case 'GPS_RAW_INT':

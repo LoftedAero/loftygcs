@@ -38,4 +38,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- From Android 11 an app sees only the services it declares; the voice
+         callouts bind to the system's text-to-speech engine. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 </manifest>

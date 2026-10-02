@@ -1,11 +1,15 @@
 # The Android app (experimental)
 
 The Android app is the web app inside [Capacitor](https://capacitorjs.com),
-with one native plugin for the links a WebView cannot open:
-`android/app/src/main/java/com/loftedaero/gcs/LinkPlugin.java` provides TCP,
-UDP and UART links behind the same interface as the desktop app's Electron
-bridge (`src/transport/native-link.ts`). Everything else is the shared web
-build.
+with two native plugins for what a WebView cannot do:
+
+- `LinkPlugin.java` provides TCP, UDP and UART links behind the same interface
+  as the desktop app's Electron bridge (`src/transport/native-link.ts`).
+- `SpeechPlugin.java` speaks the voice callouts through the system's
+  text-to-speech engine (`src/services/voice/speech.ts`), since Android's
+  WebView has no `speechSynthesis`. The beeps are Web Audio and need no plugin.
+
+Everything else is the shared web build.
 
 The first targets are Android handheld ground stations:
 
@@ -82,7 +86,16 @@ cd android
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The app runs full screen and keeps the screen on (`MainActivity.java`).
+The app runs full screen and keeps the screen on (`MainActivity.java`). Its
+version name and code come from `package.json` (`app/build.gradle`): 1.2.3 is
+code 10203, which must grow for Android to install an update.
+
+The launcher icons and launch splash screens are rendered from
+`public/icons/icon.svg` by `npm run icon`, with the desktop icon. The adaptive
+icon's background is the mark's charcoal bezel, so any launcher mask reads as
+the bezel.
+
+CI builds the APK in the manual release run (`docs/releasing.md`).
 
 ## Testing without a vehicle
 

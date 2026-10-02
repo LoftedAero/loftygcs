@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- The mark's dark bezel, so the launcher's mask reads as the bezel
+         whatever shape it cuts (scripts/make-icon.mjs draws the foreground). -->
+    <color name="ic_launcher_background">#2D2D2F</color>
 </resources>

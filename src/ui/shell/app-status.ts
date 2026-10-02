@@ -15,6 +15,8 @@ export type StatusTone = 'ok' | 'warn' | 'bad' | 'idle'
 export interface BarStatus {
   text: string
   tone: StatusTone
+  /** The whole sentence behind a failed connection, which `text` shortens. */
+  detail?: string
 }
 
 export interface VehicleStatusInput {
@@ -31,16 +33,21 @@ export interface VehicleStatusInput {
 /**
  * The status word, or null when idle (the Connect button says enough).
  *
- * A failed connection shows the error text itself, since "connection
- * refused" distinguishes a simulator that is not running from a mistyped
- * port.
+ * A failed connection keeps the error text as `detail`, since "nothing is
+ * listening" distinguishes a simulator that is not running from a mistyped
+ * port; the word itself stays short enough for a handheld's bar.
  */
 export function barStatus(v: VehicleStatusInput): BarStatus | null {
   switch (v.phase) {
     case 'idle':
       return null
     case 'error':
-      return { text: v.error ?? 'Connection failed', tone: 'bad' }
+      if (!v.error) return { text: 'Connection failed', tone: 'bad' }
+      return {
+        text: v.error.startsWith('No heartbeat') ? 'No heartbeat' : 'Connection failed',
+        tone: 'bad',
+        detail: v.error,
+      }
     case 'opening':
       return { text: 'Opening link', tone: 'idle' }
     case 'handshaking':

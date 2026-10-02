@@ -90,10 +90,10 @@ export default function AppStatus() {
         <span
           className={`app-status__state app-status__state--${status.tone}`}
           /* Error text can be long; the row clips it, the tooltip does not. */
-          title={status.text}
+          title={status.detail ?? status.text}
         >
           <span className="app-status__dot" aria-hidden="true" />
-          <span className="app-status__word">{status.text}</span>
+          <span className="app-status__word">{status.detail ?? status.text}</span>
         </span>
       )}
 

@@ -1,4 +1,9 @@
-import { LaButton, LaField, LaHint, LaModal, LaSelect } from '../components/La'
+import { useState } from 'react'
+import { LaButton, LaField, LaHint, LaModal, LaSelect, LaSwitch } from '../components/La'
+import VoiceCalloutsModal from './VoiceCalloutsModal'
+import { REPEAT_CHOICES_S } from '../../services/voice/catalog'
+import { TONES } from '../../services/voice/tones'
+import { announcer } from '../../services/voice/announcer'
 import { BRAND } from '../../brand'
 import { useUiStore } from '../../stores/ui-store'
 import { UI_SCALES, usePreferencesStore, type LayoutChoice } from '../../stores/preferences-store'
@@ -43,6 +48,11 @@ export default function PreferencesModal() {
   const canScale = typeof window !== 'undefined' && !!window.loftgcs
   const themeChoice = useThemeStore((s) => s.choice)
   const setThemeChoice = useThemeStore((s) => s.setChoice)
+  const voice = usePreferencesStore((s) => s.voice)
+  const setVoiceEnabled = usePreferencesStore((s) => s.setVoiceEnabled)
+  const setTone = usePreferencesStore((s) => s.setTone)
+  const setRepeatS = usePreferencesStore((s) => s.setRepeatS)
+  const [calloutsOpen, setCalloutsOpen] = useState(false)
 
   return (
     <LaModal
@@ -148,6 +158,66 @@ export default function PreferencesModal() {
         </LaField>
         {!canScale && <LaHint>Use the browser’s zoom</LaHint>}
       </section>
+
+      <section className="prefs__group">
+        <h3 className="prefs__head">Voice callouts</h3>
+        <LaField label="Sound" htmlFor="pref-voice">
+          <LaSwitch
+            id="pref-voice"
+            label={voice.enabled ? 'On' : 'Off'}
+            checked={voice.enabled}
+            onChange={(e) => setVoiceEnabled(e.target.checked)}
+          />
+        </LaField>
+        {(['info', 'warn'] as const).map((kind) => (
+          <LaField
+            key={kind}
+            label={kind === 'info' ? 'Info beep' : 'Warning beep'}
+            htmlFor={`pref-tone-${kind}`}
+          >
+            <LaSelect
+              id={`pref-tone-${kind}`}
+              value={voice.tones[kind]}
+              onChange={(e) => {
+                setTone(kind, e.target.value)
+                announcer.preview(kind, e.target.value)
+              }}
+            >
+              {TONES[kind].map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </LaSelect>
+          </LaField>
+        ))}
+        <LaField label="Repeat active alerts" htmlFor="pref-repeat">
+          <LaSelect
+            id="pref-repeat"
+            value={String(voice.repeatS)}
+            onChange={(e) => setRepeatS(Number(e.target.value))}
+          >
+            {REPEAT_CHOICES_S.map((s) => (
+              <option key={s} value={s}>
+                {s === 0 ? 'Never' : `Every ${s} s`}
+              </option>
+            ))}
+          </LaSelect>
+        </LaField>
+        <LaField label="Callouts">
+          <div className="prefs__buttons">
+            <LaButton variant="ghost" onClick={() => announcer.test()}>
+              Test
+            </LaButton>
+            <LaButton variant="secondary" onClick={() => setCalloutsOpen(true)}>
+              Configure
+            </LaButton>
+          </div>
+        </LaField>
+      </section>
+      {/* Mounted only while open: its group headings would otherwise sit in the
+          page under every screen. */}
+      {open && calloutsOpen && <VoiceCalloutsModal open onClose={() => setCalloutsOpen(false)} />}
       {/* The footer shows these too, but compact mode has no footer. */}
       <p className="la-card__note prefs__version">
         {BRAND.name} v{__APP_VERSION__}

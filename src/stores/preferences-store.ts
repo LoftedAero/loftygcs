@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 import type { VehicleClass } from '../protocol/modes'
 import {
+  DEFAULT_REPEAT_S,
+  REPEAT_CHOICES_S,
+  calloutDef,
+  isCalloutId,
+  modesOf,
+  type CalloutId,
+  type CalloutMode,
+} from '../services/voice/catalog'
+import { DEFAULT_TONES, TONE_IDS, type ToneChoice } from '../services/voice/tones'
+import {
   DEFAULT_UNITS,
   type DistanceUnit,
   type SpeedUnit,
@@ -38,6 +48,31 @@ export interface Preferences {
    * window size.
    */
   layout: LayoutChoice
+  voice: VoicePrefs
+}
+
+/**
+ * Voice callouts and beeps (services/voice). Only the rows the user changed
+ * are stored; the catalog holds every default, so a new callout needs no
+ * migration.
+ */
+export interface VoicePrefs {
+  /** The master switch: no speech and no beeps when off. */
+  enabled: boolean
+  modes: Partial<Record<CalloutId, CalloutMode>>
+  /** Thresholds, in the catalog's units (SI for distance and speed). */
+  values: Partial<Record<CalloutId, number>>
+  /** How often an alert that is still true is said again, in seconds; 0 never. */
+  repeatS: number
+  tones: ToneChoice
+}
+
+export const DEFAULT_VOICE: VoicePrefs = {
+  enabled: true,
+  modes: {},
+  values: {},
+  repeatS: DEFAULT_REPEAT_S,
+  tones: DEFAULT_TONES,
 }
 
 export type LayoutChoice = 'auto' | 'desktop' | 'compact'
@@ -52,6 +87,7 @@ const DEFAULTS: Preferences = {
   planFor: 'copter',
   uiScale: 1,
   layout: 'auto',
+  voice: DEFAULT_VOICE,
 }
 
 /** Reads the stored preferences, ignoring anything this build does not recognize. */
@@ -65,6 +101,7 @@ function load(): Preferences {
       planFor?: string
       uiScale?: number
       layout?: string
+      voice?: unknown
     }
     if (typeof parsed !== 'object' || parsed === null) return DEFAULTS
     return {
@@ -85,10 +122,48 @@ function load(): Preferences {
         ? (parsed.uiScale as number)
         : DEFAULTS.uiScale,
       layout: valid(parsed.layout, ['auto', 'desktop', 'compact'], DEFAULTS.layout),
+      voice: loadVoice(parsed.voice),
     }
   } catch {
     // Storage unavailable or unparseable: use the defaults.
     return DEFAULTS
+  }
+}
+
+/** Keeps only the rows and values this build knows, within each row's range. */
+export function loadVoice(raw: unknown): VoicePrefs {
+  if (typeof raw !== 'object' || raw === null) return DEFAULT_VOICE
+  const v = raw as Record<string, unknown>
+  const modes: VoicePrefs['modes'] = {}
+  const values: VoicePrefs['values'] = {}
+  if (typeof v.modes === 'object' && v.modes !== null) {
+    for (const [id, mode] of Object.entries(v.modes)) {
+      if (!isCalloutId(id)) continue
+      if (modesOf(calloutDef(id)).includes(mode as CalloutMode)) modes[id] = mode as CalloutMode
+    }
+  }
+  if (typeof v.values === 'object' && v.values !== null) {
+    for (const [id, value] of Object.entries(v.values)) {
+      if (!isCalloutId(id)) continue
+      const t = calloutDef(id).threshold
+      if (t && typeof value === 'number' && value >= t.min && value <= t.max) values[id] = value
+    }
+  }
+  const tones = (typeof v.tones === 'object' && v.tones !== null ? v.tones : {}) as Record<
+    string,
+    unknown
+  >
+  return {
+    enabled: typeof v.enabled === 'boolean' ? v.enabled : DEFAULT_VOICE.enabled,
+    modes,
+    values,
+    repeatS: (REPEAT_CHOICES_S as readonly number[]).includes(v.repeatS as number)
+      ? (v.repeatS as number)
+      : DEFAULT_VOICE.repeatS,
+    tones: {
+      info: valid(tones.info, TONE_IDS.info, DEFAULT_TONES.info),
+      warn: valid(tones.warn, TONE_IDS.warn, DEFAULT_TONES.warn),
+    },
   }
 }
 
@@ -115,6 +190,14 @@ interface PreferencesState extends Preferences {
   setPlanFor(cls: VehicleClass): void
   setUiScale(scale: number): void
   setLayout(layout: LayoutChoice): void
+  setVoiceEnabled(enabled: boolean): void
+  /** Sets one row's mode; the default is stored as no entry. */
+  setCalloutMode(id: CalloutId, mode: CalloutMode): void
+  setCalloutValue(id: CalloutId, value: number): void
+  setRepeatS(seconds: number): void
+  setTone(kind: keyof ToneChoice, id: string): void
+  /** Puts every callout row back to its default, keeping the master switch. */
+  resetCallouts(): void
   /** Restores the defaults. */
   reset(): void
 }
@@ -153,11 +236,62 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
     save(get())
   },
 
+  setVoiceEnabled(enabled) {
+    set({ voice: { ...get().voice, enabled } })
+    save(get())
+  },
+
+  setCalloutMode(id, mode) {
+    const modes = { ...get().voice.modes }
+    if (mode === calloutDef(id).mode) delete modes[id]
+    else modes[id] = mode
+    set({ voice: { ...get().voice, modes } })
+    save(get())
+  },
+
+  setCalloutValue(id, value) {
+    const t = calloutDef(id).threshold
+    if (!t || !Number.isFinite(value)) return
+    const values = { ...get().voice.values }
+    const v = Math.min(t.max, Math.max(t.min, value))
+    if (v === t.default) delete values[id]
+    else values[id] = v
+    set({ voice: { ...get().voice, values } })
+    save(get())
+  },
+
+  setRepeatS(repeatS) {
+    if (!(REPEAT_CHOICES_S as readonly number[]).includes(repeatS)) return
+    set({ voice: { ...get().voice, repeatS } })
+    save(get())
+  },
+
+  setTone(kind, id) {
+    if (!(TONE_IDS[kind] as readonly string[]).includes(id)) return
+    set({ voice: { ...get().voice, tones: { ...get().voice.tones, [kind]: id } } })
+    save(get())
+  },
+
+  resetCallouts() {
+    set({ voice: { ...DEFAULT_VOICE, enabled: get().voice.enabled } })
+    save(get())
+  },
+
   reset() {
     set({ ...DEFAULTS })
     save(DEFAULTS)
   },
 }))
+
+/** A row's effective mode: the user's, else the catalog's. */
+export function calloutMode(voice: VoicePrefs, id: CalloutId): CalloutMode {
+  return voice.modes[id] ?? calloutDef(id).mode
+}
+
+/** A row's effective threshold, in the catalog's units. */
+export function calloutValue(voice: VoicePrefs, id: CalloutId): number {
+  return voice.values[id] ?? calloutDef(id).threshold?.default ?? 0
+}
 
 /** The unit choices, selected so components re-render only when units change. */
 export const useUnits = (): UnitPrefs => usePreferencesStore((s) => s.units)

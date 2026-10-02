@@ -11,7 +11,9 @@
 
 import { compassTicks, tapeTicks, type ArmReadiness, tapeStep } from './hud-draw'
 import {
+  distanceLabel,
   fixed,
+  formatDistance,
   formatSpeed,
   formatVerticalSpeed,
   speedLabel,
@@ -27,6 +29,8 @@ const GROUND_HIGH = '#A67C46'
 const GROUND_LOW = '#4A3520'
 const INK = '#FFFFFF'
 const DIM = 'rgba(255, 255, 255, 0.62)'
+/** The inset's symbology, which must not compete with the main view. */
+const FAINT = 'rgba(255, 255, 255, 0.5)'
 const AMBER = '#F7941D'
 const GREEN = '#35D07F'
 const RED = '#FF453A'
@@ -76,6 +80,11 @@ export interface HudState {
    * symbology (line, ladder, bank scale) and no sky or ground fill.
    */
   videoBehind: boolean
+  /**
+   * The picture-in-picture inset: a faint horizon and bank pointer with speed
+   * and altitude in the bottom corners, in place of every other layer.
+   */
+  mini?: boolean
   /** Areas covered by compact Fly's controls, kept clear (see HudAvoid). */
   avoid?: HudAvoid | null
 }
@@ -138,7 +147,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
 
   // Proportional to the panel, which is resizable.
   const s = Math.min(1.5, Math.max(0.75, Math.min(w, h) / 320))
-  const ribbonH = 24 * s
+  const ribbonH = st.mini ? 0 : 24 * s
   const tapeW = 50 * s
   const gap = 6 * s
   const cx = w / 2
@@ -201,6 +210,39 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
       })
       write(value, x + capW, y, { size })
     }
+  }
+
+  if (st.mini) {
+    // A glance, not an instrument: it must not pull the eye off the main
+    // view, so everything is fainter and the bank scale is only its pointer.
+    if (st.horizon) {
+      paintHorizon(ctx, w, h, 0, cx, cy, pxPerDeg, st, s)
+      paintBankPointer(ctx, cx, cy, Math.min(w, h) * 0.42, st.roll, s)
+      paintAircraft(ctx, cx, cy, s * 0.5)
+    }
+    // Fixed sizes: the inset does not resize, and scaled text would be
+    // too small to read at its size.
+    const edge = 6
+    const base = h - edge
+    const reading = (caption: string, value: string, unit: string, align: 'left' | 'right') => {
+      ctx.save()
+      ctx.font = `500 13px ${MONO}`
+      const valW = ctx.measureText(value).width
+      ctx.font = `500 9px ${SANS}`
+      const capW = ctx.measureText(caption).width + 3
+      const unitW = ctx.measureText(unit).width + 2
+      ctx.restore()
+      const cap = { size: 9, color: DIM, font: SANS, weight: '500' }
+      // Caption, value, unit, laid left to right from x0.
+      const x0 = align === 'left' ? edge : w - edge - capW - valW - unitW
+      write(caption, x0, base, cap)
+      write(value, x0 + capW, base, { size: 13, weight: '500' })
+      write(unit, x0 + capW + valW + 2, base, cap)
+    }
+    const { speed, distance } = st.units
+    reading('AS', formatSpeed(st.airspeedMs, speed), speedLabel(speed), 'left')
+    reading('ALT', formatDistance(st.relAltM, distance), distanceLabel(distance), 'right')
+    return
   }
 
   if (st.horizon) {
@@ -442,8 +484,8 @@ function paintHorizon(
     ctx.fillStyle = g.ground
     ctx.fillRect(-reach, 0, reach * 2, h * 2)
   }
-  ctx.strokeStyle = INK
-  ctx.lineWidth = 1.6 * s
+  ctx.strokeStyle = st.mini ? FAINT : INK
+  ctx.lineWidth = (st.mini ? 1.2 : 1.6) * s
   ctx.beginPath()
   ctx.moveTo(-reach, 0)
   ctx.lineTo(reach, 0)
@@ -456,6 +498,24 @@ function paintHorizon(
   ctx.rect(0, top, w, h - top)
   ctx.clip()
   place()
+
+  if (st.mini) {
+    // Two short unnumbered bars each way, enough to read a climb or a dive.
+    ctx.strokeStyle = FAINT
+    ctx.lineWidth = 1 * s
+    for (const deg of [-20, -10, 10, 20]) {
+      const y = -deg * pxPerDeg
+      const half = (Math.abs(deg) === 10 ? 14 : 9) * s
+      ctx.setLineDash(deg < 0 ? [4 * s, 3 * s] : [])
+      ctx.beginPath()
+      ctx.moveTo(-half, y)
+      ctx.lineTo(half, y)
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+    ctx.restore()
+    return
+  }
 
   // Pitch ladder: finer near the horizon, dashed below it.
   ctx.lineCap = 'butt'
@@ -554,6 +614,34 @@ function paintBank(
   ctx.lineTo(6.5 * s, -r + 13.5 * s)
   ctx.lineTo(5 * s, -r + 17.5 * s)
   ctx.lineTo(-5 * s, -r + 17.5 * s)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+}
+
+/** The inset's bank scale: a zero mark and the moving pointer, nothing else. */
+function paintBankPointer(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  roll: number,
+  s: number,
+) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.strokeStyle = FAINT
+  ctx.lineWidth = 1 * s
+  ctx.beginPath()
+  ctx.moveTo(0, -r - 1 * s)
+  ctx.lineTo(0, -r - 6 * s)
+  ctx.stroke()
+  ctx.rotate(-roll)
+  ctx.fillStyle = AMBER
+  ctx.beginPath()
+  ctx.moveTo(0, -r + 1 * s)
+  ctx.lineTo(-4 * s, -r + 7 * s)
+  ctx.lineTo(4 * s, -r + 7 * s)
   ctx.closePath()
   ctx.fill()
   ctx.restore()

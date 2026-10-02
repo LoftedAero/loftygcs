@@ -71,6 +71,16 @@ export default function CompactStatus() {
             </div>
           )}
         </BarPopover>
+      ) : status.detail ? (
+        // The sentence would push the bar past a handheld's width, so it is
+        // a tap away.
+        <BarPopover
+          className={`compact-status__item app-status__state app-status__state--${status.tone}`}
+          label="Connection"
+          button={chip}
+        >
+          {() => <p className="bar-pop__note bar-pop__detail">{status.detail}</p>}
+        </BarPopover>
       ) : (
         <span
           className={`compact-status__item app-status__state app-status__state--${status.tone}`}

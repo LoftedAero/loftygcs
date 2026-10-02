@@ -169,6 +169,12 @@ export type TelemetryDelta =
       voltageV: number | null
       currentA: number
       remainingPct: number
+      /**
+       * MAV_BATTERY_CHARGE_STATE: 0 undefined, 1 OK, 2 low, 3 critical,
+       * 4 emergency, 5 failed, 6 unhealthy. ArduPilot sets it from the
+       * vehicle's own BATT_LOW/BATT_CRT thresholds.
+       */
+      chargeState: number
     }
   | { k: 'gps'; fixType: number; satellites: number; hdop: number }
   | { k: 'rc'; channels: number[]; rssi: number }
@@ -194,6 +200,18 @@ export type TelemetryDelta =
       /** Meters the vehicle is above (positive) or below its target. */
       altErrorM: number | null
     }
+  /** Where the vehicle will return to, from HOME_POSITION. */
+  | { k: 'home'; latDeg: number; lonDeg: number; altMslM: number }
+  /**
+   * EXTENDED_SYS_STATE. `landed` is MAV_LANDED_STATE: 0 unknown, 1 on the
+   * ground, 2 in the air, 3 taking off, 4 landing. `vtol` is MAV_VTOL_STATE.
+   */
+  | { k: 'flightState'; landed: number; vtol: number }
+  /**
+   * FENCE_STATUS. `breachType` is FENCE_BREACH: 0 none, 1 minimum altitude,
+   * 2 maximum altitude, 3 boundary.
+   */
+  | { k: 'fence'; breached: boolean; breachType: number }
 
 export interface LinkStats {
   /** Packets parsed OK since the last report. */

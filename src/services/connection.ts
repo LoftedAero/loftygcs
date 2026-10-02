@@ -461,8 +461,22 @@ class ConnectionService {
         // Merged: each monitor arrives in its own message.
         p.batteries = {
           ...(p.batteries ?? useVehicleStore.getState().batteries),
-          [d.id]: { voltageV: d.voltageV, currentA: d.currentA, remainingPct: d.remainingPct },
+          [d.id]: {
+            voltageV: d.voltageV,
+            currentA: d.currentA,
+            remainingPct: d.remainingPct,
+            chargeState: d.chargeState,
+          },
         }
+        break
+      case 'home':
+        p.home = { latDeg: d.latDeg, lonDeg: d.lonDeg, altMslM: d.altMslM }
+        break
+      case 'flightState':
+        p.landedState = d.landed
+        break
+      case 'fence':
+        p.fence = { breached: d.breached, breachType: d.breachType }
         break
       case 'gps':
         p.gpsFix = d.fixType
