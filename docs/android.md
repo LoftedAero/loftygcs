@@ -92,8 +92,8 @@ code 10203, which must grow for Android to install an update.
 
 The launcher icons and launch splash screens are rendered from
 `public/icons/icon.svg` by `npm run icon`, with the desktop icon. The adaptive
-icon's background is the mark's charcoal bezel, so any launcher mask reads as
-the bezel.
+icon's background is white (`ic_launcher_background`), so the mark's dark bezel
+stands out on a dark home screen.
 
 CI builds the APK in the manual release run (`docs/releasing.md`).
 
