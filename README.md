@@ -5,7 +5,7 @@ screen-by-screen setup of configurators like Betaflight and INAV together with t
 of Mission Planner: setup and calibration, full parameter management, mission planning, flying,
 and log review.
 
-One TypeScript and React codebase runs two ways:
+One TypeScript and React codebase runs three ways:
 
 - **In the browser** at [gcs.loftedaero.com](https://gcs.loftedaero.com) (Chrome, Edge, Firefox
   151+): nothing to install. Connects to a flight controller over USB with the Web Serial API,
@@ -13,6 +13,9 @@ One TypeScript and React codebase runs two ways:
 - **As a desktop app** (Windows, macOS, Linux, built with Electron): the same interface, plus
   TCP and UDP links for SITL, telemetry radios and Wi-Fi bridges, HUD video, and a managed
   ArduPilot SITL.
+- **As an Android app** (experimental, built with Capacitor) for handheld ground stations such
+  as the RadioMaster AX12: TCP, UDP and the radio's internal serial port, with a compact
+  layout for small screens. See [docs/android.md](docs/android.md).
 
 Status: **preview**. The app is in active development and has not had a stable release.
 
@@ -29,6 +32,11 @@ Status: **preview**. The app is in active development and has not had a stable r
   KML/GPX import and export, and offline map downloads.
 - **Fly**: map and HUD, arming, modes and guided commands, live plots of any telemetry field,
   ADS-B traffic, camera and gimbal control, HUD video over RTSP or RTP, and gamepad control.
+- **Voice callouts**: spoken alerts and two warning beeps for modes, arming, battery, GPS,
+  failsafes and more, each set to voice, beep or off.
+- **Small screens**: a compact layout for handhelds, phones and small windows, used
+  automatically below 800×480.
+- **Slow links**: parameters and missions transfer reliably over radio links such as ELRS.
 - **Data**: log download over MAVFTP, log review with plots, expressions and a 3D replay, a
   MAVFTP file browser, and a MAVLink inspector.
 
@@ -44,6 +52,8 @@ npm run dev:electron   # desktop app against the same dev server
 
 With no flight controller, use ArduPilot SITL: on Windows the desktop app can download and run
 it from the **SITL** tray in the app bar. On macOS and Linux, run ArduPilot's `sim_vehicle.py` and connect over TCP or UDP.
+
+The Android app is built with Gradle; see [docs/android.md](docs/android.md).
 
 ## Development
 
@@ -71,14 +81,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 - `src/protocol/`: the MAVLink core, environment-agnostic (no DOM, React, Electron or Node
   imports). It runs in a Web Worker in the app and in plain Node in the integration tests.
-- `src/transport/`: one `Transport` interface with Web Serial, Electron TCP/UDP and WebSocket
-  backends.
+- `src/transport/`: one `Transport` interface with Web Serial, Electron TCP/UDP, WebSocket and
+  Android native (TCP, UDP, UART) backends.
 - `src/worker/`: the protocol worker and the typed client the UI talks to.
 - `src/services/` and `src/stores/`: connection, parameters, missions, logs and other state.
 - `src/ui/`: React screens. The UI reaches the protocol only through the worker client and the
   stores.
 - `electron/`: the desktop shell. `contextIsolation` and `sandbox` are on, and `preload.ts` is
   the entire privileged surface.
+- `android/`: the Capacitor shell, with native plugins for links and speech.
 - `src/styles/`: `lofted-aero.css` is a vendored design-system stylesheet and is not edited
   here; app styles live in `app.css`, built from its tokens.
 
@@ -92,13 +103,14 @@ subsystem and the ArduPilot behaviors the code depends on.
   how screens are designed and built
 - [docs/screen-review.md](docs/screen-review.md): the checklist for UI changes
 - [docs/hardware-checklist.md](docs/hardware-checklist.md): checks that need real hardware
+- [docs/android.md](docs/android.md): the Android app, building it, and handheld notes
 - [docs/preview-testing.md](docs/preview-testing.md): installing and testing a build
 - [docs/releasing.md](docs/releasing.md): the release process
 
 ## Scope
 
 Lofty GCS is an ArduPilot ground station. PX4 support, multi-vehicle control, telemetry log
-(tlog) recording, RTK/NTRIP injection, voice announcements and antenna tracking are out of scope
+(tlog) recording, RTK/NTRIP injection and antenna tracking are out of scope
 for now.
 
 ## Contributing

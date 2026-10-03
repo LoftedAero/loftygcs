@@ -20,6 +20,8 @@ Builds come in two forms:
 - The web app at <https://gcs.loftedaero.com>, which runs in the browser with
   nothing to install.
 - Desktop installers for Windows, macOS and Linux.
+- An Android app (experimental) for handheld ground stations such as the
+  RadioMaster AX12.
 
 Preview builds are marked with an amber Preview chip next to the version
 number in the bottom right of the window. They are development snapshots and
@@ -29,18 +31,20 @@ project's GitHub Releases page.
 The app does not update itself. To move to a newer build, download and
 install it over the old one.
 
-## Browser or desktop
+## Browser, desktop or Android
 
-|                              | Browser                                 | Desktop app   |
-| ---------------------------- | --------------------------------------- | ------------- |
-| Install needed               | no                                      | yes           |
-| USB flight controller        | yes (Chrome, Edge, Opera, Firefox 151+) | yes           |
-| Firmware flashing over DFU   | Chrome, Edge and Opera only             | yes           |
-| WebSocket telemetry          | yes                                     | yes           |
-| TCP / UDP telemetry          | no                                      | yes           |
-| Built-in ArduPilot simulator | no                                      | yes (Windows) |
-| Video in the HUD             | no                                      | yes           |
-| Missions, parameters, OSD    | yes                                     | yes           |
+|                              | Browser                                 | Desktop app   | Android app |
+| ---------------------------- | --------------------------------------- | ------------- | ----------- |
+| Install needed               | no                                      | yes           | yes         |
+| USB flight controller        | yes (Chrome, Edge, Opera, Firefox 151+) | yes           | no          |
+| Firmware flashing            | yes (DFU in Chrome, Edge, Opera only)   | yes           | no          |
+| WebSocket telemetry          | yes                                     | yes           | yes         |
+| TCP / UDP telemetry          | no                                      | yes           | yes         |
+| The radio's internal serial  | no                                      | no            | yes (AX12)  |
+| Built-in ArduPilot simulator | no                                      | yes (Windows) | no          |
+| Video in the HUD             | no                                      | yes           | no          |
+| Missions, parameters, OSD    | yes                                     | yes           | yes         |
+| Voice callouts               | yes                                     | yes           | yes         |
 
 If you have a flight controller and a USB cable, the browser version is the
 quickest way to start. For the built-in simulator, a network telemetry radio,
@@ -138,6 +142,31 @@ Chromium installed as a snap runs in its own sandbox and may not see serial
 devices. If the browser version cannot list ports but the desktop app can,
 this is the likely cause.
 
+## The Android app
+
+The Android app is experimental. It needs Android 7 or later and is aimed at
+handheld ground stations with a built-in radio link.
+
+1. Download `Lofty-GCS-<version>-android.apk` from the release.
+2. Open it on the device. Android asks you to allow installs from whichever app
+   opened it (the browser or the file manager); allow it, then Install.
+3. To update, install the newer APK over the old one. If Android says the app
+   is not installed because of a conflict, the two builds were signed
+   differently: uninstall the old one first. Uninstalling deletes the app's
+   settings and downloaded maps.
+
+A system update on the RadioMaster AX12 uninstalls the app; install it again
+afterwards.
+
+To connect on the AX12, put the ELRS module and receiver in MAVLink mode, set
+the ELRS Backpack's Telemetry to WiFi, join the `ExpressLRS TX Backpack`
+network on the radio (password `expresslrs`), and connect over UDP, listening
+on port 14550. On a SIYI UniRC 10 Pro, set SIYI's datalink to UDP and connect
+over UDP. [android.md](android.md) has the details for each radio.
+
+On a screen this small the app uses its compact layout. Preferences, opened
+from the logo, can choose the layout and the voice callouts.
+
 ## Where to start
 
 Without hardware:
@@ -191,7 +220,8 @@ When something breaks, include:
 
 - what you were doing, and what you expected to happen
 - the build version (bottom right of the window)
-- your operating system, and whether you used the browser or the desktop app
+- your operating system, and whether you used the browser, the desktop app or
+  the Android app (with the device's model)
 - the vehicle type and firmware version, if hardware was connected
 
 Screenshots help, especially for layout or wording problems.

@@ -20,6 +20,21 @@ board first. Check items off per release.
 - [ ] UDP: a Wi-Fi bridge, or `--out udp:<pc>:14550` from SITL or a vehicle,
       connects with UDP on port 14550.
 
+## Android handheld (AX12)
+
+- [ ] Install the release APK; the launcher shows the Lofty icon and the app
+      opens full screen in the compact layout.
+- [ ] UDP through the ELRS Backpack's WiFi: a heartbeat arrives, parameters
+      download, and a mode change from the bar's mode picker takes effect.
+- [ ] Internal serial (`/dev/ttyS1`): telemetry arrives. Note whether
+      anything sent reaches the aircraft (on the unit tested so far, nothing
+      does).
+- [ ] Voice callouts through the radio's speaker: a mode change is spoken,
+      and Test in Preferences plays the info beep, the warning beep and a
+      voice line in order.
+- [ ] Arm and Takeoff from the command strip (props off): each needs the
+      slide, and the slide withdraws on its own after 10 s.
+
 ## Parameters
 
 - [ ] The full parameter table loads from the board. Note whether it came

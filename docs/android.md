@@ -95,7 +95,11 @@ The launcher icons and launch splash screens are rendered from
 icon's background is white (`ic_launcher_background`), so the mark's dark bezel
 stands out on a dark home screen.
 
-CI builds the APK in the manual release run (`docs/releasing.md`).
+CI builds the APK in the manual release run (`docs/releasing.md`). It is
+signed with the debug key Gradle generates on each fresh runner, so no two
+CI builds share a signature and Android refuses to install one over another:
+updating means uninstalling first, which deletes the app's settings and maps.
+A release key kept as a repository secret would fix that.
 
 ## Testing without a vehicle
 

@@ -39,6 +39,10 @@ Both:
 - [ ] Dark mode is checked by looking at it. Dropdowns, disabled controls and
       anything on a permanently dark background are the usual problems.
 - [ ] Copy is short. A hint says the one thing needed when it is read.
+- [ ] Compact: at 732×412 (the AX12) every setting and action is still
+      reachable, nothing runs past the window, and every control is at least
+      44px on its short side. Choose Compact in Preferences to check it in a
+      large window.
 
 A screen with no difference between the two states still gets both checks;
 confirming there is no difference is the check.

@@ -1,7 +1,8 @@
 # Lofty GCS architecture
 
 Lofty GCS is a cross-platform ArduPilot ground station. One React + TypeScript + Vite
-renderer is shared by a browser PWA and an Electron desktop app. This document records how
+renderer is shared by a browser PWA, an Electron desktop app and an Android app (Capacitor,
+`docs/android.md`). This document records how
 the code is organized and the rules and traps that keep it working. Each rule is stated with
 its reason so it can be argued with; code comments carry the detail for a single file.
 
@@ -13,18 +14,20 @@ Related documents:
   run on a new screen.
 - `docs/screen-review.md`: the per-screen review gate before a preview build.
 - `docs/releasing.md`: the release runbook.
+- `docs/android.md`: the Android shell, its native plugins, and the handheld hardware.
 
 ## Source layout and layering
 
 | Directory       | Role                                                                                                                   |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `src/protocol`  | MAVLink encode/decode, protocol clients (parameters, missions, MAVFTP, bootloaders), pure logic. Environment-agnostic. |
-| `src/transport` | Byte links: Web Serial, WebSocket, and Electron-hosted TCP/UDP.                                                        |
+| `src/transport` | Byte links: Web Serial, WebSocket, Electron-hosted TCP/UDP, and Android native TCP/UDP/UART (`native-link.ts`).        |
 | `src/worker`    | The protocol engine runs in a Web Worker; `worker-client` is the renderer's handle to it.                              |
 | `src/services`  | Operations that combine protocol, transport and browser APIs (connection, flashing, tile cache, terrain, video).       |
 | `src/stores`    | Application state (Zustand stores).                                                                                    |
 | `src/ui`        | React components: `shell/` for the app bar and dialogs, `tabs/` for screens.                                           |
 | `electron/`     | Main process, preload, SITL management, video receiver, serial/USB choosers.                                           |
+| `android/`      | Capacitor shell: `LinkPlugin` (TCP, UDP, UART) and `SpeechPlugin` (text to speech).                                    |
 
 The layering is enforced by ESLint (`import/no-restricted-paths` in `eslint.config.*`):
 

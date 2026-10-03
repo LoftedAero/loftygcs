@@ -1,7 +1,7 @@
 # Lofty GCS: notes for AI coding agents
 
 Cross-platform ArduPilot ground station: one React + TypeScript + Vite renderer shared by a
-browser PWA and an Electron desktop app. GPL-3.0.
+browser PWA, an Electron desktop app and an Android app (Capacitor). GPL-3.0.
 
 ## Read first
 
@@ -12,6 +12,7 @@ browser PWA and an Electron desktop app. GPL-3.0.
   screen.
 - `docs/screen-review.md`: the per-screen review gate.
 - `docs/releasing.md`: the release runbook. Follow it rather than reconstructing the process.
+- `docs/android.md`: the Android app and the handheld hardware (AX12) it targets.
 
 ## Keeping the docs current
 
