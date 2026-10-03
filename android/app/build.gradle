@@ -7,6 +7,19 @@ apply plugin: 'com.android.application'
 def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
 def appVersionCode = appVersion.tokenize('.-')[0..2].collect { it as int }.with { it[0] * 10000 + it[1] * 100 + it[2] }
 
+// The release key (docs/android.md, Signing): from the environment in CI,
+// from keystore.properties on a developer's machine. Every build signed with
+// it can update every other; without it Gradle's own debug key is used, and
+// the APK cannot update one signed with the release key.
+def signing = new Properties()
+def signingFile = rootProject.file('keystore.properties')
+if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
+['storeFile': 'LOFTY_KEYSTORE', 'storePassword': 'LOFTY_KEYSTORE_PASSWORD',
+ 'keyAlias': 'LOFTY_KEY_ALIAS', 'keyPassword': 'LOFTY_KEY_PASSWORD'].each { key, env ->
+    if (System.getenv(env)) signing[key] = System.getenv(env)
+}
+def hasReleaseKey = signing.storeFile && file(signing.storeFile).exists()
+
 android {
     namespace = "com.loftedaero.gcs"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -23,8 +36,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseKey) {
+            lofty {
+                storeFile file(signing.storeFile)
+                storePassword signing.storePassword
+                keyAlias signing.keyAlias
+                keyPassword signing.keyPassword
+            }
+        }
+    }
     buildTypes {
+        debug {
+            if (hasReleaseKey) signingConfig signingConfigs.lofty
+        }
         release {
+            if (hasReleaseKey) signingConfig signingConfigs.lofty
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

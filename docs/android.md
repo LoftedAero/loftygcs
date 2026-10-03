@@ -95,11 +95,29 @@ The launcher icons and launch splash screens are rendered from
 icon's background is white (`ic_launcher_background`), so the mark's dark bezel
 stands out on a dark home screen.
 
-CI builds the APK in the manual release run (`docs/releasing.md`). It is
-signed with the debug key Gradle generates on each fresh runner, so no two
-CI builds share a signature and Android refuses to install one over another:
-updating means uninstalling first, which deletes the app's settings and maps.
-A release key kept as a repository secret would fix that.
+CI builds the APK in the manual release run (`docs/releasing.md`).
+
+## Signing
+
+Android installs an update only if it is signed with the same key as the
+installed app, so every build carries one release key: `lofty-gcs` in
+`lofty-gcs-release.jks` (PKCS12, RSA 4096, valid to 2054, certificate SHA-256
+`E4:9B:E2:E7:...:9A:1A:BA:F7`). Losing it means no installed copy can be
+updated again; each user would have to uninstall, losing settings and maps.
+Keep the keystore and its password backed up outside this machine.
+
+- **CI** reads it from the secrets `ANDROID_KEYSTORE_BASE64` (the keystore,
+  base64) and `ANDROID_KEYSTORE_PASSWORD`, and refuses to build without them.
+- **A developer machine** reads `android/keystore.properties` (`storeFile`,
+  `storePassword`, `keyAlias`, `keyPassword`), which is gitignored. With it,
+  local debug builds are signed with the same key and install over a release
+  APK. Without it Gradle signs with its own debug key, and switching between
+  that and a release APK needs an uninstall.
+- `LOFTY_KEYSTORE`, `LOFTY_KEYSTORE_PASSWORD`, `LOFTY_KEY_ALIAS` and
+  `LOFTY_KEY_PASSWORD` override the file (`app/build.gradle`).
+
+The Play Store would re-sign with its own key, uploaded with this one as the
+upload key.
 
 ## Testing without a vehicle
 

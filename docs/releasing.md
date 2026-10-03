@@ -69,9 +69,9 @@ run on every push in a separate, Linux-only job.
 
 The run creates a draft GitHub release, `v<version>`, and uploads the
 installers, the Android APK (`Lofty-GCS-<version>-android.apk`) and the web zip
-to it. The APK is debug-signed until there is a release key; Android refuses to
-install one build over another signed with a different key, so a tester moving
-between a CI build and one built locally uninstalls first. Review the draft, write the notes, and
+to it. The APK is signed with the release key from the repository's secrets, so
+each one installs over the last; the job fails without the key rather than
+ship an APK that cannot (`docs/android.md`, Signing). Review the draft, write the notes, and
 publish it; publishing creates the tag. Files go to the release rather than to
 workflow artifacts because artifacts count against the account's Actions
 storage quota, which a few installer runs fill.
@@ -161,6 +161,8 @@ Nothing is signed, so:
 - macOS reports the app as damaged; users go to Privacy & Security → Open
   Anyway.
 - Linux does not check.
+- Android is the exception: the APK carries the release key, since Android
+  requires every update to be signed by the same key as the installed app.
 
 An OV certificate (about $200 to $400 a year) removes the Windows warning,
 though a new certificate has to build SmartScreen reputation before it does

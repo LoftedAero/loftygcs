@@ -150,10 +150,8 @@ handheld ground stations with a built-in radio link.
 1. Download `Lofty-GCS-<version>-android.apk` from the release.
 2. Open it on the device. Android asks you to allow installs from whichever app
    opened it (the browser or the file manager); allow it, then Install.
-3. To update, install the newer APK over the old one. If Android says the app
-   is not installed because of a conflict, the two builds were signed
-   differently: uninstall the old one first. Uninstalling deletes the app's
-   settings and downloaded maps.
+3. To update, install the newer APK over the old one. Settings and downloaded
+   maps are kept.
 
 A system update on the RadioMaster AX12 uninstalls the app; install it again
 afterwards.
