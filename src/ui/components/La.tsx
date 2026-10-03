@@ -6,6 +6,7 @@ import type {
   ReactNode,
   SelectHTMLAttributes,
 } from 'react'
+import { createPortal } from 'react-dom'
 
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type BtnSize = 'sm' | 'lg' | 'block'
@@ -183,7 +184,9 @@ export function LaModal({
   const cls = ['la-modal', toast ? 'la-modal--toast' : '', open ? '' : 'hidden']
     .filter(Boolean)
     .join(' ')
-  return (
+  // Portaled to the body, so a dialog opened from a panel or a sheet layers
+  // over everything and stays up when that panel closes.
+  return createPortal(
     <div className={cls}>
       <div
         className={[
@@ -198,6 +201,7 @@ export function LaModal({
         <div className="la-modal__body">{children}</div>
         {actions && <div className="la-modal__actions">{actions}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

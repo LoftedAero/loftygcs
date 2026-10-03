@@ -4,6 +4,7 @@ import { connectionService } from './connection'
 import { useVehicleStore } from '../stores/vehicle-store'
 import { useParamStore } from '../stores/param-store'
 import { modeNumberByName, vehicleClass } from '../protocol/modes'
+import { announce } from './voice/announcer'
 
 /** MAV_RESULT_UNSUPPORTED: this vehicle has no handler for the request. */
 const MAV_RESULT_UNSUPPORTED = 3
@@ -53,17 +54,20 @@ export async function modeReached(customMode: number, timeoutMs = 4000): Promise
 /** Ask for a mode and report whether the vehicle really took it. */
 export async function setModeConfirmed(customMode: number, timeoutMs?: number): Promise<number> {
   const result = await setMode(customMode)
-  if (result !== 0) return result
   // MAV_RESULT_FAILED, which is what a mode the vehicle declined amounts to.
-  return (await modeReached(customMode, timeoutMs)) ? 0 : 4
+  const confirmed = result !== 0 ? result : (await modeReached(customMode, timeoutMs)) ? 0 : 4
+  if (confirmed !== 0) announce({ t: 'mode-refused' })
+  return confirmed
 }
 
-export function arm(force = false): Promise<number> {
-  return connectionService.runCommand(
+export async function arm(force = false): Promise<number> {
+  const result = await connectionService.runCommand(
     MAV_CMD_COMPONENT_ARM_DISARM,
     [1, force ? FORCE_MAGIC : 0, 0, 0, 0, 0, 0],
     5000,
   )
+  if (result !== 0) announce({ t: 'arm-refused' })
+  return result
 }
 
 export function disarm(force = false): Promise<number> {

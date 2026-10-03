@@ -108,6 +108,15 @@ Dark mode is an app-local override because the shared sheet is frozen.
 - A flyout from a scrolling strip must be `position: fixed`, placed from the button's
   `getBoundingClientRect()`, or the `overflow: auto` ancestor clips it. The symptom is an
   element that measures correctly while `elementFromPoint` returns something else.
+- `LaModal` is portaled to `document.body`, so a dialog opened from a floating side panel is
+  not clipped or buried by the panel's stacking context. A click-away that tests containment
+  must count `.la-modal` as inside, since the dialog is no longer inside what opened it. React
+  events still bubble to the component that rendered it.
+- An ancestor with a `transform` (or `filter`) becomes the containing block of a
+  `position: fixed` descendant, so center overlays with margins or grid, not `translate`.
+- Compact panels close on `onOutsidePress` (`ui/components/outside-press.ts`): pointerdown in
+  the capture phase, because Leaflet stops mousedown. A press on the map that closes a panel
+  also swallows the click that follows, or Plan would take it as a new waypoint.
 - A Leaflet popup holding controls must stop click, wheel and keydown propagation. Plan edits
   rebuild the marker layer, so an open popup is reopened after the rebuild.
 
@@ -176,6 +185,53 @@ mechanisms behind them.
   `OSD_TYPE` at 0 disables everything (`osdOff`); replacing it would also remove the Display
   card where `OSD_TYPE` is set.
 
+### Compact Setup
+
+Compact mode (`ui/compact.ts`, `data-compact` on the root) keeps every Setup screen and
+changes how each is laid out. The rules are in the compact block at the end of `app.css`, which
+redefines `--la-appbar-h` so everything placed below the bar follows its shorter height.
+
+- There is no rail. The mode switch's Setup button names the current screen and opens the
+  rail's groups as a panel (`SetupScreenPicker` in `NavRail.tsx`). It has one width for every
+  screen name, and the bar's grid becomes `auto 1fr auto` with the status anchored beside the
+  link, so nothing moves when the screen or the mode changes.
+- Cards lose the title's rule and some padding. A curated row hides its ArduPilot name by
+  collapsing that track of `--app-named-tracks` to zero rather than removing it, so rows built
+  by hand on the same tracks keep their columns.
+- A screen's column is a side panel (`ColumnShell`, `.app-side-panel`) opened by
+  `ColumnToggle`, the same square button at the top-right of the pane's toolbar, or in the
+  corner of Plan's map (`.app-panel-corner`), on every screen. The panel floats over the pane,
+  hanging under the row that holds the button (its top is measured from the button, and never
+  above the app bar), so that row stays usable: the button closes it, and Write beside it stays
+  in reach. On Plan the map's floating controls, which would sit on the panel's top edge, are
+  hidden while it is open. It stays mounted while closed, because
+  its buttons own hidden file inputs and dialogs, and it is `position: fixed` so no screen's
+  grid or scroll container can move it. One panel is open at a time, and leaving the screen
+  closes it.
+- Write moves to the toolbar (`ToolbarWrite`) and the column's own is hidden
+  (`.app-col__primary`). A failed write, or a transfer running in the closed panel (Files),
+  puts a dot on the panel's button (`alert`). Log Review has a panel on each side once a log is
+  open, and keeps its column in place before that. Inspector opens its panel when a message is
+  picked.
+- Plan's side panel holds the plan's actions; Plan writes from there, since a mission write is
+  a transfer with its own status, not a staged parameter. Its items rise from the bottom in a
+  sheet (`BottomSheet`, shared with Fly) opened by an Items handle at the bottom center, which
+  rides on the sheet's top edge to close it, as the side panel's button does; one of the two is
+  open at a time, and the sheet exists only while the mission is being edited. A tap on the map
+  does not close the sheet, so items can be placed with it up. The sheet is a list
+  (`ItemList`) in place of the table; tapping a line or a marker opens that item's editor
+  (`ItemEditor`, open item in `item-editor-store`) in the sheet, laid out across its width,
+  and the map pans the item above the sheet once the sheet has drawn. Changing an item's
+  command goes through `changeCommand` in `mission-store`, shared with the desktop table.
+  While the sheet is up the palette scrolls in the map above it (`has-sheet`).
+- In compact mode every control is at least 44px on its short side (`--app-touch`); a control
+  whose visible size must stay smaller (the inset's hide button) gets the hit area from a
+  `::before`. Controls sharing a row with the side panel's button are its height. The palettes
+  are two columns so every tool, fence Finish included, fits a 412px window.
+- A table too wide for the window keeps what is watched in the row and opens the rest beneath
+  it (Outputs: function and position, then travel). The frame picker is one row of thumbnails
+  that scrolls sideways.
+
 ## Links and messages
 
 ### Link errors (`services/link-error.ts`)
@@ -193,6 +249,44 @@ Do not gate a feature on a MAVLink capability bit. Real flight controllers and A
 report no `MAV_PROTOCOL_CAPABILITY_FTP` while serving MAVFTP. The bits are decoded into
 `vehicle-store` for display only; act on what an operation answers (an ack, a listing, a NAK).
 Likewise, an unrecognized value is not an absent one.
+
+### Telemetry requests (`requestTelemetry` in `protocol/engine.ts`)
+
+ArduPlane (and Rover before 4.7) saves a `REQUEST_DATA_STREAM` into its stream-rate parameters
+(`SRn_*`, renamed `MAVn_*` in 4.7), so a GCS that sends one overwrites rates the user chose for
+the link, such as the reduced ones an ELRS link needs. Copter, Sub, Blimp and Tracker do not
+save it, and Copter's defaults are 0, so the request is what makes it stream at all.
+
+- Vehicles that save it (fixed wing, the VTOL types, rover, boat) get one
+  `SET_MESSAGE_INTERVAL` per message the app displays (`MESSAGE_RATES_HZ`), which is never
+  saved. The rest keep the all-streams request at 4 Hz.
+- If the first interval request is refused or unanswered, the firmware predates it and gets the
+  all-streams request after all.
+- On a link slower than `SLOW_LINK_RTT_MS` the interval rates are halved.
+- `sitl.integration.test.ts` checks that connecting to Plane SITL leaves `SR0_*`/`MAV1_*` at 1.
+
+### Slow links (`protocol/link-timing.ts`)
+
+A radio link can answer in seconds where USB answers in milliseconds: ELRS in MAVLink mode at
+333 Hz carries about 46 messages a second and answers a request in about 0.5 s, at 150 Hz about
+10 messages and 2.5 s. Every request/response client takes its timeout from one `RttEstimator`
+(the TCP method, RFC 6298), with its old constant as a floor so fast links behave as before.
+
+- The estimate comes from TIMESYNC (sent on the first heartbeat, then every 2 s; ArduPilot
+  echoes `ts1`) and from first-attempt replies to commands and parameter writes. A reply to a
+  resend is ambiguous about which send it answers, so it is not sampled.
+- Each retry waits twice as long as the one before, capped at 10 s: on a radio a missed reply is
+  usually queued behind telemetry, not lost. Replies to earlier attempts are accepted (MAVFTP
+  keeps every attempt's sequence number registered until the request settles).
+- A parameter download waits up to 3 s for the first measurement before trying MAVFTP, whose
+  500 ms floor would otherwise give up on a slow link before it was measured.
+- Missing parameters are refetched a few at a time (`REFETCH_WINDOW`), each index on its own
+  timeout, rather than a flood of requests that queues behind telemetry.
+- `slow-link.integration.test.ts` runs parameters and a mission through `SlowLink`
+  (`src/test-fixtures/slow-link.ts`), which models ELRS at 333 Hz: 1.8 kB/s down, latency, loss,
+  and the receiver's 1 kB buffer, reported to ArduPilot in RADIO_STATUS so it throttles its
+  streams as it would on the real link. Measured: Plane's 1,419 parameters in about 64 s and a
+  40-item mission up and back in about 39 s; Copter 74 s and 58 s.
 
 ### Airframe banner (`protocol/airframe.ts`)
 
@@ -288,6 +382,10 @@ faded; the switch changes what clicks mean.
   screen is still enforced. The vehicle half is `MISSION_CLEAR_ALL` (`services/plan-clear.ts`),
   covered for all three types in `sitl.integration.test.ts`. A refused clear leaves the screen
   unchanged.
+- During an upload ArduPilot answers an item it did not ask for with a MISSION_ACK of
+  INVALID_SEQUENCE and keeps waiting for the one it wants. On a slow link that is our resend
+  crossing its next request, so the client ignores that ack during an upload rather than
+  failing the transfer.
 
 ### Geofence (`protocol/geofence.ts`)
 
@@ -348,6 +446,16 @@ the cache and the prefetch only fills gaps.
   terrain loader, and cleared elsewhere.
 - The download's outcome message is composed from the returned `PrefetchProgress`, never from
   the request.
+- A download (`offlineTiles` in `services/tile-math.ts`) covers the view from its own zoom up,
+  and four levels below it a screen the size of the view around its center, so zooming out over
+  the field offline still fills the screen. Each lower level costs about as many tiles as the
+  view.
+- Lower levels are measured at the view's whole zoom (`Math.floor`), since a view zoomed past
+  the imagery's native zoom would otherwise measure a smaller area than it shows.
+- A download asks for persistent storage, since the press is what shows the user wants the maps
+  kept; a browser grants it more readily after a gesture. Android's WebView refuses, but gives a
+  quota of tens of gigabytes. An app update that reinstalls the app (the AX12's OTA did) deletes
+  the stored maps with the rest of its data.
 
 ### Terrain (`services/terrain.ts`, `services/mission-terrain.ts`)
 
@@ -406,9 +514,55 @@ the capped panel fills it, except on a short window (grid under 740px tall), whe
 falls below the floor and the column follows the drag. The switch keys on height, because the
 cap moves with the column width. Context menus place themselves by their measured size.
 
+### Compact layout (`CompactFlight` in `FlightTab.tsx`)
+
+After QGroundControl's Fly view: the map or the video (with the HUD) fills the window and the
+other sits in a picture-in-picture inset; a tap on the inset swaps them. It shares
+`aspectPanel` with the desktop layout, whose pinned panel is the inset.
+
+- The app bar's readings (`ui/shell/CompactStatus.tsx`) each open a panel (`BarPopover`) with
+  the detail: preflight, mode picker, battery, GPS, messages, and the link with Disconnect. Each
+  reading has a fixed slot (`--app-cbar-*`), so a changing value moves nothing. A mode is
+  changed with one tap in the picker, as on the desktop; the mode picker and Arm share
+  `useModeChange` and `useFlightActions` with the desktop controls. The logo opens Preferences,
+  which holds the theme. A failed connection is one short phrase ("No heartbeat", "Connection
+  failed") whose panel holds the sentence, which in the bar pushed it past the window.
+- There is no actions column. `CommandStrip`, over the bottom center, holds Arm or Disarm and
+  Takeoff; everything else is a mode, picked from the bar. Takeoff sits beside Disarm, outside
+  the row's centered width so Disarm never moves, from arming until the vehicle has climbed 2 m
+  (`AIRBORNE_M`, latched until disarm), so it is never offered to something already flying.
+  Each is confirmed by `SlideConfirm`, which withdraws when its command stops applying, and
+  after 10 s. A refused arm puts up a force-arm slider in the same place, never a one-tap
+  button.
+- `SlideConfirm` follows one pointer: a second finger is ignored, a `pointercancel` (the
+  system taking the gesture) resets the knob rather than confirming, the 10 s timeout waits
+  while a finger is on the knob, and unmounting mid-drag detaches its listeners so it can never
+  confirm afterwards.
+- Everything else (`FlightSheet`) rises from the bottom in a sheet, as Plan's items do
+  (`BottomSheet`): its sections are whole panes, wider than they are tall. One section shows at
+  a time (Controls, Camera, Video, Joystick, Status, View). Messages and Preflight are left out
+  because the bar's items open them. The command row is on the handle's row and rides up with
+  the sheet, so Disarm stays in reach; the handle sits to the right, since Arm has the middle.
+  It is a caret alone on a dark wash, like the inset's buttons, named for assistive technology
+  by the section it opens on.
+- The sheet's body scrolls. Its sections keep their height (`flex-shrink: 0`): the controls
+  clip their own overflow, so as a shrinking flex item they were cut off with nothing to
+  scroll.
+- The HUD's layers are switched from its context menu, which a long press opens on a touch
+  screen; its HUD video item opens the sheet's Video section. The inset draws its own reduced
+  HUD (`HudState.mini`), whatever the layers say: a faint horizon and short pitch bars, a bank
+  pointer without its scale, and airspeed and altitude in the bottom corners, with no horizon
+  while video plays. It is a glance, so nothing in it competes with the main view. The
+  full-screen HUD draws no overlay while the sheet is up, since its readings would lie half
+  under the sheet. Over the full-screen HUD, the
+  inset (or the button that shows it again), the sheet's handle and the command row are
+  measured and passed as `HudState.avoid`. Each side column's readings stack under the top line
+  when its bottom corner is covered (the inset on the left, the handle on the right), the tape
+  fitting between, and the center chips move clear of the inset and above the row.
+
 ### Lower pane (`LOG_PANES` in `stores/flight-layout-store.ts`)
 
-Messages, Status, Preflight, Camera and Joystick are tabs of one pane. A pane is mounted only
+Messages, Status, Preflight, Camera, Joystick, Video and View are tabs of one pane. A pane is mounted only
 while showing, so anything that must outlive it (the joystick read loop) lives in the app. A
 saved pane name is validated on load.
 
@@ -523,6 +677,49 @@ Windows.Gaming.Input, which is undocumented for this and untested. Reading them 
 in the main process would settle it. In a browser, losing focus releases control; a hidden page
 releases in both.
 
+## Voice callouts (`services/voice/`)
+
+Spoken callouts and two beeps, after Yaapu Telemetry and QGroundControl. Every row in
+`catalog.ts` is voice, a beep, or off; its default was chosen by the project's owner, and
+Preferences stores only the rows changed from it, so a new callout needs no migration. A beep
+is for what the screen already explains (a refused arm), a voice callout for what a pilot needs
+without looking.
+
+- **The rules** (`rules.ts`) are pure logic over snapshots and an injected clock, so each is
+  unit-tested without a vehicle. They say crossings, never running values: battery steps only
+  go down, and a battery state is said only when it gets worse than what was last said. A
+  mode is said once it has held for 0.5 s. Alerts still true repeat at the user's interval,
+  only while flying. The first `SETTLE_MS` after connecting are taken as found.
+- **PreArm.** ArduPilot repeats each failing check every 30 s while disarmed; those go only to
+  their own row (off by default). A refused arm says the reason from the `Arm:` message that
+  arrives just before the ack, so the announcer reads the message feed before the event.
+- **GPS 3D fix** is said from a reported no-fix (fix type 1 or 2), never from 0, which is also
+  what a vehicle looks like before its first GPS report; on a slow link that report comes many
+  seconds after the heartbeat, behind the parameter download. The SITL runner boots a fresh
+  simulator for every connection, so there the callout on connecting is real.
+- **Battery state** comes from BATTERY_STATUS's `charge_state`, which ArduPilot sets from the
+  vehicle's own BATT_LOW/BATT_CRT thresholds, but only evaluates while armed (measured on
+  Copter SITL 4.7: charge state stays OK on the ground with BATT_LOW_VOLT above the pack). The
+  vehicle's own "Battery 1 is low" message is not said a second time.
+- **The queue** (`queue.ts`) plays one sound at a time. Critical interrupts anything less,
+  warnings go ahead of information, and an item that has waited too long (5 s for
+  information) is dropped rather than said late.
+- **Speech.** The desktop app and the web app use `speechSynthesis`; Electron on Windows has
+  local voices, so it works with no network. Android's WebView has no `speechSynthesis` at all,
+  so the Android app speaks through `SpeechPlugin.java` (the system engine, as navigation
+  guidance so other audio ducks). It waits for the engine to bind, which QGroundControl 5.1
+  did not, and Android 11 and later need the `TTS_SERVICE` query in the manifest.
+- **Beeps** (`tones.ts`) are synthesized with Web Audio everywhere, after cockpit sounds and
+  the FAA's guidance for flight-deck aural alerts (AC 25.1322-1): one tone for caution and one
+  for warning, 200-4500 Hz, soft onsets. The AX12's WebView starts an AudioContext without a
+  tap.
+- **Telemetry it needs:** HOME_POSITION, EXTENDED_SYS_STATE (landed state) and FENCE_STATUS,
+  requested by SET_MESSAGE_INTERVAL from every vehicle (after the all-streams request on
+  Copter), except from firmware that refused the interval request.
+- **Testing in the running app:** hook `speechSynthesis.speak` and `AudioContext` in the main
+  world (`webContents.executeJavaScript`; `page.evaluate` runs in an isolated world) to log
+  each phrase and oscillator, muted.
+
 ## Video (`services/video.ts`, `electron/video/`)
 
 The desktop app receives H.264 over RTSP or raw RTP/UDP in the main process.
@@ -557,6 +754,18 @@ fallback). Traps:
 - Sides are walked in order and the step only counts up, so the requested side shows how far
   the run has got.
 
+### OSD grid (`ui/tabs/osd/osd-layout.ts`)
+
+Over MSP DisplayPort, ArduPilot does not clip to `OSDn_TXT_RES`. It writes each panel at its
+stored column and row, and the goggles draw what lands on their own canvas, whose size the
+vehicle never learns; positions accept columns 0-59 and rows 0-21 whatever the setting says.
+A layout made for DJI O3 or Walksnail goggles (53x20, which `TXT_RES` has no value for) often
+leaves `TXT_RES` at 0 and works. So `editorGrid` draws the smallest canvas (30x16, 50x18,
+53x20, 60x22) that holds every enabled panel, never smaller than the declared grid, and
+outlines the declared one. It fits both the staged and the stored placements, so moving a
+panel inward does not shrink the canvas under the finger. Only an analog OSD, which really is 30x16, reports panels outside
+the grid and offers to bring them back.
+
 ## MAVFTP, files and logs
 
 ### Reading (`protocol/ftp/mavftp.ts`)
@@ -573,6 +782,11 @@ sequential.
   TerminateSession ack arrives only after the burst in flight (~0.6 s), which is also why the
   next request after a cancel waits about that long. A canceled read never falls back to
   sequential reads and ends quietly.
+- ArduPilot paces a burst by its serial port's baud, not the radio's air rate. Behind ELRS
+  (460800 baud, about 1.8 kB/s on air) the receiver's buffer overflows and each burst loses all
+  but its first few packets, which made a 15 kB `param.pck` take four minutes. Two short bursts
+  in a row (`WEAK_BURST_BYTES`) switch the read to sequential requests, resuming where the
+  bursts left off.
 
 ### Writing (`services/vehicle-files.ts`)
 
@@ -784,6 +998,10 @@ Behavior to know:
     two packets. `avdec_h264` conceals truncated slices unless `output-corrupt=false` is set.
   - The size assertions are calibrated against measured values. If one fails, check the
     fixture before the client.
+- `slow-link.integration.test.ts` (part of `SITL=1`) runs parameters and a mission through an
+  ELRS-like link; see [Slow links](#slow-links-protocollink-timingts). It takes about two minutes.
+- `electron/sitl-core.test.ts` launches its own simulator on port 5760, so run it with no other
+  SITL on that port.
 - `LOG_SWEEP=<dir> npx vitest run log-sweep.test.ts` runs the log pipeline over a directory of
   real logs.
 - Test fakes should be strict. The MAVLink encoder accepts any field name, so a fake that

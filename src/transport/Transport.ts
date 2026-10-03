@@ -2,7 +2,7 @@
 // Betaflight Configurator uses). Transports move bytes and know nothing about
 // MAVLink.
 
-export type TransportKind = 'serial' | 'tcp' | 'udp' | 'ws'
+export type TransportKind = 'serial' | 'tcp' | 'udp' | 'ws' | 'uart'
 
 export type TransportOptions =
   /**
@@ -14,6 +14,8 @@ export type TransportOptions =
   | { kind: 'tcp'; host: string; port: number }
   | { kind: 'udp'; localPort: number; host?: string; port?: number }
   | { kind: 'ws'; url: string }
+  /** A device's own UART, such as the AX12's internal ELRS port (Android app). */
+  | { kind: 'uart'; path: string; baudRate: number }
 
 export interface Transport {
   readonly kind: TransportKind

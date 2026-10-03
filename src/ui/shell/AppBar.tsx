@@ -4,32 +4,59 @@ import { useConnectionStore } from '../../stores/connection-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
 import AppStatus from './AppStatus'
+import CompactStatus, { CompactLink } from './CompactStatus'
+import { SetupScreenPicker } from './NavRail'
 import JoystickChip from './JoystickChip'
 import ParamProgress from './ParamProgress'
 import SimTray from './SimTray'
 import ThemeToggle from './ThemeToggle'
-import { hasIpLinks } from '../../env'
+import { hasIpLinks, hasUart, isNativeApp } from '../../env'
+import { useCompact } from '../compact'
 import type { TransportKind } from '../../transport/Transport'
 
 // Top-level mode switch. Not orange: Connect is the bar's one primary action.
 // The active segment inverts to a light surface instead.
-function ModeSwitch() {
+/** In compact mode, Setup's button also picks the screen (see SetupScreenPicker). */
+function ModeSwitch({ compact = false }: { compact?: boolean }) {
   const mode = useUiStore((s) => s.mode)
   const setMode = useUiStore((s) => s.setMode)
   return (
     <div className="app-modes" role="tablist" aria-label="Mode">
-      {MODES.map((m) => (
-        <button
-          key={m.id}
-          role="tab"
-          aria-selected={m.id === mode}
-          className={m.id === mode ? 'app-modes__item app-modes__item--active' : 'app-modes__item'}
-          onClick={() => setMode(m.id)}
-        >
-          {m.label}
-        </button>
-      ))}
+      {MODES.map((m) =>
+        compact && m.id === 'setup' && mode === 'setup' ? (
+          <SetupScreenPicker key={m.id} />
+        ) : (
+          <button
+            key={m.id}
+            role="tab"
+            aria-selected={m.id === mode}
+            className={
+              m.id === mode ? 'app-modes__item app-modes__item--active' : 'app-modes__item'
+            }
+            onClick={() => setMode(m.id)}
+          >
+            {m.label}
+          </button>
+        ),
+      )}
     </div>
+  )
+}
+
+/** The connection types this build can open. */
+export function ConnectionKindOptions() {
+  const ipLinks = hasIpLinks()
+  return (
+    <>
+      {/* The Android WebView has no Web Serial. */}
+      {!isNativeApp() && <option value="serial">USB serial</option>}
+      {hasUart() && <option value="uart">Internal serial</option>}
+      {/* A browser cannot open raw sockets, so TCP and UDP are desktop
+        only. WebSocket is the browser's route to the same targets. */}
+      {ipLinks && <option value="tcp">TCP</option>}
+      {ipLinks && <option value="udp">UDP</option>}
+      <option value="ws">WebSocket</option>
+    </>
   )
 }
 
@@ -39,7 +66,7 @@ function ModeSwitch() {
 export default function AppBar() {
   const phase = useConnectionStore((s) => s.phase)
   const selectedKind = useConnectionStore((s) => s.selectedKind)
-  const ipLinks = hasIpLinks()
+  const compact = useCompact()
   const setSelectedKind = useConnectionStore((s) => s.setSelectedKind)
   const setConnectModalOpen = useUiStore((s) => s.setConnectModalOpen)
   const setPreferencesOpen = useUiStore((s) => s.setPreferencesOpen)
@@ -58,6 +85,37 @@ export default function AppBar() {
     }
   }
 
+  // Compact mode's bar, after QGroundControl's: the logo opens Preferences
+  // (theme included), the readings open their detail, and one control shows
+  // the link. The SITL tray is desktop-sized; the Layout preference restores
+  // it.
+  if (compact) {
+    return (
+      <header className="la-appbar">
+        <div className="app-bar__band">
+          <button
+            type="button"
+            className="app-bar__logo-btn"
+            aria-label="Preferences"
+            title="Preferences"
+            onClick={() => setPreferencesOpen(true)}
+          >
+            <img className="la-appbar__logo la-appbar__logo--badge" src={BRAND.iconPath} alt="" />
+          </button>
+          <ModeSwitch compact />
+        </div>
+        <div className="app-bar__band app-bar__band--center">
+          <CompactStatus />
+          <JoystickChip />
+        </div>
+        <ParamProgress />
+        <div className="app-bar__band app-bar__band--right">
+          <CompactLink />
+        </div>
+      </header>
+    )
+  }
+
   return (
     // A three-track grid (`1fr auto 1fr`) centers the status on the window
     // rather than between the two side groups, which differ in width.
@@ -74,7 +132,8 @@ export default function AppBar() {
         />
         <span className="la-appbar__title">{BRAND.name}</span>
         <ModeSwitch />
-        <SimTray />
+        {/* SITL runs on a desktop; the Android app cannot start it. */}
+        {!isNativeApp() && <SimTray />}
         <button
           type="button"
           className="app-theme-toggle"
@@ -103,12 +162,7 @@ export default function AppBar() {
           onChange={(e) => setSelectedKind(e.target.value as TransportKind)}
           title="Connection type"
         >
-          <option value="serial">USB serial</option>
-          {/* A browser cannot open raw sockets, so TCP and UDP are desktop
-            only. WebSocket is the browser's route to the same targets. */}
-          {ipLinks && <option value="tcp">TCP</option>}
-          {ipLinks && <option value="udp">UDP</option>}
-          <option value="ws">WebSocket</option>
+          <ConnectionKindOptions />
         </LaSelect>
         <LaButton variant="primary" disabled={linked} onClick={connect}>
           Connect

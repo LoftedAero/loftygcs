@@ -25,6 +25,7 @@ export default function MissionTable() {
   const selected = useMissionStore((s) => s.selected)
   const select = useMissionStore((s) => s.select)
   const update = useMissionStore((s) => s.updateItem)
+  const changeCommand = useMissionStore((s) => s.changeCommand)
   const remove = useMissionStore((s) => s.removeItem)
   const move = useMissionStore((s) => s.moveItem)
   const addAfter = useMissionStore((s) => s.addItemAfter)
@@ -123,6 +124,7 @@ export default function MissionTable() {
               selected={selected === it.uid}
               onSelect={() => select(it.uid)}
               onChange={(patch) => update(it.uid, patch)}
+              onCommand={(command) => changeCommand(it.uid, command)}
               onRemove={() => remove(it.uid)}
               onMove={(to) => move(it.uid, to)}
             />
@@ -143,6 +145,7 @@ function Row({
   selected,
   onSelect,
   onChange,
+  onCommand,
   onRemove,
   onMove,
 }: {
@@ -155,6 +158,7 @@ function Row({
   selected: boolean
   onSelect: () => void
   onChange: (patch: Partial<Omit<PlanItem, 'uid'>>) => void
+  onCommand: (command: number) => void
   onRemove: () => void
   onMove: (to: number) => void
 }) {
@@ -177,7 +181,7 @@ function Row({
         <LaSelect
           aria-label={`Item ${seq} command`}
           value={item.command}
-          onChange={(e) => onChange(commandChange(Number(e.target.value)))}
+          onChange={(e) => onCommand(Number(e.target.value))}
         >
           {/* An unknown command keeps its own entry. */}
           {!spec && <option value={item.command}>{commandLabel(item.command)}</option>}
@@ -304,24 +308,6 @@ function Row({
       </td>
     </tr>
   )
-}
-
-/**
- * Changing a row's command clears the parameters, which mean different
- * things per command (a hold time of 15 would become 15 loiter turns).
- * Position is kept.
- */
-function commandChange(command: number): Partial<Omit<PlanItem, 'uid'>> {
-  const spec = commandSpec(command)
-  return {
-    command,
-    param1: 0,
-    param2: 0,
-    param3: 0,
-    param4: 0,
-    ...(spec && !spec.location ? { x: 0, y: 0 } : {}),
-    ...(spec?.altitude === false ? { z: 0 } : {}),
-  }
 }
 
 function round(v: number): number {

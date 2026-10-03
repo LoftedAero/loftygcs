@@ -6,8 +6,8 @@
 #    so it must run for pull requests from forks too; those runs get no
 #    secrets.
 #
-#  - release, build and web: a draft GitHub release holding the three-platform
-#    installers and the web zip, and the web app's deploy to Cloudflare
+#  - release, build, android and web: a draft GitHub release holding the
+#    three-platform installers, the Android APK and the web zip, and the web app's deploy to Cloudflare
 #    Pages, by hand ONLY. A release is one run. macOS
 #    bills at 10x and Windows 2x while this repo is private, so a matrix that
 #    fires on its own is a bill for a commit that edited a comment. Note the
@@ -103,6 +103,39 @@ jobs:
         run: |
           v=$(node -p "require('./package.json').version")
           gh release upload "v$v" ${{ matrix.files }} --clobber
+
+  android:
+    # The Android app, debug-signed until there is a release key to sign
+    # with. Same manual trigger as the installers.
+    if: github.event_name == 'workflow_dispatch' && inputs.installers
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run build:web
+      - run: npx cap sync android
+      # The runner's Android SDK is found through ANDROID_HOME; Gradle fetches
+      # any platform it lacks.
+      - run: ./gradlew assembleDebug
+        working-directory: android
+      - name: Upload to the draft release
+        run: |
+          v=$(node -p "require('./package.json').version")
+          cp android/app/build/outputs/apk/debug/app-debug.apk "Lofty-GCS-$v-android.apk"
+          gh release upload "v$v" "Lofty-GCS-$v-android.apk" --clobber
 
   web:
     # The web app ships with the installers: same manual trigger, same commit.

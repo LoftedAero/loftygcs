@@ -15,9 +15,14 @@ import GeoExchange from './GeoExchange'
 import ItemPalette from './ItemPalette'
 import FencePalette from './FencePalette'
 import AltitudeProfile from './AltitudeProfile'
+import ItemEditor, { ItemList } from './ItemEditor'
+import { useItemEditor } from '../../../stores/item-editor-store'
 import Divider from '../../components/Divider'
 import { LaButton, LaModal, LaSwitch } from '../../components/La'
 import { useMissionStore } from '../../../stores/mission-store'
+import { useCompact } from '../../compact'
+import ColumnShell, { ColumnToggle, closeColumn, useColumnOpen } from '../../components/ColumnShell'
+import BottomSheet from '../../components/BottomSheet'
 
 // Mission planning: Mission Planner's shape with QGroundControl's ideas
 // where they are better.
@@ -54,6 +59,180 @@ export default function MissionTab() {
   const setSplit = useMissionStore((s) => s.setSplit)
 
   const profileVisible = showProfile && items > 0
+  const compact = useCompact()
+  // Compact mode: the item sheet that rises from the bottom, whether it shows
+  // the profile, and the side panel with the plan's actions. One of the two
+  // is open at a time.
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [compactProfile, setCompactProfile] = useState(false)
+  const editorUid = useItemEditor((s) => s.uid)
+  const closeEditor = useItemEditor((s) => s.close)
+  const panelOpen = useColumnOpen()
+  // Tapping an item opens the sheet on its editor; closing the sheet ends the
+  // edit.
+  useEffect(() => {
+    if (editorUid) setSheetOpen(true)
+  }, [editorUid])
+  useEffect(() => {
+    if (sheetOpen) closeColumn()
+    else closeEditor()
+  }, [sheetOpen, closeEditor])
+  useEffect(() => {
+    if (panelOpen) setSheetOpen(false)
+  }, [panelOpen])
+  useEffect(() => closeEditor, [closeEditor])
+  // The items are the mission's: the fence and rally lists are in the panel.
+  useEffect(() => {
+    if (editing !== 'mission') setSheetOpen(false)
+  }, [editing])
+
+  const mapArea = (
+    <div className="mission-map-area">
+      {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
+      {/* The same strip for the fence tools. */}
+      {editing === 'fence' && <FencePalette />}
+      <MissionMap
+        tool={tool}
+        onPlaced={() => setTool(null)}
+        onFirstItem={setFirstAt}
+        onView={setView}
+        coverage={coverage}
+      />
+    </div>
+  )
+
+  const lower = (
+    <div className="mission-lower">
+      <div className="mission-lower__head">
+        <h3 className="mission-lower__title">
+          Items {items > 0 && <span className="mission-lower__count">{items}</span>}
+        </h3>
+        {/* Beside the rows they apply to. Shown on every plan; the
+            altitude also applies to new rally points. */}
+        <NewItemDefaults />
+        <span className="la-grow" />
+        {items > 0 && <TerrainWarning />}
+        <span className="la-grow" />
+        {items > 0 && (
+          <LaSwitch
+            label="Show altitude profile"
+            checked={showProfile}
+            onChange={(e) => setShowProfile(e.target.checked)}
+          />
+        )}
+      </div>
+      {profileVisible && <AltitudeProfile />}
+      <MissionTable />
+    </div>
+  )
+
+  const sideContent = (
+    <>
+      {/* Everything that belongs to a plan scrolls. */}
+      <div className="app-col mission-side__scroll">
+        <PlanKindSwitch />
+        {/* Read, write and clear, shared by all three plans. */}
+        <PlanActions />
+        {/* Files apply to whichever plan is selected. */}
+        <GeoExchange />
+        {editing === 'mission' && (
+          <>
+            <SurveyPanel />
+            <MissionSettings />
+          </>
+        )}
+        {/* Lists come last because they are the only sections that grow. */}
+        {editing === 'fence' && <FencePanel />}
+        {editing === 'rally' && <RallyPanel />}
+      </div>
+
+      {/* Pinned to the foot: offline maps are not about the plan, so they
+          stay put when the plan switch changes the column above. */}
+      <div className="mission-side__foot">
+        <OfflineMapsPanel
+          bounds={view?.bounds ?? null}
+          zoom={view?.zoom ?? 15}
+          coverage={coverage}
+          onCoverage={setCoverage}
+        />
+      </div>
+    </>
+  )
+  const side = <aside className="app-col-shell mission-side">{sideContent}</aside>
+
+  const firstPrompt = (
+    <FirstItemPrompt
+      at={firstAt}
+      onClose={() => setFirstAt(null)}
+      onWaypoint={(at) => {
+        addItem(16, at)
+        setFirstAt(null)
+      }}
+      onTakeoff={(at) => {
+        // Takeoff first, then a waypoint at the point that was clicked.
+        addItem(22)
+        addItem(16, at)
+        setFirstAt(null)
+      }}
+    />
+  )
+
+  // Compact mode: the map fills the window; the plan's actions are the side
+  // panel, and the items rise from the bottom in a sheet.
+  if (compact) {
+    return (
+      <div
+        className={`mission-screen mission-compact${panelOpen ? ' has-panel' : ''}${
+          sheetOpen && editing === 'mission' ? ' has-sheet' : ''
+        }`}
+      >
+        {mapArea}
+        {/* The screen's side panel, as on every screen with a column: the
+            plan's actions. */}
+        <div className="app-panel-corner">
+          <ColumnToggle label="Plan panel" />
+        </div>
+        <ColumnShell base="app-col-shell mission-panel">
+          <div className="mission-side">{sideContent}</div>
+        </ColumnShell>
+        {/* The items rise from the bottom, where the route stays in view
+            above them; the handle rides on the sheet's top edge. */}
+        {editing === 'mission' && (
+          <BottomSheet
+            id="plan-sheet-body"
+            className="plan-sheet"
+            label={items > 0 ? `Items · ${items}` : 'Items'}
+            open={sheetOpen}
+            onOpen={setSheetOpen}
+          >
+            {editorUid ? (
+              <ItemEditor />
+            ) : (
+              <div className="mission-lower">
+                <div className="mission-lower__head">
+                  <NewItemDefaults />
+                  <span className="la-grow" />
+                  {/* In the header, as on the desktop, so the list below
+                        does not move when terrain loads. */}
+                  {items > 0 && <TerrainWarning />}
+                  {items > 0 && (
+                    <LaSwitch
+                      label="Profile"
+                      checked={compactProfile}
+                      onChange={(e) => setCompactProfile(e.target.checked)}
+                    />
+                  )}
+                </div>
+                {compactProfile && items > 0 && <AltitudeProfile />}
+                <ItemList />
+              </div>
+            )}
+          </BottomSheet>
+        )}
+        {firstPrompt}
+      </div>
+    )
+  }
 
   return (
     <div className="mission-screen">
@@ -68,18 +247,7 @@ export default function MissionTab() {
             } as React.CSSProperties
           }
         >
-          <div className="mission-map-area">
-            {editing === 'mission' && <ItemPalette tool={tool} onTool={setTool} />}
-            {/* The same strip for the fence tools. */}
-            {editing === 'fence' && <FencePalette />}
-            <MissionMap
-              tool={tool}
-              onPlaced={() => setTool(null)}
-              onFirstItem={setFirstAt}
-              onView={setView}
-              coverage={coverage}
-            />
-          </div>
+          {mapArea}
 
           {/* No divider on an empty plan, so no split is stored against an
               empty table. */}
@@ -92,76 +260,13 @@ export default function MissionTab() {
             />
           )}
 
-          <div className="mission-lower">
-            <div className="mission-lower__head">
-              <h3 className="mission-lower__title">
-                Items {items > 0 && <span className="mission-lower__count">{items}</span>}
-              </h3>
-              {/* Beside the rows they apply to. Shown on every plan; the
-                  altitude also applies to new rally points. */}
-              <NewItemDefaults />
-              <span className="la-grow" />
-              {items > 0 && <TerrainWarning />}
-              <span className="la-grow" />
-              {items > 0 && (
-                <LaSwitch
-                  label="Show altitude profile"
-                  checked={showProfile}
-                  onChange={(e) => setShowProfile(e.target.checked)}
-                />
-              )}
-            </div>
-            {profileVisible && <AltitudeProfile />}
-            <MissionTable />
-          </div>
+          {lower}
         </div>
 
-        <aside className="app-col-shell mission-side">
-          {/* Everything that belongs to a plan scrolls. */}
-          <div className="app-col mission-side__scroll">
-            <PlanKindSwitch />
-            {/* Read, write and clear, shared by all three plans. */}
-            <PlanActions />
-            {/* Files apply to whichever plan is selected. */}
-            <GeoExchange />
-            {editing === 'mission' && (
-              <>
-                <SurveyPanel />
-                <MissionSettings />
-              </>
-            )}
-            {/* Lists come last because they are the only sections that grow. */}
-            {editing === 'fence' && <FencePanel />}
-            {editing === 'rally' && <RallyPanel />}
-          </div>
-
-          {/* Pinned to the foot: offline maps are not about the plan, so they
-              stay put when the plan switch changes the column above. */}
-          <div className="mission-side__foot">
-            <OfflineMapsPanel
-              bounds={view?.bounds ?? null}
-              zoom={view?.zoom ?? 15}
-              coverage={coverage}
-              onCoverage={setCoverage}
-            />
-          </div>
-        </aside>
+        {side}
       </div>
 
-      <FirstItemPrompt
-        at={firstAt}
-        onClose={() => setFirstAt(null)}
-        onWaypoint={(at) => {
-          addItem(16, at)
-          setFirstAt(null)
-        }}
-        onTakeoff={(at) => {
-          // Takeoff first, then a waypoint at the point that was clicked.
-          addItem(22)
-          addItem(16, at)
-          setFirstAt(null)
-        }}
-      />
+      {firstPrompt}
     </div>
   )
 }

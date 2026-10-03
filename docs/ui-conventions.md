@@ -407,6 +407,105 @@ frame, header band, row rule, row metrics and monospace identifier column. A
 table declares only its `grid-template-columns`. The header reuses
 `.la-card__subtitle`'s type settings rather than defining its own.
 
+## Sound
+
+### Speak what is needed without looking; beep for what the screen explains
+
+A voice callout is for something a pilot must know with eyes on the aircraft:
+a mode change, a failsafe, telemetry lost. A beep is for something the screen
+already explains, such as a refused arm right after pressing Arm. There are two
+beeps, info and warning, and a row's beep follows its priority, so each sound
+keeps one meaning everywhere.
+
+### Say a change once, and repeat only what is still true
+
+A running value is never read out unasked; a crossing is said once. Only an
+alert that is still true repeats, at the user's interval and only while flying.
+A callout that has waited too long is dropped rather than said late.
+
+## Compact mode
+
+For a window too small for the desktop layout, such as a handheld ground
+station at 732×412. The mechanisms are in
+[architecture.md](architecture.md#compact-setup).
+
+### A screen keeps everything and rearranges it
+
+Compact mode never drops a setting or an action. It moves what does not fit
+behind one tap: a side panel, an expanding row, a row that scrolls sideways.
+
+### Navigation lives in the app bar
+
+The content area is too short to give a row to a selector. The mode switch's
+Setup button names the screen and opens the list, at one width for every name.
+
+### The column is a side panel; Write stays in view
+
+Every screen's column opens the same way, Plan's included: one square
+button with a side-panel icon at the top-right of the pane, blue while open,
+and a floating panel hanging under the row that holds it. That row stays
+usable: the button that opened the panel closes it. Anything else floating in
+that row over the panel's side (a map's controls) steps aside while the panel
+is open. A screen never has two different buttons for its panels on one side.
+Controls in the same row as the button are its height, so the row reads as one
+set.
+
+On a screen that stages parameters, Write sits beside the button with its
+count, because a staged edit nobody can see is an edit nobody writes. The
+column's own Write is hidden, so there is still one. Plan writes from its
+panel, since a mission write is a transfer with its own status.
+
+Something in a closed panel that needs seeing (a failed write, a transfer
+under way) puts a dot on its button.
+
+### What is wide and short rises from below
+
+Over a full-window view (Plan's map, Fly's map or video), content that is
+wider than it is tall opens as a sheet from the bottom, under a handle that
+rides on its top edge and closes it again: Plan's items, and Fly's controls,
+camera, video, joystick, status and view. The view stays in sight above it,
+and the sheet's width suits the altitude profile, an item's fields and Fly's
+panes laid out across. Controls that share the bottom edge with the handle
+(Fly's Arm) ride up with it, so they stay in reach. The handle is in the middle
+unless something else owns the middle, then at the right. Over a view that is
+itself read (Fly's HUD), the handle is a caret alone, quiet like the inset's
+buttons; over a map it carries its name (Items). On Plan the side panel and the
+sheet are one at a time.
+
+### A command that moves the aircraft is slid, not tapped
+
+On a handheld a tap lands by accident. Arm, Disarm, Takeoff and force-arm are
+confirmed by sliding; the slider takes the buttons' place and withdraws when
+its command stops applying. A mode change is one tap in the mode picker, as on
+the desktop, because the picker is already a deliberate second step.
+
+### Every control is a finger wide
+
+Every control is at least 44px on its short side. Where something must look
+smaller (the inset's hide button), its hit area is still 44px.
+
+### Tapping the map to close a panel only closes it
+
+A tap outside a panel closes it and does nothing else; it never also drops a
+waypoint.
+
+### A wide table shows what is watched and opens the rest
+
+A row keeps the columns read at a glance (a servo's function and position) and
+a chevron opens the ones set once (its travel) in a row beneath. Columns are
+never squeezed until their controls overlap.
+
+### A finger nudges with arrows
+
+Where a desktop moves a selection with the arrow keys, a touch screen gets a
+pad of arrow buttons at touch size, stepping once per tap and repeating while
+held. The number boxes stay for an exact value.
+
+### A set of pictures is one scrolling row
+
+Thumbnails side by side, with the last one cut off so the row reads as
+scrollable, instead of full-size pictures stacked down the page.
+
 ## See also
 
 - [architecture.md](architecture.md): the design-system rules for

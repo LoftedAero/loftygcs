@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { usePreferencesStore } from './preferences-store'
+import { calloutMode, calloutValue, loadVoice, usePreferencesStore } from './preferences-store'
 import { fromDistance, fromSpeed, toDistance, toSpeed } from '../units'
 
 const KEY = 'loftgcs.preferences'
@@ -125,5 +125,46 @@ describe('the interface scale', () => {
     expect(store().uiScale).toBe(1.5)
     store().reset()
     expect(store().uiScale).toBe(1)
+  })
+})
+
+describe('voice callout preferences', () => {
+  it('stores only the rows changed from their defaults', () => {
+    store().setCalloutMode('wp', 'off')
+    store().setCalloutMode('armed', 'voice')
+    store().setCalloutValue('max-alt', 150)
+    expect(store().voice.modes).toEqual({ wp: 'off' })
+    expect(store().voice.values).toEqual({ 'max-alt': 150 })
+    store().setCalloutMode('wp', 'voice')
+    expect(store().voice.modes).toEqual({})
+  })
+
+  it('reads back what this build knows and drops the rest', () => {
+    const v = loadVoice({
+      enabled: false,
+      modes: { wp: 'beep', readout: 'beep', 'no-such-row': 'voice', armed: 'shout' },
+      values: { 'max-alt': 150, 'min-alt': -5, 'batt-pct': 'half' },
+      repeatS: 7,
+      tones: { info: 'c-chord', warn: 'klaxon' },
+    })
+    expect(v.enabled).toBe(false)
+    // The readout is voice or off only, so a stored beep is not honored.
+    expect(v.modes).toEqual({ wp: 'beep' })
+    expect(v.values).toEqual({ 'max-alt': 150 })
+    expect(v.repeatS).toBe(30)
+    expect(v.tones).toEqual({ info: 'c-chord', warn: 'beeper' })
+  })
+
+  it('falls back to the catalog for anything not stored', () => {
+    const v = loadVoice(undefined)
+    expect(calloutMode(v, 'arm-refused')).toBe('beep')
+    expect(calloutMode(v, 'ekf')).toBe('beep')
+    expect(calloutMode(v, 'joystick')).toBe('off')
+    expect(calloutValue(v, 'rc-low')).toBe(50)
+  })
+
+  it('keeps a threshold inside its range', () => {
+    store().setCalloutValue('readout', 1)
+    expect(calloutValue(store().voice, 'readout')).toBe(10)
   })
 })

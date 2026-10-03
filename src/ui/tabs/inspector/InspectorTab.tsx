@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { LaCard, LaHint, LaInput, LaSwitch } from '../../components/La'
+import ColumnShell, { ColumnToggle, openColumn } from '../../components/ColumnShell'
+import { useCompact } from '../../compact'
 import { connectionService } from '../../../services/connection'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { rowKey, useInspectorStore } from '../../../stores/inspector-store'
@@ -13,6 +15,7 @@ import type { FieldValue } from '../../../protocol/types'
 // is mounted.
 
 export default function InspectorTab() {
+  const compact = useCompact()
   const connected = useConnectionStore((s) => s.phase === 'connected' || s.phase === 'linkLost')
   const rows = useInspectorStore((s) => s.rows)
   const selectedKey = useInspectorStore((s) => s.selectedKey)
@@ -68,6 +71,7 @@ export default function InspectorTab() {
             {rows.length} message types · {totalHz.toFixed(0)} msg/s
           </span>
           <LaSwitch label="Pause" checked={paused} onChange={(e) => setPaused(e.target.checked)} />
+          <ColumnToggle label="Fields" />
         </div>
         <div className="inspector__scroll">
           <table className="inspector__table">
@@ -87,7 +91,11 @@ export default function InspectorTab() {
                   <tr
                     key={key}
                     className={key === selectedKey ? 'is-selected' : undefined}
-                    onClick={() => select(key === selectedKey ? null : key)}
+                    onClick={() => {
+                      select(key === selectedKey ? null : key)
+                      // In compact mode the fields are in the side panel.
+                      if (key !== selectedKey && compact) openColumn()
+                    }}
                   >
                     <td>{r.msgName}</td>
                     <td className="num">{r.msgid}</td>
@@ -109,7 +117,7 @@ export default function InspectorTab() {
         </div>
       </div>
 
-      <aside className="app-col-shell">
+      <ColumnShell>
         <div className="app-col">
           <section className="app-col__group">
             <h3 className="app-col__head">
@@ -134,7 +142,7 @@ export default function InspectorTab() {
               unknown one cannot survive framing. */}
           </section>
         </div>
-      </aside>
+      </ColumnShell>
     </div>
   )
 }

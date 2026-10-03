@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import AppBar from './ui/shell/AppBar'
 import NavRail from './ui/shell/NavRail'
+import { useCompact } from './ui/compact'
 import ActionBar from './ui/shell/ActionBar'
 import ConnectModal from './ui/shell/ConnectModal'
 import PreferencesModal from './ui/shell/PreferencesModal'
@@ -31,6 +32,7 @@ import FlightTab from './ui/tabs/flight/FlightTab'
 import MissionTab from './ui/tabs/mission/MissionTab'
 import SimFieldPicker from './ui/shell/SimFieldPicker'
 import { startReading } from './services/joystick'
+import { announcer } from './services/voice/announcer'
 
 function SetupContent() {
   const activeTab = useUiStore((s) => s.activeTab)
@@ -83,6 +85,12 @@ export default function App() {
     startReading()
   }, [])
 
+  // Voice callouts watch the vehicle on every screen.
+  useEffect(() => {
+    announcer.start()
+    return () => announcer.stop()
+  }, [])
+
   // Losing the link while on a vehicle-only tab drops to the first tab that
   // remains. No unsaved-changes prompt: the disconnect already cleared the
   // parameters those screens stage against.
@@ -93,7 +101,13 @@ export default function App() {
     const first = offline[0]
     if (first) useUiStore.setState({ activeTab: first.id })
   }, [connected, activeTab])
-  const showRail = mode === 'setup'
+  const compact = useCompact()
+  // Before paint, so a switch never shows a frame of the other layout.
+  useLayoutEffect(() => {
+    document.documentElement.toggleAttribute('data-compact', compact)
+  }, [compact])
+  // Compact mode picks the screen from the app bar instead (SetupScreenPicker).
+  const showRail = mode === 'setup' && !compact
   // Fly and Mission always take the window; inside Setup, so do the tabs
   // that lay out their own full height rather than tiling cards.
   const flush = mode !== 'setup' || tabFills(activeTab)

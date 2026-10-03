@@ -13,3 +13,5 @@ package-lock.json -diff linguist-generated
 # glTF is JSON, so Git will happily diff it -- 700 KB of mesh coordinates that
 # no reviewer wants inline. Treat the models as the assets they are.
 *.gltf -diff linguist-vendored
+# Windows batch files need CRLF; cmd misreads labels and jumps with LF.
+*.bat text eol=crlf

@@ -12,6 +12,7 @@ import {
   encodeFtpPacket,
   type FtpPacket,
 } from './packet'
+import { backoff } from '../link-timing'
 
 const OP_TIMEOUT_MS = 1000
 const OP_RETRIES = 3
@@ -54,6 +55,8 @@ export interface FtpDirEntry {
 
 /** Refuse to page a directory forever if a device keeps answering. */
 const MAX_DIR_ENTRIES = 5000
+/** A burst that ends short of this, with file left, is outrunning the link. */
+const WEAK_BURST_BYTES = 8 * 239
 
 /**
  * Split a ListDirectory payload into entries.
@@ -114,8 +117,13 @@ export class MavFtpClient {
 
   constructor(
     private sendPayload: (payload: number[]) => void,
-    private opTimeoutMs = OP_TIMEOUT_MS,
+    /** Milliseconds, or a function so the timeout can follow the measured link. */
+    private opTimeout: number | (() => number) = OP_TIMEOUT_MS,
   ) {}
+
+  private get opTimeoutMs(): number {
+    return typeof this.opTimeout === 'function' ? this.opTimeout() : this.opTimeout
+  }
 
   /** Feed every incoming FILE_TRANSFER_PROTOCOL payload here. */
   handlePayload(payload: number[] | Uint8Array) {
@@ -169,30 +177,46 @@ export class MavFtpClient {
     data?: Uint8Array,
     size?: number,
   ): Promise<FtpPacket> {
-    const attempt = (retriesLeft: number): Promise<FtpPacket> => {
-      const seq = this.seq++ & 0xffff
-      const payload = encodeFtpPacket({
-        seq,
-        session,
-        opcode,
-        offset,
-        ...(data ? { data } : {}),
-        ...(size !== undefined ? { size } : {}),
-      })
-      return new Promise<FtpPacket>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          this.pending.delete(seq)
-          if (retriesLeft > 0) {
-            attempt(retriesLeft - 1).then(resolve, reject)
-          } else {
-            reject(new Error(`MAVFTP op ${opcode} timed out`))
-          }
-        }, this.opTimeoutMs)
-        this.pending.set(seq, { resolve, reject, timer })
+    return new Promise<FtpPacket>((resolve, reject) => {
+      // Every attempt keeps its seq registered until the request settles: on
+      // a slow link the reply to an earlier attempt often arrives after the
+      // retry went out, and it answers the request just as well.
+      const seqs: number[] = []
+      let timer: ReturnType<typeof setTimeout>
+      const settle = (fn: () => void) => {
+        clearTimeout(timer)
+        for (const s of seqs) this.pending.delete(s)
+        fn()
+      }
+      const attempt = (n: number) => {
+        const seq = this.seq++ & 0xffff
+        seqs.push(seq)
+        const payload = encodeFtpPacket({
+          seq,
+          session,
+          opcode,
+          offset,
+          ...(data ? { data } : {}),
+          ...(size !== undefined ? { size } : {}),
+        })
+        // Each retry waits twice as long: a missed reply is usually queued,
+        // not lost.
+        timer = setTimeout(
+          () => {
+            if (n < OP_RETRIES) attempt(n + 1)
+            else settle(() => reject(new Error(`MAVFTP op ${opcode} timed out`)))
+          },
+          backoff(this.opTimeoutMs, n),
+        )
+        this.pending.set(seq, {
+          resolve: (p) => settle(() => resolve(p)),
+          reject: (e) => settle(() => reject(e)),
+          timer,
+        })
         this.sendPayload(payload)
-      })
-    }
-    return attempt(OP_RETRIES)
+      }
+      attempt(0)
+    })
   }
 
   /**
@@ -421,15 +445,19 @@ export class MavFtpClient {
     } catch (err) {
       closeAndStop(err)
     }
+    // Bytes the bursts delivered, contiguous from the start of the file.
+    let got: Uint8Array = new Uint8Array(0)
     if (size > 0) {
+      const out = new Uint8Array(size)
+      let at = 0
       try {
-        const out = new Uint8Array(size)
-        let at = 0
         let stalled = 0
+        let weak = 0
         while (at < size) {
           stopIfCancelled()
-          const end = await this.burstOnce(session, at, out, (got) => onProgress?.(got, size))
-          if (end <= at) {
+          const end = await this.burstOnce(session, at, out, (n) => onProgress?.(n, size))
+          const gained = end - at
+          if (gained <= 0) {
             // No progress at all: two in a row means bursts are not
             // getting through, and sequential reads are the answer.
             if (++stalled >= 2) throw new Error('burst read made no progress')
@@ -437,17 +465,30 @@ export class MavFtpClient {
             stalled = 0
           }
           at = Math.max(at, end)
+          // ArduPilot paces a burst by its serial port's baud, which on a
+          // radio like ELRS is far above the air rate, so the radio drops
+          // most of each burst. Bursts that keep breaking off after a few
+          // packets are slower than asking for one packet at a time.
+          if (at < size && gained < WEAK_BURST_BYTES) {
+            if (++weak >= 2) break
+          } else {
+            weak = 0
+          }
         }
-        await this.terminate(session)
-        return out
+        if (at >= size) {
+          await this.terminate(session)
+          return out
+        }
       } catch (err) {
         // A cancel ends the read here; anything else falls through to the
         // sequential path on the same open session.
         if (err instanceof FtpCancelled) closeAndStop(err)
       }
+      got = out.subarray(0, at)
     }
-    const chunks: Uint8Array[] = []
-    let offset = 0
+    // Sequential reads, resuming where the bursts left off.
+    const chunks: Uint8Array[] = got.length > 0 ? [got] : []
+    let offset = got.length
     try {
       for (;;) {
         stopIfCancelled()

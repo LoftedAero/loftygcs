@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- White, so the mark's dark bezel stands out on a dark home screen
+         (scripts/make-icon.mjs draws the foreground). -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

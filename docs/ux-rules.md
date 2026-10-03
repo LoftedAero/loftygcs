@@ -65,6 +65,8 @@ Controls
       failure.
 - [ ] A wizard that succeeds closes itself and leaves a brief confirmation.
 - [ ] A control that enables another sits right next to it.
+- [ ] On a touch screen every control is at least 44px on its short side, and
+      a tap that dismisses something does nothing else.
 
 Process
 
@@ -336,6 +338,13 @@ Where a named option stands for a number that matters, show both.
 An action that can cause harm (rebooting a flying vehicle, overwriting a
 configuration) is refused or confirmed in a short dialog. Reassurance goes in
 that dialog, not in standing text.
+
+### Touch is a finger, and it slips
+
+On a touch screen every target is at least 44px on its short side, even where
+the drawing is smaller. A tap that dismisses a panel or menu only dismisses
+it; it never also acts on what lay underneath. A command that is hard to undo
+is confirmed by a gesture a stray tap cannot make, such as a slide.
 
 ### Disabled looks disabled, quietly
 

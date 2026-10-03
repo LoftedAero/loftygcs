@@ -11,7 +11,9 @@
 
 import { compassTicks, tapeTicks, type ArmReadiness, tapeStep } from './hud-draw'
 import {
+  distanceLabel,
   fixed,
+  formatDistance,
   formatSpeed,
   formatVerticalSpeed,
   speedLabel,
@@ -27,6 +29,8 @@ const GROUND_HIGH = '#A67C46'
 const GROUND_LOW = '#4A3520'
 const INK = '#FFFFFF'
 const DIM = 'rgba(255, 255, 255, 0.62)'
+/** The inset's symbology, which must not compete with the main view. */
+const FAINT = 'rgba(255, 255, 255, 0.5)'
 const AMBER = '#F7941D'
 const GREEN = '#35D07F'
 const RED = '#FF453A'
@@ -76,7 +80,40 @@ export interface HudState {
    * symbology (line, ladder, bank scale) and no sky or ground fill.
    */
   videoBehind: boolean
+  /**
+   * The picture-in-picture inset: a faint horizon and bank pointer with speed
+   * and altitude in the bottom corners, in place of every other layer.
+   */
+  mini?: boolean
+  /** Areas covered by compact Fly's controls, kept clear (see HudAvoid). */
+  avoid?: HudAvoid | null
 }
+
+/** A covered area's width and height, in CSS pixels from its canvas edges. */
+export interface HudBox {
+  w: number
+  h: number
+}
+
+/**
+ * What compact Fly lays over the HUD, measured from the canvas's own edges.
+ *
+ * - `bottomLeft`, the map inset: the left column's readings move up under the
+ *   GPS line, the speed tape fits between them and the inset, and the center
+ *   chips slide clear of it.
+ * - `bottomRight`, the sheet's handle: the right column's readings move up
+ *   under the link line, mirroring the left, and the altitude tape fits
+ *   between them and the handle.
+ * - `bottomCenter`, the command row (Arm or Disarm, or its slider): the
+ *   center chips rise above it.
+ */
+export interface HudAvoid {
+  bottomLeft?: HudBox | null
+  bottomRight?: HudBox | null
+  bottomCenter?: HudBox | null
+}
+
+const covers = (b: HudBox | null | undefined): b is HudBox => !!b && b.w > 0 && b.h > 0
 
 interface Text {
   size?: number
@@ -110,7 +147,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
 
   // Proportional to the panel, which is resizable.
   const s = Math.min(1.5, Math.max(0.75, Math.min(w, h) / 320))
-  const ribbonH = 24 * s
+  const ribbonH = st.mini ? 0 : 24 * s
   const tapeW = 50 * s
   const gap = 6 * s
   const cx = w / 2
@@ -175,6 +212,39 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     }
   }
 
+  if (st.mini) {
+    // A glance, not an instrument: it must not pull the eye off the main
+    // view, so everything is fainter and the bank scale is only its pointer.
+    if (st.horizon) {
+      paintHorizon(ctx, w, h, 0, cx, cy, pxPerDeg, st, s)
+      paintBankPointer(ctx, cx, cy, Math.min(w, h) * 0.42, st.roll, s)
+      paintAircraft(ctx, cx, cy, s * 0.5)
+    }
+    // Fixed sizes: the inset does not resize, and scaled text would be
+    // too small to read at its size.
+    const edge = 6
+    const base = h - edge
+    const reading = (caption: string, value: string, unit: string, align: 'left' | 'right') => {
+      ctx.save()
+      ctx.font = `500 13px ${MONO}`
+      const valW = ctx.measureText(value).width
+      ctx.font = `500 9px ${SANS}`
+      const capW = ctx.measureText(caption).width + 3
+      const unitW = ctx.measureText(unit).width + 2
+      ctx.restore()
+      const cap = { size: 9, color: DIM, font: SANS, weight: '500' }
+      // Caption, value, unit, laid left to right from x0.
+      const x0 = align === 'left' ? edge : w - edge - capW - valW - unitW
+      write(caption, x0, base, cap)
+      write(value, x0 + capW, base, { size: 13, weight: '500' })
+      write(unit, x0 + capW + valW + 2, base, cap)
+    }
+    const { speed, distance } = st.units
+    reading('AS', formatSpeed(st.airspeedMs, speed), speedLabel(speed), 'left')
+    reading('ALT', formatDistance(st.relAltM, distance), distanceLabel(distance), 'right')
+    return
+  }
+
   if (st.horizon) {
     paintHorizon(ctx, w, h, ribbonH, cx, cy, pxPerDeg, st, s)
     paintBank(ctx, cx, cy, Math.min(w, h - ribbonH) * 0.36, st.roll, s)
@@ -192,69 +262,111 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   // Converted once here so the tapes, readouts and labels agree.
   const spd = st.units.speed
   const dst = st.units.distance
-  paintTape(
-    ctx,
-    gap,
-    tapeTop,
-    tapeW,
-    tapeH,
-    toSpeed(st.airspeedMs, spd),
-    tapeStep('speed', spd),
-    s,
-    'left',
-    write,
-  )
-  paintTape(
-    ctx,
-    w - tapeW - gap,
-    tapeTop,
-    tapeW,
-    tapeH,
-    toDistance(st.relAltM, dst),
-    tapeStep('altitude', dst),
-    s,
-    'right',
-    write,
-  )
+  const left = gap
+  const right = w - gap
+  const corner = 13 * s
+  const bottomLeft = covers(st.avoid?.bottomLeft) ? st.avoid.bottomLeft : null
+  const bottomRight = covers(st.avoid?.bottomRight) ? st.avoid.bottomRight : null
+  const bottomCenter = covers(st.avoid?.bottomCenter) ? st.avoid.bottomCenter : null
+  const avoid = bottomLeft
+  // The GPS line, with the link opposite it.
+  const topLine = ribbonH + 18 * s
+  // The first line of a column's stack when its bottom corner is covered.
+  const stackTop = topLine + 16 * s
+  const stackBottom = stackTop + 17 * s + 15 * s
+  const clearTop = avoid ? h - avoid.h : h
+  // The lowest a center chip's bottom edge may sit.
+  const chipFloor = bottomCenter ? h - bottomCenter.h - gap : h
+
+  // Each side column. Normally the tape is beside the horizon with two
+  // readings under it and a corner item below; with the corner covered the
+  // corner item and readings stack under the top line and the tape takes the
+  // room between.
+  let leftTapeTop = tapeTop
+  let leftTapeH = tapeH
+  if (avoid) {
+    leftTapeTop = stackBottom + gap
+    leftTapeH = Math.min(tapeH, clearTop - gap - leftTapeTop)
+  }
+  let rightTapeTop = tapeTop
+  let rightTapeH = tapeH
+  if (bottomRight) {
+    rightTapeTop = stackBottom + gap
+    rightTapeH = Math.min(tapeH, h - bottomRight.h - gap - rightTapeTop)
+  }
+  if (leftTapeH >= 40 * s) {
+    paintTape(
+      ctx,
+      gap,
+      leftTapeTop,
+      tapeW,
+      leftTapeH,
+      toSpeed(st.airspeedMs, spd),
+      tapeStep('speed', spd),
+      s,
+      'left',
+      write,
+    )
+  }
+  if (rightTapeH >= 40 * s) {
+    paintTape(
+      ctx,
+      w - tapeW - gap,
+      rightTapeTop,
+      tapeW,
+      rightTapeH,
+      toDistance(st.relAltM, dst),
+      tapeStep('altitude', dst),
+      s,
+      'right',
+      write,
+    )
+  }
 
   paintAircraft(ctx, cx, cy, s)
 
   // Under the speed tape: the two speeds. Under the altitude tape: vertical
   // speed and throttle.
   const u1 = tapeBottom + 17 * s
-  const u2 = u1 + 15 * s
-  const left = gap
-  const right = w - gap
-  pair('AS', `${formatSpeed(st.airspeedMs, spd)} ${speedLabel(spd)}`, left, u1, 'left')
-  pair('GS', `${formatSpeed(st.groundspeedMs, spd)} ${speedLabel(spd)}`, left, u2, 'left')
+  const l1 = avoid ? stackTop + 17 * s : u1
+  const l2 = l1 + 15 * s
+  const r1 = bottomRight ? stackTop + 17 * s : u1
+  const r2 = r1 + 15 * s
+  pair('AS', `${formatSpeed(st.airspeedMs, spd)} ${speedLabel(spd)}`, left, l1, 'left')
+  pair('GS', `${formatSpeed(st.groundspeedMs, spd)} ${speedLabel(spd)}`, left, l2, 'left')
   const vs = formatVerticalSpeed(st.climbMs, st.units)
   pair(
     'V/S',
     `${st.climbMs >= 0 ? '+' : ''}${vs} ${verticalSpeedLabel(st.units)}`,
     right,
-    u1,
+    r1,
     'right',
   )
-  pair('THR', `${st.throttlePct.toFixed(0)}%`, right, u2, 'right')
+  pair('THR', `${st.throttlePct.toFixed(0)}%`, right, r2, 'right')
 
   // The corners: battery bottom left, mode bottom right, link top right,
   // GPS top left, all at the same weight as the readouts above them.
-  const corner = 13 * s
-  write(st.batteryText, left, h - 8 * s, { size: corner })
-  write(st.modeName || '—', right, h - 8 * s, {
+  write(st.batteryText, left, avoid ? stackTop : h - 8 * s, { size: corner })
+  write(st.modeName || '—', right, bottomRight ? stackTop : h - 8 * s, {
     size: corner,
     weight: '600',
     font: SANS,
     spacing: 0.5,
     align: 'right',
   })
-  write(st.linkText, right, ribbonH + 18 * s, { size: corner, align: 'right' })
-  // GPS opposite the link on the same line. Red without a usable fix, since
-  // position modes are then refused.
-  write(st.gpsText, left, ribbonH + 18 * s, {
+  write(st.linkText, right, topLine, { size: corner, align: 'right' })
+  // GPS opposite the link. Red without a usable fix, since position modes
+  // are then refused.
+  write(st.gpsText, left, topLine, {
     size: corner,
     ...(st.gpsUsable ? {} : { color: RED, weight: '600' }),
   })
+
+  /** A centered chip's x, moved right when its line runs beside the covered corner. */
+  const chipX = (width: number, bottom: number) =>
+    avoid && bottom > clearTop ? Math.max(cx, avoid.w + gap + width / 2) : cx
+  /** A center chip's baseline, raised so its bottom edge clears the command row. */
+  const chipY = (y: number, below: number) => Math.min(y, chipFloor - below)
 
   // State, centered above the aircraft symbol.
   const stateY = cy - Math.min(w, h) * 0.17
@@ -293,7 +405,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
   // pane has the full text.
   if (st.message) {
     const size = 12 * s
-    const y = cy + Math.min(w, h) * 0.17
+    const y = chipY(cy + Math.min(w, h) * 0.17, 6 * s)
     const room = w - 2 * (tapeW + gap) - 24 * s
     ctx.save()
     ctx.font = `600 ${Math.round(size)}px ${SANS}`
@@ -301,32 +413,34 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     while (text.length > 4 && ctx.measureText(text).width > room) text = text.slice(0, -2)
     if (text !== st.message) text = `${text.trimEnd()}…`
     const tw = ctx.measureText(text).width + 20 * s
+    const mx = chipX(tw, y + 6 * s)
     ctx.beginPath()
-    ctx.roundRect(cx - tw / 2, y - 14 * s, tw, 20 * s, 8 * s)
+    ctx.roundRect(mx - tw / 2, y - 14 * s, tw, 20 * s, 8 * s)
     ctx.fillStyle = CHIP
     ctx.fill()
     ctx.restore()
-    write(text, cx, y, { size, weight: '600', font: SANS, align: 'center', color: RED })
+    write(text, mx, y, { size, weight: '600', font: SANS, align: 'center', color: RED })
   }
 
   if (st.readiness === 'ready' || st.readiness === 'notReady') {
     const ready = st.readiness === 'ready'
     const label = ready ? 'READY TO ARM' : 'NOT READY TO ARM'
-    const y = h - 25 * s
+    const y = chipY(h - 25 * s, 5 * s)
     // On a chip so ladder rungs do not run through the words.
     ctx.save()
     ctx.font = `600 ${Math.round(11 * s)}px ${SANS}`
     // measureText ignores letter-spacing, so the chip allows for it.
     const tw = ctx.measureText(label).width + label.length * 1.1 * s + 20 * s
     ctx.restore()
+    const rx = chipX(tw, y + 5 * s)
     ctx.save()
     ctx.beginPath()
-    ctx.roundRect(cx - tw / 2, y - 12 * s, tw, 17 * s, 8 * s)
+    ctx.roundRect(rx - tw / 2, y - 12 * s, tw, 17 * s, 8 * s)
     ctx.fillStyle = CHIP
     ctx.fill()
     ctx.restore()
     // Its own line above the corners, clear of the battery and mode.
-    write(label, cx, y, {
+    write(label, rx, y, {
       size: 11 * s,
       weight: '600',
       font: SANS,
@@ -370,8 +484,8 @@ function paintHorizon(
     ctx.fillStyle = g.ground
     ctx.fillRect(-reach, 0, reach * 2, h * 2)
   }
-  ctx.strokeStyle = INK
-  ctx.lineWidth = 1.6 * s
+  ctx.strokeStyle = st.mini ? FAINT : INK
+  ctx.lineWidth = (st.mini ? 1.2 : 1.6) * s
   ctx.beginPath()
   ctx.moveTo(-reach, 0)
   ctx.lineTo(reach, 0)
@@ -384,6 +498,24 @@ function paintHorizon(
   ctx.rect(0, top, w, h - top)
   ctx.clip()
   place()
+
+  if (st.mini) {
+    // Two short unnumbered bars each way, enough to read a climb or a dive.
+    ctx.strokeStyle = FAINT
+    ctx.lineWidth = 1 * s
+    for (const deg of [-20, -10, 10, 20]) {
+      const y = -deg * pxPerDeg
+      const half = (Math.abs(deg) === 10 ? 14 : 9) * s
+      ctx.setLineDash(deg < 0 ? [4 * s, 3 * s] : [])
+      ctx.beginPath()
+      ctx.moveTo(-half, y)
+      ctx.lineTo(half, y)
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+    ctx.restore()
+    return
+  }
 
   // Pitch ladder: finer near the horizon, dashed below it.
   ctx.lineCap = 'butt'
@@ -482,6 +614,34 @@ function paintBank(
   ctx.lineTo(6.5 * s, -r + 13.5 * s)
   ctx.lineTo(5 * s, -r + 17.5 * s)
   ctx.lineTo(-5 * s, -r + 17.5 * s)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+}
+
+/** The inset's bank scale: a zero mark and the moving pointer, nothing else. */
+function paintBankPointer(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  roll: number,
+  s: number,
+) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.strokeStyle = FAINT
+  ctx.lineWidth = 1 * s
+  ctx.beginPath()
+  ctx.moveTo(0, -r - 1 * s)
+  ctx.lineTo(0, -r - 6 * s)
+  ctx.stroke()
+  ctx.rotate(-roll)
+  ctx.fillStyle = AMBER
+  ctx.beginPath()
+  ctx.moveTo(0, -r + 1 * s)
+  ctx.lineTo(-4 * s, -r + 7 * s)
+  ctx.lineTo(4 * s, -r + 7 * s)
   ctx.closePath()
   ctx.fill()
   ctx.restore()

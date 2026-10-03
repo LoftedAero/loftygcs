@@ -1,6 +1,7 @@
 // COMMAND_LONG with COMMAND_ACK tracking: every command gets a definite
 // answer (accepted, rejected with a result code, or no reply), so a command
 // can never fail silently.
+import { backoff, type RttEstimator } from './link-timing'
 import type { FieldValue } from './types'
 
 /** MAV_RESULT names for the codes wizards care about. */
@@ -21,6 +22,9 @@ interface Pending {
   resolve: (result: number) => void
   reject: (e: Error) => void
   timer: ReturnType<typeof setTimeout>
+  sentAt: number
+  /** Only an answer to the first send is a clean round-trip sample. */
+  firstAttempt: boolean
 }
 
 export class CommandClient {
@@ -29,6 +33,7 @@ export class CommandClient {
   constructor(
     private send: (msgName: string, fields: Record<string, FieldValue>) => void,
     private target: () => { sysid: number; compid: number },
+    private rtt?: RttEstimator,
   ) {}
 
   /** Feed every COMMAND_ACK here. */
@@ -42,6 +47,7 @@ export class CommandClient {
     if (result === 5) return
     this.pending.delete(command)
     clearTimeout(p.timer)
+    if (p.firstAttempt) this.rtt?.sample(Date.now() - p.sentAt)
     p.resolve(result)
   }
 
@@ -50,16 +56,26 @@ export class CommandClient {
    * resolves rather than rejects; only a missing ack rejects.
    */
   run(command: number, params: number[] = [], opts?: { timeoutMs?: number }): Promise<number> {
-    const timeoutMs = opts?.timeoutMs ?? ACK_TIMEOUT_MS
+    const floorMs = opts?.timeoutMs ?? ACK_TIMEOUT_MS
     const t = this.target()
     const attempt = (retriesLeft: number): Promise<number> =>
       new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          this.pending.delete(command)
-          if (retriesLeft > 0) attempt(retriesLeft - 1).then(resolve, reject)
-          else reject(new Error(`Command ${command}: no reply from the vehicle`))
-        }, timeoutMs)
-        this.pending.set(command, { resolve, reject, timer })
+        const timer = setTimeout(
+          () => {
+            this.pending.delete(command)
+            if (retriesLeft > 0) attempt(retriesLeft - 1).then(resolve, reject)
+            else reject(new Error(`Command ${command}: no reply from the vehicle`))
+          },
+          this.rtt?.timeout(floorMs, RETRIES - retriesLeft) ??
+            backoff(floorMs, RETRIES - retriesLeft),
+        )
+        this.pending.set(command, {
+          resolve,
+          reject,
+          timer,
+          sentAt: Date.now(),
+          firstAttempt: retriesLeft === RETRIES,
+        })
         this.send('COMMAND_LONG', {
           targetSystem: t.sysid,
           targetComponent: t.compid,

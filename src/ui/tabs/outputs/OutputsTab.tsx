@@ -15,6 +15,7 @@ import { connectionService } from '../../../services/connection'
 import { PWM_SCALE_MAX, PWM_SCALE_MIN, pwmPct } from '../../pwm-scale'
 import { MAV_RESULT } from '../../../protocol/commands'
 import { vehicleClass } from '../../../protocol/modes'
+import { useCompact } from '../../compact'
 
 const MAV_CMD_DO_MOTOR_TEST = 209
 const MAX_OUTPUTS = 16
@@ -73,6 +74,7 @@ export default function OutputsTab() {
 }
 
 function OutputsCard() {
+  const compact = useCompact()
   const entries = useParamStore((s) => s.entries)
   const outputs: number[] = []
   for (let n = 1; n <= MAX_OUTPUTS; n++) {
@@ -81,15 +83,24 @@ function OutputsCard() {
   return (
     <LaCard title="Servo outputs">
       <div className="app-table">
-        <div className="app-table__row outputs-grid app-table__head">
-          <span>Output</span>
-          <span>Function</span>
-          <span>Min</span>
-          <span>Trim</span>
-          <span>Max</span>
-          <span>Position</span>
-          <span>Reversed</span>
-        </div>
+        {compact ? (
+          <div className="app-table__row outputs-grid outputs-grid--compact app-table__head">
+            <span>Output</span>
+            <span>Function</span>
+            <span>Position</span>
+            <span></span>
+          </div>
+        ) : (
+          <div className="app-table__row outputs-grid app-table__head">
+            <span>Output</span>
+            <span>Function</span>
+            <span>Min</span>
+            <span>Trim</span>
+            <span>Max</span>
+            <span>Position</span>
+            <span>Reversed</span>
+          </div>
+        )}
         {outputs.map((n) => (
           <OutputRow key={n} n={n} />
         ))}
@@ -99,6 +110,52 @@ function OutputsCard() {
 }
 
 function OutputRow({ n }: { n: number }) {
+  const compact = useCompact()
+  const [open, setOpen] = useState(false)
+  // Seven columns do not fit a compact window: the row keeps what is watched
+  // (function and position) and opens to the travel settings.
+  if (compact) {
+    return (
+      <>
+        <div className="app-table__row outputs-grid outputs-grid--compact">
+          <span className="app-table__label">SERVO{n}</span>
+          <ParamField param={`SERVO${n}_FUNCTION`} label="Function" bare writeNow />
+          <OutputPosition n={n} />
+          <button
+            type="button"
+            className="outputs-grid__more"
+            aria-expanded={open}
+            aria-label={`SERVO${n} travel`}
+            onClick={() => setOpen(!open)}
+          >
+            <svg viewBox="0 0 10 6" aria-hidden="true">
+              <path d="M1 1l4 4 4-4" />
+            </svg>
+          </button>
+        </div>
+        {open && (
+          <div className="app-table__row outputs-detail">
+            {(['Min', 'Trim', 'Max'] as const).map((label) => (
+              <span key={label} className="outputs-detail__field">
+                <span className="la-field__label">{label}</span>
+                <ParamField
+                  param={`SERVO${n}_${label.toUpperCase()}`}
+                  label={label}
+                  bare
+                  writeNow
+                />
+              </span>
+            ))}
+            <SetTrimButton n={n} />
+            <span className="outputs-detail__field">
+              <span className="la-field__label">Reversed</span>
+              <ReverseSwitch param={`SERVO${n}_REVERSED`} />
+            </span>
+          </div>
+        )}
+      </>
+    )
+  }
   return (
     <div className="app-table__row outputs-grid">
       <span className="app-table__label">SERVO{n}</span>

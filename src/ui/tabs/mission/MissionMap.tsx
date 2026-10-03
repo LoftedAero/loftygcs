@@ -5,6 +5,7 @@ import { createCoverageLayer } from '../flight/coverage-layer'
 import { TERRAIN_ATTRIBUTION } from '../../../services/terrain'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { useItemEditor } from '../../../stores/item-editor-store'
 import { useMissionStore } from '../../../stores/mission-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useUnits } from '../../../stores/preferences-store'
@@ -293,6 +294,40 @@ export default function MissionMap({
     }
   }, [onView, centered])
 
+  // Compact mode's item sheet covers the map's lower part, so an item it
+  // opens on is panned into the part left showing. The sheet opens a render
+  // after the tap, later still on its first mount, so this waits for it.
+  const editorUid = useItemEditor((s) => s.uid)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !editorUid) return
+    let frame = 0
+    let tries = 30
+    const pan = () => {
+      const sheet = document.querySelector('.plan-sheet.is-open .app-sheet__body')
+      if (!sheet) {
+        if (--tries > 0) frame = requestAnimationFrame(pan)
+        return
+      }
+      const it = useMissionStore.getState().plan.items.find((i) => i.uid === editorUid)
+      if (!it || !hasCoords(it)) return
+      const box = map.getContainer().getBoundingClientRect()
+      const size = map.getSize()
+      const bottom = sheet.getBoundingClientRect().top - box.top
+      const pt = map.latLngToContainerPoint([it.x / 1e7, it.y / 1e7])
+      // Clear of the sheet's edge, the palette and the window's edges by a
+      // marker's size, into the middle of what is left.
+      const margin = 48
+      const palette = document.querySelector('.mission-palette')?.getBoundingClientRect()
+      const left = palette ? palette.right - box.left : 0
+      const dy = pt.y > bottom - margin || pt.y < margin ? pt.y - bottom / 2 : 0
+      const dx = pt.x < left + margin || pt.x > size.x - margin ? pt.x - (left + size.x) / 2 : 0
+      if (dx || dy) map.panBy([dx, dy])
+    }
+    frame = requestAnimationFrame(pan)
+    return () => cancelAnimationFrame(frame)
+  }, [editorUid])
+
   // Redraw the whole plan on change. A mission is tens of markers, so
   // rebuilding is simpler than diffing.
   const plan = useMissionStore((s) => s.plan)
@@ -349,7 +384,16 @@ export default function MissionMap({
         icon: itemIcon(i + 1, selected === it.uid, isNav ? 'nav' : 'other'),
         draggable: true,
       })
-        .on('click', () => useMissionStore.getState().select(it.uid))
+        .on('click', () => {
+          const store = useMissionStore.getState()
+          store.select(it.uid)
+          // Compact mode's editor, while the mission is what is being edited;
+          // the desktop edits in the table. The layout is marked on the root.
+          const compact = document.documentElement.hasAttribute('data-compact')
+          if (compact && store.editing === 'mission' && !store.survey) {
+            useItemEditor.getState().open(it.uid)
+          }
+        })
         .on('dragend', (e) => {
           const p = (e.target as L.Marker).getLatLng()
           useMissionStore.getState().updateItem(it.uid, {

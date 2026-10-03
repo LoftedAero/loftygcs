@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { LinkStats } from '../protocol/types'
 import type { TransportKind } from '../transport/Transport'
+import { hasUart } from '../env'
 
 // Read-only mirror of the connection service's state machine, for the UI.
 // Mutations happen only in services/connection.ts.
@@ -28,7 +29,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   kind: null,
   error: null,
   linkStats: null,
-  selectedKind: 'serial',
+  selectedKind: hasUart() ? 'uart' : 'serial',
   setSelectedKind: (selectedKind) => set({ selectedKind }),
 }))
 

@@ -3,6 +3,11 @@
 // gaps are refetched by index; writes are PARAM_SET verified by the echoed
 // PARAM_VALUE. The MAVFTP fast path (param-ftp) is layered in front of
 // this, so this path must always work.
+//
+// Timeouts come from the measured link round trip (link-timing), with the
+// constants below as floors, so a slow radio link is given the patience it
+// needs while USB and SITL behave as before.
+import { backoff, type RttEstimator } from '../link-timing'
 import type { FieldValue } from '../types'
 
 export interface ParamRecord {
@@ -17,9 +22,19 @@ interface SendFn {
 }
 
 const STALL_TIMEOUT_MS = 3000
-const GAP_RETRY_LIMIT = 3
+/** Refetch requests in flight at once: enough to keep a slow link busy without queueing a flood behind the telemetry. */
+const REFETCH_WINDOW = 8
+const REFETCH_TIMEOUT_MS = 1000
+/** Unanswered requests for one parameter before the download gives up. */
+const REFETCH_TRIES = 6
 const SET_TIMEOUT_MS = 1500
-const SET_RETRIES = 2
+const SET_RETRIES = 3
+
+interface Refetch {
+  queue: number[]
+  inflight: Map<number, ReturnType<typeof setTimeout>>
+  tries: Map<number, number>
+}
 
 export class ParamStreamClient {
   private received = new Map<number, ParamRecord>()
@@ -30,17 +45,28 @@ export class ParamStreamClient {
     resolve: (params: ParamRecord[]) => void
     reject: (e: Error) => void
     onProgress: (got: number, total: number) => void
-    gapRetries: number
+    refetch: Refetch | null
   } | null = null
   private pendingSets = new Map<
     string,
-    { resolve: (v: number) => void; timer: ReturnType<typeof setTimeout> }
+    {
+      resolve: (v: number) => void
+      timer: ReturnType<typeof setTimeout>
+      sentAt: number
+      firstAttempt: boolean
+    }
   >()
 
   constructor(
     private send: SendFn,
     private target: () => { sysid: number; compid: number },
+    private rtt?: RttEstimator,
   ) {}
+
+  /** A reply timeout for the given retry (0 for the first send). */
+  private wait(floorMs: number, attempt = 0): number {
+    return this.rtt?.timeout(floorMs, attempt) ?? backoff(floorMs, attempt)
+  }
 
   /** Feed every PARAM_VALUE here. */
   handleParamValue(fields: Record<string, FieldValue>) {
@@ -62,13 +88,26 @@ export class ParamStreamClient {
     if (set) {
       this.pendingSets.delete(record.name)
       clearTimeout(set.timer)
+      if (set.firstAttempt) this.rtt?.sample(Date.now() - set.sentAt)
       set.resolve(record.value)
     }
 
-    if (this.active) {
-      this.active.onProgress(this.received.size, this.total)
+    const a = this.active
+    if (!a) return
+    a.onProgress(this.received.size, this.total)
+    if (this.received.size >= this.total && this.total > 0) {
+      this.finish()
+      return
+    }
+    if (a.refetch) {
+      const timer = a.refetch.inflight.get(index)
+      if (timer !== undefined) {
+        clearTimeout(timer)
+        a.refetch.inflight.delete(index)
+      }
+      this.pumpRefetch()
+    } else {
       this.bumpStall()
-      if (this.received.size >= this.total && this.total > 0) this.finish()
     }
   }
 
@@ -77,7 +116,7 @@ export class ParamStreamClient {
     this.received.clear()
     const t = this.target()
     return new Promise((resolve, reject) => {
-      this.active = { resolve, reject, onProgress, gapRetries: 0 }
+      this.active = { resolve, reject, onProgress, refetch: null }
       this.send('PARAM_REQUEST_LIST', { targetSystem: t.sysid, targetComponent: t.compid })
       this.bumpStall()
     })
@@ -86,12 +125,12 @@ export class ParamStreamClient {
   /** The stream went quiet: either done-with-gaps or dead. */
   private bumpStall() {
     if (this.stallTimer) clearTimeout(this.stallTimer)
-    this.stallTimer = setTimeout(() => this.onStall(), STALL_TIMEOUT_MS)
+    this.stallTimer = setTimeout(() => this.onStall(), this.wait(STALL_TIMEOUT_MS))
   }
 
   private onStall() {
     const a = this.active
-    if (!a) return
+    if (!a || a.refetch) return
     if (this.total === 0) {
       this.fail(new Error('no PARAM_VALUE received'))
       return
@@ -102,28 +141,55 @@ export class ParamStreamClient {
       this.finish()
       return
     }
-    if (a.gapRetries >= GAP_RETRY_LIMIT) {
-      this.fail(new Error(`param download incomplete: ${missing.length} of ${this.total} missing`))
-      return
-    }
-    a.gapRetries++
+    // Ask for the gaps by index, a few at a time, each on its own timeout.
+    a.refetch = { queue: missing, inflight: new Map(), tries: new Map() }
+    this.clearStall()
+    this.pumpRefetch()
+  }
+
+  private pumpRefetch() {
+    const r = this.active?.refetch
+    if (!r) return
     const t = this.target()
-    // Refetch by index, a bounded batch per stall round.
-    for (const i of missing.slice(0, 50)) {
+    while (r.inflight.size < REFETCH_WINDOW && r.queue.length > 0) {
+      const i = r.queue.shift()!
+      if (this.received.has(i)) continue
       this.send('PARAM_REQUEST_READ', {
         targetSystem: t.sysid,
         targetComponent: t.compid,
         paramId: '',
         paramIndex: i,
       })
+      r.inflight.set(
+        i,
+        setTimeout(
+          () => this.onRefetchTimeout(i),
+          this.wait(REFETCH_TIMEOUT_MS, r.tries.get(i) ?? 0),
+        ),
+      )
     }
-    this.bumpStall()
+  }
+
+  private onRefetchTimeout(index: number) {
+    const r = this.active?.refetch
+    if (!r) return
+    r.inflight.delete(index)
+    const tries = (r.tries.get(index) ?? 0) + 1
+    r.tries.set(index, tries)
+    if (tries >= REFETCH_TRIES) {
+      const missing = this.total - this.received.size
+      this.fail(new Error(`param download incomplete: ${missing} of ${this.total} missing`))
+      return
+    }
+    r.queue.push(index)
+    this.pumpRefetch()
   }
 
   private finish() {
     const a = this.active
     if (!a) return
     this.clearStall()
+    this.clearRefetch()
     this.active = null
     a.resolve([...this.received.entries()].sort(([x], [y]) => x - y).map(([, r]) => r))
   }
@@ -132,6 +198,7 @@ export class ParamStreamClient {
     const a = this.active
     if (!a) return
     this.clearStall()
+    this.clearRefetch()
     this.active = null
     a.reject(err)
   }
@@ -141,17 +208,32 @@ export class ParamStreamClient {
     this.stallTimer = null
   }
 
+  private clearRefetch() {
+    const r = this.active?.refetch
+    if (!r) return
+    for (const timer of r.inflight.values()) clearTimeout(timer)
+    r.inflight.clear()
+  }
+
   /** Write one parameter and resolve with the vehicle's echoed value. */
   setParam(name: string, value: number, mavType: number): Promise<number> {
     const t = this.target()
     const attempt = (retriesLeft: number): Promise<number> =>
       new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          this.pendingSets.delete(name)
-          if (retriesLeft > 0) attempt(retriesLeft - 1).then(resolve, reject)
-          else reject(new Error(`${name}: no reply from the vehicle`))
-        }, SET_TIMEOUT_MS)
-        this.pendingSets.set(name, { resolve, timer })
+        const timer = setTimeout(
+          () => {
+            this.pendingSets.delete(name)
+            if (retriesLeft > 0) attempt(retriesLeft - 1).then(resolve, reject)
+            else reject(new Error(`${name}: no reply from the vehicle`))
+          },
+          this.wait(SET_TIMEOUT_MS, SET_RETRIES - retriesLeft),
+        )
+        this.pendingSets.set(name, {
+          resolve,
+          timer,
+          sentAt: Date.now(),
+          firstAttempt: retriesLeft === SET_RETRIES,
+        })
         this.send('PARAM_SET', {
           targetSystem: t.sysid,
           targetComponent: t.compid,

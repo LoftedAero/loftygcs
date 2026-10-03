@@ -6,7 +6,7 @@ import importPlugin from 'eslint-plugin-import'
 // only through the worker client and stores. This keeps the protocol core
 // testable in plain Node and shared between the browser and Electron builds.
 export default tseslint.config(
-  { ignores: ['dist/', 'dist-web/', 'dist-electron/', 'node_modules/'] },
+  { ignores: ['dist/', 'dist-web/', 'dist-electron/', 'node_modules/', 'android/'] },
   ...tseslint.configs.recommended,
   {
     plugins: { import: importPlugin },

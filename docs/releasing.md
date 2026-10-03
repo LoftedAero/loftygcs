@@ -68,7 +68,10 @@ once the workflow file is on the default branch. Lint, typecheck and tests
 run on every push in a separate, Linux-only job.
 
 The run creates a draft GitHub release, `v<version>`, and uploads the
-installers and the web zip to it. Review the draft, write the notes, and
+installers, the Android APK (`Lofty-GCS-<version>-android.apk`) and the web zip
+to it. The APK is debug-signed until there is a release key; Android refuses to
+install one build over another signed with a different key, so a tester moving
+between a CI build and one built locally uninstalls first. Review the draft, write the notes, and
 publish it; publishing creates the tag. Files go to the release rather than to
 workflow artifacts because artifacts count against the account's Actions
 storage quota, which a few installer runs fill.

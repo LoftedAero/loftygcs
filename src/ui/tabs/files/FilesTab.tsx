@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ColumnShell, { ColumnToggle } from '../../components/ColumnShell'
 import { LaButton, LaCard, LaHint, LaInput, LaModal } from '../../components/La'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { parentPath, useFilesStore } from '../../../stores/files-store'
@@ -72,6 +73,8 @@ export default function FilesTab() {
           >
             Up
           </LaButton>
+          {/* The transfer and its result are in the side panel. */}
+          <ColumnToggle alert={!!transfer || status.kind === 'error'} />
         </div>
 
         <div className="files__scroll">
@@ -109,7 +112,7 @@ export default function FilesTab() {
         </div>
       </div>
 
-      <aside className="app-col-shell">
+      <ColumnShell>
         <div className="app-col">
           <section className="app-col__group">
             <h3 className="app-col__head">This folder</h3>
@@ -201,7 +204,7 @@ export default function FilesTab() {
           {status.kind === 'error' && <p className="app-col__note is-error">{status.text}</p>}
           {status.kind === 'done' && <p className="app-col__note">{status.text}</p>}
         </div>
-      </aside>
+      </ColumnShell>
 
       {confirming && (
         <LaModal

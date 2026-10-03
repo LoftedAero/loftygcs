@@ -16,6 +16,56 @@
 
   /* The width of a screen's actions/settings column, shared by every screen. */
   --app-col-w: 280px;
+
+  /* Compact mode (the section at the end): the app bar's height and badge. */
+  --app-compact-bar-h: 40px;
+  --app-compact-badge: 28px;
+  /* A touch target: the smallest a thumb hits reliably. */
+  --app-touch: 44px;
+  /* Voice callouts: a mode dropdown fits "Warning beep" and its chevron; a
+     threshold fits "10000". */
+  --app-callout-mode-w: 136px;
+  --app-callout-value-w: 76px;
+  /* The words either side of a threshold: "beyond", "V/cell". */
+  --app-callout-word-w: 48px;
+  /* Compact Fly: the picture-in-picture inset and the slide-to-confirm bar. */
+  --app-compact-inset-w: 168px;
+  --app-slide-w: 400px;
+  --app-slide-min-w: 280px;
+  /* Compact app bar: the widest a status panel grows. */
+  --app-pop-w: 360px;
+  /* Its readings' slots, each as wide as its longest value, so a changing
+     value moves nothing: "Loiter QLand" (the short "Loiter to QLand"),
+     "100%" or "15.9V", "No GPS", "146/s". Measured with the bar's type. */
+  --app-cbar-mode-w: 96px;
+  --app-cbar-batt-w: 66px;
+  --app-cbar-gps-w: 76px;
+  --app-cbar-link-w: 66px;
+  /* A dialog that is only a question and its answers. */
+  --app-dialog-narrow-w: 280px;
+  /* The servo table's first column, "SERVO16". */
+  --app-servo-output-w: 80px;
+  /* A labeled sheet handle: fits Plan's "Items · 99" and the chevron. */
+  --app-sheet-handle-w: 128px;
+  /* Fly's sheet: a few rows of controls under its section tabs. */
+  --app-fly-sheet-h: 240px;
+  /* Compact Plan: the item sheet's height, leaving the upper part of the
+     AX12's map in view, and one field's narrowest width in the editor. */
+  --app-plan-sheet-h: 210px;
+  --app-item-field-w: 150px;
+  /* Compact Configuration: a frame picker thumbnail. Five fit the AX12's
+     width, with the sixth cut off to show the row scrolls. */
+  --app-frame-thumb-w: 124px;
+  /* Compact Setup's screen picker: fits the longest screen name, "Parameter
+     List", and its chevron. */
+  --app-screen-pick-w: 128px;
+  /* The Controls section of compact Fly's sheet: one column of fields. */
+  --app-sheet-form-w: 440px;
+  /* One width for a row of short buttons in compact mode: Fly's Set and Run,
+     the item editor's Earlier, Later and Delete. */
+  --app-compact-btn-w: 72px;
+  /* The label column of compact Fly's sheet. */
+  --app-compact-label-w: 88px;
   /* One width for every control in a settings column (`.app-col--fields`), so
      dropdowns and number boxes share a right edge. The labels get the rest. */
   --app-col-control-w: 128px;
@@ -84,7 +134,7 @@
   /* A heading and the gap under it; a switch row and the gap above it. */
   --app-cam-head: 24px;
   --app-cam-switch-row: 32px;
-  --app-cam-btn-h: 44px;
+  --app-cam-btn-h: var(--app-touch);
   --app-cam-btn-h-max: 64px;
   /* The smallest a dial is drawn; below it the pane scrolls. */
   --app-cam-dial-min-h: 110px;
@@ -241,7 +291,7 @@
    narrower, and a dialog holding a question and three answers should not be
    560px wide. */
 .la-modal__card--narrow {
-  width: min(280px, 100%);
+  width: min(var(--app-dialog-narrow-w), 100%);
 }
 /* An empty body is still a flex child, so it adds a gap and pads the card. */
 .la-modal__body:empty {
@@ -713,6 +763,11 @@
 
 /* Preview marker in the action bar. Amber (the warn role: status, never an
    action), sized to be noticed without competing with the write button. */
+.prefs__version {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+}
 .app-preview-chip {
   font-size: var(--la-size-xs);
   font-weight: 700;
@@ -943,6 +998,52 @@
   grid-auto-columns: 1fr;
   width: max-content;
   margin-left: auto;
+}
+
+/* Test and Configure share the column's width, as one control. */
+.prefs__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--la-space-2);
+  width: var(--app-prefs-control-w);
+}
+
+/* Voice callouts (VoiceCalloutsModal): one grid for every group, so the
+   thresholds and the mode dropdowns line up down the whole dialog. */
+.callouts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--app-callout-mode-w);
+  gap: var(--la-space-2) var(--la-space-3);
+  align-items: center;
+}
+.callouts__row {
+  display: contents;
+}
+.callouts__head {
+  grid-column: 1 / -1;
+  margin-top: var(--la-space-3);
+}
+.callouts__head:first-child {
+  margin-top: 0;
+}
+.callouts__label {
+  font-size: var(--la-size-md);
+  color: var(--la-ink);
+}
+.callouts__threshold {
+  display: grid;
+  grid-template-columns: var(--app-callout-word-w) var(--app-callout-value-w) var(
+      --app-callout-word-w
+    );
+  align-items: center;
+  gap: var(--la-space-1);
+}
+/* "below 50 %": the word right against the box, so every box lines up. */
+.callouts__threshold > :first-child {
+  text-align: right;
+}
+.callouts__threshold .la-input {
+  width: 100%;
 }
 
 .prefs__head {
@@ -4906,7 +5007,7 @@ button.app-status__state--bad:hover {
    and so is its heading. */
 .outputs-grid {
   grid-template-columns:
-    80px minmax(0, var(--app-servo-function-w)) 100px 100px 100px
+    var(--app-servo-output-w) minmax(0, var(--app-servo-function-w)) 100px 100px 100px
     calc(var(--app-servo-position-w) + var(--la-space-1) + var(--app-servo-set-w)) 68px;
   justify-content: start;
 }
@@ -4971,6 +5072,55 @@ button.app-status__state--bad:hover {
 .app-table__head.outputs-grid > :nth-child(7),
 .outputs-grid__reverse {
   justify-self: center;
+}
+/* Compact mode's row (OutputRow): what is watched, and a button that opens the
+   travel settings in a row of their own beneath it. */
+.outputs-grid--compact {
+  grid-template-columns:
+    var(--app-servo-output-w) minmax(0, 1fr) var(--app-servo-position-w)
+    var(--app-touch);
+}
+/* The desktop header's column widths do not apply to these four. */
+.app-table__head.outputs-grid--compact > * {
+  width: auto;
+  padding-right: 0;
+}
+.outputs-grid__more {
+  display: grid;
+  place-items: center;
+  width: var(--app-touch);
+  height: var(--app-touch);
+  border: 0;
+  border-radius: var(--la-radius-sm);
+  background: none;
+  color: var(--la-ink-2);
+}
+.outputs-grid__more svg {
+  width: 10px;
+  height: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.outputs-grid__more[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+/* Part of the row above it, so no rule between them, on the header's ground. */
+.app-table__row.outputs-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--la-space-2) var(--la-space-4);
+  border-top: 0;
+  background: var(--la-surface-2);
+}
+.outputs-detail__field {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.outputs-detail .outputs-grid__reverse {
+  justify-self: auto;
 }
 .app-table__head.outputs-grid > :nth-child(7) {
   width: calc(var(--app-switch-w) + var(--app-write-mark-w));
@@ -5326,6 +5476,13 @@ button.app-status__state--bad:hover {
 }
 .status-row:hover {
   background: var(--la-surface-2);
+}
+/* Read-only where there is no plot to add to. */
+.status-row--static {
+  cursor: default;
+}
+.status-row--static:hover {
+  background: none;
 }
 /* A field on the plot is marked in the plot's accent, so the two panels agree
    about what is being watched. */
@@ -5888,6 +6045,30 @@ body.is-splitting .flight-map {
   font-size: var(--la-size-xs);
   white-space: nowrap;
 }
+/* The grid the screen declares, inside a larger one drawn to hold the panels
+   (see `editorGrid`). Drawn like the NTSC cut, as the same kind of mark. */
+.osd-screen__declared {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-right: 1px dashed var(--la-gold);
+  border-bottom: 1px dashed var(--la-gold);
+  pointer-events: none;
+}
+/* Under the outline's bottom-left corner: inside it, the tag would sit on
+   panels. Every larger canvas has at least two more rows, so it fits there. */
+.osd-screen__declared-label {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  padding: 1px var(--la-space-1);
+  border-radius: 0 0 var(--la-radius-sm) 0;
+  background: var(--la-charcoal);
+  color: var(--la-gold);
+  font-family: var(--la-font);
+  font-size: var(--la-size-xs);
+  white-space: nowrap;
+}
 
 .osd-screen__empty {
   position: absolute;
@@ -5923,6 +6104,8 @@ body.is-splitting .flight-map {
   line-height: 1;
   white-space: pre;
   cursor: grab;
+  /* A finger drags the panel rather than scrolling the page under it. */
+  touch-action: none;
   /* Subpixel antialiasing fringes thin white strokes on a dark ground with
      orange and cyan; grayscale keeps the text neutral. */
   -webkit-font-smoothing: antialiased;
@@ -6002,6 +6185,11 @@ body.is-splitting .flight-map {
   --app-osd-list-w: 262px;
   --app-osd-res-w: 118px;
   --app-osd-coord-w: 84px;
+  /* Compact mode's strip beside the preview: the arrow pad (three touch
+     targets and two gaps) and its padding. */
+  --app-osd-side-w: calc(
+    var(--app-touch) * 3 + var(--la-space-1) * 2 + var(--la-space-3) + var(--la-space-2)
+  );
   display: grid;
   grid-template-columns: var(--app-osd-list-w) minmax(0, 1fr) var(--app-col-w);
   grid-template-rows: minmax(0, 1fr);
@@ -6088,6 +6276,115 @@ body.is-splitting .flight-map {
   min-width: 0;
 }
 
+/* Compact mode's card: one bar of controls, then the preview at the card's
+   full height with the selected panel's controls in a strip beside it. */
+.osd-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+}
+.osd-bar__screen {
+  width: var(--app-osd-res-w);
+  min-width: 0;
+}
+.osd-bar__end {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  min-width: 0;
+  margin-left: auto;
+}
+.osd-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--la-space-3);
+}
+.osd-stage > .osd-screen-fit {
+  min-width: 0;
+}
+.osd-stage > .osd-selection {
+  flex: none;
+  width: var(--app-osd-side-w);
+  margin-top: 0;
+  padding: 0 0 0 var(--la-space-3);
+  border-top: 0;
+  border-left: 1px solid var(--la-line);
+}
+/* The strip's contents (SelectionDetail's pad form): the name, the two boxes
+   side by side, the arrows, and Remove at the foot. */
+.osd-selection--pad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+.osd-selection__coords {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--la-space-2);
+}
+.osd-selection--pad .osd-selection__coord {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--la-space-1);
+}
+/* Scoped by the stage to outrank the desktop row's one width for Remove. */
+.osd-selection--pad .osd-selection__coord .la-input,
+.osd-stage .osd-selection--pad > .la-btn {
+  width: 100%;
+  min-width: 0;
+}
+.osd-selection--pad > .la-btn {
+  margin-top: auto;
+}
+.osd-nudge {
+  display: grid;
+  grid-template-columns: repeat(3, var(--app-touch));
+  grid-template-rows: repeat(3, var(--app-touch));
+  gap: var(--la-space-1);
+  justify-content: center;
+}
+.osd-nudge__btn {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  color: var(--la-ink-2);
+  /* A held finger repeats the step rather than scrolling or zooming. */
+  touch-action: none;
+}
+.osd-nudge__btn:not(:disabled):active {
+  border-color: var(--la-blue);
+  background: var(--la-blue-soft);
+  color: var(--la-ink);
+}
+.osd-nudge__btn:disabled {
+  background: var(--la-surface-2);
+  color: var(--la-ink-3);
+}
+.osd-nudge__btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+}
+.osd-nudge__btn--up {
+  grid-area: 1 / 2;
+}
+.osd-nudge__btn--left {
+  grid-area: 2 / 1;
+}
+.osd-nudge__btn--right {
+  grid-area: 2 / 3;
+}
+.osd-nudge__btn--down {
+  grid-area: 3 / 2;
+}
+
 /* Sits on the bottom edge of the card, so when the settings column is the
    tallest thing on the row, the slack lands above this row rather than below
    it. */
@@ -6098,6 +6395,16 @@ body.is-splitting .flight-map {
 }
 .osd-selection__name {
   font-size: var(--la-size-md);
+}
+/* In the compact strip a name may take two lines; both are always reserved,
+   so the arrows below never move with the selection. */
+.osd-selection--pad .osd-selection__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 2.6em;
+  line-height: 1.3;
+  overflow: hidden;
 }
 /* Each box with its label beside it, so the row is one control tall. The two
    boxes and Remove are one set, one width. */
@@ -6136,9 +6443,11 @@ body.is-splitting .flight-map {
   justify-content: space-between;
 }
 
-/* Narrow tier: the rail gives up its width before anything clips. */
+/* Narrow tier: the rail gives up its width before anything clips. Only where
+   there is a rail: this rule comes after `.app-main--full`, so without the
+   `:not` it gave Fly and Plan an empty column. */
 @media (max-width: 820px) {
-  .app-main {
+  .app-main:not(.app-main--full) {
     grid-template-columns: 140px minmax(0, 1fr);
   }
   .param-row {
@@ -6262,6 +6571,14 @@ body.is-splitting .flight-map {
   gap: var(--app-col-gap);
   flex: 1;
   min-height: 0;
+}
+/* Compact mode's bar over an open log, holding its two side panels' buttons. */
+.log-toolbar {
+  flex: none;
+  display: flex;
+  gap: var(--la-space-2);
+  padding: var(--la-space-1) var(--la-space-2);
+  border-bottom: 1px solid var(--la-line);
 }
 .log-main {
   min-width: 0;
@@ -7590,4 +7907,1192 @@ body.is-splitting .flight-map {
 }
 .cal-att__tile.is-here .cal-att__spin {
   opacity: 1;
+}
+
+/* --- Compact mode ------------------------------------------------------
+
+   On while src/ui/compact.ts says so (window size, or the Layout preference),
+   which App marks on the root element. Screens that rearrange themselves read
+   useCompact(); what needs no rearranging is here. */
+:root[data-compact] {
+  --la-appbar-h: var(--app-compact-bar-h);
+  & .la-appbar {
+    padding: 0 var(--la-space-2);
+  }
+  & .app-bar__band {
+    gap: var(--la-space-2);
+  }
+  & .la-appbar__logo--badge {
+    width: var(--app-compact-badge);
+    height: var(--app-compact-badge);
+  }
+  & .app-modes {
+    margin-left: 0;
+  }
+  /* The bar is 40px, so its controls stop short of a full touch target:
+     the mode switch and the readings take the bar's height less its well. */
+  & .app-modes__item {
+    height: calc(var(--la-appbar-h) - var(--la-space-2));
+    padding: 0 var(--la-space-3);
+  }
+  /* In Setup the screen picker lengthens the left group, so the status is
+     anchored to the link instead of centered between equal side tracks. */
+  & .la-appbar {
+    grid-template-columns: auto 1fr auto;
+    column-gap: var(--la-space-2);
+  }
+  & .app-bar__band--center {
+    justify-content: flex-end;
+  }
+
+  /* The footer's version moves to Preferences and its Preview marker to the
+     app bar. */
+  & .la-actionbar {
+    display: none;
+  }
+
+  /* Setup cards: a smaller title without its rule, and tighter padding, so a
+     card spends its height on settings. */
+  & .la-card {
+    padding: var(--la-space-3);
+    gap: var(--la-space-2);
+  }
+  & .la-card__title,
+  & .la-card__head {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  & .la-card__title {
+    font-size: var(--la-size-md);
+  }
+  & .app-content {
+    gap: var(--la-space-3);
+  }
+  /* A curated row drops its ArduPilot name; Parameter List finds a setting by
+     name. The track stays at zero width so rows built on the same tracks keep
+     their columns. */
+  --app-named-tracks: minmax(0, var(--app-config-label-w)) 0
+    minmax(var(--app-named-control-lead), var(--app-config-control-w)) var(--app-config-unit-w);
+  & .app-content .la-card .la-field--named > .la-field__param,
+  & .outproto__protocol > .la-field__param {
+    visibility: hidden;
+  }
+
+  /* Fly and Plan run edge to edge; Setup keeps a tighter margin. */
+  & .app-main--full > .app-content--flush {
+    padding: 0;
+  }
+  & .app-content,
+  & .app-main:not(.app-main--full) > .app-content--flush {
+    padding: var(--la-space-3);
+  }
+
+  /* Overview keeps the model beside the vitals, as on the desktop, rather than
+     stacking them; the vitals column scrolls on its own. */
+  & .live-panel {
+    grid-template-columns: minmax(0, 1fr) var(--app-col-w);
+  }
+  & .live-panel__side {
+    overflow-y: auto;
+  }
+  /* Firmware's paired controls share the row instead of keeping their
+     desktop width, which is wider than the window. */
+  & .fw-card,
+  & .fw-step__body--wide,
+  & .fw-state {
+    max-width: none;
+  }
+  & .fw-step__body > .la-readout,
+  & .fw-step__body > .la-select,
+  & .fw-step__body > .la-btn {
+    width: calc((100% - var(--la-space-2)) / 2);
+  }
+  /* Shorter tiles, so the whole card fits a 412px window. */
+  & .fw-vehicle {
+    padding-block: var(--la-space-2);
+  }
+
+  /* A side panel (ColumnShell) floats over the pane, hanging under the row
+     that holds its button (its top is measured from the button), so that row,
+     with the button and a screen's Write, stays usable. The bar popovers'
+     frame. Fixed, so no screen's grid or scrolling moves it. The column's
+     Write moves to the toolbar (ToolbarWrite). */
+  & .app-side-panel {
+    position: fixed;
+    top: var(--la-appbar-h);
+    bottom: var(--la-space-2);
+    z-index: 5;
+    width: var(--app-col-w);
+    display: none;
+    margin-top: var(--la-space-2);
+    border-color: var(--la-line-strong);
+    box-shadow: var(--la-shadow-2);
+  }
+  & .app-side-panel--right {
+    right: var(--la-space-2);
+  }
+  & .app-side-panel--left {
+    left: var(--la-space-2);
+  }
+  & .app-side-panel.is-open {
+    display: flex;
+  }
+  /* Log Review with a log open: the plot takes the width, under a toolbar
+     whose two ends open the fields and the actions. */
+  & .log-body--fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  & .log-toolbar {
+    justify-content: space-between;
+  }
+  & .app-col__primary {
+    display: none;
+  }
+  /* Every control is a touch target, everywhere but the app bar (above). */
+  & :is(.la-btn, .la-input, .la-select):not(.la-appbar *) {
+    min-height: var(--app-touch);
+  }
+  /* Controls the design system does not draw: sub-tabs (Power's batteries)
+     and the compass order's arrows. */
+  & .app-subtab {
+    min-height: var(--app-touch);
+  }
+  & .compass-prio {
+    --prio-moves-w: calc(var(--app-touch) * 2 + var(--la-space-1));
+  }
+  & .compass-prio__move {
+    width: var(--app-touch);
+    height: var(--app-touch);
+  }
+  /* A readout in a toolbar matches the controls beside it. */
+  & .osd-bar .la-readout {
+    min-height: var(--app-touch);
+  }
+  /* Write keeps one width whatever its label says ("Write (12)", "Writing"). */
+  & .app-toolbar-write {
+    width: var(--app-card-action-w);
+  }
+  /* The toggle ends its toolbar, whatever else the bar holds. */
+  & .app-panel-toggle {
+    margin-left: auto;
+  }
+  & .log-toolbar .app-panel-toggle,
+  & .inspector__bar .app-panel-toggle {
+    margin-left: 0;
+  }
+  /* Title-row buttons keep one width, a narrower one. */
+  --app-card-action-w: 112px;
+  & .params-layout,
+  & .files,
+  & .inspector,
+  & .osd-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 0;
+  }
+  /* OSD's narrow-window arrangement (the preview, then the panel list), at any
+     width. */
+  & .osd-workspace {
+    grid-template-rows: 100% auto;
+    overflow-y: auto;
+    /* Scrolled by touch; a scrollbar would narrow the card and move the side
+       panel's button off the line every other screen puts it on. */
+    scrollbar-width: none;
+  }
+  /* The shared sheet's scrollbar is a WebKit one, which the property above
+     does not reach in the Android WebView. */
+  & .osd-workspace::-webkit-scrollbar {
+    width: 0;
+  }
+  & .osd-workspace__screen {
+    grid-area: 1 / 1;
+    /* Puts the side panel's button where the other screens' toolbars do. */
+    padding: var(--la-space-2);
+  }
+  & .osd-workspace__panels {
+    grid-area: 2 / 1;
+  }
+  & .osd-workspace .osd-palette-scroll {
+    flex: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  /* Map controls a finger can hit, on both maps. */
+  & .leaflet-control-zoom a {
+    width: var(--app-touch);
+    height: var(--app-touch);
+    line-height: var(--app-touch);
+  }
+  & .map-controls .la-btn,
+  & .map-controls button {
+    min-height: var(--app-touch);
+  }
+  /* The attribution on one line; a tap shows the rest. */
+  & .leaflet-control-attribution {
+    max-width: 60vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .leaflet-control-attribution:hover {
+    max-width: none;
+    white-space: normal;
+  }
+
+  /* Ports' table takes the card's full width; half the window is too narrow
+     for its four columns. */
+  & .ports-card {
+    max-width: none;
+  }
+
+  /* Configuration's frame picker: one row of thumbnails that scrolls sideways,
+     where two columns of full-size diagrams ran to five screens. */
+  & .frame-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: var(--app-frame-thumb-w);
+    overflow-x: auto;
+    padding-bottom: var(--la-space-1);
+  }
+
+  /* Dialogs run edge to edge and as tall as they need, up to the window. The
+     body scrolls and the buttons stay pinned below it. */
+  & .la-modal {
+    padding: 0;
+  }
+  & .la-modal__card,
+  & .la-modal__card--wide {
+    width: 100%;
+    border-radius: 0;
+    overflow: hidden;
+    padding: var(--la-space-4);
+  }
+  & .la-modal__body {
+    min-height: 0;
+    overflow-y: auto;
+  }
+  & .la-modal__actions {
+    flex: none;
+  }
+  /* A question with its answers stays the small card it is. */
+  & .la-modal:has(.la-modal__card--narrow) {
+    padding: var(--la-space-4);
+  }
+  & .la-modal__card--narrow {
+    width: min(var(--app-dialog-narrow-w), 100%);
+    border-radius: var(--la-radius);
+  }
+}
+
+/* Compact Fly (FlightTab's CompactFlight): the map or the video fills the
+   window, the other sits in an inset, and the commands float over the bottom.
+   Each panel is isolated so Leaflet's z-indexes (controls at 1000) stay inside
+   it and the inset and commands can sit over the map. */
+.flight-compact {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.flight-compact--video {
+  background: var(--la-charcoal);
+}
+.flight-compact__main {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  isolation: isolate;
+  background: var(--la-charcoal);
+}
+.flight-compact__main > *,
+.flight-compact__inset > :first-child {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.flight-compact__inset {
+  position: absolute;
+  left: var(--la-space-2);
+  bottom: var(--la-space-2);
+  z-index: 1;
+  display: flex;
+  width: var(--app-compact-inset-w);
+  aspect-ratio: 4 / 3;
+  border: 2px solid var(--app-on-dark);
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow: var(--la-shadow-2);
+}
+/* The map's own controls have no room in the inset; swapping brings them back. */
+.flight-compact__inset .map-controls,
+.flight-compact__inset .leaflet-control-container {
+  display: none;
+}
+.flight-compact__inset-tap {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.flight-compact__inset-hide {
+  position: absolute;
+  top: var(--la-space-1);
+  right: var(--la-space-1);
+  z-index: 2;
+  width: var(--la-space-6);
+  height: var(--la-space-6);
+  border: 0;
+
+  border-radius: var(--la-radius-sm);
+  background: color-mix(in srgb, var(--la-charcoal) 75%, transparent);
+  color: var(--app-on-dark);
+  font: 700 var(--la-size-lg) / 1 var(--la-font);
+}
+/* Kept small over the inset; its tap target is a finger wide around it. */
+.flight-compact__inset-hide::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--la-space-6) - var(--app-touch)) / 2);
+}
+.flight-compact__inset-show {
+  padding: 0 var(--la-space-4);
+  border: 0;
+  border-radius: var(--la-radius-sm);
+  background: color-mix(in srgb, var(--la-charcoal) 80%, transparent);
+  color: var(--app-on-dark);
+  font: 600 var(--la-size-sm) / 1 var(--la-font);
+}
+.flight-compact__inset-show {
+  position: absolute;
+  left: var(--la-space-2);
+  bottom: var(--la-space-2);
+  z-index: 2;
+  min-height: var(--app-touch);
+}
+.flight-compact__novideo {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-space-3);
+  color: var(--app-on-dark);
+  font: 600 var(--la-size-md) / 1.4 var(--la-font);
+  pointer-events: none;
+}
+.flight-compact__novideo p {
+  margin: 0;
+}
+.flight-compact__novideo .la-btn {
+  pointer-events: auto;
+}
+
+/* CommandStrip: Arm or Disarm over the bottom center, Takeoff hanging beside
+   it; the slider takes their place while it is up. It sits on the sheet
+   handle's row (BottomSheet), centered whatever the handle does, and kept
+   clear of the inset on both sides so it stays centered. */
+.command-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  gap: var(--la-space-2);
+  width: fit-content;
+  max-width: calc(100% - 2 * (var(--app-compact-inset-w) + var(--la-space-4)));
+  margin-inline: auto;
+}
+/* Riding on the open sheet, it stands off the sheet's edge. */
+.app-sheet.is-open .command-strip {
+  bottom: var(--la-space-2);
+}
+.command-strip__btn {
+  min-width: calc(var(--la-space-6) * 3);
+  min-height: var(--app-touch);
+  padding: 0 var(--la-space-5);
+  border: 0;
+  border-radius: var(--la-radius-pill);
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+  font: 600 var(--la-size-md) / 1 var(--la-font);
+  box-shadow: var(--la-shadow-2);
+  cursor: pointer;
+}
+/* Arm is the screen's one primary action; Disarm is destructive. */
+.command-strip__arm {
+  background: var(--la-orange);
+}
+.command-strip__disarm {
+  background: var(--la-bad);
+}
+/* The dark theme's red is light; dark text keeps the label legible on it. */
+:root[data-theme='dark'] .command-strip__disarm,
+:root[data-theme='dark'] .slide-confirm--danger .slide-confirm__knob {
+  color: var(--la-surface);
+}
+/* Takeoff hangs beside the centered button rather than widening the row. */
+.command-strip__side {
+  position: absolute;
+  top: 0;
+  left: calc(100% + var(--la-space-2));
+  white-space: nowrap;
+}
+.command-strip .slide-confirm {
+  width: var(--app-slide-w);
+  /* A short track would let a jittery tap reach the end. */
+  min-width: var(--app-slide-min-w);
+  max-width: 100%;
+}
+
+/* SlideConfirm. */
+.slide-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-1);
+  padding: var(--la-space-1);
+  border-radius: var(--la-radius-pill);
+  background: color-mix(in srgb, var(--la-charcoal) 88%, transparent);
+  box-shadow: var(--la-shadow-3);
+}
+.slide-confirm__track {
+  position: relative;
+  flex: 1;
+  height: var(--app-touch);
+  border-radius: var(--la-radius-pill);
+  background: color-mix(in srgb, var(--app-on-dark) 14%, transparent);
+  overflow: hidden;
+}
+.slide-confirm__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: var(--app-touch);
+  color: var(--app-on-dark);
+  font: 600 var(--la-size-md) / 1 var(--la-font);
+  pointer-events: none;
+}
+.slide-confirm__knob {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--app-touch);
+  height: var(--app-touch);
+  border-radius: var(--la-radius-pill);
+  /* Blue like the command it confirms; orange only for the primary one. */
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+  font: 700 var(--la-size-xl) / 1 var(--la-font);
+  cursor: grab;
+  /* The drag, not the page, gets the touch. */
+  touch-action: none;
+  transition: transform 0.2s var(--la-ease);
+}
+.slide-confirm__knob.is-dragging {
+  cursor: grabbing;
+  transition: none;
+}
+.slide-confirm__knob:focus-visible {
+  outline: 2px solid var(--app-on-dark);
+  outline-offset: 2px;
+}
+.slide-confirm--primary .slide-confirm__knob {
+  background: var(--la-orange);
+}
+.slide-confirm--danger .slide-confirm__knob {
+  background: var(--la-bad);
+}
+.slide-confirm__cancel {
+  flex: none;
+  width: var(--app-touch);
+  height: var(--app-touch);
+  border: 0;
+  border-radius: var(--la-radius-pill);
+  background: none;
+  color: var(--app-on-dark);
+  font: 700 var(--la-size-xl) / 1 var(--la-font);
+  cursor: pointer;
+}
+
+/* Compact app bar (AppBar, CompactStatus): short readings that open panels. */
+.app-bar__logo-btn {
+  display: flex;
+  padding: 0;
+  border: 0;
+  border-radius: var(--la-radius-pill);
+  background: none;
+  cursor: pointer;
+}
+.compact-status {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+.compact-status__item {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-space-1);
+  /* The bar's height less its margin: the most a 40px bar allows. */
+  height: calc(var(--la-appbar-h) - var(--la-space-2));
+  padding: 0 var(--la-space-1);
+  border: 0;
+  border-radius: var(--la-radius-sm);
+  background: none;
+  color: var(--app-on-dark);
+  font: 600 var(--la-size-sm) / 1 var(--la-font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+button.compact-status__item:hover,
+.compact-status__item.is-open {
+  background: color-mix(in srgb, var(--app-on-dark) 12%, transparent);
+}
+.compact-status .app-status__state {
+  min-width: 0;
+  /* The desktop bar collapses the pill at narrow widths; this bar has room. */
+  max-width: none;
+  margin-right: 0;
+  height: calc(var(--la-appbar-h) - var(--la-space-2));
+  padding: 0 var(--la-space-2);
+}
+/* The slots; the state word on the left grows leftward, moving nothing. */
+.compact-status__battery {
+  width: var(--app-cbar-batt-w);
+}
+.compact-status__gps {
+  width: var(--app-cbar-gps-w);
+}
+.compact-status__link {
+  width: var(--app-cbar-link-w);
+}
+.compact-status .app-status__val {
+  font-size: var(--la-size-sm);
+}
+.compact-status__mode {
+  width: var(--app-cbar-mode-w);
+}
+.compact-status__badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: var(--la-space-4);
+  padding: 0 var(--la-space-1);
+  border-radius: var(--la-radius-pill);
+  /* A count, not an action: the working blue, not the primary orange. */
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+  font: 700 var(--la-size-xs) / var(--la-space-4) var(--la-font);
+  text-align: center;
+}
+
+/* The side panel's button (ColumnShell's ColumnToggle): one square, the same
+   on every screen, blue while its panel is open. */
+.app-panel-toggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--app-touch);
+  height: var(--app-touch);
+  padding: 0;
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  color: var(--la-ink-2);
+  box-shadow: var(--la-shadow-1);
+  cursor: pointer;
+}
+.app-panel-toggle:hover {
+  color: var(--la-ink);
+}
+.app-panel-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+.app-panel-toggle.is-on {
+  border-color: var(--la-blue);
+  background: var(--la-blue);
+  color: var(--app-on-dark);
+}
+.app-panel-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+/* Something in the closed panel wants seeing (a transfer, a failed write). */
+.app-panel-toggle.has-alert {
+  position: relative;
+}
+.app-panel-toggle.has-alert::after {
+  content: '';
+  position: absolute;
+  top: var(--la-space-1);
+  right: var(--la-space-1);
+  width: var(--la-space-2);
+  height: var(--la-space-2);
+  border-radius: var(--la-radius-pill);
+  background: var(--la-blue);
+}
+.app-panel-toggle__pane {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* Compact Setup's screen picker (NavRail's SetupScreenPicker): the mode
+   switch's Setup button names the screen, at one width for every name so
+   nothing beside it moves, and opens the rail's groups side by side. */
+.app-screen-pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-space-1);
+  width: var(--app-screen-pick-w);
+}
+.app-screen-pick__chevron {
+  flex: none;
+  width: 10px;
+  height: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.bar-pop.app-screens {
+  display: flex;
+  gap: var(--la-space-4);
+  max-width: calc(100vw - 2 * var(--la-space-2));
+}
+.app-screens__group {
+  display: flex;
+  flex-direction: column;
+}
+.app-screens .app-nav__group {
+  margin-top: 0;
+}
+/* Five to a column, so the longest group takes two and the panel stays short
+   enough for a 412px window. */
+.app-screens__list {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(5, auto);
+  column-gap: var(--la-space-1);
+}
+.app-screens .app-nav__item {
+  min-height: var(--app-touch);
+  white-space: nowrap;
+}
+
+.bar-pop__progress {
+  margin: 0 0 var(--la-space-3);
+  color: var(--la-ink);
+  font: 600 var(--la-size-sm) / 1.3 var(--la-font);
+}
+.bar-pop {
+  position: fixed;
+  /* Above the map (Leaflet's controls at 1000), below the modals at 2000. */
+  z-index: 1500;
+  max-width: min(var(--app-pop-w), calc(100vw - 2 * var(--la-space-2)));
+  max-height: calc(100vh - var(--la-appbar-h) - var(--la-space-4));
+  overflow-y: auto;
+  padding: var(--la-space-3);
+  /* Framed like the SITL tray's panel, the other panel opened from the bar. */
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  color: var(--la-ink);
+  box-shadow: var(--la-shadow-2);
+}
+.bar-pop__rows {
+  display: grid;
+  gap: var(--la-space-2);
+  min-width: calc(var(--app-pop-w) * 0.6);
+  margin: 0;
+}
+.bar-pop__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--la-space-4);
+  font-size: var(--la-size-md);
+}
+.bar-pop__row dt {
+  color: var(--la-ink-2);
+}
+.bar-pop__row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.bar-pop__note {
+  margin: 0;
+  color: var(--la-ink-2);
+}
+/* A sentence on its own, kept to a readable measure. */
+.bar-pop__detail {
+  max-width: 36ch;
+  color: var(--la-ink);
+}
+.bar-pop__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--la-space-3);
+}
+.bar-pop__modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--la-space-1);
+  width: var(--app-pop-w);
+  max-width: 100%;
+}
+.bar-pop__mode {
+  min-height: var(--app-touch);
+  padding: 0 var(--la-space-1);
+  border: 1px solid var(--la-line);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface-2);
+  color: var(--la-ink);
+  font: 600 var(--la-size-sm) / 1.2 var(--la-font);
+  cursor: pointer;
+}
+.bar-pop__mode.is-current {
+  border-color: var(--la-blue);
+  background: var(--la-blue-soft);
+  cursor: default;
+}
+.bar-pop__messages {
+  width: var(--app-pop-w);
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--la-size-sm) / 1.4 var(--la-font-mono);
+}
+.bar-pop__messages li {
+  padding: var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+.bar-pop__messages li.is-warn {
+  color: var(--la-warn);
+}
+.bar-pop__preflight {
+  width: var(--app-pop-w);
+  max-width: 100%;
+}
+
+.flight-controls--compact {
+  border: 0;
+  background: none;
+}
+/* Mission progress rides on the app bar's mode in compact mode (ModeItem). */
+.flight-controls--compact .flight-progress {
+  display: none;
+}
+/* Compact Fly's sheet (FlightSheet, in a BottomSheet): a row of section tabs
+   over the section, which scrolls under them. */
+.flight-sheet {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.flight-sheet__tabs {
+  flex: none;
+  display: flex;
+  padding: 0 var(--la-space-2);
+  border-bottom: 1px solid var(--la-line);
+  background: var(--la-surface-2);
+}
+.flight-sheet__tabs .log-pane__tab {
+  min-height: var(--app-touch);
+  font-size: var(--la-size-md);
+}
+.flight-sheet__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--la-space-3) var(--la-space-4);
+}
+/* A section keeps its height and the body scrolls: the controls clip their
+   own overflow, so as a shrinking flex item they would be cut off instead. */
+.flight-sheet__body > * {
+  flex-shrink: 0;
+}
+/* The field list runs edge to edge, like the log pane it came from, and
+   scrolls itself. */
+.flight-sheet__body--status {
+  padding: 0;
+}
+.flight-sheet__body--status > * {
+  flex-shrink: 1;
+  min-height: 0;
+}
+/* Controls: the adjustments stack, one per row, in one column. Every control
+   is one touch target tall; the value fills the row between - and +, and Set
+   and Run share a width so the right edge is one line. */
+.flight-sheet .flight-controls--compact .flight-controls__secondary {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--la-space-3);
+  max-width: var(--app-sheet-form-w);
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.flight-sheet .flight-controls__field,
+.flight-sheet .flight-controls__run {
+  gap: var(--la-space-2);
+}
+.flight-sheet .flight-controls__secondary .la-btn,
+.flight-sheet .flight-controls__secondary .la-input,
+.flight-sheet .flight-controls__secondary .la-select {
+  height: var(--app-touch);
+  min-height: var(--app-touch);
+  font-size: var(--la-size-md);
+}
+.flight-sheet .flight-controls__secondary .la-btn {
+  min-width: var(--app-touch);
+  padding: 0;
+}
+.flight-sheet .flight-controls__secondary .la-field__label {
+  font-size: var(--la-size-sm);
+}
+.flight-sheet .flight-controls__num {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.flight-sheet .flight-controls__field > .la-btn:last-child,
+.flight-sheet .flight-controls__run > .la-btn {
+  flex: none;
+  width: var(--app-compact-btn-w);
+}
+/* Display has two small groups; spread across the sheet they read as
+   unrelated. The body already pads. */
+.flight-sheet .view-pane {
+  justify-content: flex-start;
+  gap: var(--la-space-4) var(--la-space-6);
+  padding: 0;
+}
+
+/* Compact Plan (MissionTab): the map fills the window; the plan's actions are
+   the side panel, and the items rise from the bottom in a sheet. */
+.mission-compact {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.mission-compact > .mission-map-area {
+  flex: 1;
+  min-width: 0;
+  isolation: isolate;
+}
+/* The side panel's button where a screen has no toolbar for it (Plan): the
+   view's top-right corner. The map's base-layer switch moves in beside it
+   rather than below. */
+.app-panel-corner {
+  position: absolute;
+  top: var(--la-space-2);
+  right: var(--la-space-2);
+  z-index: 2;
+}
+.mission-compact .map-controls {
+  right: calc(var(--app-touch) + var(--la-space-2) * 2);
+}
+/* Plan has no toolbar: the row the panel hangs under is the map's own
+   floating controls, which would sit on the panel's top edge. They belong to
+   the map the panel covers, so they step aside while it is open. */
+.mission-compact.has-panel .map-controls {
+  visibility: hidden;
+}
+/* Plan's side panel (ColumnShell): the plan column. */
+.mission-panel {
+  overflow: hidden;
+}
+/* In the panel the plan column scrolls as one, foot included. */
+.mission-panel .mission-side {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: none;
+  overflow-y: auto;
+}
+.mission-panel .mission-side__scroll {
+  flex: none;
+  overflow: visible;
+}
+.mission-panel .mission-side__foot {
+  border-top: 0;
+}
+/* The plan switch is a finger tall like the controls under it. */
+.mission-panel .plan-switch__btn {
+  min-height: var(--app-touch);
+}
+
+/* Compact mode's bottom sheet (BottomSheet): Plan's items and Fly's sheet.
+   It rises from the bottom, so the view stays in sight above it, and its
+   handle rides on its top edge to close it again. The handle's row can carry
+   the view's other bottom controls (Fly's Arm), which ride up with it. Only
+   those controls and the body take touches; the view around them stays live. */
+.app-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.app-sheet__row {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  /* Clear of the map's attribution line while the sheet is closed. */
+  margin-bottom: var(--la-space-5);
+  padding-inline: var(--la-space-2);
+}
+/* Where the middle is taken (Fly's Arm). */
+.app-sheet--right .app-sheet__row {
+  justify-content: flex-end;
+}
+.app-sheet__row > * {
+  pointer-events: auto;
+}
+.app-sheet__handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--la-space-2);
+  /* Fits the longest label, so the handle keeps its place as it changes. */
+  min-width: var(--app-sheet-handle-w);
+  min-height: var(--app-touch);
+  padding: 0 var(--la-space-5);
+  border: 1px solid var(--la-line-strong);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface);
+  color: var(--la-ink);
+  font: 600 var(--la-size-md) / 1 var(--la-font);
+  box-shadow: var(--la-shadow-2);
+  cursor: pointer;
+}
+.app-sheet__handle svg {
+  width: 10px;
+  height: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+/* The caret alone (Fly's), kept quiet over the view like the inset's buttons:
+   a finger square, on a dark wash that lets the view show through. */
+.app-sheet__handle--caret {
+  min-width: var(--app-touch);
+  padding: 0;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--la-charcoal) 60%, transparent);
+  color: var(--app-on-dark);
+  box-shadow: none;
+}
+.app-sheet__handle--caret svg {
+  width: 14px;
+  height: 8px;
+  stroke-width: 2;
+}
+.app-sheet.is-open .app-sheet__handle--caret {
+  border-color: var(--la-line-strong);
+  background: var(--la-surface);
+  color: var(--la-ink);
+}
+/* Open, the handle is the sheet's tab: joined to its top edge. */
+.app-sheet.is-open .app-sheet__row {
+  margin-bottom: -1px;
+}
+.app-sheet.is-open .app-sheet__handle {
+  position: relative;
+  z-index: 1;
+  border-bottom-color: var(--la-surface);
+  border-radius: var(--la-radius-sm) var(--la-radius-sm) 0 0;
+  box-shadow: none;
+}
+.app-sheet.is-open .app-sheet__handle svg {
+  transform: rotate(180deg);
+}
+.app-sheet__body {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--la-line-strong);
+  background: var(--la-surface);
+  box-shadow: var(--la-shadow-2);
+}
+.app-sheet__body > * {
+  flex: 1;
+  min-height: 0;
+}
+.plan-sheet .app-sheet__body {
+  height: var(--app-plan-sheet-h);
+}
+.flight-dock .app-sheet__body {
+  height: var(--app-fly-sheet-h);
+}
+.plan-sheet .mission-lower {
+  border: 0;
+  border-radius: 0;
+}
+/* Two columns of tools, so the whole palette fits the window's height with
+   Finish in view, where one column ran past the attribution. */
+.mission-compact .mission-palette {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  max-height: none;
+  overflow: visible;
+}
+/* With the sheet up it scrolls in the map above it, rather than running under
+   the sheet; its flyouts are fixed, so scrolling clips nothing. */
+.mission-compact.has-sheet .mission-palette {
+  max-height: calc(100% - var(--app-plan-sheet-h) - var(--la-space-4));
+  overflow-y: auto;
+}
+
+/* The item list (ItemEditor's ItemList): a line per item, each opening the
+   editor. Only the lines scroll; Add stays under them. */
+.item-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.item-list__rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.item-list__row {
+  display: grid;
+  grid-template-columns: var(--app-touch) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--la-space-2);
+  min-height: var(--app-touch);
+  padding: 0 var(--la-space-3) 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--la-line);
+  background: none;
+  color: var(--la-ink);
+  font: 400 var(--la-size-md) / 1.2 var(--la-font);
+  text-align: left;
+}
+.item-list__row.is-selected {
+  background: var(--la-blue-soft);
+}
+.item-list__seq {
+  justify-self: center;
+  color: var(--la-ink-3);
+  font-family: var(--la-font-mono);
+}
+.item-list__cmd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-list__alt {
+  color: var(--la-ink-2);
+  font-family: var(--la-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.item-list__foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-space-3);
+  padding: var(--la-space-2) var(--la-space-3);
+  border-top: 1px solid var(--la-line);
+}
+
+/* One item's editor (ItemEditor), across the item sheet: its heading and
+   actions share one row, and the fields tile beneath. */
+.item-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.item-editor__head {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  padding: var(--la-space-1) var(--la-space-2) var(--la-space-1) var(--la-space-3);
+  border-bottom: 1px solid var(--la-line);
+}
+.item-editor__title {
+  margin: 0;
+  font-size: var(--la-size-md);
+}
+.item-editor__leg {
+  color: var(--la-ink-3);
+  font-size: var(--la-size-sm);
+}
+.item-editor__back {
+  margin-left: auto;
+}
+.item-editor__body {
+  grid-area: 2 / 1 / 3 / 3;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--app-item-field-w), 1fr));
+  align-content: start;
+  gap: var(--la-space-3);
+  padding: var(--la-space-3);
+}
+.item-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-1);
+}
+.item-editor__alt {
+  display: grid;
+  grid-template-columns: var(--app-touch) minmax(0, 1fr) var(--app-touch);
+  gap: var(--la-space-2);
+}
+.item-editor__alt .la-input {
+  width: 100%;
+}
+.item-editor__alt .la-btn {
+  padding: 0;
+  font-size: var(--la-size-lg);
+}
+.item-editor__foot {
+  grid-area: 1 / 2;
+  display: grid;
+  grid-template-columns: repeat(3, var(--app-compact-btn-w));
+  gap: var(--la-space-2);
+  padding: var(--la-space-1) var(--la-space-3) var(--la-space-1) 0;
+  border-bottom: 1px solid var(--la-line);
+}
+/* One label width in compact Fly's sheet, so the controls line up. */
+.flight-sheet .flight-controls__field > .la-field__label,
+.flight-sheet .flight-controls__run > .la-field__label {
+  width: var(--app-compact-label-w);
+  flex: none;
+}
+.flight-sheet .flight-controls__run .flight-controls__action {
+  flex: 1;
+  width: auto;
+  min-width: 0;
 }

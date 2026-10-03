@@ -18,6 +18,8 @@ export interface BatteryReading {
   voltageV: number | null
   currentA: number
   remainingPct: number
+  /** MAV_BATTERY_CHARGE_STATE; 0 when the vehicle does not set it. */
+  chargeState: number
 }
 
 export interface VehicleSnapshot {
@@ -106,6 +108,12 @@ export interface VehicleSnapshot {
    * is not answering.
    */
   gimbal: { rollDeg: number; pitchDeg: number; yawDeg: number } | null
+  /** Where the vehicle will return to, or null until it reports one. */
+  home: { latDeg: number; lonDeg: number; altMslM: number } | null
+  /** MAV_LANDED_STATE (0 unknown, 1 on the ground, 2 in the air, 3 taking off, 4 landing). */
+  landedState: number
+  /** The fence's state, or null when the vehicle has sent none (no fence enabled). */
+  fence: { breached: boolean; breachType: number } | null
   statusTexts: StatusText[]
 }
 
@@ -153,6 +161,9 @@ const EMPTY: VehicleSnapshot = {
   capabilities: 0,
   boardId: 0,
   gimbal: null,
+  home: null,
+  landedState: 0,
+  fence: null,
   statusTexts: [],
 }
 

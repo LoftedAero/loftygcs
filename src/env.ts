@@ -1,5 +1,8 @@
-// Runtime environment detection. The browser and Electron builds share one
-// renderer; features probe here for what exists rather than forking the build.
+// Runtime environment detection. The browser, Electron and Android builds
+// share one renderer; features probe here for what exists rather than forking
+// the build.
+import { Capacitor } from '@capacitor/core'
+
 export function isElectron(): boolean {
   return typeof window !== 'undefined' && 'loftgcs' in window
 }
@@ -8,10 +11,21 @@ export function hasWebSerial(): boolean {
   return typeof navigator !== 'undefined' && 'serial' in navigator
 }
 
-// IP links (TCP/UDP) need the Electron main process; a plain browser tab
-// cannot open raw sockets. A WebSocket bridge (mavlink2rest) works anywhere.
+/** The Android app, which brings its own native links. */
+export function isNativeApp(): boolean {
+  return Capacitor.isNativePlatform()
+}
+
+// IP links (TCP/UDP) need the Electron main process or the Android app; a
+// plain browser tab cannot open raw sockets. A WebSocket bridge
+// (mavlink2rest) works anywhere.
 export function hasIpLinks(): boolean {
-  return isElectron()
+  return isElectron() || isNativeApp()
+}
+
+/** A device's own UART, such as a handheld radio's internal RF module. */
+export function hasUart(): boolean {
+  return isNativeApp()
 }
 
 /**

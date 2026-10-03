@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { LaButton, LaHint, LaModal } from '../../components/La'
 import VehicleParamActions from '../../components/VehicleParamActions'
+import ColumnShell from '../../components/ColumnShell'
 import ParamField from '../../components/ParamField'
 import type { ParamFieldSpec } from '../../components/ParamCard'
 import { BRAND } from '../../../brand'
@@ -19,21 +20,19 @@ export function isOsdParam(name: string): boolean {
   return /^OSD\d?_/.test(name)
 }
 
+export const OSD_REBOOT_REASON = 'OSD changes take effect after a restart'
+
 /**
  * The OSD's actions column: vehicle actions and the layout file first, then
  * settings groups (`children`).
  */
 export default function OsdActions({ children }: { children?: ReactNode }) {
   return (
-    <div className="app-col-shell">
+    <ColumnShell>
       <div className="app-col app-col--fields">
         {/* Scoped to OSD parameters, so edits staged on other screens are
             not sent from here. */}
-        <VehicleParamActions
-          title="OSD"
-          owns={isOsdParam}
-          reason="OSD changes take effect after a restart"
-        />
+        <VehicleParamActions title="OSD" owns={isOsdParam} reason={OSD_REBOOT_REASON} />
         <section className="app-col__group">
           <h3 className="app-col__head">Layout file</h3>
           <SaveLayout />
@@ -41,7 +40,7 @@ export default function OsdActions({ children }: { children?: ReactNode }) {
         </section>
         {children}
       </div>
-    </div>
+    </ColumnShell>
   )
 }
 

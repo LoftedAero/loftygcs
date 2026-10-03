@@ -40,6 +40,50 @@ export function screenGrid(osdType: number | undefined, txtRes: number | undefin
   return TEXT_RESOLUTIONS.find((r) => r.value === txtRes)?.grid ?? SD
 }
 
+/**
+ * The canvas DJI O3 and Walksnail goggles draw. OSD{n}_TXT_RES has no value
+ * for it, but layouts made for those goggles use it.
+ */
+const HD_53X20: Grid = { cols: 53, rows: 20, label: 'HD 53×20' }
+
+/** Every canvas a video system draws, smallest first. */
+const CANVASES: readonly Grid[] = [
+  SD,
+  TEXT_RESOLUTIONS[1]!.grid,
+  HD_53X20,
+  TEXT_RESOLUTIONS[2]!.grid,
+]
+
+/**
+ * The grid the editor draws, and the one the screen declares.
+ *
+ * Over MSP DisplayPort ArduPilot does not clip to OSD{n}_TXT_RES: it writes
+ * each panel at its stored column and row, and the goggles draw what lands on
+ * their own canvas, whose size the vehicle never learns. A layout that works
+ * can therefore sit outside the declared grid (a 53x20 layout with TXT_RES
+ * left at 0). The panels are the evidence, so the editor draws the smallest
+ * canvas that holds every enabled one, never smaller than the declared grid.
+ * Other backends draw exactly their grid.
+ */
+export function editorGrid(
+  osdType: number | undefined,
+  txtRes: number | undefined,
+  placements: readonly Placement[],
+  stored: readonly Placement[] = placements,
+): { grid: Grid; declared: Grid } {
+  const declared = screenGrid(osdType, txtRes)
+  if (osdType !== TYPE_MSP_DISPLAYPORT) return { grid: declared, declared }
+  const holds = CANVASES.filter((c) => c.cols >= declared.cols && c.rows >= declared.rows)
+  const fit = (list: readonly Placement[]) =>
+    holds.findIndex((c) => findOffGrid(list, c).size === 0)
+  // The larger of what the vehicle's layout and the staged one need, so
+  // moving the last outlying panel inward does not shrink the canvas under
+  // it and stop it going back.
+  const at = [fit(placements), fit(stored)].map((i) => (i < 0 ? holds.length - 1 : i))
+  const grid = holds[Math.max(...at)] ?? declared
+  return { grid, declared }
+}
+
 /** Rows beyond an NTSC frame's 13 visible lines, on the classic analog grid. */
 export const NTSC_VISIBLE_ROWS = 13
 
@@ -118,8 +162,8 @@ export function clampPlacement(
 }
 
 /**
- * Ids of enabled panels that do not fit on the grid, typically after
- * switching a screen from HD to SD. Such a panel silently stops appearing.
+ * Ids of enabled panels that do not fit on the grid. On an analog OSD such a
+ * panel silently stops appearing.
  */
 export function findOffGrid(placements: readonly Placement[], grid: Grid): Set<string> {
   const out = new Set<string>()
