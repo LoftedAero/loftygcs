@@ -43,6 +43,8 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:pwa
 
   release:
     # The draft release the installers and the web zip are uploaded to. Its

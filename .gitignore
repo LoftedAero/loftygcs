@@ -9,6 +9,8 @@ dist-electron/
 
 # Test and tool output
 coverage/
+playwright-report/
+test-results/
 *.log
 
 # Local environment and editor state

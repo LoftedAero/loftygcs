@@ -39,6 +39,7 @@
     "cal-art": "electron scripts/make-cal-art.mjs",
     "dist": "npm run build:electron && electron-builder --publish never",
     "test": "vitest run",
+    "test:pwa": "npm run build:web && playwright test",
     "sitl": "node scripts/sitl.mjs run",
     "sitl:fetch": "node scripts/sitl.mjs fetch",
     "video:testsrc": "node scripts/video-testsrc.mjs rtsp",
@@ -63,6 +64,7 @@
   "devDependencies": {
     "@capacitor/android": "^8.5.2",
     "@capacitor/cli": "^8.5.2",
+    "@playwright/test": "^1.64.0",
     "@testing-library/react": "^16.0.0",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^22.0.0",
@@ -83,6 +85,7 @@
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.0.0",
     "vite": "^7.0.0",
+    "vite-plugin-pwa": "^2.0.0",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^3.0.0"
   },

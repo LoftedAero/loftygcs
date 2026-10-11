@@ -6,6 +6,9 @@ import './styles/lofted-aero.css'
 import './styles/app.css'
 import { watchSystemTheme } from './stores/theme-store'
 import { usePreferencesStore } from './stores/preferences-store'
+import { startPwa } from './services/pwa'
+
+void startPwa()
 
 // index.html's inline script has already applied the theme; this keeps it
 // following the OS while the choice is "system".

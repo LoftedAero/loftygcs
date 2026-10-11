@@ -1001,6 +1001,13 @@
 }
 
 /* Test and Configure share the column's width, as one control. */
+.prefs__offline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--la-space-2);
+}
+
 .prefs__buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;

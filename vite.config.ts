@@ -4,6 +4,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // CesiumJS fetches its workers, shaders and widget CSS at runtime from
 // CESIUM_BASE_URL, so they cannot be bundled: they are served from
@@ -53,7 +54,31 @@ function cesiumAssets(): Plugin {
 // file:// inside the packaged Electron app.
 export default defineConfig({
   base: './',
-  plugins: [react(), cesiumAssets()],
+  plugins: [
+    react(),
+    cesiumAssets(),
+    VitePWA({
+      // Registration is browser-only; packaged Electron/Capacitor use these
+      // same files but must never install a worker over their bundled app.
+      injectRegister: false,
+      manifest: false,
+      integration: { closeBundleOrder: 'post' },
+      workbox: {
+        globPatterns: ['**/*'],
+        globIgnores: ['**/*.map', '_headers'],
+        maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
+        // Include the copied Cesium runtime and lazy chunks, not only the
+        // initial screen. Never reload or replace a live vehicle session.
+        skipWaiting: false,
+        clientsClaim: false,
+        // Compatibility cleanup matches scope substrings and can delete a
+        // nested app's cache. Normal activation prunes this cache's old entries.
+        cleanupOutdatedCaches: false,
+        navigateFallback: null,
+        runtimeCaching: [],
+      },
+    }),
+  ],
   // glTF is not a Vite asset type by default. Models are imported with ?url.
   assetsInclude: ['**/*.gltf'],
   define: {
@@ -66,6 +91,7 @@ export default defineConfig({
     target: 'es2022',
   },
   test: {
+    exclude: ['node_modules/**', 'e2e/**', 'dist*/**'],
     environment: 'jsdom',
     // Stubs for browser APIs jsdom lacks.
     setupFiles: ['./src/test-setup.ts'],

@@ -54,7 +54,12 @@ Unzip it onto a static host. The host must meet two requirements:
   previous build after it has been replaced.
 
 The build uses `base: './'`, so it works from a domain root or any subpath
-without rebuilding.
+without rebuilding. The production build includes an offline service worker;
+serve `sw.js` and `manifest.webmanifest` with revalidation as well. Deploy the
+complete output atomically and retain older hashed assets while clients finish
+installing. Updates activate after all app windows close, never by automatically
+reloading an active session. Run `npm run test:pwa` before shipping the web build.
+See [pwa.md](pwa.md) for preparation, update behavior and device validation.
 
 ## 3. Installers
 

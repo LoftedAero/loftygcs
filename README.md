@@ -57,6 +57,10 @@ The Android app is built with Gradle; see [docs/android.md](docs/android.md).
 
 ## Development
 
+The production browser build supports offline startup after an online install.
+See [Offline browser app](docs/pwa.md) for Home Screen installation, readiness,
+updates and local secure WebSocket connections.
+
 ```sh
 npm test               # unit and component tests (Vitest)
 npm run typecheck      # renderer and Electron projects

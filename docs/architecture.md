@@ -49,6 +49,31 @@ Product identity (name, preview flag) lives only in `src/brand.ts`. The desktop 
 and the OS key their records on it. Electron names the data folder after the product, and
 `main.ts` moves a folder left by the old name (Loft GCS) into place on first launch.
 
+## Browser offline app
+
+`vite-plugin-pwa` generates a revisioned Workbox precache after Cesium's assets
+are copied. It covers the complete local production build, including models,
+the inlined protocol worker and Cesium's runtime workers. It caches no arbitrary
+network responses: map tiles, terrain and parameter metadata retain their own
+storage policies. Device requests and WebSockets never enter the app cache.
+
+`services/pwa.ts` registers only in a secure, production browser context, never
+in Electron, Capacitor or the Vite development server. Preferences reports when
+installation has completed and allows retrying a failed installation. Updates
+wait for every controlled window to close: no `skipWaiting`, `clientsClaim` or
+automatic reload can interrupt a vehicle connection or discard staged edits.
+An incomplete update cannot activate over the previous precache. Normal
+activation prunes obsolete entries from its own cache. Workbox compatibility
+cleanup is disabled because its substring scope matching can delete a nested
+application's cache when a root installation activates.
+
+The manifest, registration URL and precache URLs are relative so the same zip
+works at a domain root or subpath. There is no catch-all navigation fallback:
+the app uses in-memory navigation, and unrelated URLs must not return its HTML.
+`npm run test:pwa` exercises the production build offline, including subpaths
+and waiting/failed updates. Installation and device trust on iPad still require
+physical validation; see `docs/pwa.md`.
+
 ## Electron shell
 
 - `contextIsolation` and `sandbox` stay on. The whole privileged surface is

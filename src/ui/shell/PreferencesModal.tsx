@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LaButton, LaField, LaHint, LaModal, LaSelect, LaSwitch } from '../components/La'
 import VoiceCalloutsModal from './VoiceCalloutsModal'
+import OfflineApp from './OfflineApp'
 import { REPEAT_CHOICES_S } from '../../services/voice/catalog'
 import { TONES } from '../../services/voice/tones'
 import { announcer } from '../../services/voice/announcer'
@@ -215,6 +216,7 @@ export default function PreferencesModal() {
           </div>
         </LaField>
       </section>
+      <OfflineApp />
       {/* Mounted only while open: its group headings would otherwise sit in the
           page under every screen. */}
       {open && calloutsOpen && <VoiceCalloutsModal open onClose={() => setCalloutsOpen(false)} />}

@@ -26,6 +26,19 @@ const SPLASH_BG = '#F1F2F5'
  */
 function outputs() {
   const list = [{ file: path.join(root, 'build/icon.png'), w: 512, h: 512, mark: 512 }]
+  for (const size of [180, 192, 512]) {
+    list.push({
+      file: path.join(
+        root,
+        'public/icons',
+        size === 180 ? 'apple-touch-icon.png' : `icon-${size}.png`,
+      ),
+      w: size,
+      h: size,
+      mark: Math.round(size * 0.8),
+      bg: SPLASH_BG,
+    })
+  }
   if (!existsSync(RES)) return list
   const densities = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 }
   for (const [d, k] of Object.entries(densities)) {
