@@ -326,8 +326,11 @@ link lost, connected but unidentified, Not ready, Ready, Armed and Failsafe.
 - [ ] A vehicle with no battery monitor and no GPS shows those readings as
       dashes or "No GPS", not zeros
 - [ ] The firmware and version readout matches the Firmware tab after a flash
-- [ ] At narrow widths the firmware readout drops at 1700px, the other
-      readings at 1500px, and the status word at 1080px
+- [ ] The EKF pill reads EKF3 (or the configured EKF) in green on a settled
+      vehicle and opens the EKF window
+- [ ] At narrow widths the firmware readout drops at 1800px, the other
+      readings at 1650px, and the EKF pill and status word at 1140px, and
+      the status never touches either side band
 
 ### Footer
 

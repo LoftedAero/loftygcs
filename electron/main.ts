@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, shell, session } from 'electron'
+import { app, BrowserWindow, ipcMain, net, screen, shell, session } from 'electron'
 import { existsSync, readdirSync, renameSync, rmdirSync } from 'node:fs'
 import path from 'node:path'
 import { withDriverNames } from './serial-names'
@@ -32,6 +32,12 @@ function adoptPreRenameData(): void {
 adoptPreRenameData()
 
 let mainWindow: BrowserWindow | null = null
+
+/** Window names the renderer's PopupWindow uses; the only windows it may open. */
+const POPUP_NAME_PREFIX = 'loftgcs-popup-'
+
+/** Open pop-out windows by name, so the renderer can size one (app:fit-popup). */
+const popups = new Map<string, BrowserWindow>()
 
 // Electron fires select-serial-port when the renderer calls
 // navigator.serial.requestPort(). Main forwards the candidate list to the
@@ -102,9 +108,45 @@ function createWindow() {
    * EADDRINUSE. The simulator is left running: it is a separate process, not
    * renderer state.
    */
+  /**
+   * Pop-out windows (PopupWindow): blank same-origin documents the renderer
+   * draws into, so their content stays in the app's React tree and stores and
+   * can be dragged to another screen. They are allowed by name only, with the
+   * main window's sandbox, and close when the renderer that drew them goes.
+   * Anything else asking for a window is refused; a web link goes to the OS
+   * browser instead, since a target="_blank" link would otherwise load a
+   * remote page in a window with this app's privileges.
+   */
+  mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    if (url === 'about:blank' && frameName.startsWith(POPUP_NAME_PREFIX)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          autoHideMenuBar: true,
+          minWidth: 480,
+          minHeight: 320,
+          webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+        },
+      }
+    }
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  mainWindow.webContents.on('did-create-window', (win, { frameName }) => {
+    popups.set(frameName, win)
+    win.setMenuBarVisibility(false)
+    win.on('closed', () => {
+      if (popups.get(frameName) === win) popups.delete(frameName)
+    })
+  })
+  const closePopups = () => {
+    for (const win of popups.values()) win.close()
+  }
+
   const dropRendererState = () => {
     closeAllLinks()
     stopVideo()
+    closePopups()
   }
   mainWindow.webContents.on('did-start-loading', dropRendererState)
   mainWindow.webContents.on('render-process-gone', dropRendererState)
@@ -304,6 +346,9 @@ function createWindow() {
     void mainWindow.loadFile(path.join(__dirname, '../dist-web/index.html'))
   }
 
+  // Before 'closed': a pop-out left open would keep the app running with
+  // nothing behind it to draw it.
+  mainWindow.on('close', closePopups)
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -335,6 +380,18 @@ app.whenReady().then(() => {
   // gamepad input while the override stream keeps sending the last sticks.
   ipcMain.on('app:background-throttling', (e, allowed: unknown) => {
     e.sender.setBackgroundThrottling(allowed !== false)
+  })
+  // A pop-out's content height, measured by the renderer that draws it. Only
+  // the main window's renderer may ask, only for a pop-out, and never for more
+  // than the screen holds.
+  ipcMain.on('app:fit-popup', (e, name: unknown, height: unknown) => {
+    if (e.sender !== mainWindow?.webContents) return
+    if (typeof name !== 'string' || typeof height !== 'number' || !Number.isFinite(height)) return
+    const win = popups.get(name)
+    if (!win) return
+    const workArea = screen.getDisplayMatching(win.getBounds()).workAreaSize.height
+    const width = win.getContentSize()[0] ?? 0
+    win.setContentSize(width, Math.round(Math.min(Math.max(height, 200), workArea)))
   })
   ipcMain.on('app:open-external', (_e, url: string) => {
     // Web links and mailto only. A file: or custom scheme from a compromised

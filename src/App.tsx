@@ -31,6 +31,7 @@ import InspectorTab from './ui/tabs/inspector/InspectorTab'
 import FlightTab from './ui/tabs/flight/FlightTab'
 import MissionTab from './ui/tabs/mission/MissionTab'
 import SimFieldPicker from './ui/shell/SimFieldPicker'
+import EstimatorWindow from './ui/shell/EstimatorDialog'
 import { startReading } from './services/joystick'
 import { announcer } from './services/voice/announcer'
 
@@ -126,6 +127,7 @@ export default function App() {
       <ActionBar />
       <ConnectModal />
       <SimFieldPicker />
+      <EstimatorWindow />
       <PreferencesModal />
       <SerialChooserModal />
       <UnsavedChangesModal />

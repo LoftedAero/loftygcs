@@ -162,6 +162,7 @@ export function LaHint({ error, children }: { error?: boolean; children?: ReactN
 export function LaModal({
   open,
   toast,
+  floating,
   wide,
   narrow,
   title,
@@ -170,6 +171,12 @@ export function LaModal({
 }: {
   open: boolean
   toast?: boolean
+  /**
+   * No backdrop and nothing blocked, like the toast but full size: for a
+   * readout opened in flight, where the controls behind it must stay usable.
+   * App-local; see app.css.
+   */
+  floating?: boolean
   /** The wider card DESIGN.md defines, for dialogs with a diagram or a table. */
   wide?: boolean
   /**
@@ -181,7 +188,12 @@ export function LaModal({
   children?: ReactNode
   actions?: ReactNode
 }) {
-  const cls = ['la-modal', toast ? 'la-modal--toast' : '', open ? '' : 'hidden']
+  const cls = [
+    'la-modal',
+    toast ? 'la-modal--toast' : '',
+    floating ? 'la-modal--floating' : '',
+    open ? '' : 'hidden',
+  ]
     .filter(Boolean)
     .join(' ')
   // Portaled to the body, so a dialog opened from a panel or a sheet layers

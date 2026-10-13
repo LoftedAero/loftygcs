@@ -146,3 +146,34 @@ describe('the voice callouts’ messages', () => {
     ).toEqual([{ k: 'fence', breached: true, breachType: 2 }])
   })
 })
+
+describe('EKF_STATUS_REPORT', () => {
+  const report = (fields: Record<string, number>): DecodedMessage => ({
+    msgid: 193,
+    msgName: 'EKF_STATUS_REPORT',
+    sysid: 1,
+    compid: 1,
+    seq: 0,
+    fields,
+  })
+  const base = {
+    flags: 831,
+    velocityVariance: 0.0088,
+    posHorizVariance: 0.0051,
+    posVertVariance: 0.0000068,
+    compassVariance: 0.0098,
+    terrainAltVariance: 0,
+  }
+
+  it('carries the flags and every variance, as SITL sent them', () => {
+    expect(messageToDeltas(report({ ...base, airspeedVariance: 0.2 }))).toEqual([
+      { k: 'ekf', status: { ...base, airspeedVariance: 0.2 } },
+    ])
+  })
+
+  it('reads the airspeed extension an older sender leaves out as zero', () => {
+    expect(messageToDeltas(report(base))).toEqual([
+      { k: 'ekf', status: { ...base, airspeedVariance: 0 } },
+    ])
+  })
+})

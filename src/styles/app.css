@@ -43,6 +43,9 @@
   --app-cbar-link-w: 66px;
   /* A dialog that is only a question and its answers. */
   --app-dialog-narrow-w: 280px;
+  /* The EKF status window: variances and sensors side by side, wide enough
+     for the GPS row's "RTK fixed · 10 sats" unclipped. */
+  --app-estimator-w: 840px;
   /* The servo table's first column, "SERVO16". */
   --app-servo-output-w: 80px;
   /* A labeled sheet handle: fits Plan's "Items · 99" and the chevron. */
@@ -296,6 +299,32 @@
 /* An empty body is still a flex child, so it adds a gap and pads the card. */
 .la-modal__body:empty {
   display: none;
+}
+
+/* A pop-out window's document (PopupWindow). The shared sheet turns off the
+   page's own scrolling, as a desktop window should; a pop-out made smaller than
+   its content scrolls here instead. */
+.app-popup {
+  height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: var(--la-space-5);
+  background: var(--la-surface);
+}
+
+/* A dialog that blocks nothing, after the system sheet's toast: no scrim, and
+   clicks pass through everything but the card. It sits over the right of the
+   window, which on Fly is the map, so the HUD and the flight controls on the
+   left stay in view and in reach. */
+.la-modal--floating {
+  justify-content: flex-end;
+  background: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+.la-modal--floating .la-modal__card {
+  width: min(var(--app-estimator-w), 100%);
+  pointer-events: auto;
 }
 
 /* The Connect dialog, for all three network link kinds: one column with the
@@ -912,6 +941,212 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--la-ink-3);
+}
+/* EKF status window. Every list is one fixed set per vehicle and every row
+   one line, so the window keeps its size as values change; only fills, dots
+   and words move. Green/amber/red are status only. */
+.estimator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
+  font-size: var(--la-size-sm);
+  color: var(--la-ink);
+}
+.estimator section {
+  min-width: 0;
+}
+.estimator__head {
+  margin: 0 0 var(--la-space-2);
+  font-size: var(--la-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--la-ink-3);
+}
+.estimator__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--la-ink-3);
+}
+.estimator__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-5);
+}
+/* The HUD pill, large: tinted by its state like the app bar's status. */
+.estimator__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  padding: var(--la-space-2) var(--la-space-4);
+  border-radius: 999px;
+  font-size: var(--la-size-lg);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: var(--la-surface-2);
+}
+.estimator__pill--ok {
+  background: color-mix(in srgb, var(--la-ok) 16%, transparent);
+}
+.estimator__pill--warn {
+  background: color-mix(in srgb, var(--la-warn) 18%, transparent);
+}
+.estimator__pill--bad {
+  background: color-mix(in srgb, var(--la-bad) 16%, transparent);
+}
+.estimator__pill--ok .estimator__dot {
+  background: var(--la-ok);
+}
+.estimator__pill--warn .estimator__dot {
+  background: var(--la-warn);
+}
+.estimator__pill--bad .estimator__dot {
+  background: var(--la-bad);
+}
+.estimator__facts {
+  margin: 0;
+  display: flex;
+  gap: var(--la-space-5);
+}
+.estimator__facts dt {
+  font-size: var(--la-size-xs);
+  color: var(--la-ink-3);
+}
+.estimator__facts dd {
+  margin: 0;
+  font-weight: 600;
+  font-family: var(--la-font-mono);
+}
+.estimator__fact--bad dd {
+  color: var(--la-bad);
+}
+.estimator__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--la-space-5);
+}
+.estimator__variances,
+.estimator__sensors,
+.estimator__flags {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+.estimator__variance {
+  display: grid;
+  grid-template-columns: 19ch minmax(0, 1fr) 5ch;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.estimator__bar {
+  position: relative;
+  height: var(--la-space-2);
+  border-radius: var(--la-radius-sm);
+  background: var(--la-surface-2);
+}
+.estimator__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--la-radius-sm);
+  background: var(--la-ok);
+}
+.estimator__variance--bad .estimator__fill {
+  background: var(--la-bad);
+}
+/* The vehicle's own failsafe line, FS_EKF_THRESH. */
+.estimator__limit {
+  position: absolute;
+  top: calc(-1 * var(--la-space-1));
+  bottom: calc(-1 * var(--la-space-1));
+  border-left: 2px solid var(--la-ink-2);
+}
+.estimator__value {
+  text-align: right;
+  font-family: var(--la-font-mono);
+  color: var(--la-ink-2);
+}
+.estimator__variance--bad .estimator__value {
+  color: var(--la-bad);
+  font-weight: 600;
+}
+.estimator__variance--none .estimator__label,
+.estimator__variance--none .estimator__value {
+  color: var(--la-ink-3);
+}
+.estimator__sensor {
+  display: grid;
+  grid-template-columns: auto 15ch minmax(0, 1fr) 9ch;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.estimator__detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--la-font-mono);
+  color: var(--la-ink-2);
+}
+.estimator__word {
+  text-align: right;
+  color: var(--la-ink-2);
+}
+.estimator__sensor--ok .estimator__dot {
+  background: var(--la-ok);
+}
+.estimator__sensor--bad .estimator__dot {
+  background: var(--la-bad);
+}
+.estimator__sensor--bad .estimator__word {
+  color: var(--la-bad);
+  font-weight: 600;
+}
+.estimator__sensor--none {
+  color: var(--la-ink-3);
+}
+.estimator__flags {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--la-space-4);
+}
+.estimator__flag {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  white-space: nowrap;
+}
+.estimator__flag--off {
+  color: var(--la-ink-3);
+}
+.estimator__flag--good .estimator__dot {
+  background: var(--la-ok);
+}
+.estimator__flag--warn .estimator__dot {
+  background: var(--la-warn);
+}
+.estimator__flag--warn {
+  color: var(--la-warn);
+  font-weight: 600;
+}
+.estimator__flag--bad .estimator__dot {
+  background: var(--la-bad);
+}
+.estimator__flag--bad {
+  color: var(--la-bad);
+  font-weight: 600;
+}
+/* Fixed at six lines whatever has been said, so the window never grows. The
+   content box is sized, so the border and padding cannot shave a line off. */
+.estimator__log {
+  box-sizing: content-box;
+  height: calc(6 * 1.6em);
+  overflow-y: auto;
 }
 
 /* Mission progress on the Fly screen. It sits on the controls strip but reads
@@ -2260,11 +2495,15 @@
    This also avoids a trap in the system sheet: `.la-appbar__spacer` is
    declared `flex: 1 1 auto` but overridden by the later, more specific
    `.la-appbar > * { flex: none }`, so the sheet's spacer never grows. This
-   bar uses no spacers. */
+   bar uses no spacers.
+
+   The column gap keeps the status off a side band once that band has
+   outgrown its share and the middle gives way. The breakpoints below count
+   it. */
 .la-appbar {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  gap: 0;
+  gap: 0 var(--la-space-4);
 }
 .app-bar__band {
   display: flex;
@@ -2394,11 +2633,11 @@
   font-weight: 600;
   white-space: nowrap;
   /* A failed connection puts a whole sentence here; every other state is two
-     words. The two side bands take a fixed amount of the bar, so the cap
-     follows the window and stops at 64ch, past which the tooltip carries the
-     rest. No floor: a fixed minimum on a narrow window overflows the bar and
-     pushes Connect and Disconnect off the end. */
-  max-width: min(64ch, calc(100vw - 860px));
+     words. The two side bands and their gaps take a fixed amount of the bar
+     (about 886px), so the cap follows the window and stops at 64ch, past which
+     the tooltip carries the rest. No floor: a fixed minimum on a narrow window
+     overflows the bar and pushes Connect and Disconnect off the end. */
+  max-width: min(64ch, calc(100vw - 892px));
   overflow: hidden;
 }
 /* The truncation happens on the word, not the pill. `text-overflow` needs a
@@ -2455,6 +2694,29 @@ button.app-status__state--warn:hover {
 }
 button.app-status__state--bad:hover {
   background: color-mix(in srgb, var(--la-bad) 52%, transparent);
+}
+
+/* The estimator pill (EstimatorChip), first in the row: the readiness pill's
+   shape and tones, but only as wide as its word, which is one width for EKF3,
+   EKF2 and DCM so a fallback does not move the row. Its gap to the readiness
+   pill is the row's own; the wide margin belongs to the gauges. Two classes,
+   to outrank that margin, set further down. */
+.app-status__state.app-status__ekf {
+  min-width: 0;
+  margin-right: 0;
+}
+.app-status__ekf-word {
+  min-width: 4ch;
+  text-align: center;
+}
+/* No AHRS report yet: the untinted ground, and a dimmed dot that claims no
+   state. */
+.app-status__state--none .app-status__dot {
+  opacity: 0.5;
+}
+/* Its window is open. */
+.app-status__ekf[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--app-on-dark) 45%, transparent);
 }
 
 /* The gamepad has control (ui/shell/JoystickChip.tsx), lifted toward white for
@@ -2580,20 +2842,21 @@ button.app-status__state--bad:hover {
   color: color-mix(in srgb, var(--la-bad) 55%, white);
 }
 
-/* Narrow windows drop the readings whole and keep the fused word: it is the
-   only element that says the aircraft is not ready to fly, and the readings are
-   repeated on the Fly screen. The breakpoint clears the longest strings a real
-   vehicle produces ("15.9V 24.1A 61%", "RTK fixed · 22"). */
-@media (max-width: 1500px) {
+/* Narrow windows drop the readings whole and keep the fused word and the
+   estimator: the word is the only element that says the aircraft is not ready
+   to fly, and the readings are repeated on the Fly screen. The breakpoint
+   clears the side bands (about 854px), their gaps, and the longest row a real
+   vehicle produces ("External", "15.9V 24.1A 61%", "RTK fixed · 22"). */
+@media (max-width: 1650px) {
   .app-status__item {
     display: none;
   }
 }
-/* Below 1080px the word goes too, because the rest of the bar needs the room.
-   The breakpoint clears the longest state ("Waiting for heartbeat", 179px), not
-   just the common ones, so the bar does not overflow the moment a connection
-   starts. */
-@media (max-width: 1080px) {
+/* Below 1140px the word goes too, because the rest of the bar needs the room.
+   The breakpoint clears the estimator and the word together (about 250px),
+   which outgrow the longest state before a vehicle exists ("Waiting for
+   heartbeat", 179px). */
+@media (max-width: 1140px) {
   .app-status {
     display: none;
   }
@@ -7503,9 +7766,11 @@ body.is-splitting .flight-map {
   margin-right: var(--la-space-4);
 }
 /* First to go when the window narrows: it is static identity, also shown on
-   Overview. Dropping it before the gauges' own breakpoint buys them about
-   150px. */
-@media (max-width: 1700px) {
+   Overview. The breakpoint is where the full row stops fitting beside the side
+   bands; above it the row may sit off the midline (about 40px at 1920) rather
+   than lose the readout. Dropping it before the gauges' own breakpoint buys
+   them about 170px. */
+@media (max-width: 1800px) {
   .app-status__item--firmware {
     display: none;
   }
