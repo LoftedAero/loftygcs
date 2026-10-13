@@ -569,6 +569,28 @@ Messages, Status, Preflight, Camera, Joystick, Video and View are tabs of one pa
 while showing, so anything that must outlive it (the joystick read loop) lives in the app. A
 saved pane name is validated on load.
 
+### Arming checks (`protocol/arming-checks.ts`)
+
+The Preflight pane lists every arming check with its state, reached from the HUD's readiness
+pill or the app bar's status word. ArduPilot knows which check each failure belongs to but drops
+it: STATUSTEXT carries only "PreArm: Compass 1 not healthy". The check is recovered from the
+wording, matched against the format strings `AP_Arming` and the vehicles pass to
+`check_failed()`. A reason nothing matches goes under Other, as do the mandatory checks that
+ignore the skip mask, so no failure is lost.
+
+- 4.7 replaced `ARMING_CHECK` (bits to run, bit 0 for all) with `ARMING_SKIPCHK` (bits to skip,
+  -1 for all). The bit positions did not change. With neither downloaded, skipped is unknown.
+- Reasons repeat only every 30 s, so while the vehicle is not ready the pane sends
+  `MAV_CMD_RUN_PREARM_CHECKS` (401), which reports every failing check at once.
+- Until the firmware has finished starting up, every vehicle answers a checks run with
+  "System not initialised" alone. The pane never asks then: ArduPilot sends no SYS_STATUS
+  until it has started (measured on SITL with `BRD_BOOT_DELAY`), and the pane asks only once
+  that reads not ready. A test that asks on the first heartbeat has to ask again.
+- The prearm bit outranks the reasons: once the vehicle reports ready, every running check
+  passes, though a reason from before is still within the pane's minute.
+- `arming-checks.integration.test.ts` raises `BATT_ARM_VOLT` on SITL and checks the firmware's
+  own wording lands on Battery Level.
+
 ### Takeoff (`takeoffStyle()` in `services/flight.ts`)
 
 Measured against SITL, armed:

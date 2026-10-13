@@ -52,6 +52,10 @@ confirming there is no difference is the check.
 - [ ] Disconnected
 - [ ] Connected
 - [ ] Lower pane tabs: Messages, Status, Preflight
+- [ ] Preflight lists every arming check: a failing one reads Fail with the
+      vehicle's reason on hover, a skipped one Skipped, and none fails
+      beside "Ready to arm"
+- [ ] Clicking the HUD's readiness pill opens the Preflight pane
 - [ ] Camera (needs a mount): an unconfigured mount says so rather than
       appearing to work
 - [ ] Joystick (needs a gamepad): nothing moves the aircraft until a device is

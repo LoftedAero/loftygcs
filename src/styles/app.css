@@ -914,6 +914,49 @@
   color: var(--la-ink-3);
 }
 
+/* Every check is always listed, so the list is one shape whatever passes;
+   only the dot and the word change. Columns rather than one long list, so
+   twenty rows fit the lower pane. */
+.preflight__checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(26ch, 1fr));
+  column-gap: var(--la-space-4);
+  row-gap: var(--la-space-1);
+  font-size: var(--la-size-sm);
+}
+.preflight__check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 7ch;
+  align-items: center;
+  gap: var(--la-space-2);
+  color: var(--la-ink);
+}
+.preflight__check-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preflight__check-status {
+  color: var(--la-ink-2);
+}
+.preflight__check--pass .preflight__dot {
+  background: var(--la-ok);
+}
+.preflight__check--fail .preflight__dot {
+  background: var(--la-bad);
+}
+.preflight__check--fail .preflight__check-status {
+  color: var(--la-bad);
+  font-weight: 600;
+}
+.preflight__check--skipped,
+.preflight__check--skipped .preflight__check-status {
+  color: var(--la-ink-3);
+}
+
 /* Mission progress on the Fly screen. It sits on the controls strip but reads
    as a readout: no border, no fill, monospace numbers that do not jump as they
    count down. */

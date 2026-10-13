@@ -70,6 +70,11 @@ export default function FlightTab() {
     layout.setLogPane('video')
     if (!layout.showMessages) layout.toggle('showMessages')
   }
+  // The HUD's readiness pill goes where the app bar's status word does.
+  const showPreflightPane = () => {
+    layout.setLogPane('preflight')
+    if (!layout.showMessages) layout.toggle('showMessages')
+  }
 
   // The guided target and home pins belong to the connected vehicle, so they
   // are cleared when it goes.
@@ -90,7 +95,12 @@ export default function FlightTab() {
     />
   )
   const hudPanel = (
-    <Hud horizon={layout.hudHorizon} overlays={layout.hudOverlays} onContextMenu={setHudMenu} />
+    <Hud
+      horizon={layout.hudHorizon}
+      overlays={layout.hudOverlays}
+      onContextMenu={setHudMenu}
+      onReadinessClick={showPreflightPane}
+    />
   )
   // Compact mode draws the HUD differently in the inset and full screen.
   const hud = (props: Partial<HudProps>) => (
