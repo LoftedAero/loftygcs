@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
+import { useUiStore } from '../../../stores/ui-store'
 import {
   LOG_PANES,
   useFlightLayoutStore,
@@ -75,6 +76,7 @@ export default function FlightTab() {
     layout.setLogPane('preflight')
     if (!layout.showMessages) layout.toggle('showMessages')
   }
+  const openPreflightPanel = () => useUiStore.getState().setPreflightOpen(true)
 
   // The guided target and home pins belong to the connected vehicle, so they
   // are cleared when it goes.
@@ -102,12 +104,14 @@ export default function FlightTab() {
       onReadinessClick={showPreflightPane}
     />
   )
-  // Compact mode draws the HUD differently in the inset and full screen.
+  // Compact mode draws the HUD differently in the inset and full screen. Its
+  // pill opens the app bar's Preflight panel, as there is no lower pane.
   const hud = (props: Partial<HudProps>) => (
     <Hud
       horizon={layout.hudHorizon}
       overlays={layout.hudOverlays}
       onContextMenu={setHudMenu}
+      onReadinessClick={openPreflightPanel}
       {...props}
     />
   )

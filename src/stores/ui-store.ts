@@ -122,6 +122,10 @@ interface UiState {
   fieldPickerOpen: boolean
   setFieldPickerOpen: (open: boolean) => void
 
+  /** Compact mode's Preflight panel. In the store because the HUD's pill opens it. */
+  preflightOpen: boolean
+  setPreflightOpen: (open: boolean) => void
+
   /** Non-null while a navigation is waiting on staged parameter edits. */
   pendingNav: PendingNav | null
   /** Go where the user asked, guard already satisfied. */
@@ -154,6 +158,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   // Opening it closes the tray rather than racing the tray's click-away.
   setFieldPickerOpen: (fieldPickerOpen) =>
     set(fieldPickerOpen ? { fieldPickerOpen, simTrayOpen: false } : { fieldPickerOpen }),
+  preflightOpen: false,
+  setPreflightOpen: (preflightOpen) => set({ preflightOpen }),
   pendingNav: null,
 
   setMode: (mode) => {

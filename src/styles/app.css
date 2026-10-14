@@ -854,8 +854,8 @@
   background: var(--la-blue);
 }
 
-/* Preflight: why it will not arm, reasons first. Green/amber/red are status
-   only. */
+/* Preflight: why it will not arm, the checks first and the reasons after.
+   Green/amber/red are status only. */
 .preflight {
   padding: var(--la-space-3);
   overflow-y: auto;
@@ -915,8 +915,8 @@
 }
 
 /* Every check is always listed, so the list is one shape whatever passes;
-   only the dot and the word change. Columns rather than one long list, so
-   twenty rows fit the lower pane. */
+   only the dot and the word change. As many columns as the width holds, to
+   keep it short; the pane scrolls for the rest. */
 .preflight__checks {
   margin: 0;
   padding: 0;

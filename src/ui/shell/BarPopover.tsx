@@ -14,6 +14,7 @@ export default function BarPopover({
   title,
   button,
   children,
+  open: openProp,
   onToggle,
   buttonProps,
 }: {
@@ -26,12 +27,15 @@ export default function BarPopover({
   button: ReactNode
   /** The panel's content; a function so it can close the panel. */
   children: (close: () => void) => ReactNode
+  /** Set when something other than the button can open the panel; onToggle then owns it. */
+  open?: boolean
   /** Told when the panel opens or closes. */
   onToggle?: (open: boolean) => void
   /** Extra attributes for the button, such as a role it plays in a group. */
   buttonProps?: ButtonHTMLAttributes<HTMLButtonElement>
 }) {
-  const [open, setOpenState] = useState(false)
+  const [openState, setOpenState] = useState(false)
+  const open = openProp ?? openState
   const toggleRef = useRef(onToggle)
   toggleRef.current = onToggle
   const setOpen = (next: boolean) => {

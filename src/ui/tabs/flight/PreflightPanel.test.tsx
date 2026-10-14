@@ -13,13 +13,17 @@ const MAV_CMD_RUN_PREARM_CHECKS = 401
 
 let runCommand: MockInstance<typeof connectionService.runCommand>
 
-const vehicle = (ready: boolean, reasons: string[] = []) =>
+// The panel asks for checks at most every thirty seconds across mounts, so
+// each test starts a minute after the last.
+let clock = Date.parse('2026-01-01T00:00:00Z')
+
+const vehicle = (ready: boolean, reasons: string[] = [], vehicleType = 2 /* quadrotor */) =>
   act(() => {
     useConnectionStore.setState({ phase: 'connected', error: null })
     useVehicleStore.setState({
       present: true,
       armed: false,
-      vehicleType: 2, // quadrotor
+      vehicleType,
       sensorsPresent: SENSOR_BITS.prearm,
       sensorsHealth: ready ? SENSOR_BITS.prearm : 0,
       statusTexts: reasons.map((r) => ({ severity: 2, text: `PreArm: ${r}`, at: Date.now() })),
@@ -32,6 +36,9 @@ const row = (label: string) => {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  clock += 60_000
+  vi.setSystemTime(clock)
   useVehicleStore.getState().reset()
   useParamStore.getState().reset()
   useParamStore.getState().loaded([{ name: 'ARMING_SKIPCHK', value: 1 << 16, mavType: 6 }])
@@ -39,6 +46,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.restoreAllMocks()
   useConnectionStore.setState({ phase: 'idle', error: null, linkStats: null })
 })
@@ -67,10 +75,69 @@ describe('the arming checks list', () => {
     expect(runCommand).toHaveBeenCalledWith(MAV_CMD_RUN_PREARM_CHECKS, [], 2000)
   })
 
+  it('asks at most every thirty seconds, however often it is opened', () => {
+    vehicle(false)
+    render(<PreflightPanel />)
+    cleanup()
+    render(<PreflightPanel />)
+    expect(runCommand).toHaveBeenCalledTimes(1)
+    vi.setSystemTime(Date.now() + 30_000)
+    cleanup()
+    render(<PreflightPanel />)
+    expect(runCommand).toHaveBeenCalledTimes(2)
+  })
+
+  it('asks again on a new connection, whatever the last one asked', () => {
+    vehicle(false)
+    render(<PreflightPanel />)
+    cleanup()
+    act(() => useConnectionStore.setState({ phase: 'opening' }))
+    vehicle(false)
+    render(<PreflightPanel />)
+    expect(runCommand).toHaveBeenCalledTimes(2)
+  })
+
+  it('lists the reasons after the checks, so their coming and going never moves the grid', () => {
+    vehicle(false, ['Compass not calibrated', 'Gyros inconsistent'])
+    render(<PreflightPanel />)
+    const sections = [...document.querySelectorAll('.preflight__head')].map((h) => h.textContent)
+    expect(sections).toEqual(['Arming checks', 'Messages'])
+    expect(screen.getByText('Gyros inconsistent')).toBeTruthy()
+  })
+
+  it('waits, rather than blaming the firmware, before the first sensor report', () => {
+    vehicle(true)
+    act(() => useVehicleStore.setState({ sensorsPresent: 0, sensorsHealth: 0 }))
+    render(<PreflightPanel />)
+    expect(screen.getByText('Waiting for the arming state…')).toBeTruthy()
+  })
+
+  it("lists a VTOL plane's checks as a plane's", () => {
+    vehicle(true, [], 20) // MAV_TYPE_VTOL_QUADROTOR
+    render(<PreflightPanel />)
+    expect(row('Airspeed')).toBeTruthy()
+    expect(screen.queryByText('VisualOdometry')).toBeNull()
+  })
+
   it('reads a dash, not a pass, before any reason is heard', () => {
     vehicle(false)
     render(<PreflightPanel />)
     expect(within(row('Compass')).getByText('-')).toBeTruthy()
+  })
+
+  it('lists no reason from before beside "Ready to arm", but keeps a refused attempt', () => {
+    vehicle(true, ['Compass not calibrated'])
+    render(<PreflightPanel />)
+    expect(screen.getByText('Ready to arm')).toBeTruthy()
+    expect(screen.queryByText('Compass not calibrated')).toBeNull()
+    cleanup()
+    act(() =>
+      useVehicleStore.setState({
+        statusTexts: [{ severity: 2, text: 'Arm: Throttle too high', at: Date.now() }],
+      }),
+    )
+    render(<PreflightPanel />)
+    expect(screen.getByText('Throttle too high')).toBeTruthy()
   })
 
   it('does not fail a check beside "Ready to arm" for a reason sent before', () => {

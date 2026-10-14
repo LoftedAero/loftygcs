@@ -56,6 +56,7 @@ confirming there is no difference is the check.
       vehicle's reason on hover, a skipped one Skipped, and none fails
       beside "Ready to arm"
 - [ ] Clicking the HUD's readiness pill opens the Preflight pane
+- [ ] Compact: tapping the HUD's readiness pill opens the bar's Preflight panel
 - [ ] Camera (needs a mount): an unconfigured mount says so rather than
       appearing to work
 - [ ] Joystick (needs a gamepad): nothing moves the aircraft until a device is
