@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isPrearmMessage, prearmFailures } from './prearm'
+import { currentFailures, isPrearmMessage, prearmFailures } from './prearm'
 
 // The strings are ArduPilot's own wording, from SITL and AP_Arming.
 const NOW = 1_000_000
@@ -72,5 +72,28 @@ describe('distilling the feed into reasons', () => {
 
   it('ignores a prefix with nothing after it', () => {
     expect(prearmFailures([msg('PreArm:', 100)], NOW)).toEqual([])
+  })
+})
+
+describe('the reasons that still stand', () => {
+  const feed = [msg('PreArm: Compass not calibrated', 20000), msg('Arm: Throttle too high', 5000)]
+  const reasons = (readiness: Parameters<typeof currentFailures>[2]) =>
+    currentFailures(feed, NOW, readiness).map((f) => f.reason)
+
+  it('keeps every recent reason while the vehicle is not ready', () => {
+    expect(reasons('notReady')).toEqual(['Throttle too high', 'Compass not calibrated'])
+  })
+
+  it('drops a PreArm reason once the vehicle reports ready, but keeps a refused attempt', () => {
+    // The PreArm line is within the minute but predates the vehicle passing.
+    expect(reasons('ready')).toEqual(['Throttle too high'])
+  })
+
+  it('has nothing to explain once armed', () => {
+    expect(reasons('armed')).toEqual([])
+  })
+
+  it('keeps every reason when the vehicle reports no verdict', () => {
+    expect(reasons('unknown')).toEqual(['Throttle too high', 'Compass not calibrated'])
   })
 })

@@ -46,3 +46,22 @@ export function prearmFailures(
     .sort((a, b) => b[1] - a[1])
     .map(([reason, at]) => ({ reason, at }))
 }
+
+const ARM_PREFIX = /^Arm\s*:/i
+
+/**
+ * The reasons that still explain something, given the vehicle's own verdict.
+ * Once its prearm checks pass, a PreArm reason is out of date even though it
+ * is within the minute (they repeat only every thirty seconds); an Arm reason
+ * is a refused attempt the verdict says nothing about. An armed vehicle has
+ * nothing left to explain, and with no verdict reported every reason stands.
+ */
+export function currentFailures(
+  texts: readonly { text: string; at: number }[],
+  now: number,
+  readiness: 'armed' | 'ready' | 'notReady' | 'unknown',
+): PrearmFailure[] {
+  if (readiness === 'armed') return []
+  const standing = readiness === 'ready' ? texts.filter((t) => ARM_PREFIX.test(t.text)) : texts
+  return prearmFailures(standing, now)
+}

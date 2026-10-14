@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useConnectionStore } from '../../stores/connection-store'
 import { useVehicleStore } from '../../stores/vehicle-store'
 import { useParamStore } from '../../stores/param-store'
@@ -39,6 +39,12 @@ export default function CompactStatus() {
   const systemStatus = useVehicleStore((s) => s.systemStatus)
   const sensorsPresent = useVehicleStore((s) => s.sensorsPresent)
   const sensorsHealth = useVehicleStore((s) => s.sensorsHealth)
+  const preflightOpen = useUiStore((s) => s.preflightOpen)
+  const setPreflightOpen = useUiStore((s) => s.setPreflightOpen)
+  // The panel goes with the vehicle, so it must not reopen with the next one.
+  useEffect(() => {
+    if (!present) setPreflightOpen(false)
+  }, [present, setPreflightOpen])
 
   const status = barStatus({
     phase,
@@ -64,6 +70,8 @@ export default function CompactStatus() {
           className={`compact-status__item app-status__state app-status__state--${status.tone}`}
           label="Preflight"
           button={chip}
+          open={preflightOpen}
+          onToggle={setPreflightOpen}
         >
           {() => (
             <div className="bar-pop__preflight">

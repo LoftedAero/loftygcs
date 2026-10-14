@@ -141,9 +141,32 @@ function gradients(ctx: CanvasRenderingContext2D, h: number) {
   return skyCache
 }
 
-export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st: HudState) {
+/** A drawn element's box, in the canvas's CSS pixels. */
+export interface HudRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/**
+ * Where this frame drew the elements that answer a click. A canvas has no
+ * elements to attach a handler to, so the painter says where things landed
+ * and the HUD tests clicks against that. Absent means not drawn this frame.
+ */
+export interface HudHits {
+  readiness?: HudRect
+}
+
+export function paintHud(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  st: HudState,
+): HudHits {
+  const hits: HudHits = {}
   ctx.clearRect(0, 0, w, h)
-  if (w < 40 || h < 40) return
+  if (w < 40 || h < 40) return hits
 
   // Proportional to the panel, which is resizable.
   const s = Math.min(1.5, Math.max(0.75, Math.min(w, h) / 320))
@@ -242,7 +265,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     const { speed, distance } = st.units
     reading('AS', formatSpeed(st.airspeedMs, speed), speedLabel(speed), 'left')
     reading('ALT', formatDistance(st.relAltM, distance), distanceLabel(distance), 'right')
-    return
+    return hits
   }
 
   if (st.horizon) {
@@ -250,7 +273,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     paintBank(ctx, cx, cy, Math.min(w, h - ribbonH) * 0.36, st.roll, s)
   }
 
-  if (!st.overlays) return
+  if (!st.overlays) return hits
 
   paintRibbon(ctx, w, ribbonH, st.headingDeg, s, write)
 
@@ -433,12 +456,14 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
     const tw = ctx.measureText(label).width + label.length * 1.1 * s + 20 * s
     ctx.restore()
     const rx = chipX(tw, y + 5 * s)
+    const chip = { x: rx - tw / 2, y: y - 12 * s, w: tw, h: 17 * s }
     ctx.save()
     ctx.beginPath()
-    ctx.roundRect(rx - tw / 2, y - 12 * s, tw, 17 * s, 8 * s)
+    ctx.roundRect(chip.x, chip.y, chip.w, chip.h, 8 * s)
     ctx.fillStyle = CHIP
     ctx.fill()
     ctx.restore()
+    hits.readiness = chip
     // Its own line above the corners, clear of the battery and mode.
     write(label, rx, y, {
       size: 11 * s,
@@ -449,6 +474,7 @@ export function paintHud(ctx: CanvasRenderingContext2D, w: number, h: number, st
       color: ready ? GREEN : RED,
     })
   }
+  return hits
 }
 
 function paintHorizon(

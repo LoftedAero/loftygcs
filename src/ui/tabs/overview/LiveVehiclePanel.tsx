@@ -6,8 +6,9 @@ import { telemetryRings } from '../../../services/telemetry-ring'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { vehicleClass } from '../../../protocol/modes'
-import { decodeSensors, type SensorState } from '../../../protocol/sensors'
-import { prearmFailures } from '../../../protocol/prearm'
+import { decodeSensors, SENSOR_BITS, type SensorState } from '../../../protocol/sensors'
+import { currentFailures } from '../../../protocol/prearm'
+import { armReadiness } from '../flight/hud-draw'
 import { isElectron } from '../../../env'
 
 const GPS_FIX_NAMES = ['No GPS', 'No fix', '2D fix', '3D fix', 'DGPS', 'RTK float', 'RTK fixed']
@@ -186,9 +187,9 @@ function SystemCard() {
   const v = useVehicleStore()
   const stats = useConnectionStore((s) => s.linkStats)
   // ArduPilot reports why it will not arm in PreArm status lines; show the
-  // newest. An armed vehicle, or a reason that has stopped repeating, has
-  // nothing left to explain.
-  const prearm = v.armed ? undefined : prearmFailures(v.statusTexts, Date.now())[0]
+  // newest that still applies (see currentFailures).
+  const readiness = armReadiness(v.armed, v.sensorsPresent, v.sensorsHealth, SENSOR_BITS.prearm)
+  const prearm = currentFailures(v.statusTexts, Date.now(), readiness)[0]
   return (
     <LaCard title="System">
       <Stat label="Vehicle" value={live ? v.vehicleName || null : null} />
