@@ -102,6 +102,22 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           health: f.onboardControlSensorsHealth as number,
         },
       ]
+    case 'EKF_STATUS_REPORT':
+      return [
+        {
+          k: 'ekf',
+          status: {
+            flags: f.flags as number,
+            velocityVariance: f.velocityVariance as number,
+            posHorizVariance: f.posHorizVariance as number,
+            posVertVariance: f.posVertVariance as number,
+            compassVariance: f.compassVariance as number,
+            terrainAltVariance: f.terrainAltVariance as number,
+            // A MAVLink 2 extension: absent from an older sender.
+            airspeedVariance: (f.airspeedVariance as number | undefined) ?? 0,
+          },
+        },
+      ]
     case 'BATTERY_STATUS':
       return [
         {

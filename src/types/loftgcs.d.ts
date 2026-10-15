@@ -119,6 +119,12 @@ export interface LoftGcsBridge {
     setBackgroundThrottling(allowed: boolean): void
     /** The whole window's scale, Chromium's page zoom: 1 is 100%. */
     setZoomFactor(factor: number): void
+    /**
+     * Give a pop-out window (PopupWindow) this content height, in CSS pixels.
+     * The page's own resizeTo is unreliable under Wayland, which miscounts the
+     * window frame; the main process sets the content size exactly.
+     */
+    fitPopup(name: string, height: number): void
   }
 
   /**

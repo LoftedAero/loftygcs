@@ -93,6 +93,7 @@ contextBridge.exposeInMainWorld('loftgcs', {
     setZoomFactor: (factor: number) => {
       if (Number.isFinite(factor)) webFrame.setZoomFactor(Math.min(2, Math.max(0.75, factor)))
     },
+    fitPopup: (name: string, height: number) => ipcRenderer.send('app:fit-popup', name, height),
   },
 
   // Video crosses IPC as compressed H.264 and is decoded in the renderer;

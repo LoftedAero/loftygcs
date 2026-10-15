@@ -506,6 +506,9 @@ class ConnectionService {
         p.sensorsEnabled = d.enabled
         p.sensorsHealth = d.health
         break
+      case 'ekf':
+        p.ekf = d.status
+        break
     }
     this.pendingDirty = true
   }

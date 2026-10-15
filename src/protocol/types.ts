@@ -126,6 +126,22 @@ export interface FirmwareVersion {
   type: number
 }
 
+/**
+ * EKF_STATUS_REPORT, decoded. ArduPilot fills it from the *configured*
+ * estimator (AHRS_EKF_TYPE), not the active one, so after a fallback to DCM it
+ * keeps describing the EKF -- it cannot say which estimator is in charge.
+ */
+export interface EkfStatus {
+  /** EKF_STATUS_FLAGS bits. */
+  flags: number
+  velocityVariance: number
+  posHorizVariance: number
+  posVertVariance: number
+  compassVariance: number
+  terrainAltVariance: number
+  airspeedVariance: number
+}
+
 export type TelemetryDelta =
   | {
       k: 'attitude'
@@ -186,6 +202,8 @@ export type TelemetryDelta =
    */
   | { k: 'servoOutputs'; port: number; valuesUs: number[] }
   | { k: 'sensors'; present: number; enabled: number; health: number }
+  /** EKF_STATUS_REPORT: the configured estimator's flags and variances. */
+  | { k: 'ekf'; status: EkfStatus }
   /**
    * Where the vehicle is in its mission: MISSION_CURRENT gives the item,
    * NAV_CONTROLLER_OUTPUT the distance. A field is null until its message

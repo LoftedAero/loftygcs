@@ -6,6 +6,7 @@ import { useFlightLayoutStore } from '../../stores/flight-layout-store'
 import { SENSOR_BITS } from '../../protocol/sensors'
 import { batteryLabel, gpsKind, gpsUsable, linkLabel } from '../tabs/flight/hud-draw'
 import { useParamStore } from '../../stores/param-store'
+import EstimatorChip from './EstimatorChip'
 import {
   barBattery,
   barFirmware,
@@ -74,6 +75,8 @@ export default function AppStatus() {
 
   return (
     <div className="app-status" role="group" aria-label="Vehicle status">
+      {present && <EstimatorChip />}
+
       {/* A button only while there is a vehicle; otherwise (connecting,
           failed or lost link) the same chip as plain text. */}
       {present ? (

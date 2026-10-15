@@ -64,6 +64,16 @@ and the OS key their records on it. Electron names the data folder after the pro
 - The main process owns the Web Serial and WebUSB choosers (`select-serial-port`,
   `select-usb-device`), which is what lets the firmware flow pick a bootloader port without
   showing a chooser. See [Firmware](#firmware).
+- Pop-out windows (`ui/components/PopupWindow.tsx`) are blank same-origin documents the
+  renderer opens and draws into with a React portal, so their content stays in the app's tree
+  and stores and can be dragged to another screen. `main.ts`'s window-open handler allows only
+  names starting `loftgcs-popup-`, with the main window's sandbox, and closes them when the
+  renderer reloads or the main window closes. Every other window request is refused; an
+  http(s) URL goes to the OS browser, since a `target="_blank"` link would otherwise load a
+  remote page with the app's privileges. A pop-out sizes itself to its content through
+  `app.fitPopup` (the page's own `resizeTo` miscounts the frame under Wayland), and checks and
+  retries, because a resize landing while the window is first shown is undone by the
+  compositor. Android has one window, so there the same content is a floating dialog.
 - `LOFTGCS_DEBUG_SERIAL=1` and `LOFTGCS_DEBUG_USB=1` trace the main process's side of the
   serial and USB choosers. The shell shows no chooser when it answers one itself, so these
   traces are the only way to see why a device was or was not found.
@@ -159,14 +169,22 @@ mechanisms behind them.
   track changes size, so controls never move when a status changes.
 - There are no spacers: the shared sheet's `.la-appbar__spacer` is overridden by
   `.la-appbar > * { flex: none }` and never flexes. Do not put `min-width: 0` on a side band,
-  or its track shrinks under its content and runs into the status.
-- Room is made by dropping whole items at breakpoints (readings at 1500px, the status word at
-  1080px), never by clipping a reading.
+  or its track shrinks under its content and runs into the status. A side band that outgrows
+  its share pushes the status off the midline; the grid's column gap keeps them apart.
+- Room is made by dropping whole items at breakpoints (firmware at 1800px, readings at 1650px,
+  the whole status at 1140px), never by clipping a reading. Each is where the bar would
+  otherwise overflow, with the EKF pill at its widest ("External"). The left band, about 530px,
+  is the wider side, so above a breakpoint the row may sit off the midline (by 40px at a
+  width of 1920) rather than lose a reading. Re-measure them when either band or the row
+  changes.
 - The vehicle indicators (`ui/shell/AppStatus.tsx`, `app-status.ts`) render nothing with no
   vehicle and a fixed set with one; a value never sent is a dash, never a zero. Color comes only
   from the vehicle's thresholds (`BATT_LOW_VOLT`, `BATT_CRT_VOLT`, the 3D-fix requirement). The
   status word shares `armReadiness` with the Preflight pane, and strings come from
   `hud-draw.ts`'s formatters.
+- The EKF pill (`ui/shell/EstimatorChip.tsx`) comes first, shaped as the status word, and opens
+  the EKF window. Its word has one width for EKF3, EKF2 and DCM, so a fallback does not move the
+  row. Its rules are in [Estimator](#estimator-protocolestimatorts).
 - Parameter download progress (`ui/shell/ParamProgress.tsx`) is on the app bar because the
   download runs on connect, reboot and gating writes, not for one screen. It keys off
   `progress` as well as `loadState` (a quiet refresh never touches `loadState`) and is
@@ -300,6 +318,27 @@ latched in `vehicle-store`, because the status feed is a capped ring. The banner
 with `MAV_CMD_DO_SEND_BANNER` (42428) on the first heartbeat, since a GCS attaching to a running
 vehicle never sees the boot banner (`banner.integration.test.ts`). `KnownAirframe` grows one
 aircraft at a time, never by pattern.
+
+### Estimator (`protocol/estimator.ts`)
+
+MAVLink has no field naming the active estimator, so the EKF pill and window piece it
+together from ArduPilot's own signals (`AP_AHRS`, read in source):
+
+- "AHRS: EKF3 active" (or EKF2, DCM, SIM, External) is sent once per change. It is latched in
+  `vehicle-store`, but a GCS that connects later never hears it.
+- The SYS_STATUS AHRS health bit is set only while the estimator chosen in `AHRS_EKF_TYPE` is
+  active and healthy, so clear is ambiguous: fallen back, or unhealthy.
+- EKF_STATUS_REPORT describes the configured estimator, not the active one, so after a fallback
+  to DCM it still describes the EKF.
+
+The label is therefore never a name the signals cannot back: the configured estimator while the
+bit is set, the announced one when it is clear and one was heard, otherwise the configured one
+in red. Colors come from the vehicle: red for the bit clear or an EKF failsafe in effect, amber
+for the GPS-glitching or constant-position flag. The failsafe needs its own signal, because
+losing GPS on Copter SITL declared one ("EKF variance: position lost", heartbeat CRITICAL) with
+the AHRS bit still set. It is latched from the text and cleared when the heartbeat leaves the
+failsafe states, since Plane sends no clearing text. The primary core follows "EKF3 lane switch
+N", falling back to `EK3_PRIMARY`. Variance bars mark the vehicle's `FS_EKF_THRESH`.
 
 ### Message inspector (`protocol/engine.ts`, `stores/inspector-store.ts`)
 

@@ -115,6 +115,10 @@ interface UiState {
   simTrayOpen: boolean
   setSimTrayOpen: (open: boolean) => void
 
+  /** The EKF status window, opened from the app bar on any screen. */
+  estimatorOpen: boolean
+  setEstimatorOpen: (open: boolean) => void
+
   /**
    * The map picker for the simulator's home location. Not mounted inside the
    * tray, which dismisses on any outside click, including one on the map.
@@ -153,6 +157,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPreferencesOpen: (preferencesOpen) => set({ preferencesOpen }),
   simTrayOpen: false,
   setSimTrayOpen: (simTrayOpen) => set({ simTrayOpen }),
+  estimatorOpen: false,
+  setEstimatorOpen: (estimatorOpen) => set({ estimatorOpen }),
 
   fieldPickerOpen: false,
   // Opening it closes the tray rather than racing the tray's click-away.

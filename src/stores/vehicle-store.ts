@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 import { frameName, knownAirframe, type KnownAirframe } from '../protocol/airframe'
 import { boardNameFromBanner, parseRcoutBanner, type RcoutBanner } from '../protocol/rcout-banner'
-import type { FirmwareVersion } from '../protocol/types'
+import type { EkfStatus, FirmwareVersion } from '../protocol/types'
+import {
+  announcedEstimator,
+  ekfFailsafeChange,
+  isFailsafeState,
+  laneSwitch,
+} from '../protocol/estimator'
 
 // Throttled snapshot of vehicle state for ordinary React components (mode
 // label, battery readout, GPS badge). The connection service pushes here at
@@ -88,6 +94,23 @@ export interface VehicleSnapshot {
   sensorsPresent: number
   sensorsEnabled: number
   sensorsHealth: number
+  /** The latest EKF_STATUS_REPORT; null until one arrives. */
+  ekf: EkfStatus | null
+  /**
+   * The estimator ArduPilot last announced as active ("AHRS: DCM active").
+   * Latched, because the line is sent once per change and soon scrolls out
+   * of the status ring; null if none has been heard this connection.
+   */
+  estimatorAnnounced: string | null
+  /** The EKF core last announced as primary ("EKF3 lane switch 1"); latched. */
+  ekfPrimaryCore: number | null
+  /**
+   * An EKF failsafe was announced and has not cleared. Set by its status text,
+   * cleared by Copter's and Rover's "cleared" text or by the heartbeat leaving
+   * the failsafe states (Plane sends no clearing text). Read together with the
+   * heartbeat: the text says which failsafe, the heartbeat that it still holds.
+   */
+  ekfFailsafe: boolean
   /**
    * From AUTOPILOT_VERSION; null until the vehicle answers. The version
    * selects parameter metadata and the mount protocol generation.
@@ -157,6 +180,10 @@ const EMPTY: VehicleSnapshot = {
   sensorsPresent: 0,
   sensorsEnabled: 0,
   sensorsHealth: 0,
+  ekf: null,
+  estimatorAnnounced: null,
+  ekfPrimaryCore: null,
+  ekfFailsafe: false,
   firmware: null,
   capabilities: 0,
   boardId: 0,
@@ -177,7 +204,17 @@ const STATUSTEXT_CAP = 200
 
 export const useVehicleStore = create<VehicleStore>((set) => ({
   ...EMPTY,
-  apply: (patch) => set(patch),
+  apply: (patch) =>
+    set((s) =>
+      // Only on the way *out* of failsafe: the text can arrive before the
+      // heartbeat that turns CRITICAL, so clearing whenever the status is not a
+      // failsafe would drop the latch the moment it was set.
+      patch.systemStatus !== undefined &&
+      isFailsafeState(s.systemStatus) &&
+      !isFailsafeState(patch.systemStatus)
+        ? { ...patch, ekfFailsafe: false }
+        : patch,
+    ),
   appendStatusText: (st) =>
     set((s) => ({
       statusTexts: [...s.statusTexts.slice(-(STATUSTEXT_CAP - 1)), st],
@@ -188,6 +225,9 @@ export const useVehicleStore = create<VehicleStore>((set) => ({
       // output modes. Other lines parse to null and leave it alone.
       rcout: parseRcoutBanner(st.text) ?? s.rcout,
       boardName: boardNameFromBanner(st.text) ?? s.boardName,
+      estimatorAnnounced: announcedEstimator(st.text) ?? s.estimatorAnnounced,
+      ekfPrimaryCore: laneSwitch(st.text) ?? s.ekfPrimaryCore,
+      ekfFailsafe: ekfFailsafeChange(st.text) ?? s.ekfFailsafe,
     })),
   reset: () => set({ ...EMPTY, statusTexts: [] }),
 }))
