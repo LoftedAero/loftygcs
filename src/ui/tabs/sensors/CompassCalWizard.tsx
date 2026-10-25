@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { LaButton, LaHint, LaModal } from '../../components/La'
+import { useContext, useState } from 'react'
+import { CardScope, LaButton, LaHint, LaModal } from '../../components/La'
 import CalAttitudes from './CalAttitudes'
 import ParamField from '../../components/ParamField'
 import { magCalFinished, magCalList, useCalStore } from '../../../stores/cal-store'
@@ -33,6 +33,7 @@ export default function CompassCalWizard({ onClose }: { onClose: () => void }) {
   const magCal = useCalStore((s) => s.magCal)
   const armed = useVehicleStore((s) => s.armed)
   const connected = useConnectionStore((s) => s.phase === 'connected')
+  const card = useContext(CardScope)
   const [error, setError] = useState('')
   /** Accepted in this dialog (not reflected in `autosaved`). */
   const [accepted, setAccepted] = useState(false)
@@ -94,7 +95,7 @@ export default function CompassCalWizard({ onClose }: { onClose: () => void }) {
     void stop()
     if (remind) {
       const feedback = useWriteFeedbackStore.getState()
-      feedback.needReboot(REBOOT_REASON)
+      feedback.needReboot(REBOOT_REASON, card)
       feedback.deferReboot()
     }
     onClose()

@@ -63,12 +63,14 @@ export default function RadioCalCard() {
         }
       >
         <ChannelMonitor channels={channels} mapping={mapping} slots={CHANNEL_SLOTS} />
+        {/* Inside the card, though portaled, so its restart reminder lands
+            here. */}
+        <RadioCalWizard
+          open={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          onSaved={() => setSaved(true)}
+        />
       </LaCard>
-      <RadioCalWizard
-        open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
-        onSaved={() => setSaved(true)}
-      />
     </>
   )
 }

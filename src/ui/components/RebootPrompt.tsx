@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { LaButton, LaModal } from './La'
 import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
 import { useConnectionStore } from '../../stores/connection-store'
@@ -10,12 +11,22 @@ import { rebootAutopilot } from '../../services/flight'
 //
 // "Later" steps the dialog down to an inline reminder rather than clearing
 // it, so several changes can share one reboot; only a new reason reopens the
-// dialog. The inline form sits on a card's title row so the card does not
-// grow, with the reason as hover text.
+// dialog. The inline form sits on the title row of the card where the change
+// was made (`useRebootReminder`, which every LaCard calls), so the card does
+// not grow and the reminder is beside its cause, with the reason as hover
+// text.
 /**
  * A pending reboot, as a dialog or (with `inline`) the stepped-down reminder
  * on a card's title row. The dialog is mounted once, in the app shell.
  */
+/** The reminder for a card's title row, on the card whose change needs it. */
+export function useRebootReminder(card: string | null): ReactNode {
+  const here = useWriteFeedbackStore(
+    (s) => card !== null && s.rebootPending !== null && s.rebootDeferred && s.rebootSource === card,
+  )
+  return here ? <RebootPrompt inline /> : null
+}
+
 export default function RebootPrompt({ inline = false }: { inline?: boolean }) {
   const pending = useWriteFeedbackStore((s) => s.rebootPending)
   const deferred = useWriteFeedbackStore((s) => s.rebootDeferred)

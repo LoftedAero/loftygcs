@@ -1,4 +1,6 @@
+import { useContext } from 'react'
 import { mdiArrowDown, mdiArrowUp } from '@mdi/js'
+import { CardScope } from '../../components/La'
 import ParamField from '../../components/ParamField'
 import WriteFeedback from '../../components/WriteFeedback'
 import { useParamStore } from '../../../stores/param-store'
@@ -54,6 +56,7 @@ const ALL_DEV_IDS = [
 export default function CompassPriority() {
   const entries = useParamStore((s) => s.entries)
   const edit = useParamStore((s) => s.edit)
+  const card = useContext(CardScope)
 
   const slots = PRIORITY.filter((s) => entries.has(s.prio))
   if (slots.length === 0) return null
@@ -105,7 +108,7 @@ export default function CompassPriority() {
       .then(() => {
         feedback.report({ ok: true, param: from.prio })
         // The new order applies only after a restart.
-        feedback.needReboot('Compass priority takes effect after a restart')
+        feedback.needReboot('Compass priority takes effect after a restart', card)
       })
       .catch((err: unknown) => {
         edit(from.prio, to.id)

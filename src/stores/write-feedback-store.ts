@@ -28,7 +28,13 @@ interface WriteFeedbackStore {
    * use. One reason string, since the prompt is just "restart to apply".
    */
   rebootPending: string | null
-  needReboot: (reason: string) => void
+  /**
+   * The title of the card whose change needs the restart, where the reminder
+   * shows after Later; null for a change made outside a card (a screen's
+   * column, whose Reboot button is always there).
+   */
+  rebootSource: string | null
+  needReboot: (reason: string, source?: string | null) => void
   rebootDone: () => void
   /**
    * The dialog was answered with Later. The reminder stays as a line on the
@@ -44,9 +50,11 @@ export const useWriteFeedbackStore = create<WriteFeedbackStore>((set) => ({
   clear: () => set({ latest: null }),
 
   rebootPending: null,
+  rebootSource: null,
   // A new reason re-opens the dialog.
-  needReboot: (reason) => set({ rebootPending: reason, rebootDeferred: false }),
-  rebootDone: () => set({ rebootPending: null, rebootDeferred: false }),
+  needReboot: (reason, source = null) =>
+    set({ rebootPending: reason, rebootSource: source, rebootDeferred: false }),
+  rebootDone: () => set({ rebootPending: null, rebootSource: null, rebootDeferred: false }),
   rebootDeferred: false,
   deferReboot: () => set({ rebootDeferred: true }),
 }))

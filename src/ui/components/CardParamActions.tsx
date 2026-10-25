@@ -1,6 +1,5 @@
-import { useState } from 'react'
-import { LaButton } from './La'
-import RebootPrompt from './RebootPrompt'
+import { useContext, useState } from 'react'
+import { CardScope, LaButton } from './La'
 import WriteParamsModal from '../shell/WriteParamsModal'
 import { useParamStore } from '../../stores/param-store'
 import { useConnectionStore } from '../../stores/connection-store'
@@ -34,6 +33,7 @@ export function useParamWrite({
     return n
   })
   const writeBusy = useParamStore((s) => s.writeBusy)
+  const card = useContext(CardScope)
   const [confirming, setConfirming] = useState(false)
 
   const revert = () => {
@@ -56,7 +56,7 @@ export function useParamWrite({
       // (a frame class, not a filter frequency).
       const { metadata } = useParamStore.getState()
       if (result.written.some((n) => metadata[n]?.rebootRequired)) {
-        useWriteFeedbackStore.getState().needReboot(reason)
+        useWriteFeedbackStore.getState().needReboot(reason, card)
       }
     })
   }
@@ -94,9 +94,6 @@ export default function CardParamActions({
   return (
     <>
       {w.modal}
-      {/* Nothing until a restart is needed, then "Reboot required" and the
-          button. */}
-      <RebootPrompt inline />
       {/* Hidden rather than disabled until there are edits, so the card with
           staged edits stands out. Kept during the write so "Writing…" stays
           visible. A screen's column (`VehicleParamActions`) always shows its

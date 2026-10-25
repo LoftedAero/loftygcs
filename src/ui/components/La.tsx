@@ -1,5 +1,6 @@
 // Thin typed wrappers over the Lofted Aero design system. Each emits exactly
 // the markup DESIGN.md documents, so components cannot drift from it.
+import { createContext, useContext } from 'react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -27,6 +28,19 @@ export function LaLinkButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button className="la-link-btn" {...props} />
 }
 
+/**
+ * The title of the card a control sits in, so what the control causes (a
+ * restart reminder) shows on that card and no other.
+ */
+export const CardScope = createContext<string | null>(null)
+
+/**
+ * The app's additions to a card's title row, as a hook given the card's
+ * title. App provides it, so these wrappers stay free of app state; the
+ * default adds nothing.
+ */
+export const CardHeadExtra = createContext<(title: string | null) => ReactNode>(() => null)
+
 export function LaCard({
   title,
   subtitle,
@@ -46,20 +60,27 @@ export function LaCard({
   children?: ReactNode
   className?: string
 }) {
+  const useHeadExtra = useContext(CardHeadExtra)
+  const extra = useHeadExtra(title ?? null)
   return (
-    <section className={`la-card ${className}`.trim()}>
-      {title && actions ? (
-        <div className="la-card__head">
-          <h2 className="la-card__title">{title}</h2>
-          <div className="la-card__actions">{actions}</div>
-        </div>
-      ) : (
-        title && <h2 className="la-card__title">{title}</h2>
-      )}
-      {subtitle && <p className="la-card__subtitle">{subtitle}</p>}
-      {children}
-      {note && <p className="la-card__note">{note}</p>}
-    </section>
+    <CardScope.Provider value={title ?? null}>
+      <section className={`la-card ${className}`.trim()}>
+        {title && (extra || actions) ? (
+          <div className="la-card__head">
+            <h2 className="la-card__title">{title}</h2>
+            <div className="la-card__actions">
+              {extra}
+              {actions}
+            </div>
+          </div>
+        ) : (
+          title && <h2 className="la-card__title">{title}</h2>
+        )}
+        {subtitle && <p className="la-card__subtitle">{subtitle}</p>}
+        {children}
+        {note && <p className="la-card__note">{note}</p>}
+      </section>
+    </CardScope.Provider>
   )
 }
 

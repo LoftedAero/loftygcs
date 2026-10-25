@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { LaButton, LaHint, LaModal } from '../../components/La'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { CardScope, LaButton, LaHint, LaModal } from '../../components/La'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import { useParamStore } from '../../../stores/param-store'
 import { useWriteFeedbackStore } from '../../../stores/write-feedback-store'
@@ -40,6 +40,7 @@ export default function RadioCalWizard({
   onSaved?: () => void
 }) {
   const channels = useVehicleStore((s) => s.rcChannels)
+  const card = useContext(CardScope)
 
   const [stage, setStage] = useState<StageId>('intro')
   const [step, setStep] = useState(0)
@@ -152,7 +153,9 @@ export default function RadioCalWizard({
     onClose()
     onSaved?.()
     if (remapped) {
-      useWriteFeedbackStore.getState().needReboot('The stick mapping takes effect after a restart')
+      useWriteFeedbackStore
+        .getState()
+        .needReboot('The stick mapping takes effect after a restart', card)
     }
   }
 

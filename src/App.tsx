@@ -8,7 +8,8 @@ import PreferencesModal from './ui/shell/PreferencesModal'
 import SerialChooserModal from './ui/shell/SerialChooserModal'
 import PreviewNotice from './ui/shell/PreviewNotice'
 import UnsavedChangesModal from './ui/shell/UnsavedChangesModal'
-import RebootPrompt from './ui/components/RebootPrompt'
+import RebootPrompt, { useRebootReminder } from './ui/components/RebootPrompt'
+import { CardHeadExtra } from './ui/components/La'
 import { holdsVehicleTabs, tabFills, useUiStore, visibleTabs } from './stores/ui-store'
 import { useConnectionStore } from './stores/connection-store'
 import OverviewTab from './ui/tabs/overview/OverviewTab'
@@ -113,26 +114,30 @@ export default function App() {
   const flush = mode !== 'setup' || tabFills(activeTab)
 
   return (
-    <div className="la-app">
-      <AppBar />
-      <main className={showRail ? 'la-main app-main' : 'la-main app-main app-main--full'}>
-        {showRail && <NavRail />}
-        <div className={flush ? 'app-content app-content--flush' : 'app-content'}>
-          {mode === 'setup' && <SetupContent />}
-          {mode === 'fly' && <FlightTab />}
-          {mode === 'mission' && <MissionTab />}
-        </div>
-      </main>
-      <ActionBar />
-      <ConnectModal />
-      <SimFieldPicker />
-      <PreferencesModal />
-      <SerialChooserModal />
-      <UnsavedChangesModal />
-      {/* The single restart dialog for every screen; see RebootPrompt. */}
-      <RebootPrompt />
-      {/* Last, so it sits over everything on first run. */}
-      <PreviewNotice />
-    </div>
+    // Every card shows a pending restart's reminder when its own change
+    // caused it.
+    <CardHeadExtra.Provider value={useRebootReminder}>
+      <div className="la-app">
+        <AppBar />
+        <main className={showRail ? 'la-main app-main' : 'la-main app-main app-main--full'}>
+          {showRail && <NavRail />}
+          <div className={flush ? 'app-content app-content--flush' : 'app-content'}>
+            {mode === 'setup' && <SetupContent />}
+            {mode === 'fly' && <FlightTab />}
+            {mode === 'mission' && <MissionTab />}
+          </div>
+        </main>
+        <ActionBar />
+        <ConnectModal />
+        <SimFieldPicker />
+        <PreferencesModal />
+        <SerialChooserModal />
+        <UnsavedChangesModal />
+        {/* The single restart dialog for every screen; see RebootPrompt. */}
+        <RebootPrompt />
+        {/* Last, so it sits over everything on first run. */}
+        <PreviewNotice />
+      </div>
+    </CardHeadExtra.Provider>
   )
 }

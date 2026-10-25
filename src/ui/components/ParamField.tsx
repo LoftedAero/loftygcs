@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { LaButton, LaSelect } from './La'
+import { useContext, useRef, useState } from 'react'
+import { CardScope, LaButton, LaSelect } from './La'
 import BitmaskEditor, { countBits, describeBits } from './BitmaskEditor'
 import { shortOption } from './option-names'
 import WriteFeedback from './WriteFeedback'
@@ -97,6 +97,7 @@ export default function ParamField({
   const entry = useParamStore((s) => s.entries.get(param))
   const meta = useParamStore((s) => s.metadata[param])
   const edit = useParamStore((s) => s.edit)
+  const card = useContext(CardScope)
   const [bitmaskOpen, setBitmaskOpen] = useState(false)
   // The commit, reachable from a native listener that outlives this render.
   const commitRef = useRef<(v: number) => void>(() => {})
@@ -116,7 +117,7 @@ export default function ParamField({
         useWriteFeedbackStore.getState().report({ ok: true, param })
         // ArduPilot's metadata says which parameters are read only at boot.
         if (meta?.rebootRequired) {
-          useWriteFeedbackStore.getState().needReboot(`${param} takes effect after a restart`)
+          useWriteFeedbackStore.getState().needReboot(`${param} takes effect after a restart`, card)
         }
         if (!gatesOthers) return
         // A quiet refresh skips `beginDownload`, so curated tabs are not

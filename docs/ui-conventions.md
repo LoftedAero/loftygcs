@@ -112,6 +112,12 @@ The app asks for the restart and reconnects on its own, so it returns to the
 screen that asked. The placeholder shown meanwhile says what is happening
 rather than asking for a vehicle.
 
+A change that needs a restart asks once in a dialog. After Later, "Reboot
+required" stays on the title row of the card where the change was made, and on
+no other card: every `LaCard` shows it for its own changes, so a card needs no
+code for it. A change made from a screen's column leaves no card reminder,
+since the column's Reboot button is always there.
+
 ### Red is status, except for destructive actions
 
 Green and red are status colors, never actions. The one exception is a

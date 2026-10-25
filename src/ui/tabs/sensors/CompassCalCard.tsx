@@ -3,7 +3,6 @@ import { LaButton, LaCard, LaHint } from '../../components/La'
 import ParamField from '../../components/ParamField'
 import CompassPriority from './CompassPriority'
 import CompassCalWizard from './CompassCalWizard'
-import RebootPrompt from '../../components/RebootPrompt'
 import { useParamStore } from '../../../stores/param-store'
 
 // The compasses the vehicle has, their priority, and the settings that apply
@@ -24,13 +23,9 @@ export default function CompassCalCard() {
       title="Compass"
       className="compass-card"
       actions={
-        <>
-          {/* The restart reminder left after Later. */}
-          <RebootPrompt inline />
-          <LaButton variant="secondary" disabled={!anyUsed} onClick={() => setCalibrating(true)}>
-            Calibrate compass
-          </LaButton>
-        </>
+        <LaButton variant="secondary" disabled={!anyUsed} onClick={() => setCalibrating(true)}>
+          Calibrate compass
+        </LaButton>
       }
     >
       <CompassPriority />
