@@ -343,6 +343,19 @@ by accident is the failure to design against. Revert stays enabled.
   A dirty entry keeps its staged value and updates the vehicle value it is staged against, so
   an edit the vehicle has caught up with stops being an edit.
 
+### Reset to defaults (`eraseParameters` in `services/flight.ts`)
+
+`MAV_CMD_PREFLIGHT_STORAGE` with param1 = 2 runs `AP_Param::erase_all()` and answers "All
+parameters reset, reboot board"; every other param1 is refused. The running firmware keeps
+its values until it boots, so Parameter List's Reset reboots straight after the ack. Calibrations
+are parameters and go too, which is why the dialog offers a saved file first. ArduPilot honors
+the command while armed, so the app refuses it then.
+
+- `param-reset.integration.test.ts` checks the ack and the message on Copter and Plane. It
+  cannot check the defaults after a reboot, because the runner launches with `-w`. That was
+  checked once by hand against SITL launched without `-w`: a value written, kept across a
+  plain reboot, then back to its default after Reset.
+
 ### Curated screens
 
 Curated tabs are declarations: `ParamCard` takes a field list, drops parameters the vehicle

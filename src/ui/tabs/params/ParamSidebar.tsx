@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react'
 import { LaButton, LaHint, LaModal } from '../../components/La'
 import { useParamStore } from '../../../stores/param-store'
+import { useConnectionStore } from '../../../stores/connection-store'
+import { useVehicleStore } from '../../../stores/vehicle-store'
+import { eraseParameters, rebootAutopilot } from '../../../services/flight'
 import VehicleParamActions from '../../components/VehicleParamActions'
 import ParamCompareModal from './ParamCompareModal'
 import {
@@ -25,25 +28,114 @@ export default function ParamSidebar() {
         <ImportButton />
         <ExportButton />
       </section>
+
+      <section className="app-col__group">
+        <h3 className="app-col__head">Defaults</h3>
+        <ResetDefaultsButton />
+      </section>
     </div>
   )
 }
 
+/** Downloads the parameters as a Mission Planner style `.param` file. */
+function saveParamFile() {
+  const { entries, order } = useParamStore.getState()
+  const lines = order.map((n) => `${n},${entries.get(n)?.value ?? 0}`)
+  const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/plain' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'loftgcs.param'
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 function ExportButton() {
-  const download = () => {
-    const { entries, order } = useParamStore.getState()
-    const lines = order.map((n) => `${n},${entries.get(n)?.value ?? 0}`)
-    const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/plain' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'loftgcs.param'
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }
   return (
-    <LaButton variant="secondary" size="block" onClick={download}>
+    <LaButton variant="secondary" size="block" onClick={saveParamFile}>
       Save to file
     </LaButton>
+  )
+}
+
+/**
+ * Every parameter back to the firmware's default: erase, then reboot so the
+ * defaults load. The dialog offers a saved copy first, since calibrations go
+ * too and only a file brings them back.
+ */
+function ResetDefaultsButton() {
+  const connected = useConnectionStore((s) => s.phase === 'connected')
+  const fromFile = useParamStore((s) => s.source === 'file')
+  const armed = useVehicleStore((s) => s.armed)
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const reset = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const result = await eraseParameters()
+      if (result !== 0) {
+        setError('The autopilot refused the reset.')
+        return
+      }
+      setAsking(false)
+      // The defaults load at boot. A rebooting vehicle often drops the link
+      // before acking, so a rejection here is expected.
+      void rebootAutopilot().catch(() => {})
+    } catch {
+      setError('The autopilot did not answer.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <LaButton
+        variant="ghost"
+        size="block"
+        disabled={!connected || fromFile}
+        onClick={() => {
+          setError('')
+          setAsking(true)
+        }}
+      >
+        Reset to defaults
+      </LaButton>
+
+      <LaModal
+        open={asking}
+        narrow
+        title="Reset every parameter to its default?"
+        actions={
+          <div className="la-prompt-actions">
+            <LaButton
+              variant="danger"
+              size="block"
+              disabled={busy || armed || !connected}
+              onClick={() => void reset()}
+            >
+              {busy ? 'Resetting…' : 'Reset and reboot'}
+            </LaButton>
+            <LaButton variant="secondary" size="block" onClick={saveParamFile}>
+              Save to file first
+            </LaButton>
+            <LaButton variant="ghost" size="block" onClick={() => setAsking(false)}>
+              Cancel
+            </LaButton>
+          </div>
+        }
+      >
+        {/* ArduPilot erases even while armed, so the app refuses. */}
+        <p>
+          {armed
+            ? 'This vehicle is armed. Disarm before resetting.'
+            : 'Calibrations and tuning are erased too.'}
+        </p>
+        {error && <LaHint error>{error}</LaHint>}
+      </LaModal>
+    </>
   )
 }
 

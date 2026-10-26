@@ -286,6 +286,8 @@ Cards in two columns that fit an 1100px-tall window without scrolling.
 - [ ] Connected
 - [ ] Search, the bitmask editor, and dirty-row highlighting
 - [ ] File import and export, and the compare dialog
+- [ ] Reset to defaults: confirms, offers Save to file first, is refused while
+      armed, and reconnects after the reboot with every value at its default
 
 ## Setup: Data
 

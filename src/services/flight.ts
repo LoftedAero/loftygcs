@@ -18,6 +18,7 @@ const MAV_CMD_DO_SET_ROI_LOCATION = 195
 const MAV_CMD_DO_DIGICAM_CONTROL = 203
 const MAV_CMD_DO_SET_MISSION_CURRENT = 224
 const MAV_CMD_PREFLIGHT_CALIBRATION = 241
+const MAV_CMD_PREFLIGHT_STORAGE = 245
 const MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN = 246
 const MAV_CMD_SCRIPTING = 42701
 // Magic value ArduPilot requires in param2 to force arm/disarm past checks.
@@ -235,6 +236,17 @@ export function rebootAutopilot(): Promise<number> {
     [1, 0, 0, 0, 0, 0, 0],
     5000,
   )
+}
+
+/**
+ * Erases every stored parameter, calibrations included, so each takes its
+ * firmware default at the next boot; the running firmware keeps the old
+ * values until then. Resolves with the MAV_RESULT.
+ */
+export function eraseParameters(): Promise<number> {
+  // param1 = 2 is ArduPilot's reset (GCS_Common.cpp); any other value is
+  // refused. It is honored even when armed, so callers must check.
+  return connectionService.runCommand(MAV_CMD_PREFLIGHT_STORAGE, [2, 0, 0, 0, 0, 0, 0], 5000)
 }
 
 /** Guided "fly here": position-only target at the vehicle's current relative altitude (or the given one). */
