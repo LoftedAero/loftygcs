@@ -45,6 +45,12 @@ async function handleRequest(cmd: Extract<EngineCommand, { t: 'req' }>) {
       case 'cancelDownload':
         engine.cancelDownload()
         break
+      case 'listLogs':
+        data = await engine.listLogs()
+        break
+      case 'downloadLog':
+        data = await engine.downloadLog(cmd.entry, cmd.size)
+        break
       case 'uploadFile':
         await engine.uploadFile(cmd.path, cmd.bytes)
         break

@@ -75,7 +75,7 @@ export type ProtocolEvent =
   | { t: 'commandAck'; command: number; result: number }
   | { t: 'linkStats'; stats: LinkStats }
   | { t: 'paramProgress'; got: number; total: number; source: 'ftp' | 'stream' }
-  /** A file coming off the vehicle over MAVFTP, usually a log. */
+  /** A file coming off the vehicle over MAVFTP, or a log over the log protocol. */
   | { t: 'fileProgress'; path: string; got: number; total: number }
   | { t: 'missionProgress'; got: number; total: number; dir: 'read' | 'write' }
   | {
@@ -272,11 +272,22 @@ export type EngineRequest =
   | { op: 'listFiles'; path: string }
   | { op: 'downloadFile'; path: string }
   | { op: 'cancelDownload' }
+  | { op: 'listLogs' }
+  | { op: 'downloadLog'; entry: number; size: number }
   | { op: 'uploadFile'; path: string; bytes: Uint8Array }
   | { op: 'removeFile'; path: string }
   | { op: 'createDirectory'; path: string }
   | { op: 'removeDirectory'; path: string }
   | { op: 'renameFile'; from: string; to: string }
+
+/**
+ * Fails to compile if a request has a field named like the envelope's (`t`,
+ * `id`), which would overwrite it and send the answer to the wrong request.
+ */
+type NoClash<T extends never> = T
+export type EngineRequestFieldsChecked = NoClash<
+  Extract<EngineRequest, { id: unknown } | { t: unknown }>
+>
 
 /** Messages into the protocol worker. */
 export type EngineCommand =

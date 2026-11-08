@@ -11,6 +11,7 @@ import { decodeParamPck } from './params/pck'
 import { ParamStreamClient } from './params/param-client'
 import { CommandClient } from './commands'
 import { MissionClient } from './mission'
+import { LogTransferClient, type LogEntryInfo } from './log-transfer'
 import { RttEstimator } from './link-timing'
 import type {
   DecodedMessage,
@@ -162,6 +163,11 @@ export class ProtocolEngine {
     1500,
     this.rtt,
   )
+  private logs = new LogTransferClient(
+    (msgName, fields) => this.send(msgName, fields),
+    () => ({ sysid: this.vehicleSysid ?? 1, compid: this.vehicleCompid }),
+    this.rtt,
+  )
 
   constructor(private emit: (out: EngineOutput) => void) {}
 
@@ -196,6 +202,7 @@ export class ProtocolEngine {
     this.paramStream.abort('link closed')
     this.commands.abort('link closed')
     this.mission.abort('link closed')
+    this.logs.abort('link closed')
   }
 
   pushBytes(bytes: Uint8Array) {
@@ -375,6 +382,10 @@ export class ProtocolEngine {
       case 'MISSION_REQUEST_INT':
       case 'MISSION_ACK':
         this.mission.handleMessage(msg.msgName, msg.fields)
+        return
+      case 'LOG_ENTRY':
+      case 'LOG_DATA':
+        this.logs.handleMessage(msg.msgName, msg.fields)
         return
       case 'COMMAND_LONG':
         // A request from the vehicle. The only one handled is the accel
@@ -610,9 +621,28 @@ export class ProtocolEngine {
     return this.ftp.listDirectory(path)
   }
 
-  /** Stops the file read in progress (see MavFtpClient.cancelRead). */
+  /** Stops the file or log read in progress (see MavFtpClient.cancelRead). */
   cancelDownload() {
     this.ftp.cancelRead()
+    this.logs.cancel()
+  }
+
+  /** The vehicle's logs as its log protocol lists them (see log-transfer.ts). */
+  listLogs(): Promise<LogEntryInfo[]> {
+    return this.logs.list()
+  }
+
+  /** Reads one log by its list entry, reporting progress as a file read does. */
+  downloadLog(id: number, size: number): Promise<Uint8Array> {
+    // No file has this name; the Logs screen does not read it.
+    const path = `log:${id}`
+    let lastAt = 0
+    return this.logs.read(id, size, (got, total) => {
+      const now = Date.now()
+      if (got < total && now - lastAt < PROGRESS_INTERVAL_MS) return
+      lastAt = now
+      this.emit({ t: 'evt', evt: { t: 'fileProgress', path, got, total } })
+    })
   }
 
   /** Reads a file off the vehicle, reporting progress. */

@@ -594,7 +594,21 @@ class ConnectionService {
     return worker.downloadFile(path)
   }
 
-  /** Stop the file read in progress. The download rejects as canceled. */
+  /** The vehicle's logs, listed by MAVLink's log protocol rather than MAVFTP. */
+  listLogs() {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.listLogs()
+  }
+
+  /** Read a log by its list entry. Progress arrives as fileProgress events. */
+  downloadLog(id: number, size: number) {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('not connected'))
+    return worker.downloadLog(id, size)
+  }
+
+  /** Stop the file or log read in progress. The download rejects as canceled. */
   cancelDownload() {
     return this.worker?.cancelDownload() ?? Promise.resolve()
   }

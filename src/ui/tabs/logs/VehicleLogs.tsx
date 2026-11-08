@@ -62,7 +62,7 @@ export default function VehicleLogs() {
                 : null
             return (
               <button
-                key={l.path}
+                key={'path' in l ? l.path : `entry:${l.entry}`}
                 type="button"
                 className={`log-list__item${pct !== null ? ' is-downloading' : ''}`}
                 style={pct !== null ? ({ '--pct': `${pct}%` } as CSSProperties) : undefined}

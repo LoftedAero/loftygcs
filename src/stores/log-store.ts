@@ -125,13 +125,15 @@ export function defaultAxis(
   return best
 }
 
-/** A log sitting on the vehicle's card. */
-export interface VehicleLog {
+/**
+ * A log on the vehicle: a file read over MAVFTP, or an entry in the log
+ * protocol's list (logs in onboard flash, which has no files).
+ */
+export type VehicleLog = {
   name: string
-  path: string
-  /** Bytes, as the directory listing reported them. */
+  /** Bytes, as the vehicle listed them. */
   size: number
-}
+} & ({ path: string } | { entry: number })
 
 /** What the vehicle side of this screen is doing. */
 export type VehicleLogStatus =

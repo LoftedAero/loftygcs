@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// Parameters and missions over a slow radio link: SITL behind the SlowLink
+// Parameters, missions and logs over a slow radio link: SITL behind the SlowLink
 // shim, which approximates ELRS in MAVLink mode at 333 Hz. Start SITL first
 // (npm run sitl, or npm run sitl -- plane), then:
 //   SITL=1 npx vitest run slow-link
@@ -10,6 +10,7 @@ import type net from 'node:net'
 import { connectSitl } from '../test-fixtures/sitl-client'
 import { SlowLink } from '../test-fixtures/slow-link'
 import { ProtocolEngine } from './engine'
+import { parseDataflash } from './dataflash'
 import type { MissionItem, ProtocolEvent } from './types'
 
 async function waitFor(cond: () => boolean, timeoutMs: number, what: string) {
@@ -46,7 +47,7 @@ function survey(count: number): MissionItem[] {
 }
 
 describe.runIf(process.env.SITL === '1')('slow link', () => {
-  it('downloads parameters, writes one and round-trips a mission', async () => {
+  it('downloads parameters, writes one, round-trips a mission and reads a log', async () => {
     const events: ProtocolEvent[] = []
     /** Arrival time of each event, for the timing breakdown. */
     const times: number[] = []
@@ -115,9 +116,30 @@ describe.runIf(process.env.SITL === '1')('slow link', () => {
       }
       await engine.clearMission(0)
 
+      // Logs over the log protocol, which boards logging to onboard flash
+      // need. Lost LOG_DATA is asked for again once the stream has ended. A
+      // whole log takes minutes at this rate, so only its start is read; a
+      // hole filled with anything but the log would break the framing.
+      const t2 = Date.now()
+      const entries = await engine.listLogs()
+      expect(entries.length).toBeGreaterThan(0)
+      const listSecs = (Date.now() - t2) / 1000
+
+      const BYTES = 20000
+      const log = entries.find((e) => e.size >= BYTES)!
+      const t3 = Date.now()
+      const bytes = await engine.downloadLog(log.id, BYTES)
+      const readSecs = (Date.now() - t3) / 1000
+      expect(bytes.length).toBe(BYTES)
+      const parsed = parseDataflash(bytes)
+      expect(parsed.messages.has('PARM')).toBe(true)
+      expect(parsed.skippedBytes).toBe(0)
+
       console.log(
         `slow link: ${result.params.length} params via ${result.source} in ${paramSecs.toFixed(1)} s; ` +
           `40-item mission up and back in ${missionSecs.toFixed(1)} s; ` +
+          `${entries.length} logs listed in ${listSecs.toFixed(1)} s and ` +
+          `${BYTES} bytes of one read in ${readSecs.toFixed(1)} s; ` +
           `lost packets ${link.stats.lostPackets}`,
       )
     } finally {
@@ -125,5 +147,5 @@ describe.runIf(process.env.SITL === '1')('slow link', () => {
       link.stop()
       socket.destroy()
     }
-  }, 300000)
+  }, 420000)
 })

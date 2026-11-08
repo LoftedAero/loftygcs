@@ -339,6 +339,40 @@ describe.runIf(process.env.SITL === '1')('SITL integration', () => {
     }
   }, 240000)
 
+  it('lists and reads logs over the log protocol, matching MAVFTP', async () => {
+    // The log protocol is how boards that log to onboard flash are read; on
+    // SITL it serves the same files MAVFTP sees in /logs, which is the check.
+    const events: ProtocolEvent[] = []
+    let socket: net.Socket | null = null
+    const engine = new ProtocolEngine((out) => {
+      if (out.t === 'tx') socket?.write(out.bytes)
+      else if (out.t === 'evt') events.push(out.evt)
+    })
+    socket = await connectVehicle(engine, events, (s) => (socket = s))
+
+    try {
+      const files = (await engine.listFiles('/logs'))
+        .filter((e) => e.kind === 'file' && /^\d+\.bin$/i.test(e.name))
+        .sort((a, b) => parseInt(a.name, 10) - parseInt(b.name, 10))
+      const entries = await engine.listLogs()
+      // Entry 1 is the oldest log, and so on in order.
+      expect(entries.map((e) => e.size)).toEqual(files.map((f) => f.size))
+
+      const smallest = entries.reduce((a, b) => (b.size < a.size ? b : a))
+      const file = files[smallest.id - 1]!
+      const viaLog = await engine.downloadLog(smallest.id, smallest.size)
+      const viaFtp = await engine.downloadFile(`/logs/${file.name}`)
+      expect(viaLog.length).toBe(smallest.size)
+      expect(Buffer.from(viaLog).equals(Buffer.from(viaFtp))).toBe(true)
+      expect(events.some((e) => e.t === 'fileProgress' && e.path === `log:${smallest.id}`)).toBe(
+        true,
+      )
+    } finally {
+      engine.stop()
+      socket?.destroy()
+    }
+  }, 240000)
+
   it('writes, reads back and deletes a file over MAVFTP', async () => {
     // The write path has no burst mode and no fallback: CreateFile returns
     // a session every WriteFile must use, and offsets are absolute.

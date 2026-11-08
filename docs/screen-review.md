@@ -294,8 +294,9 @@ Cards in two columns that fit an 1100px-tall window without scrolling.
 ### Log Review
 
 - [ ] Disconnected and connected
-- [ ] Download from the vehicle (needs an SD card on hardware; SITL stores
-      logs elsewhere)
+- [ ] Download from the vehicle: from an SD card (MAVFTP) and from a board
+      that logs to onboard flash (the log protocol, listed by time or as
+      `log-N.bin`)
 - [ ] A log opened from a file: table, plots and 3D replay
 
 ### MAVFTP

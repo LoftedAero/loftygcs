@@ -14,6 +14,7 @@ import type {
   ProtocolEvent,
 } from '../protocol/types'
 import type { FtpDirEntry } from '../protocol/ftp/mavftp'
+import type { LogEntryInfo } from '../protocol/log-transfer'
 
 export class WorkerClient {
   private worker: Worker
@@ -90,9 +91,19 @@ export class WorkerClient {
     return this.request({ op: 'downloadFile', path }) as Promise<Uint8Array>
   }
 
-  /** Stop the file read in progress; it rejects as canceled. */
+  /** Stop the file or log read in progress; it rejects as canceled. */
   cancelDownload(): Promise<void> {
     return this.request({ op: 'cancelDownload' }) as Promise<void>
+  }
+
+  /** The vehicle's logs as MAVLink's log protocol lists them. */
+  listLogs(): Promise<LogEntryInfo[]> {
+    return this.request({ op: 'listLogs' }) as Promise<LogEntryInfo[]>
+  }
+
+  /** Read one log by its list entry. Progress arrives as `fileProgress` events. */
+  downloadLog(entry: number, size: number): Promise<Uint8Array> {
+    return this.request({ op: 'downloadLog', entry, size }) as Promise<Uint8Array>
   }
 
   uploadFile(path: string, bytes: Uint8Array): Promise<void> {

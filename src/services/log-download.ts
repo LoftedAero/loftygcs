@@ -1,14 +1,18 @@
-// Pulling a dataflash log off the vehicle over MAVFTP.
+// Pulling a dataflash log off the vehicle.
 //
-// ArduPilot keeps logs numbered in /APM/LOGS, with LASTLOG.TXT naming the
-// most recent. MAVFTP is used rather than LOG_REQUEST_DATA because it is
-// faster and already used for parameters. A ten-megabyte log still takes a
-// minute over USB and most of an hour over a 57600-baud radio, hence the
-// progress reporting and cancel.
+// MAVFTP first: ArduPilot keeps logs on an SD card as numbered files in
+// /APM/LOGS, and a burst read is about ten times faster than the log
+// protocol. A board that logs to an onboard flash chip has no files, so when
+// MAVFTP shows no logs the list comes from MAVLink's log protocol
+// (protocol/log-transfer.ts), as Mission Planner reads them. A ten-megabyte
+// log still takes a minute over USB and most of an hour over a 57600-baud
+// radio, hence the progress reporting and cancel.
 
 import { connectionService } from './connection'
 import { useLogStore, type VehicleLog } from '../stores/log-store'
+import { useVehicleStore } from '../stores/vehicle-store'
 import { serializeParamFile } from '../protocol/param-file'
+import type { LogEntryInfo } from '../protocol/log-transfer'
 
 /**
  * Where logs live, most likely first: hardware mounts the SD card at /APM,
@@ -30,8 +34,8 @@ function logNumber(name: string): number {
   return m ? Number(m[1]) : 0
 }
 
-/** The first log directory this vehicle actually has, with its contents. */
-async function findLogDir(): Promise<{ dir: string; logs: VehicleLog[] }> {
+/** The logs in the first log directory this vehicle has, newest first. */
+async function findLogDir(): Promise<VehicleLog[]> {
   let lastError: unknown = null
   for (const dir of LOG_DIRS) {
     try {
@@ -40,8 +44,8 @@ async function findLogDir(): Promise<{ dir: string; logs: VehicleLog[] }> {
         .filter((e) => e.kind === 'file' && isLog(e.name))
         .map((e) => ({ name: e.name, path: `${dir}/${e.name}`, size: e.size ?? 0 }))
         .sort((a, b) => logNumber(b.name) - logNumber(a.name))
-      // An empty directory is still the right one; the vehicle has not flown.
-      return { dir, logs }
+      // An empty directory ends the search; a vehicle has only one.
+      return logs
     } catch (err) {
       lastError = err
       // Only a missing directory moves on to the next candidate; a timeout
@@ -56,21 +60,55 @@ function isMissing(err: unknown): boolean {
   return err instanceof Error && /FileNotFound/.test(err.message)
 }
 
+/**
+ * The vehicle answers the log protocol only while disarmed (MAVFTP works
+ * either way).
+ */
+const DISARM_TEXT = 'Disarm to read logs from this vehicle.'
+
+/**
+ * A list entry's name. The protocol never gives a log's own number, so it is
+ * named by its time, as Mission Planner names it, or else by its entry.
+ */
+export function entryName(e: LogEntryInfo): string {
+  if (e.timeUtc <= 0) return `log-${e.id}.bin`
+  const d = new Date(e.timeUtc * 1000)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}.bin`
+  )
+}
+
+/** The logs the log protocol lists, newest first. */
+async function listEntries(): Promise<VehicleLog[]> {
+  const entries = await connectionService.listLogs()
+  return entries
+    .map((e) => ({ name: entryName(e), size: e.size, entry: e.id }))
+    .sort((a, b) => b.entry - a.entry)
+}
+
 /** List the logs on the vehicle. */
 export async function listVehicleLogs(): Promise<void> {
   const store = useLogStore.getState()
   store.setVehicleStatus({ kind: 'listing' })
   try {
-    const { dir, logs } = await findLogDir()
+    let logs: VehicleLog[] = []
+    try {
+      logs = await findLogDir()
+    } catch {
+      // No log directory, or no MAVFTP: the log protocol may still answer.
+    }
+    if (logs.length === 0) {
+      if (useVehicleStore.getState().armed) throw new Error(DISARM_TEXT)
+      logs = await listEntries()
+    }
     useLogStore.getState().setVehicleLogs(logs)
-    useLogStore.getState().setVehicleStatus(
-      logs.length === 0
-        ? {
-            kind: 'error',
-            text: `No logs in ${dir}`,
-          }
-        : { kind: 'idle' },
-    )
+    useLogStore
+      .getState()
+      .setVehicleStatus(
+        logs.length === 0 ? { kind: 'error', text: 'No logs on the vehicle.' } : { kind: 'idle' },
+      )
   } catch (err) {
     useLogStore.getState().setVehicleStatus({ kind: 'error', text: describe(err) })
   }
@@ -81,7 +119,11 @@ export async function downloadVehicleLog(log: VehicleLog): Promise<void> {
   const store = useLogStore.getState()
   store.setVehicleStatus({ kind: 'downloading', name: log.name, got: 0, total: log.size })
   try {
-    const bytes = await connectionService.downloadFile(log.path)
+    if ('entry' in log && useVehicleStore.getState().armed) throw new Error(DISARM_TEXT)
+    const bytes =
+      'path' in log
+        ? await connectionService.downloadFile(log.path)
+        : await connectionService.downloadLog(log.entry, log.size)
     useLogStore.getState().setVehicleStatus({ kind: 'idle' })
     useLogStore.getState().loadBytes(log.name, bytes)
   } catch (err) {
@@ -98,8 +140,8 @@ export function cancelVehicleLogDownload(): void {
 }
 
 /**
- * A read stopped on purpose. Matched on the message because errors lose
- * their class crossing the worker boundary.
+ * A read stopped on purpose (MAVFTP or the log protocol). Matched on the
+ * message because errors lose their class crossing the worker boundary.
  */
 function isCancel(err: unknown): boolean {
   return err instanceof Error && /transfer canceled/.test(err.message)
@@ -138,11 +180,9 @@ function download(name: string, data: string | Uint8Array, type: string): void {
 function describe(err: unknown): string {
   if (!(err instanceof Error)) return String(err)
   // A NAK code on its own tells a pilot nothing.
-  if (isMissing(err))
-    return `No log directory on this vehicle (looked in ${LOG_DIRS.join(' and ')}).`
+  if (isMissing(err)) return 'The log is no longer on the vehicle.'
   if (/timed out/.test(err.message)) {
-    // Either the firmware lacks MAVFTP or a busy
-    // telemetry radio drops the replies; nothing here can tell which.
+    // A busy telemetry radio drops the replies.
     return 'No answer from the vehicle. Try connecting over USB.'
   }
   return err.message

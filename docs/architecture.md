@@ -285,11 +285,12 @@ A radio link can answer in seconds where USB answers in milliseconds: ELRS in MA
   500 ms floor would otherwise give up on a slow link before it was measured.
 - Missing parameters are refetched a few at a time (`REFETCH_WINDOW`), each index on its own
   timeout, rather than a flood of requests that queues behind telemetry.
-- `slow-link.integration.test.ts` runs parameters and a mission through `SlowLink`
+- `slow-link.integration.test.ts` runs parameters, a mission and a log through `SlowLink`
   (`src/test-fixtures/slow-link.ts`), which models ELRS at 333 Hz: 1.8 kB/s down, latency, loss,
   and the receiver's 1 kB buffer, reported to ArduPilot in RADIO_STATUS so it throttles its
   streams as it would on the real link. Measured: Plane's 1,419 parameters in about 64 s and a
-  40-item mission up and back in about 39 s; Copter 74 s and 58 s.
+  40-item mission up and back in about 39 s; Copter 74 s and 58 s. The first 20 kB of a log
+  over the log protocol takes about 65 s on Copter.
 
 ### Airframe banner (`protocol/airframe.ts`)
 
@@ -852,7 +853,28 @@ before an upload and progress during it, and refuses files over 2 MB (`MAX_UPLOA
 
 ### Log download
 
-Hardware keeps logs in `/APM/LOGS`; SITL keeps them in `/logs`. The service probes both.
+Hardware keeps logs on the SD card in `/APM/LOGS`; SITL keeps them in `/logs`. The service
+probes both over MAVFTP. A board that logs to an onboard flash chip (`LOG_BACKEND_TYPE` 4, the
+block logger) has no files, so when MAVFTP shows no logs the list comes from MAVLink's log
+protocol (`protocol/log-transfer.ts`), which Mission Planner uses for everything. It serves the
+SD card too, but MAVFTP's burst read is about ten times faster: the log protocol measured about
+60 kB/s over USB from a board's onboard flash (1.3 MB in 20 s). Traps, from
+`AP_Logger_MAVLinkLogTransfer.cpp`:
+
+- Every request is ignored while armed, with one "Disarm for log download", so the app says so
+  before asking.
+- A block logger stops logging while a list or a download is active, until LOG_REQUEST_END.
+  Every operation, finished, failed or canceled, ends with one.
+- A LOG_REQUEST_DATA that arrives while the vehicle is still sending is dropped, so gaps are
+  asked for only once the stream has ended (a short packet, or the requested count reached).
+- The vehicle sends as fast as its own port allows. Behind a radio the overflow is lost, usually
+  with the packet that ends the stream, so a stream that has delivered and then stayed quiet
+  for four times its longest packet gap is taken as ended. That halved the read time through
+  `SlowLink`. Asking in windows sized to the link was slower there: the buffer is shared with
+  telemetry, so what one pass carries says little about the next.
+- Entries are numbered from 1, oldest first, and the log's own number is never sent, so an
+  entry is named by its time (as Mission Planner names it), or by its entry number when the
+  vehicle had no time.
 
 ### Log review and replay
 
@@ -1046,8 +1068,9 @@ Behavior to know:
     two packets. `avdec_h264` conceals truncated slices unless `output-corrupt=false` is set.
   - The size assertions are calibrated against measured values. If one fails, check the
     fixture before the client.
-- `slow-link.integration.test.ts` (part of `SITL=1`) runs parameters and a mission through an
-  ELRS-like link; see [Slow links](#slow-links-protocollink-timingts). It takes about two minutes.
+- `slow-link.integration.test.ts` (part of `SITL=1`) runs parameters, a mission and a log
+  through an ELRS-like link; see [Slow links](#slow-links-protocollink-timingts). It takes about
+  three minutes.
 - `electron/sitl-core.test.ts` launches its own simulator on port 5760, so run it with no other
   SITL on that port.
 - `LOG_SWEEP=<dir> npx vitest run log-sweep.test.ts` runs the log pipeline over a directory of
