@@ -5,10 +5,11 @@ import {
   armReadiness,
   batteryLabel,
   compassTicks,
-  gpsLabel,
+  gpsReadings,
   gpsUsable,
   isFailsafe,
   linkLabel,
+  linkReadings,
   tapeTicks,
   hudMessage,
   HUD_MESSAGE_MS,
@@ -166,30 +167,52 @@ describe('linkLabel', () => {
     expect(linkLabel(-1, undefined)).toBe('')
     expect(linkLabel(-1, 0)).toBe('')
   })
+
+  it('captions RSSI for the HUD and leaves the rate to its unit', () => {
+    expect(linkReadings(254, 30)).toEqual([
+      { caption: 'RSSI', value: '100%' },
+      { caption: '', value: '30 pkt/s' },
+    ])
+  })
 })
 
 describe('the GPS readout', () => {
+  /** A line as the HUD reads it, captions and values in order. */
+  const line = (...args: Parameters<typeof gpsReadings>) =>
+    gpsReadings(...args)
+      .map((r) => `${r.caption} ${r.value}`)
+      .join('  ')
+
   it('names the fix a pilot would name', () => {
-    expect(gpsLabel(2, 5)).toBe('GPS: 2D  5 sats')
-    expect(gpsLabel(3, 14)).toBe('GPS: 3D  14 sats')
+    expect(line('GPS', 2, 5)).toBe('GPS 2D  SATS 5')
+    expect(line('GPS', 3, 14)).toBe('GPS 3D  SATS 14')
     // RTK is named separately so an RTK setup can be confirmed.
-    expect(gpsLabel(5, 20)).toBe('GPS: RTK float  20 sats')
-    expect(gpsLabel(6, 20)).toBe('GPS: RTK fixed  20 sats')
+    expect(line('GPS', 5, 20)).toBe('GPS RTK float  SATS 20')
+    expect(line('GPS', 6, 20)).toBe('GPS RTK fixed  SATS 20')
   })
 
-  it('leaves the satellite count out until there is one', () => {
-    // No satellite count until the receiver reports one.
-    expect(gpsLabel(1, 0)).toBe('GPS: No fix')
+  it('adds HDOP once there is a fix to dilute', () => {
+    expect(line('GPS', 3, 14, 0.78)).toBe('GPS 3D  SATS 14  HDOP 0.8')
+    expect(line('GPS', 2, 5, 2.4)).toBe('GPS 2D  SATS 5  HDOP 2.4')
+    // No fix, no reading, or MAVLink's "unknown" (eph 65535).
+    expect(line('GPS', 1, 4, 99.99)).toBe('GPS No fix  SATS 4')
+    expect(line('GPS', 3, 14, 0)).toBe('GPS 3D  SATS 14')
+    expect(line('GPS', 3, 14, 655.35)).toBe('GPS 3D  SATS 14')
+  })
+
+  it('names each receiver when there are two', () => {
+    expect(line('GPS2', 3, 12, 0.9)).toBe('GPS2 3D  SATS 12  HDOP 0.9')
+    // A configured receiver that has failed still reports, as NO_GPS.
+    expect(line('GPS2', 0, 0, 655.35)).toBe('GPS2 No GPS')
   })
 
   it('tells a missing receiver from one that is still searching', () => {
     // GPS_FIX_TYPE 0 (NO_GPS) means no receiver is talking to the autopilot;
     // 1 (NO_FIX) means one is searching. Different causes, different words,
-    // as in Mission Planner.
-    expect(gpsLabel(0, 0)).toBe('GPS: No GPS')
-    expect(gpsLabel(1, 0)).toBe('GPS: No fix')
-    // Satellites but no fix means the receiver is still searching.
-    expect(gpsLabel(1, 4)).toBe('GPS: No fix  4 sats')
+    // as in Mission Planner. No satellite count until there is one.
+    expect(line('GPS', 0, 0)).toBe('GPS No GPS')
+    expect(line('GPS', 1, 0)).toBe('GPS No fix')
+    expect(line('GPS', 1, 4)).toBe('GPS No fix  SATS 4')
   })
 
   it('calls a fix usable at exactly the threshold ArduPilot does', () => {

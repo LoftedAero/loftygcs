@@ -630,6 +630,17 @@ ignore the skip mask, so no failure is lost.
 - `arming-checks.integration.test.ts` raises `BATT_ARM_VOLT` on SITL and checks the firmware's
   own wording lands on Battery Level.
 
+### GPS on the HUD (`gpsReadings` in `hud-draw.ts`)
+
+GPS_RAW_INT always carries the first receiver, whichever one the vehicle navigates on
+(`GPS_AUTO_SWITCH` is not reported). The second has its own message, GPS2_RAW, which ArduPilot
+sends whenever `GPS2_TYPE` is set (read live, no reboot), including when that receiver has
+failed (fix 0). So a GPS2_RAW arriving is what makes the HUD draw a second line, and a dead
+second receiver shows as `GPS2 No GPS` rather than disappearing. With one receiver the line is
+captioned GPS, with two GPS1 and GPS2. Each line gives way (HDOP, then satellites) to clear the
+link readout and the heading pointer. `gps2.integration.test.ts` checks the message follows
+`GPS2_TYPE` on SITL.
+
 ### Takeoff (`takeoffStyle()` in `services/flight.ts`)
 
 Measured against SITL, armed:

@@ -483,6 +483,9 @@ class ConnectionService {
         p.gpsSats = d.satellites
         p.gpsHdop = d.hdop
         break
+      case 'gps2':
+        p.gps2 = { fix: d.fixType, sats: d.satellites, hdop: d.hdop }
+        break
       case 'rc':
         p.rcChannels = d.channels
         p.rcRssi = d.rssi

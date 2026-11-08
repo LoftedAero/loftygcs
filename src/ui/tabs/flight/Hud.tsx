@@ -7,11 +7,11 @@ import { SENSOR_BITS } from '../../../protocol/sensors'
 import {
   armReadiness,
   batteryLabel,
-  gpsLabel,
+  gpsReadings,
   gpsUsable,
   hudMessage,
   isFailsafe,
-  linkLabel,
+  linkReadings,
 } from './hud-draw'
 import { useHudNoteStore } from '../../../stores/hud-note-store'
 import { paintHud, type HudAvoid, type HudHits, type HudRect } from './hud-paint'
@@ -118,10 +118,12 @@ export default function Hud({
         throttlePct: v.throttlePct,
         batteryText: batteryLabel(v.batteryV, v.batteryA, v.batteryPct),
         // rxCount is the count over the last second, i.e. the packet rate.
-        linkText: linkLabel(v.rcRssi, link?.rxCount),
+        link: linkReadings(v.rcRssi, link?.rxCount),
         // Blank with no vehicle rather than "No GPS".
-        gpsText: v.present ? gpsLabel(v.gpsFix, v.gpsSats) : '',
+        gps: v.present ? gpsReadings(v.gps2 ? 'GPS1' : 'GPS', v.gpsFix, v.gpsSats, v.gpsHdop) : [],
         gpsUsable: !v.present || gpsUsable(v.gpsFix),
+        gps2: v.present && v.gps2 ? gpsReadings('GPS2', v.gps2.fix, v.gps2.sats, v.gps2.hdop) : [],
+        gps2Usable: !v.present || !v.gps2 || gpsUsable(v.gps2.fix),
         modeName: v.modeName,
         armed: v.armed,
         showArmedBanner: v.armed && now - armedAt.current.at < ARMED_BANNER_MS,

@@ -55,6 +55,8 @@ const MESSAGE_RATES_HZ: readonly [number, number][] = [
   [74, 4], // VFR_HUD
   [1, 2], // SYS_STATUS
   [24, 2], // GPS_RAW_INT
+  // Sent only while GPS2_TYPE is set, so asking costs nothing with one GPS.
+  [124, 2], // GPS2_RAW
   [147, 1], // BATTERY_STATUS
   [65, 2], // RC_CHANNELS
   [36, 2], // SERVO_OUTPUT_RAW

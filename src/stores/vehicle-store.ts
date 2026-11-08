@@ -56,6 +56,12 @@ export interface VehicleSnapshot {
   gpsFix: number
   gpsSats: number
   gpsHdop: number
+  /**
+   * The second receiver, null until a GPS2_RAW arrives. ArduPilot sends one
+   * whenever GPS2_TYPE is set, so a configured receiver that has failed is
+   * still here, with fix 0.
+   */
+  gps2: { fix: number; sats: number; hdop: number } | null
   rcChannels: number[]
   /** RC receiver RSSI, 0-254. 255 (or -1 here) means the link does not report it. */
   rcRssi: number
@@ -145,6 +151,7 @@ const EMPTY: VehicleSnapshot = {
   gpsFix: 0,
   gpsSats: 0,
   gpsHdop: 0,
+  gps2: null,
   rcChannels: [],
   rcRssi: -1,
   servoOutputsUs: [],

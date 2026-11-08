@@ -145,6 +145,17 @@ export function messageToDeltas(msg: DecodedMessage): TelemetryDelta[] {
           hdop: (f.eph as number) / 100,
         },
       ]
+    // GPS_RAW_INT is always the first receiver, whichever one the vehicle
+    // navigates on; the second has its own message.
+    case 'GPS2_RAW':
+      return [
+        {
+          k: 'gps2',
+          fixType: f.fixType as number,
+          satellites: f.satellitesVisible as number,
+          hdop: (f.eph as number) / 100,
+        },
+      ]
     case 'RC_CHANNELS': {
       const count = Math.min((f.chancount as number) || 16, 16)
       const channels: number[] = []

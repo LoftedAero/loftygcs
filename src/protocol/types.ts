@@ -177,6 +177,8 @@ export type TelemetryDelta =
       chargeState: number
     }
   | { k: 'gps'; fixType: number; satellites: number; hdop: number }
+  /** The second receiver, from GPS2_RAW, which ArduPilot sends while `GPS2_TYPE` is set. */
+  | { k: 'gps2'; fixType: number; satellites: number; hdop: number }
   | { k: 'rc'; channels: number[]; rssi: number }
   /**
    * What sixteen outputs are actually driving, from one SERVO_OUTPUT_RAW.

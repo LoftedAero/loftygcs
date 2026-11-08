@@ -148,11 +148,26 @@ export function gpsKind(fixType: number): string {
               : 'No GPS'
 }
 
-export function gpsLabel(fixType: number, sats: number): string {
-  const kind = gpsKind(fixType)
-  // Satellite count only when nonzero, and labeled like the link line's
-  // values.
-  return sats > 0 ? `GPS: ${kind}  ${sats} sats` : `GPS: ${kind}`
+/** A dim caption and its value, drawn like the HUD's AS and GS. */
+export interface Reading {
+  caption: string
+  value: string
+}
+
+/**
+ * One receiver's line: its name, the fix, then the satellite count and HDOP.
+ * The name is GPS with one receiver and GPS1 or GPS2 with two, so a failure
+ * on the second is not read as the first's.
+ */
+export function gpsReadings(name: string, fixType: number, sats: number, hdop = 0): Reading[] {
+  const out: Reading[] = [{ caption: name, value: gpsKind(fixType) }]
+  if (sats > 0) out.push({ caption: 'SATS', value: String(sats) })
+  // A dilution means nothing without a fix, and GPS_RAW_INT's eph is 65535
+  // (655.35 here) when the receiver does not know it.
+  if (fixType >= 2 && hdop > 0 && hdop < 655.35) {
+    out.push({ caption: 'HDOP', value: hdop.toFixed(1) })
+  }
+  return out
 }
 
 /**
@@ -165,15 +180,25 @@ export function gpsUsable(fixType: number): boolean {
   return fixType >= 3
 }
 
-/** Link line: receiver RSSI where the vehicle reports it, else packet rate. */
-export function linkLabel(rcRssi: number, packetsPerSec: number | undefined): string {
-  const parts: string[] = []
+/**
+ * Link line: receiver RSSI where the vehicle reports it, and the packet rate.
+ * The rate carries its unit, as AS does, so it needs no caption.
+ */
+export function linkReadings(rcRssi: number, packetsPerSec: number | undefined): Reading[] {
+  const out: Reading[] = []
   // RC_CHANNELS carries RSSI as 0-254; shown as a percentage.
-  if (rcRssi >= 0) parts.push(`RSSI ${Math.round((rcRssi / 254) * 100)}%`)
+  if (rcRssi >= 0) out.push({ caption: 'RSSI', value: `${Math.round((rcRssi / 254) * 100)}%` })
   if (packetsPerSec !== undefined && packetsPerSec > 0) {
-    parts.push(`${packetsPerSec.toFixed(0)} pkt/s`)
+    out.push({ caption: '', value: `${packetsPerSec.toFixed(0)} pkt/s` })
   }
-  return parts.join('  ')
+  return out
+}
+
+/** The link line as text, for the app bar's tooltip. */
+export function linkLabel(rcRssi: number, packetsPerSec: number | undefined): string {
+  return linkReadings(rcRssi, packetsPerSec)
+    .map((r) => (r.caption ? `${r.caption} ${r.value}` : r.value))
+    .join('  ')
 }
 
 /**

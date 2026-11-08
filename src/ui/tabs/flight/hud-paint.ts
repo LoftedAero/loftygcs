@@ -9,7 +9,7 @@
 // letter-spaced sans. Text is separated from the background with a soft
 // shadow rather than an outline, which looks heavy at these sizes.
 
-import { compassTicks, tapeTicks, type ArmReadiness, tapeStep } from './hud-draw'
+import { compassTicks, tapeTicks, type ArmReadiness, type Reading, tapeStep } from './hud-draw'
 import {
   distanceLabel,
   fixed,
@@ -45,6 +45,8 @@ const CHIP = 'rgba(14, 17, 22, 0.82)'
 const PANEL_EDGE = 'rgba(255, 255, 255, 0.18)'
 const MONO = '"Roboto Mono", ui-monospace, monospace'
 const SANS = '"Work Sans", system-ui, sans-serif'
+/** A dim caption's size (AS, GS, SATS), before the HUD's scale. */
+const CAPTION = 9
 
 const CAN_LETTER_SPACE =
   typeof CanvasRenderingContext2D !== 'undefined' &&
@@ -62,10 +64,13 @@ export interface HudState {
   /** What the reader has asked to see; the numbers above stay SI. */
   units: UnitPrefs
   batteryText: string
-  linkText: string
-  gpsText: string
+  link: Reading[]
+  gps: Reading[]
   /** Whether that fix will fly a position mode; red when it will not. */
   gpsUsable: boolean
+  /** The second receiver's line under the first; empty with no second GPS. */
+  gps2: Reading[]
+  gps2Usable: boolean
   modeName: string
   armed: boolean
   showArmedBanner: boolean
@@ -204,7 +209,7 @@ export function paintHud(
     align: CanvasTextAlign,
     size = 13 * s,
   ) => {
-    const capSize = 9 * s
+    const capSize = CAPTION * s
     ctx.save()
     ctx.font = `500 ${Math.round(capSize)}px ${SANS}`
     const capW = ctx.measureText(caption).width + 5 * s
@@ -294,9 +299,14 @@ export function paintHud(
   const avoid = bottomLeft
   // The GPS line, with the link opposite it.
   const topLine = ribbonH + 18 * s
+  // A second GPS takes the line under the first, and the left column moves
+  // down by it.
+  const gps2Line = topLine + 16 * s
+  const leftDrop = st.gps2.length > 0 ? 16 * s : 0
   // The first line of a column's stack when its bottom corner is covered.
   const stackTop = topLine + 16 * s
   const stackBottom = stackTop + 17 * s + 15 * s
+  const leftStackTop = stackTop + leftDrop
   const clearTop = avoid ? h - avoid.h : h
   // The lowest a center chip's bottom edge may sit.
   const chipFloor = bottomCenter ? h - bottomCenter.h - gap : h
@@ -308,8 +318,12 @@ export function paintHud(
   let leftTapeTop = tapeTop
   let leftTapeH = tapeH
   if (avoid) {
-    leftTapeTop = stackBottom + gap
+    leftTapeTop = stackBottom + leftDrop + gap
     leftTapeH = Math.min(tapeH, clearTop - gap - leftTapeTop)
+  } else if (leftTapeTop < gps2Line + gap && st.gps2.length > 0) {
+    // A short HUD's tape would start under the second GPS line.
+    leftTapeH -= gps2Line + gap - leftTapeTop
+    leftTapeTop = gps2Line + gap
   }
   let rightTapeTop = tapeTop
   let rightTapeH = tapeH
@@ -351,7 +365,7 @@ export function paintHud(
   // Under the speed tape: the two speeds. Under the altitude tape: vertical
   // speed and throttle.
   const u1 = tapeBottom + 17 * s
-  const l1 = avoid ? stackTop + 17 * s : u1
+  const l1 = avoid ? leftStackTop + 17 * s : u1
   const l2 = l1 + 15 * s
   const r1 = bottomRight ? stackTop + 17 * s : u1
   const r2 = r1 + 15 * s
@@ -369,7 +383,7 @@ export function paintHud(
 
   // The corners: battery bottom left, mode bottom right, link top right,
   // GPS top left, all at the same weight as the readouts above them.
-  write(st.batteryText, left, avoid ? stackTop : h - 8 * s, { size: corner })
+  write(st.batteryText, left, avoid ? leftStackTop : h - 8 * s, { size: corner })
   write(st.modeName || '—', right, bottomRight ? stackTop : h - 8 * s, {
     size: corner,
     weight: '600',
@@ -377,13 +391,58 @@ export function paintHud(
     spacing: 0.5,
     align: 'right',
   })
-  write(st.linkText, right, topLine, { size: corner, align: 'right' })
-  // GPS opposite the link. Red without a usable fix, since position modes
-  // are then refused.
-  write(st.gpsText, left, topLine, {
-    size: corner,
-    ...(st.gpsUsable ? {} : { color: RED, weight: '600' }),
-  })
+  // The top lines are captioned values, like AS and GS: the link on the
+  // right, GPS on the left with a second receiver under it.
+  const readingGap = 10 * s
+  /** Each reading's caption and value widths, measured as `pair` draws them. */
+  const measureReadings = (list: Reading[], weight = '') => {
+    ctx.save()
+    const widths = list.map((r) => {
+      ctx.font = `500 ${Math.round(CAPTION * s)}px ${SANS}`
+      const cap = r.caption ? ctx.measureText(r.caption).width + 5 * s : 0
+      ctx.font = `${weight} ${Math.round(corner)}px ${MONO}`.trim()
+      return { cap, val: ctx.measureText(r.value).width }
+    })
+    ctx.restore()
+    return widths
+  }
+  const readingsWidth = (list: Reading[], weight = '') =>
+    measureReadings(list, weight).reduce(
+      (sum, m, i) => sum + m.cap + m.val + (i > 0 ? readingGap : 0),
+      0,
+    )
+  /** Draws the readings left to right from x; `alarm` turns the values red. */
+  const drawReadings = (list: Reading[], x: number, y: number, alarm = false) => {
+    const weight = alarm ? '600' : ''
+    const widths = measureReadings(list, weight)
+    list.forEach((r, i) => {
+      write(r.caption, x, y, {
+        size: CAPTION * s,
+        color: DIM,
+        font: SANS,
+        weight: '500',
+        spacing: 0.5,
+      })
+      x += widths[i]!.cap
+      write(r.value, x, y, { size: corner, ...(alarm ? { color: RED, weight } : {}) })
+      x += widths[i]!.val + readingGap
+    })
+  }
+  const linkW = readingsWidth(st.link)
+  drawReadings(st.link, right - linkW, topLine)
+  // The fix is red when it is not usable, since position modes are then
+  // refused. In a narrow HUD each GPS line gives way: HDOP, then the
+  // satellite count, drop until it clears both the link and the heading
+  // pointer at the center.
+  const gpsRoom = Math.min(right - left - linkW - 2 * gap, cx - 10 * s - left)
+  const gpsLine = (list: Reading[], usable: boolean, y: number) => {
+    const weight = usable ? '' : '600'
+    let shown = list
+    while (shown.length > 1 && readingsWidth(shown, weight) > gpsRoom) shown = shown.slice(0, -1)
+    drawReadings(shown, left, y, !usable)
+  }
+  gpsLine(st.gps, st.gpsUsable, topLine)
+  gpsLine(st.gps2, st.gps2Usable, gps2Line)
 
   /** A centered chip's x, moved right when its line runs beside the covered corner. */
   const chipX = (width: number, bottom: number) =>
