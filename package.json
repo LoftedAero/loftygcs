@@ -72,7 +72,7 @@
     "@types/w3c-web-serial": "^1.0.8",
     "@types/w3c-web-usb": "^1.0.14",
     "@vitejs/plugin-react": "^5.0.0",
-    "electron": "^44.0.0",
+    "electron": "^44.9.1",
     "electron-builder": "^26.0.0",
     "esbuild": "^0.25.0",
     "eslint": "^9.0.0",
