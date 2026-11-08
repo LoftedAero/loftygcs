@@ -5,7 +5,7 @@ import { useUiStore } from '../../stores/ui-store'
 import { connectionService } from '../../services/connection'
 import type { TransportKind } from '../../transport/Transport'
 import { useCompact } from '../compact'
-import { ConnectionKindOptions } from './AppBar'
+import { BaudSelect, ConnectionKindOptions, connectSerial } from './AppBar'
 
 // Host/port entry for the network link kinds. Serial connects straight
 // from the app bar; TCP, UDP, WebSocket and internal serial need something
@@ -42,7 +42,7 @@ export default function ConnectModal() {
   const connect = () => {
     setHint('')
     if (kind === 'serial') {
-      void connectionService.connect({ kind: 'serial', baudRate: 115200 })
+      connectSerial()
     } else if (kind === 'tcp') {
       const p = Number(port)
       if (!Number.isInteger(p) || p < 1 || p > 65535) {
@@ -102,6 +102,11 @@ export default function ConnectModal() {
             >
               <ConnectionKindOptions />
             </LaSelect>
+          </LaField>
+        )}
+        {kind === 'serial' && (
+          <LaField label="Baud rate" htmlFor="conn-serial-baud">
+            <BaudSelect id="conn-serial-baud" />
           </LaField>
         )}
         {kind === 'tcp' && (

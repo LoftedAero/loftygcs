@@ -162,6 +162,10 @@ mechanisms behind them.
   or its track shrinks under its content and runs into the status.
 - Room is made by dropping whole items at breakpoints (readings at 1500px, the status word at
   1080px), never by clipping a reading.
+- The baud dropdown beside USB serial shows only while no link is up. The readings need a
+  vehicle, so they never share the bar with it; shown while connected, it ran the centered
+  status into the link controls from 1520 to 1800px. A failed connection's message does share
+  the bar with it, so that message's cap allows for the dropdown on both sides.
 - The vehicle indicators (`ui/shell/AppStatus.tsx`, `app-status.ts`) render nothing with no
   vehicle and a fixed set with one; a value never sent is a dash, never a zero. Color comes only
   from the vehicle's thresholds (`BATT_LOW_VOLT`, `BATT_CRT_VOLT`, the 3D-fix requirement). The
@@ -245,6 +249,17 @@ whatever Node threw, wrapped by Electron's IPC. `describeLinkError` matches the 
 ("Something is already using port 14550"). An error with no code falls through to its cleaned
 text. Cancelling the Web Serial chooser (NotFoundError) returns to idle, not to an error. A link
 that drops mid-session is cleaned the same way.
+
+### USB serial (`transport/web-serial.ts`)
+
+- Web Serial reports a break, framing, parity or overrun error by erroring the read stream, but
+  the port stays open and `port.readable` is replaced; only a lost device leaves it null. The
+  read loop carries on through those, since a SiK radio sends a break as it powers up and the
+  wrong baud produces a stream of framing errors, which the heartbeat timeout reports with the
+  baud named.
+- The baud rate is a preference (`serialBaud`), 57600 by default: ArduPilot's default on every
+  telemetry port and a SiK radio's. Only a USB-UART bridge (FTDI, CP210x) uses it; a flight
+  controller's own USB ignores it.
 
 ### Capability bits are not evidence
 

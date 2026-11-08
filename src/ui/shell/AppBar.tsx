@@ -2,6 +2,7 @@ import { BRAND } from '../../brand'
 import { LaButton, LaSelect } from '../components/La'
 import { useConnectionStore } from '../../stores/connection-store'
 import { MODES, useUiStore } from '../../stores/ui-store'
+import { SERIAL_BAUDS, usePreferencesStore } from '../../stores/preferences-store'
 import { connectionService } from '../../services/connection'
 import AppStatus from './AppStatus'
 import CompactStatus, { CompactLink } from './CompactStatus'
@@ -60,6 +61,33 @@ export function ConnectionKindOptions() {
   )
 }
 
+/** The baud rate a USB serial link opens at. */
+export function BaudSelect({ id, className }: { id?: string; className?: string }) {
+  const baud = usePreferencesStore((s) => s.serialBaud)
+  const setBaud = usePreferencesStore((s) => s.setSerialBaud)
+  return (
+    <LaSelect
+      id={id}
+      className={className}
+      value={baud}
+      onChange={(e) => setBaud(Number(e.target.value))}
+      title="Baud rate"
+    >
+      {SERIAL_BAUDS.map((b) => (
+        <option key={b} value={b}>
+          {b}
+        </option>
+      ))}
+    </LaSelect>
+  )
+}
+
+/** Opens a USB serial link at the chosen baud rate. */
+export function connectSerial() {
+  const baudRate = usePreferencesStore.getState().serialBaud
+  void connectionService.connect({ kind: 'serial', baudRate })
+}
+
 // The app bar: brand, mode switch, vehicle status, connection controls.
 // Connect is the one orange action; the status indicators use color for
 // status only and never look pressable.
@@ -79,7 +107,7 @@ export default function AppBar() {
 
   const connect = () => {
     if (selectedKind === 'serial') {
-      void connectionService.connect({ kind: 'serial', baudRate: 115200 })
+      connectSerial()
     } else {
       setConnectModalOpen(true)
     }
@@ -164,6 +192,10 @@ export default function AppBar() {
         >
           <ConnectionKindOptions />
         </LaSelect>
+        {/* Only while no link is up: the readings need a vehicle, so they
+            never share the bar with it, and the room it takes would otherwise
+            run the centered status into these controls. */}
+        {selectedKind === 'serial' && !linked && <BaudSelect className="app-bar__baud" />}
         <LaButton variant="primary" disabled={linked} onClick={connect}>
           Connect
         </LaButton>

@@ -128,6 +128,30 @@ describe('the interface scale', () => {
   })
 })
 
+describe('the USB serial baud rate', () => {
+  const loaded = async (stored: unknown) => {
+    localStorage.setItem(KEY, JSON.stringify(stored))
+    vi.resetModules()
+    return (await import('./preferences-store')).usePreferencesStore.getState().serialBaud
+  }
+
+  it('starts at 57600, what a SiK radio and ArduPilot telemetry ports run at', async () => {
+    expect(await loaded({ version: 1 })).toBe(57600)
+  })
+
+  it('reads back a rate it offers and refuses one it does not', async () => {
+    expect(await loaded({ version: 1, serialBaud: 921600 })).toBe(921600)
+    expect(await loaded({ version: 1, serialBaud: 12345 })).toBe(57600)
+  })
+
+  it('is kept across a reload', () => {
+    store().setSerialBaud(115200)
+    expect(JSON.parse(localStorage.getItem(KEY)!).serialBaud).toBe(115200)
+    store().setSerialBaud(1)
+    expect(store().serialBaud).toBe(115200)
+  })
+})
+
 describe('voice callout preferences', () => {
   it('stores only the rows changed from their defaults', () => {
     store().setCalloutMode('wp', 'off')

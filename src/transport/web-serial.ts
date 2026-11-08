@@ -49,6 +49,13 @@ export class PortCancelledError extends TransportError {
   }
 }
 
+/** The errors Web Serial reports for bad bytes on the line, not a lost port. */
+const LINE_ERRORS = new Set(['BreakError', 'FramingError', 'ParityError', 'BufferOverrunError'])
+
+export function isLineError(err: unknown): boolean {
+  return err instanceof DOMException && LINE_ERRORS.has(err.name)
+}
+
 export class WebSerialTransport implements Transport {
   readonly kind = 'serial' as const
   private port: SerialPort | null = null
@@ -101,7 +108,10 @@ export class WebSerialTransport implements Transport {
 
   private async readLoop() {
     // A device unplug surfaces as an error or as done; either ends the loop
-    // and reports the close exactly once.
+    // and reports the close exactly once. A line error leaves the port open
+    // with a new `readable`, so the loop takes that and carries on: a SiK
+    // radio sends a break as it powers up, and the wrong baud produces a
+    // stream of framing errors that the heartbeat timeout reports better.
     while (this.port?.readable && !this.closing) {
       const reader = this.port.readable.getReader()
       this.reader = reader
@@ -112,8 +122,10 @@ export class WebSerialTransport implements Transport {
           if (value && value.length > 0) this.dataCb?.(value)
         }
       } catch (err) {
+        if (isLineError(err)) continue
         if (!this.closing) {
-          this.closeCb?.(err instanceof Error ? err.message : 'serial read error')
+          const said = err instanceof Error || err instanceof DOMException ? err.message : ''
+          this.closeCb?.(said || 'serial read error')
           this.closing = true
         }
       } finally {

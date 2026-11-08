@@ -48,6 +48,11 @@ export interface Preferences {
    * window size.
    */
   layout: LayoutChoice
+  /**
+   * The baud rate a USB serial link opens at. Only a USB-UART bridge (a SiK
+   * radio's FTDI, a CP210x) uses it; a flight controller's own USB ignores it.
+   */
+  serialBaud: number
   voice: VoicePrefs
 }
 
@@ -80,6 +85,9 @@ export type LayoutChoice = 'auto' | 'desktop' | 'compact'
 /** The scales offered. */
 export const UI_SCALES = [0.9, 1, 1.1, 1.25, 1.5] as const
 
+/** The rates ArduPilot's `SERIALn_BAUD` offers that a telemetry link uses. */
+export const SERIAL_BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600] as const
+
 const DEFAULTS: Preferences = {
   units: DEFAULT_UNITS,
   // Copter's command set is a superset, so a wrong default adds an unused
@@ -87,6 +95,8 @@ const DEFAULTS: Preferences = {
   planFor: 'copter',
   uiScale: 1,
   layout: 'auto',
+  // ArduPilot's default on every telemetry port, and a SiK radio's.
+  serialBaud: 57600,
   voice: DEFAULT_VOICE,
 }
 
@@ -101,6 +111,7 @@ function load(): Preferences {
       planFor?: string
       uiScale?: number
       layout?: string
+      serialBaud?: number
       voice?: unknown
     }
     if (typeof parsed !== 'object' || parsed === null) return DEFAULTS
@@ -122,6 +133,9 @@ function load(): Preferences {
         ? (parsed.uiScale as number)
         : DEFAULTS.uiScale,
       layout: valid(parsed.layout, ['auto', 'desktop', 'compact'], DEFAULTS.layout),
+      serialBaud: (SERIAL_BAUDS as readonly number[]).includes(parsed.serialBaud as number)
+        ? (parsed.serialBaud as number)
+        : DEFAULTS.serialBaud,
       voice: loadVoice(parsed.voice),
     }
   } catch {
@@ -190,6 +204,7 @@ interface PreferencesState extends Preferences {
   setPlanFor(cls: VehicleClass): void
   setUiScale(scale: number): void
   setLayout(layout: LayoutChoice): void
+  setSerialBaud(baud: number): void
   setVoiceEnabled(enabled: boolean): void
   /** Sets one row's mode; the default is stored as no entry. */
   setCalloutMode(id: CalloutId, mode: CalloutMode): void
@@ -233,6 +248,12 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
 
   setLayout(layout) {
     set({ layout })
+    save(get())
+  },
+
+  setSerialBaud(baud) {
+    if (!(SERIAL_BAUDS as readonly number[]).includes(baud)) return
+    set({ serialBaud: baud })
     save(get())
   },
 

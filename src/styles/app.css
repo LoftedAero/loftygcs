@@ -272,6 +272,9 @@
   /* One width for every box in the Connect dialog, whichever link kind. Fits a
      WebSocket URL such as `ws://127.0.0.1:5678`, with room for a hostname. */
   --app-connect-control-w: 200px;
+  /* The app bar's baud dropdown: "921600" and the chevron, narrower than the
+     design system's 9em select floor, which sizes for words. */
+  --app-bar-baud-w: 96px;
   /* One slot for every gauge in the app bar's status row: the widest reading
      ("RTK fixed · 22", about 87px at 13px Work Sans) plus a 20px icon and a 4px
      gap. */
@@ -2443,6 +2446,16 @@
      pushes Connect and Disconnect off the end. */
   max-width: min(64ch, calc(100vw - 860px));
   overflow: hidden;
+}
+/* The baud dropdown (USB serial, no link up) shares the bar only with a failed
+   connection's message. It widens the link band by its width and a gap, and the
+   status stays centered, so the cap gives up twice that. */
+.la-appbar:has(.app-bar__baud) .app-status__state {
+  max-width: min(64ch, calc(100vw - 860px - 2 * (var(--app-bar-baud-w) + var(--la-space-3))));
+}
+.app-bar__baud {
+  width: var(--app-bar-baud-w);
+  min-width: 0;
 }
 /* The truncation happens on the word, not the pill. `text-overflow` needs a
    block box of its own; on the flex container it does nothing, and because the

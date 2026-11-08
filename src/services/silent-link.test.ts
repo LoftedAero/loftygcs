@@ -27,6 +27,14 @@ describe('a serial link that opened and went quiet', () => {
     expect(said).not.toMatch(/SLCAN/)
   })
 
+  it('names the baud rate on a USB-UART bridge', () => {
+    // A SiK radio's FTDI at the wrong baud delivers noise and no heartbeat.
+    const said = describeSilentLink({ usbVendorId: 0x0403, usbProductId: 0x6015 }, 115200)
+    expect(said).toMatch(/115200 baud/)
+    // A flight controller's own USB ignores the baud, so its hint stands.
+    expect(describeSilentLink({ usbVendorId: 0x1209 }, 115200)).toMatch(/SLCAN/)
+  })
+
   it('stays generic when the port will not say what it is', () => {
     // getInfo() may report nothing.
     expect(describeSilentLink(undefined)).toMatch(/No heartbeat/)

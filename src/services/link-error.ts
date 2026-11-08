@@ -107,13 +107,22 @@ const FC_VENDORS = new Set([0x1209, 0x2dae, 0x26ac])
  * fine and stays silent. So for a flight-controller vendor the hint names
  * that case. "No heartbeat received" is Mission Planner's wording for this.
  */
-export function describeSilentLink(usb?: {
-  usbVendorId?: number | undefined
-  usbProductId?: number | undefined
-}): string {
+export function describeSilentLink(
+  usb?: {
+    usbVendorId?: number | undefined
+    usbProductId?: number | undefined
+  },
+  /** The baud rate, for a USB serial link; anything else has none. */
+  baud?: number,
+): string {
   const vendor = usb?.usbVendorId
   if (vendor !== undefined && FC_VENDORS.has(vendor)) {
     return 'No heartbeat received. For flight controllers offering multiple ports, choose the MAVLink port rather than SLCAN.'
+  }
+  // Anything else on USB serial is most likely a USB-UART bridge (a SiK
+  // radio, an FTDI cable), where a wrong baud reads as silence.
+  if (baud !== undefined) {
+    return `No heartbeat received at ${baud} baud. Check the baud rate, and that the board is running ArduPilot.`
   }
   return 'No heartbeat received. Check the connection settings, and that the board is running ArduPilot.'
 }

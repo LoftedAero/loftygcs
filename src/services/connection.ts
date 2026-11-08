@@ -130,7 +130,7 @@ class ConnectionService {
       // During a reboot wait, a port that opened and said nothing is the wrong
       // sibling (a Cube's SLCAN port, say), so the next try skips it.
       if (this.rebooting) this.rebootSkip++
-      this.linkFailed(describeSilentLink(usb))
+      this.linkFailed(describeSilentLink(usb, opts.kind === 'serial' ? opts.baudRate : undefined))
     }, HANDSHAKE_TIMEOUT_MS)
     this.snapshotTimer = setInterval(() => this.flushSnapshot(), SNAPSHOT_INTERVAL_MS)
   }
