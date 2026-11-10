@@ -41,6 +41,11 @@ The first targets are Android handheld ground stations:
     bad frames). The OTA reinstalls the Radiomaster app, deleting its models
     (`files/rcModel/*.rcm`, restorable from a copy), and uninstalls this
     app.
+  - Radiomaster's AX SDK (`RadiomasterAX_SDK`) offers no way around it. It
+    talks to the AT32 and can send raw CRSF to the module, but in MAVLink mode
+    ELRS takes uplink bytes only from the module's UART (ttyS1) and the
+    Backpack. A frame from the handset never reaches the flight controller's
+    MAVLink port.
   - The module forwards MAVLink to that port only with its Link Mode set to
     MAVLink, and ELRS accepts that change only while no receiver is
     connected. With a receiver linked, Radiomaster's ELRS page accepts the
