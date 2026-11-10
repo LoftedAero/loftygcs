@@ -359,6 +359,17 @@ by accident is the failure to design against. Revert stays enabled.
   A dirty entry keeps its staged value and updates the vehicle value it is staged against, so
   an edit the vehicle has caught up with stops being an edit.
 
+### Restart prompt (`owesRestart` in `services/param-metadata.ts`)
+
+A write prompts for a restart when the metadata marks the parameter `RebootRequired`, with one
+exception. The metadata marks every `SERVOn_FUNCTION`, but every vehicle re-reads the functions
+once a second (`enable_aux_servos`), so most changes apply live. `protocol/servo-function.ts`
+lists the ones that do not: motors, throttles and GPIO (their protocol and rate are set at
+boot), functions the vehicle code scales at boot (tilt motors, steering, winch), and a move to
+a differently scaled function, since an output keeps the first scaling it was given.
+`servo-function.integration.test.ts` moves an output to a passthrough on Copter and Plane SITL
+and sees it follow within a second.
+
 ### Reset to defaults (`eraseParameters` in `services/flight.ts`)
 
 `MAV_CMD_PREFLIGHT_STORAGE` with param1 = 2 runs `AP_Param::erase_all()` and answers "All

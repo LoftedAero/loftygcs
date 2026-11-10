@@ -16,6 +16,7 @@
 // are cached with the Cache API so the app works offline after one fetch.
 
 import type { FirmwareVersion } from '../protocol/types'
+import { isServoFunction, servoFunctionAppliesLive } from '../protocol/servo-function'
 
 export interface ParamMeta {
   displayName?: string
@@ -26,6 +27,22 @@ export interface ParamMeta {
   bitmask?: Record<number, string>
   rebootRequired?: boolean
   increment?: number
+}
+
+/**
+ * Whether writing `to` over the vehicle's `from` leaves a restart owed: the
+ * metadata's flag, except where the firmware is known to apply that change
+ * live (`servo-function.ts`).
+ */
+export function owesRestart(
+  name: string,
+  from: number | undefined,
+  to: number,
+  meta: ParamMeta | undefined,
+): boolean {
+  if (!meta?.rebootRequired) return false
+  if (from !== undefined && isServoFunction(name)) return !servoFunctionAppliesLive(from, to)
+  return true
 }
 
 const VEHICLE_TO_PDEF: Record<string, string> = {

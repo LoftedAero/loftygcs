@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bestVersion, parsePdefXml, parseVersionIndex } from './param-metadata'
+import { bestVersion, owesRestart, parsePdefXml, parseVersionIndex } from './param-metadata'
 
 // The XML below is copied from the published
 // /Parameters/versioned/Copter/stable-4.5.7/apm.pdef.xml. Note that a Range
@@ -146,5 +146,22 @@ describe('choosing which version to ask for', () => {
   it('has no answer for firmware older than anything published', () => {
     expect(bestVersion(available, { major: 3, minor: 6, patch: 0 })).toBeNull()
     expect(bestVersion([], { major: 4, minor: 5, patch: 7 })).toBeNull()
+  })
+})
+
+describe('owesRestart', () => {
+  const flagged = { rebootRequired: true }
+
+  it('follows the metadata', () => {
+    expect(owesRestart('FRAME_CLASS', 1, 2, flagged)).toBe(true)
+    expect(owesRestart('PILOT_THR_FILT', 0, 5, {})).toBe(false)
+    expect(owesRestart('PILOT_THR_FILT', 0, 5, undefined)).toBe(false)
+  })
+
+  it('lets an output function change that applies live go without one', () => {
+    expect(owesRestart('SERVO9_FUNCTION', 0, 28, flagged)).toBe(false)
+    expect(owesRestart('SERVO1_FUNCTION', 0, 33, flagged)).toBe(true)
+    // Without the vehicle's value there is nothing to judge by.
+    expect(owesRestart('SERVO9_FUNCTION', undefined, 28, flagged)).toBe(true)
   })
 })

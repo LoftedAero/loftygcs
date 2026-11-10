@@ -6,6 +6,7 @@ import WriteFeedback from './WriteFeedback'
 import { useParamStore } from '../../stores/param-store'
 import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
 import { connectionService } from '../../services/connection'
+import { owesRestart } from '../../services/param-metadata'
 
 // One control bound to a parameter by name, the building block of every
 // curated view. Edits stage in the param store like the Parameters tab, and
@@ -111,12 +112,12 @@ export default function ParamField({
       edit(param, v)
       return
     }
+    const from = entry?.origValue
     void connectionService
       .setParamNow(param, v)
-      .then(() => {
+      .then((echoed) => {
         useWriteFeedbackStore.getState().report({ ok: true, param })
-        // ArduPilot's metadata says which parameters are read only at boot.
-        if (meta?.rebootRequired) {
+        if (owesRestart(param, from, echoed, meta)) {
           useWriteFeedbackStore.getState().needReboot(`${param} takes effect after a restart`, card)
         }
         if (!gatesOthers) return

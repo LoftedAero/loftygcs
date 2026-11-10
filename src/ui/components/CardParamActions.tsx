@@ -5,6 +5,7 @@ import { useParamStore } from '../../stores/param-store'
 import { useConnectionStore } from '../../stores/connection-store'
 import { useWriteFeedbackStore } from '../../stores/write-feedback-store'
 import { connectionService } from '../../services/connection'
+import { owesRestart } from '../../services/param-metadata'
 
 /**
  * Reverting and writing staged parameters: the behavior behind every Write
@@ -50,12 +51,17 @@ export function useParamWrite({
 
   const write = () => {
     setConfirming(false)
+    // The vehicle's values before the write, which decide whether some
+    // changes need a restart.
+    const before = new Map<string, number>()
+    for (const [name, e] of useParamStore.getState().entries) before.set(name, e.origValue)
     void connectionService.writeDirtyParams(owns).then((result) => {
       useParamStore.getState().setLastWrite(result)
-      // ArduPilot's metadata says which parameters are read only at boot
-      // (a frame class, not a filter frequency).
-      const { metadata } = useParamStore.getState()
-      if (result.written.some((n) => metadata[n]?.rebootRequired)) {
+      const { metadata, entries } = useParamStore.getState()
+      const owed = result.written.some((n) =>
+        owesRestart(n, before.get(n), entries.get(n)?.value ?? NaN, metadata[n]),
+      )
+      if (owed) {
         useWriteFeedbackStore.getState().needReboot(reason, card)
       }
     })
