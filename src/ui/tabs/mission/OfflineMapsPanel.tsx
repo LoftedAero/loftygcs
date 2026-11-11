@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { LaButton, LaField, LaHint, LaSelect, LaSwitch } from '../../components/La'
+import { LaButton, LaField, LaHint, LaModal, LaSelect, LaSwitch } from '../../components/La'
 import {
   cacheStats,
   clearCache,
@@ -15,6 +15,16 @@ import {
 } from '../../../services/tile-math'
 import { layerById, loadBaseLayer } from '../flight/map-layers'
 import {
+  copyToRadio,
+  findRadioFolder,
+  folderPicker,
+  MAPS_FOLDERS,
+  PICKER_ID,
+  rememberCard,
+  rememberedCard,
+  type RadioCopy,
+} from '../../../services/radio-maps'
+import {
   TERRAIN_LAYER_ID,
   TERRAIN_URL,
   prefetchTerrainForView,
@@ -28,6 +38,9 @@ import {
 // The size estimate is shown before the download, since tile counts
 // quadruple per zoom level. Elevation is downloaded with the imagery; it is
 // only a few tiles, since one terrain tile is about ten kilometers across.
+//
+// Copy to Lofty PFD writes the same tiles onto a radio's SD card for Lofty PFD's
+// map (services/radio-maps.ts), fetching any not stored yet.
 
 /** Holds an empty slot's line open, so the box never changes height. */
 const BLANK = ' '
@@ -115,6 +128,59 @@ export default function OfflineMapsPanel({
   // Zero past the terrain area cap.
   const terrainForArea = bounds ? terrainTilesForArea(bounds).length : 0
   const running = progress !== null
+  // A folder picker is Chromium's: absent in Android's WebView.
+  const picker = folderPicker()
+
+  // Every press asks for the card first, showing where the tiles go; the
+  // picker then opens on the card last copied to.
+  const [card, setCard] = useState<FileSystemDirectoryHandle | null>(null)
+  useEffect(() => {
+    void rememberedCard().then(setCard)
+  }, [])
+  const [ask, setAsk] = useState<'card' | 'not-pfd' | 'maps' | null>(null)
+
+  const copy = async () => {
+    if (!bounds || !picker) return
+    let picked: FileSystemDirectoryHandle
+    try {
+      picked = await picker({ mode: 'readwrite', id: PICKER_ID, ...(card && { startIn: card }) })
+    } catch {
+      // Canceled, or the write grant was refused, which reads the same.
+      return
+    }
+    const folder = await findRadioFolder(picked)
+    if (!folder) {
+      // The dialog's paths end in maps, so that folder is the likely wrong
+      // pick; it cannot be shown to be Lofty PFD's.
+      setAsk(picked.name.toLowerCase() === 'maps' ? 'maps' : 'not-pfd')
+      return
+    }
+    setAsk(null)
+    setCard(picked)
+    void rememberCard(picked)
+    const controller = new AbortController()
+    abortRef.current = controller
+    setOutcome(null)
+    setProgress({ done: 0, total: tiles.length * 2, cached: 0, failed: 0 })
+    let result: RadioCopy | null = null
+    try {
+      // Satellite whatever this map shows: it is Lofty PFD's only layer.
+      result = await copyToRadio(
+        folder,
+        layerById('satellite'),
+        tiles,
+        bounds,
+        setProgress,
+        controller.signal,
+      )
+    } catch {
+      result = null
+    }
+    const stopped = controller.signal.aborted
+    abortRef.current = null
+    setProgress(null)
+    setOutcome(stopped ? 'Stopped.' : describeCopy(result, folder.radio))
+  }
 
   const start = async () => {
     if (!bounds) return
@@ -200,15 +266,79 @@ export default function OfflineMapsPanel({
           Download {count.toLocaleString()} tiles
         </LaButton>
       )}
-      <LaHint>
-        {running
-          ? `${progress.done.toLocaleString()} of ${progress.total.toLocaleString()} tiles` +
-            (progress.failed > 0 ? ` · ${progress.failed} unavailable` : '')
-          : bounds
+      {running ? (
+        // A percentage, not a tile count: a copy counts each tile twice
+        // (fetched, then written), and a download adds elevation tiles.
+        <div className="offline-progress">
+          <progress
+            className="log-progress"
+            value={progress.done}
+            max={Math.max(1, progress.total)}
+            aria-label="Offline maps progress"
+          />
+          <LaHint>
+            {`${Math.floor((100 * progress.done) / Math.max(1, progress.total))}%` +
+              (progress.failed > 0 ? ` · ${progress.failed.toLocaleString()} unavailable` : '')}
+          </LaHint>
+        </div>
+      ) : (
+        <LaHint>
+          {bounds
             ? `About ${formatBytes(count * BYTES_PER_TILE)}` +
               (terrainForArea > 0 ? ', elevation included.' : '.')
             : BLANK}
-      </LaHint>
+        </LaHint>
+      )}
+      {picker && (
+        <LaButton
+          variant="secondary"
+          size="block"
+          disabled={!bounds || count === 0 || running}
+          title="Write this view's satellite tiles to Lofty PFD on a radio's SD card"
+          onClick={() => setAsk('card')}
+        >
+          Copy to Lofty PFD
+        </LaButton>
+      )}
+      {ask && (
+        <LaModal
+          open
+          title="Copy map tiles to Lofty PFD"
+          actions={
+            <>
+              <LaButton variant="ghost" onClick={() => setAsk(null)}>
+                Cancel
+              </LaButton>
+              <LaButton variant="primary" onClick={() => void copy()}>
+                Choose SD card
+              </LaButton>
+            </>
+          }
+        >
+          {/* What to pick comes first, since a listed path reads as one to
+              open; the paths show that Lofty PFD has to be there already. A
+              pilot who opens WIDGETS or scripts anyway is still accepted
+              (findRadioFolder). */}
+          <p>Select the root directory of your radio's SD card or internal memory.</p>
+          <p>Tiles will be stored at:</p>
+          <dl className="pfd-folders">
+            {MAPS_FOLDERS.map((f) => (
+              <div key={f.radio} className="pfd-folders__row">
+                <dt>{f.radio}</dt>
+                <dd>{f.path}</dd>
+              </div>
+            ))}
+          </dl>
+          {/* Held open when empty, so a refused pick does not grow the dialog. */}
+          <LaHint error>
+            {ask === 'not-pfd'
+              ? 'Lofty PFD is not installed there.'
+              : ask === 'maps'
+                ? 'Select the root directory, not maps.'
+                : BLANK}
+          </LaHint>
+        </LaModal>
+      )}
       {/* A tile count cannot say whether the right area is stored; the
           coverage overlay can. The count covers the whole store, every layer
           and area, as Clear below does. */}
@@ -251,6 +381,16 @@ export default function OfflineMapsPanel({
       </LaButton>
     </section>
   )
+}
+
+/** What a copy to the radio did, or that the card could not be written. */
+export function describeCopy(result: RadioCopy | null, radio: string): string {
+  if (!result) return 'The card could not be written.'
+  const { written, missing } = result
+  if (written === 0) return 'Nothing here could be copied.'
+  const tiles = `${written.toLocaleString()} ${written === 1 ? 'tile' : 'tiles'}`
+  if (missing === 0) return `Copied ${tiles} to the ${radio} radio.`
+  return `Copied ${tiles} · ${missing.toLocaleString()} unavailable.`
 }
 
 /**

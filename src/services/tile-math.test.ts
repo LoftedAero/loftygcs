@@ -100,6 +100,27 @@ describe('covering an area', () => {
     expect(tiles).toHaveLength(21)
     expect(tiles.every((t) => t.x >= 0 && t.y >= 0 && t.x < 2 ** t.z && t.y < 2 ** t.z)).toBe(true)
   })
+
+  it('wraps a map panned around the world onto the same tiles', () => {
+    // Leaflet reports the same field one world east as 360 degrees on.
+    const around = { ...field, east: field.east + 360, west: field.west + 360 }
+    expect(tilesForBounds(around, 14, 16)).toEqual(tilesForBounds(field, 14, 16))
+    expect(countTiles(around, 14, 16)).toBe(countTiles(field, 14, 16))
+    expect(offlineTiles(around, 16, 17, 4)).toEqual(offlineTiles(field, 16, 17, 4))
+  })
+
+  it('covers both sides of the antimeridian', () => {
+    const fiji = { north: -16, south: -18, east: 181, west: 179 }
+    const xs = new Set(tilesForBounds(fiji, 8, 8).map((t) => t.x))
+    expect(xs).toEqual(new Set([255, 0]))
+    expect(countTiles(fiji, 8, 8)).toBe(tilesForBounds(fiji, 8, 8).length)
+  })
+
+  it('lists each column once when the view is wider than the world', () => {
+    const wide = { north: 60, south: -60, east: 300, west: -300 }
+    expect(countTiles(wide, 2, 2)).toBe(tilesForBounds(wide, 2, 2).length)
+    expect(new Set(tilesForBounds(wide, 2, 2).map((t) => t.x)).size).toBe(4)
+  })
 })
 
 describe('presenting it', () => {

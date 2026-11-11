@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeOutcome } from './OfflineMapsPanel'
+import { describeCopy, describeOutcome } from './OfflineMapsPanel'
 import type { PrefetchProgress } from '../../../services/tile-cache'
 
 // The message comes from what the download reports, not what was requested,
@@ -27,5 +27,17 @@ describe('what the download says it did', () => {
 
   it('says so when everything was already there', () => {
     expect(describeOutcome(run(10, 0, 10), run(1, 0, 1))).toBe('Everything here is already stored.')
+  })
+})
+
+describe('describeCopy', () => {
+  it('says what a copy did', () => {
+    expect(describeCopy({ written: 1234, missing: 0 }, 'EdgeTX')).toBe(
+      'Copied 1,234 tiles to the EdgeTX radio.',
+    )
+    expect(describeCopy({ written: 10, missing: 2 }, 'Ethos')).toBe(
+      'Copied 10 tiles · 2 unavailable.',
+    )
+    expect(describeCopy(null, 'Ethos')).toBe('The card could not be written.')
   })
 })

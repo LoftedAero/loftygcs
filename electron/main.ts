@@ -252,8 +252,11 @@ function createWindow() {
 
   // Without these handlers Chromium denies Web Serial and WebUSB outside a
   // browser profile. USB is limited to the ST DFU bootloader (0483:DF11).
+  // fileSystem is a folder the user picked (Copy to Lofty PFD); its grant is also
+  // requested, in app.whenReady, and the picker needs both.
   mainWindow.webContents.session.setPermissionCheckHandler(
-    (_wc, permission) => permission === 'serial' || permission === 'usb',
+    (_wc, permission) =>
+      permission === 'serial' || permission === 'usb' || permission === 'fileSystem',
   )
   mainWindow.webContents.session.setDevicePermissionHandler((details) => {
     if (details.deviceType === 'serial') return true
@@ -312,10 +315,11 @@ function createWindow() {
 app.whenReady().then(() => {
   // The window never loads remote pages; the packaged file:// load relies on
   // sandbox and contextIsolation, since a header CSP only covers http(s).
-  // Serial and USB go through the handlers in createWindow, so every
-  // permission request that reaches this one is denied.
-  session.defaultSession.setPermissionRequestHandler((_wc, _permission, cb) => {
-    cb(false)
+  // Serial and USB go through the handlers in createWindow. The one request
+  // granted here is File System Access's, which follows the user picking a
+  // folder (Copy to Lofty PFD); denied, the picker rejects as though canceled.
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
+    cb(permission === 'fileSystem')
   })
 
   ipcMain.handle('app:version', () => app.getVersion())

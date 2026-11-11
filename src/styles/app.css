@@ -1455,6 +1455,41 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A running download or copy: the bar and its percentage share slot one's
+   line, so the panel keeps its height. */
+.offline-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-2);
+}
+.offline-progress .log-progress {
+  flex: 1;
+  min-width: 0;
+}
+.offline-progress .la-hint {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Copy to Lofty PFD's dialog: each radio and the folder its tiles land in. */
+.pfd-folders {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--la-space-2) var(--la-space-4);
+  margin: 0 0 var(--la-space-2);
+}
+/* The rows lay their cells on the list's grid, so paths share a column. */
+.pfd-folders__row {
+  display: contents;
+}
+.pfd-folders__row dt {
+  color: var(--la-ink-2);
+}
+.pfd-folders__row dd {
+  margin: 0;
+  font-family: var(--la-font-mono);
+}
+
 .tile-coverage {
   width: 100%;
   height: 100%;

@@ -493,12 +493,49 @@ the cache and the prefetch only fills gaps.
   and four levels below it a screen the size of the view around its center, so zooming out over
   the field offline still fills the screen. Each lower level costs about as many tiles as the
   view.
+- Leaflet's `getBounds()` does not wrap longitude: a map panned around the world reports the
+  same field 360 degrees on, and a view across the antimeridian runs past 180. Tile columns
+  are wrapped onto the world (`wrapColumns`), never clamped, which gave no tiles at all.
 - Lower levels are measured at the view's whole zoom (`Math.floor`), since a view zoomed past
   the imagery's native zoom would otherwise measure a smaller area than it shows.
 - A download asks for persistent storage, since the press is what shows the user wants the maps
   kept; a browser grants it more readily after a gesture. Android's WebView refuses, but gives a
   quota of tens of gigabytes. An app update that reinstalls the app (the AX12's OTA did) deletes
   the stored maps with the rest of its data.
+
+### Copying maps to a radio (`services/radio-maps.ts`)
+
+Offline maps' "Copy to Lofty PFD" writes the download's area as satellite tiles onto a radio's SD
+card for Lofty PFD's map (github.com/LoftedAero/loftypfd), fetching whatever is not stored
+first. Satellite whatever the map shows, since it is Lofty PFD's only layer. The format
+is that project's; its `docs/architecture.md` ("Map tiles") is the other half.
+
+- The pilot picks the card; the copy goes into Lofty PFD's folder (`WIDGETS/LoftyPFD` on
+  EdgeTX, `scripts/loftypfd` on Ethos) and refuses a card without one. The dialog lists those
+  paths, which read as folders to open, so any folder along them down to Lofty PFD's is
+  accepted too. Its `maps` folder is not: nothing above a picked folder can be read, so
+  nothing shows it is Lofty PFD's, and that pick gets its own message.
+- **Every tile is re-encoded as baseline JPEG** (`OffscreenCanvas.convertToBlob`), the one
+  format both radios decode; OSM's are PNG. Transparent pixels are filled white first.
+- **`maps/index.txt`** lists the layers, since a radio cannot list a folder:
+  `id|label|min zoom|max zoom|center lat|center lon|credit`. A second copy of a layer widens
+  its zoom range and recenters it; other layers are kept. The credit is the layer's
+  attribution as plain text, "|" replaced.
+- The File System Access API's folder picker is Chromium's: the desktop app and Chrome have
+  it, Android's WebView does not, so the button is hidden there.
+- In the desktop app the picker asks for `fileSystem` through both the session's permission
+  request handler and its check handler, and `main.ts` allows it in both. Refused by either,
+  the picker rejects with the AbortError a cancel gives, so nothing on screen says why.
+  Picking a drive's root is allowed (checked with a USB drive).
+- Every press first asks for the card in a dialog listing where each radio's tiles go (the
+  owner's choice: the pilot sees the destination each time). A card without Lofty PFD brings
+  the dialog back with that said. The card is remembered (its handle in IndexedDB,
+  `loftgcs-radio`, apart from the tile cache so Clear keeps it) and the picker opens on it
+  (`startIn`, with an `id`).
+- Chromium refuses folders under AppData, even through a `subst` drive, so a test card has
+  to live elsewhere.
+- A failed write stops the copy and says the card could not be written: a full or read-only
+  card fails every tile the same way. A stopped copy still indexes the tiles it wrote.
 
 ### Terrain (`services/terrain.ts`, `services/mission-terrain.ts`)
 
@@ -1078,6 +1115,9 @@ Behavior to know:
 
 - `npm test`, `npm run typecheck`, `npm run lint` and `npm run format:check` must all pass; CI
   runs them on push.
+- On Windows, run Vitest from a path whose drive letter is upper case (`C:\`). From `c:\` it
+  loads itself twice and every file fails with "Cannot read properties of undefined (reading
+  'config')"; VS Code's terminal opens on the lower-case path.
 - `NET=1 npm test` also runs live checks against ardupilot.org (parameter metadata paths). It
   is the only thing that catches a server path change.
 - `SITL=1 npm test` runs the integration suite (`src/protocol/*.integration.test.ts`,

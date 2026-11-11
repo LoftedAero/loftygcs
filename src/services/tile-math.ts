@@ -30,6 +30,33 @@ export function latToTileY(lat: number, z: number): number {
   return ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * 2 ** z
 }
 
+/** A longitude brought into -180 to 180. */
+export function wrapLon(lon: number): number {
+  return ((((lon + 180) % 360) + 360) % 360) - 180
+}
+
+/**
+ * Tile columns x0 to x1 at zoom z, wrapped onto the world. Leaflet reports
+ * longitudes past 180 once the map is panned around the world, and a view
+ * across the antimeridian runs off one edge onto the other; clamped, both
+ * came to no tiles at all.
+ */
+function wrapColumns(x0: number, x1: number, z: number): number[] {
+  const n = 2 ** z
+  if (x1 - x0 + 1 >= n) return Array.from({ length: n }, (_, i) => i)
+  const out: number[] = []
+  for (let x = x0; x <= x1; x++) out.push(((x % n) + n) % n)
+  return out
+}
+
+function columns(bounds: LatLonBounds, z: number): number[] {
+  return wrapColumns(
+    Math.floor(lonToTileX(bounds.west, z)),
+    Math.floor(lonToTileX(bounds.east, z)),
+    z,
+  )
+}
+
 /**
  * Every tile covering the bounds, across a zoom range. Counts grow fourfold
  * per zoom level, so callers should check `countTiles` first.
@@ -43,11 +70,9 @@ export function tilesForBounds(
   for (let z = minZoom; z <= maxZoom; z++) {
     const max = 2 ** z - 1
     // North is a smaller y than south, so the two swap on the way in.
-    const x0 = Math.max(0, Math.floor(lonToTileX(bounds.west, z)))
-    const x1 = Math.min(max, Math.floor(lonToTileX(bounds.east, z)))
     const y0 = Math.max(0, Math.floor(latToTileY(bounds.north, z)))
     const y1 = Math.min(max, Math.floor(latToTileY(bounds.south, z)))
-    for (let x = x0; x <= x1; x++) {
+    for (const x of columns(bounds, z)) {
       for (let y = y0; y <= y1; y++) out.push({ z, x, y })
     }
   }
@@ -82,11 +107,9 @@ export function offlineTiles(
     const max = 2 ** z - 1
     const cx = lonToTileX(centerLon, z)
     const cy = latToTileY(centerLat, z)
-    const x0 = Math.max(0, Math.floor(cx - width / 2))
-    const x1 = Math.min(max, Math.floor(cx + width / 2))
     const y0 = Math.max(0, Math.floor(cy - height / 2))
     const y1 = Math.min(max, Math.floor(cy + height / 2))
-    for (let x = x0; x <= x1; x++) {
+    for (const x of wrapColumns(Math.floor(cx - width / 2), Math.floor(cx + width / 2), z)) {
       for (let y = y0; y <= y1; y++) out.push({ z, x, y })
     }
   }
@@ -98,11 +121,10 @@ export function countTiles(bounds: LatLonBounds, minZoom: number, maxZoom: numbe
   let total = 0
   for (let z = minZoom; z <= maxZoom; z++) {
     const max = 2 ** z - 1
-    const x0 = Math.max(0, Math.floor(lonToTileX(bounds.west, z)))
-    const x1 = Math.min(max, Math.floor(lonToTileX(bounds.east, z)))
     const y0 = Math.max(0, Math.floor(latToTileY(bounds.north, z)))
     const y1 = Math.min(max, Math.floor(latToTileY(bounds.south, z)))
-    total += (x1 - x0 + 1) * (y1 - y0 + 1)
+    const span = Math.floor(lonToTileX(bounds.east, z)) - Math.floor(lonToTileX(bounds.west, z))
+    total += Math.min(2 ** z, span + 1) * (y1 - y0 + 1)
   }
   return total
 }
