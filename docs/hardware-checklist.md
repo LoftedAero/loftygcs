@@ -95,8 +95,8 @@ Desktop app:
       replug prompt appears, and the check shows three green lines (board 1,
       2026-11-14).
 - [x] Update of a connected board: one press, "Flashing complete." for 5 s.
-- [ ] Update of a board plugged in but not connected: no chooser, and the trace
-      shows the auto-answer picking the `-BL` port, never the running one.
+- [x] Update of a board plugged in but not connected: no chooser, and the trace
+      shows the auto-answer picking the `-BL` port, never the running one (board 1, 2026-11-16).
 - [ ] Nothing plugged in: the press opens the wizard's DFU guide; plugging the
       board in DFU finds it without a press.
 - [ ] Interrupted receiver write (close the app during "Writing the
