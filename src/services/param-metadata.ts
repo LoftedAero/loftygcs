@@ -104,10 +104,18 @@ function normalizeEntry(raw: Record<string, unknown>): ParamMeta {
   return meta
 }
 
+/**
+ * A request whose connection failed is sent once more. A connection the
+ * server closed while it sat idle fails at once ("other side closed"): Node's
+ * fetch reuses it after the 2 MB XML's parse, which every second live test
+ * hit. A failed request would otherwise mean the wrong release's metadata.
+ */
+const fetchTwice = (url: string) => fetch(url).catch(() => fetch(url))
+
 async function cachedFetch(url: string): Promise<Response> {
   try {
     const cache = await caches.open(CACHE_NAME)
-    const fresh = await fetch(url).catch(() => null)
+    const fresh = await fetchTwice(url).catch(() => null)
     if (fresh?.ok) {
       await cache.put(url, fresh.clone())
       return fresh
@@ -117,7 +125,7 @@ async function cachedFetch(url: string): Promise<Response> {
     throw new Error(`no network and no cached copy for ${url}`)
   } catch (err) {
     // Cache API unavailable (some contexts): plain fetch or bust.
-    const r = await fetch(url)
+    const r = await fetchTwice(url)
     if (!r.ok) throw err instanceof Error ? err : new Error(String(err))
     return r
   }
