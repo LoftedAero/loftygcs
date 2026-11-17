@@ -116,14 +116,14 @@ Desktop app:
 
 Chrome (`npm run dev`):
 
-- [ ] First flash: with nothing granted, the press asks how the board is
+- [x] First flash: with nothing granted, the press asks how the board is
       connected, and "In DFU mode" opens only the DFU chooser; a board granted
       before opens the wizard with no question.
-- [ ] After the DFU write, the wizard either connects to a granted port or
+- [x] After the DFU write, the wizard either connects to a granted port or
       shows "Press Continue and select the flight controller’s port."; Continue's
       chooser lists the board and the flash goes on.
-- [ ] The receiver write runs over Web Serial: esptool opens the port, and the
+- [x] The receiver write runs over Web Serial: esptool opens the port, and the
       replug is found by itself or by Connect once it turns on after 15 s.
-- [ ] Update of a board plugged in but not connected: one serial chooser, then
-      no other prompt.
+- [x] Update of a board plugged in but not connected: one serial chooser, then
+      no other prompt (board 1, 2026-11-16, release 2026-11-16b).
 - [ ] Edge: the same first flash.
