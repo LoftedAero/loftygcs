@@ -201,7 +201,8 @@ export interface BoardEntry {
 /**
  * Group releases by board. Releases are ordered newest first by date, the
  * index's order breaking ties, so a misordered index cannot make an old
- * release look current.
+ * release look current, and two releases of one day ("2026-11-14" and
+ * "2026-11-14b") keep the index's newest-first order.
  */
 export function boardsIn(releases: CatalogRelease[]): BoardEntry[] {
   const ordered = releases
@@ -217,6 +218,38 @@ export function boardsIn(releases: CatalogRelease[]): BoardEntry[] {
     }
   }
   return [...byId.values()].sort((a, b) => a.board.name.localeCompare(b.board.name))
+}
+
+/** The new `version` format, from 2026-11-16: "<source tag> (<short commit hash>)". */
+const TAGGED_VERSION = /^(.+) \(([0-9a-f]{7,40})\)$/
+
+/**
+ * What a release list shows for each release, newest first: its `version`,
+ * with "latest" on the first. `version` is display text in two formats, "4.8.0-dev
+ * 55eeb385" and, from 2026-11-16, "StabRX-2026-11-16 (262cde4d)"; nothing
+ * compares it. Two releases whose versions read the same (built from the same
+ * uncommitted source) are told apart by their folder names.
+ *
+ * A label `fits` rejects is shortened, never clipped: the new format becomes
+ * the folder name and the hash (the tag's product is the tile, its date the
+ * folder's), and anything else loses its end to "…".
+ */
+export function releaseLabels(
+  releases: CatalogRelease[],
+  fits: (label: string) => boolean = () => true,
+): string[] {
+  const count = new Map<string, number>()
+  for (const r of releases) count.set(r.version, (count.get(r.version) ?? 0) + 1)
+  return releases.map((r, i) => {
+    const latest = i === 0 ? ' · latest' : ''
+    const full = (count.get(r.version)! > 1 ? `${r.version} · ${r.name}` : r.version) + latest
+    if (fits(full)) return full
+    const tagged = TAGGED_VERSION.exec(r.version)
+    if (tagged) return `${r.name} (${tagged[2]})${latest}`
+    let cut = full
+    while (cut.length > 1 && !fits(`${cut}…`)) cut = cut.slice(0, -1)
+    return `${cut.trimEnd()}…`
+  })
 }
 
 /** The catalog board a connected vehicle is, by its APJ_BOARD_ID. */

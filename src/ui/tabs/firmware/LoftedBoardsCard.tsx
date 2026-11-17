@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { LaButton, LaCard, LaSelect } from '../../components/La'
-import { boardForId, type BoardEntry } from '../../../protocol/lofted-boards'
+import { boardForId, releaseLabels, type BoardEntry } from '../../../protocol/lofted-boards'
 import { detectBoard, updateFirmware } from '../../../services/board-setup'
 import { catalog } from '../../../services/lofted-catalog'
 import { PortCancelledError } from '../../../transport/web-serial'
@@ -93,6 +93,37 @@ export default function LoftedBoardsCard() {
   )
   const release = releases.find((r) => r.release.name === releaseName) ?? releases[0] ?? null
   const firmware = release?.board.firmware.find((f) => f.id === option?.id) ?? null
+
+  // The release box's room for text, so a label that would be clipped is
+  // shortened instead (releaseLabels). Measured again when the box resizes
+  // (compact mode) and once the app's font has loaded.
+  const [releaseRoom, setReleaseRoom] = useState<{ width: number; font: string } | null>(null)
+  useLayoutEffect(() => {
+    const el = document.getElementById('lab-release')
+    if (!el) return
+    const measure = () => {
+      const cs = getComputedStyle(el)
+      setReleaseRoom({
+        width: el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+        font: `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,
+      })
+    }
+    measure()
+    const resized = new ResizeObserver(measure)
+    resized.observe(el)
+    void document.fonts?.ready.then(measure)
+    return () => resized.disconnect()
+  }, [])
+  const labels = useMemo(() => {
+    const ctx = releaseRoom ? document.createElement('canvas').getContext('2d') : null
+    if (ctx && releaseRoom) ctx.font = releaseRoom.font
+    const fits = (label: string) =>
+      !ctx || !releaseRoom || ctx.measureText(label).width <= releaseRoom.width
+    return releaseLabels(
+      releases.map((r) => r.release),
+      fits,
+    )
+  }, [releases, releaseRoom])
 
   if (!hasWebSerial()) return null
 
@@ -221,7 +252,7 @@ export default function LoftedBoardsCard() {
         >
           {releases.map((r, i) => (
             <option key={r.release.name} value={r.release.name}>
-              {i === 0 ? `${r.release.version} · latest` : r.release.version}
+              {labels[i]}
             </option>
           ))}
         </LaSelect>

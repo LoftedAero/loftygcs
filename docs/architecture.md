@@ -1098,6 +1098,23 @@ a first flash gets the wizard (`BoardSetupWizard`), an update is flashed from th
   image. Its README describes the format for whoever publishes;
   `lofted-catalog.live.test.ts` (`NET=1`) reads every published file and checks its hash, its
   board id, and that each `.hex` starts at `0x08000000` and holds its `.apj`'s firmware.
+- **Releases.** A folder name is one path segment: a date, with a letter for a second build that
+  day (`2026-11-14b`). Releases sort by `date`, newest first; a shared date keeps the index's
+  order, which lists the newest first, so the loader must keep that order. Each release is built
+  from a tag on LoftedAero/ardupilot (StabRX's branch is `StabRX-master`; the catalog README's
+  Source table lists them).
+- **`version` is display text, never parsed.** From 2026-11-16 it reads `<source tag> (<short
+commit hash>)` (`StabRX-2026-11-16 (262cde4d)`), the hash the firmware reports in its version
+  and boot messages; older releases keep `4.8.0-dev 78b82326-dirty`. Two releases that read the
+  same (built from the same uncommitted source) are labeled with their folder names, and a label
+  too wide for its box is shortened rather than clipped (`releaseLabels`): a tagged one to its
+  folder and hash, since the tag's product is the tile and its date the folder's. The card links
+  to no source: the tag is not a field, and taking it out of `version` would miss every release
+  before 2026-11-16. A `source` field in `boards.json` would be a format change, agreed with the
+  firmware side first.
+- StabRX's messages start `StabRX:` (they were `Gyro:`). The app matches neither, so a StabRX
+  PreArm reason is listed under Other in the Preflight pane. The app does not read the CRSF menu
+  (device "Stabilization", layout version 3).
 - **The press detects the board** (`detectBoard`) unless it is already recognized (connected,
   or held in its bootloader by the Firmware card). Before the press the state line says to plug
   the board in, in DFU mode for a first flash. A board in DFU opens the wizard at its questions;

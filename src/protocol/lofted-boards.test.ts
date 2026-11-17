@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   boardForId,
   boardsIn,
+  releaseLabels,
   parseCatalogIndex,
   parseRelease,
   safeRelativePath,
@@ -135,5 +136,66 @@ describe('boardsIn', () => {
     expect(boardForId([entry!], 5999)).toBe(entry)
     expect(boardForId([entry!], 0)).toBeNull()
     expect(boardForId([entry!], 140)).toBeNull()
+  })
+})
+
+describe('releases on the same day', () => {
+  // As published on 2026-11-16: index.json lists the newest first, and the
+  // two releases of 2026-11-14 share their date.
+  const index = parseCatalogIndex({
+    format: 1,
+    releases: ['2026-11-16', '2026-11-14b', '2026-11-14', '2026-11-13'],
+  })
+  const versions: Record<string, [string, string]> = {
+    '2026-11-16': ['2026-11-16', 'StabRX-2026-11-16 (262cde4d)'],
+    '2026-11-14b': ['2026-11-14', '4.8.0-dev 78b82326-dirty, menu v3'],
+    '2026-11-14': ['2026-11-14', '4.8.0-dev 78b82326-dirty'],
+    '2026-11-13': ['2026-11-13', '4.8.0-dev 78b82326-dirty'],
+  }
+  const releases = index.map((name) => {
+    const [date, version] = versions[name]!
+    return parseRelease(name, release({ date, version }))
+  })
+
+  it('accepts a folder name with a letter after the date', () => {
+    expect(index).toContain('2026-11-14b')
+  })
+
+  it('keeps the index’s newest-first order for a shared date', () => {
+    // loadCatalog passes the releases in the index's order, which breaks the tie.
+    const [entry] = boardsIn(releases)
+    expect(entry!.releases.map((r) => r.release.name)).toEqual([
+      '2026-11-16',
+      '2026-11-14b',
+      '2026-11-14',
+      '2026-11-13',
+    ])
+  })
+
+  it('tells apart two releases whose versions read the same, and only those', () => {
+    const [entry] = boardsIn(releases)
+    expect(releaseLabels(entry!.releases.map((r) => r.release))).toEqual([
+      'StabRX-2026-11-16 (262cde4d) · latest',
+      '4.8.0-dev 78b82326-dirty, menu v3',
+      '4.8.0-dev 78b82326-dirty · 2026-11-14',
+      '4.8.0-dev 78b82326-dirty · 2026-11-13',
+    ])
+  })
+
+  it('shortens a label too long for its box rather than clipping it', () => {
+    const tagged = parseRelease(
+      '2026-11-07',
+      release({ date: '2026-11-07', version: 'F405-SRX-ArduPilot-2026-11-07 (55eeb385)' }),
+    )
+    const old = parseRelease(
+      '2026-11-06',
+      release({ date: '2026-11-06', version: '4.8.0-dev 1234abcd-dirty, menu v4' }),
+    )
+    const fits = (label: string) => label.length <= 24
+    // The tag's product and date are on the tile and the folder; the hash stays.
+    expect(releaseLabels([tagged, old], fits)).toEqual([
+      '2026-11-07 (55eeb385) · latest',
+      '4.8.0-dev 1234abcd-dirt…',
+    ])
   })
 })
