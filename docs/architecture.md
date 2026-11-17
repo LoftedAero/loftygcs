@@ -257,9 +257,10 @@ that drops mid-session is cleaned the same way.
   read loop carries on through those, since a SiK radio sends a break as it powers up and the
   wrong baud produces a stream of framing errors, which the heartbeat timeout reports with the
   baud named.
-- The baud rate is a preference (`serialBaud`), 57600 by default: ArduPilot's default on every
-  telemetry port and a SiK radio's. Only a USB-UART bridge (FTDI, CP210x) uses it; a flight
-  controller's own USB ignores it.
+- The baud rate is a preference (`serialBaud`), 115200 by default (the owner's choice).
+  ArduPilot's telemetry ports and a SiK radio default to 57600, so those links need the
+  dropdown. Only a USB-UART bridge (FTDI, CP210x) uses it; a flight controller's own USB
+  ignores it. A stored choice is kept, so the new default reaches only a store without one.
 
 ### Capability bits are not evidence
 

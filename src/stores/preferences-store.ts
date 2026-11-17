@@ -107,8 +107,9 @@ const DEFAULTS: Preferences = {
   planFor: 'copter',
   uiScale: 1,
   layout: 'auto',
-  // ArduPilot's default on every telemetry port, and a SiK radio's.
-  serialBaud: 57600,
+  // The owner's choice. ArduPilot's telemetry ports and a SiK radio default to
+  // 57600, so those links need the dropdown.
+  serialBaud: 115200,
   voice: DEFAULT_VOICE,
   elrs: { version: '', region: 'FCC' },
 }
