@@ -15,6 +15,7 @@ import type {
 } from '../protocol/types'
 import type { FtpDirEntry } from '../protocol/ftp/mavftp'
 import type { LogEntryInfo } from '../protocol/log-transfer'
+import type { ParamRecord } from '../protocol/params/param-client'
 
 export class WorkerClient {
   private worker: Worker
@@ -58,6 +59,11 @@ export class WorkerClient {
 
   setParam(name: string, value: number, mavType: number): Promise<number> {
     return this.request({ op: 'setParam', name, value, mavType }) as Promise<number>
+  }
+
+  /** One parameter, fresh from the vehicle. */
+  readParam(name: string): Promise<ParamRecord> {
+    return this.request({ op: 'readParam', name }) as Promise<ParamRecord>
   }
 
   /** Resolves with the MAV_RESULT code (0 = accepted). */

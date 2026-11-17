@@ -24,6 +24,9 @@ async function handleRequest(cmd: Extract<EngineCommand, { t: 'req' }>) {
       case 'setParam':
         data = await engine.setParam(cmd.name, cmd.value, cmd.mavType)
         break
+      case 'readParam':
+        data = await engine.readParam(cmd.name)
+        break
       case 'command':
         data = await engine.runCommand(cmd.command, cmd.params, cmd.timeoutMs)
         break

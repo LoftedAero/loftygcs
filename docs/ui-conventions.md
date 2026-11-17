@@ -195,6 +195,14 @@ rows, same box width whatever the box holds. A port number and a URL are both
 "the value" and get the same box. Size the card to that column rather than
 leaving it at the design system's default.
 
+### A wizard's picture sits beside its step
+
+A picture centered above a step's lines leaves the lines hugging one side and
+empty space below them; a step with fewer lines looks unbalanced. Put the
+picture in a fixed left column and the step's lines in the column beside it,
+on every step, so the picture never moves and the lines use the dialog's
+width (the Lofted Aero board setup).
+
 ### A panel is framed one way, in one place
 
 A hairline border, the small radius and the surface background together make

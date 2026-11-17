@@ -42,6 +42,28 @@ describe('ParamStreamClient', () => {
     await expect(done).resolves.toBe(1500)
   })
 
+  it('reads one parameter by name, and gives up on a name the vehicle lacks', async () => {
+    vi.useFakeTimers()
+    try {
+      const { client, sent, paramValue } = makeClient()
+      const done = client.readParam('RELAY2_PIN')
+      expect(sent[0]).toEqual({
+        msgName: 'PARAM_REQUEST_READ',
+        fields: { targetSystem: 1, targetComponent: 1, paramId: 'RELAY2_PIN', paramIndex: -1 },
+      })
+      paramValue('RELAY2_PIN', 70, 812, 1400)
+      await expect(done).resolves.toEqual({ name: 'RELAY2_PIN', value: 70, mavType: 9 })
+
+      const missing = client.readParam('NO_SUCH')
+      const settled = expect(missing).rejects.toThrow(/no reply/)
+      await vi.advanceTimersByTimeAsync(60000)
+      await settled
+      expect(sent.filter((s) => s.fields.paramId === 'NO_SUCH')).toHaveLength(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   describe('gap refetch', () => {
     beforeEach(() => vi.useFakeTimers())
     afterEach(() => vi.useRealTimers())

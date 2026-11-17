@@ -573,6 +573,25 @@ class ConnectionService {
     return worker.runCommand(command, params, timeoutMs)
   }
 
+  /** One parameter, fresh from the vehicle rather than from the last download. */
+  async readParam(name: string): Promise<number> {
+    const worker = this.worker
+    if (!worker) throw new Error('not connected')
+    return (await worker.readParam(name)).value
+  }
+
+  /**
+   * Close the link and hand back its serial port, still granted, for a tool
+   * that speaks something other than MAVLink on it (esptool through
+   * ArduPilot's serial passthrough). Null when the link is not serial.
+   */
+  async releaseSerialPort(): Promise<{ port: SerialPort; baudRate: number } | null> {
+    const port = this.openedPort
+    const opts = this.openedWith
+    await this.disconnect()
+    return port && opts?.kind === 'serial' ? { port, baudRate: opts.baudRate } : null
+  }
+
   /** Set one parameter immediately (wizards; the Params tab stages instead). */
   async setParamNow(name: string, value: number): Promise<number> {
     const worker = this.worker

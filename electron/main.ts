@@ -50,6 +50,8 @@ interface OpenPortRequest {
   shown: boolean
   /** Ports that turned up while this request was open. */
   arrived: Set<string>
+  /** After a reboot, the ports the previous request listed: none is the bootloader. */
+  stale: ReadonlySet<string>
   callback: (portId: string) => void
   hold?: ReturnType<typeof setTimeout>
 }
@@ -72,6 +74,8 @@ const briefUsb = (d: { vendorId?: number; productId?: number; productName?: stri
 // Every port Chromium listed the last time it asked, and whether the next
 // ask should be answered from the difference rather than shown.
 let lastSerialPortIds = new Set<string>()
+// The ports the last request listed, kept apart from arrivals since.
+let lastRequestedIds = new Set<string>()
 let autoPickNewPort: { wait: boolean } | null = null
 
 function createWindow() {
@@ -174,7 +178,7 @@ function createWindow() {
       displayName: list[i]!.displayName,
       driverName: n.displayName !== list[i]!.displayName ? n.displayName : undefined,
     }))
-    const pick = pickBootloaderPort(candidates, before, r.arrived)
+    const pick = pickBootloaderPort(candidates, before, r.arrived, r.stale)
     traceSerial(
       'auto-answer',
       pick ?? '(none)',
@@ -200,12 +204,17 @@ function createWindow() {
     lastSerialPortIds = new Set(ports.keys())
     const arm = autoPickNewPort
     autoPickNewPort = null
+    // Only what the last request listed, not what has arrived since: a
+    // bootloader that came up before this request is still a candidate.
+    const stale = arm?.wait ? lastRequestedIds : new Set<string>()
+    lastRequestedIds = new Set(ports.keys())
     const r: OpenPortRequest = {
       ports,
       initial: new Set(ports.keys()),
       auto: arm !== null,
       shown: false,
       arrived: new Set(),
+      stale,
       callback,
     }
     openPortRequest = r

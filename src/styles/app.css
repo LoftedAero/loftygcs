@@ -74,6 +74,12 @@
      plus "µs". */
   --app-dialog-control-w: 168px;
   --app-dialog-unit-w: 48px;
+  /* Every button in the board setup wizard, sized to its longest label ("Erase
+     and install"), so Cancel stays put while the other button's label changes
+     from step to step. */
+  --app-wizard-btn-w: 136px;
+  /* The board picture in the setup wizard: wide enough to find its DFU button. */
+  --app-wizard-picture-w: 320px;
   /* The gap between a screen's main pane and its actions column. */
   --app-col-gap: var(--la-space-3);
   /* One width for every control in the Preferences dialog and its action row,
@@ -7486,12 +7492,14 @@ body.is-splitting .flight-map {
   font-variant-numeric: tabular-nums;
 }
 /* The controls: one width each, in a row, so a button can sit beside the
-   readout it acts on without either resizing. */
+   readout it acts on without either resizing. The label's height, so a
+   control shorter than it centers on the label as a select does. */
 .fw-step__body {
   display: flex;
   align-items: center;
   gap: var(--la-space-2);
   min-width: 0;
+  min-height: 32px;
 }
 .fw-step__body > .la-readout,
 .fw-step__body > .la-select,
@@ -7582,6 +7590,221 @@ body.is-splitting .flight-map {
   padding: var(--la-space-3);
   font-size: var(--la-size-sm);
   color: var(--la-ink-3);
+}
+
+/* The Lofted Aero board wizard (BoardSetupWizard). Every step has the same
+   four bands in the same places: the step strip, a picture band of one height,
+   a block of lines sized for the longest step (the check's six rows), and the
+   state line. Only their contents change. */
+.lab-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--la-space-3);
+  list-style: none;
+  /* A section's gap, not a row's: the steps head the whole dialog. */
+  margin: 0 0 var(--la-space-5);
+  padding: 0;
+}
+.lab-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--la-space-2);
+  font-size: var(--la-size-sm);
+  color: var(--la-ink-3);
+}
+.lab-stage--done {
+  color: var(--la-ink-2);
+}
+.lab-stage--on {
+  color: var(--la-ink);
+  font-weight: 600;
+}
+.lab-stage:not(.lab-stage--on) .fw-step__n {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--la-line-strong);
+  color: var(--la-ink-3);
+}
+/* One render of the board, tall enough to find the DFU button on it. */
+/* The board on the left and the step on the right, on every step, so the
+   picture never moves and the step's lines use the dialog's width. */
+.lab-body {
+  display: grid;
+  grid-template-columns: var(--app-wizard-picture-w) minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--la-space-6);
+}
+.lab-pictures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-2);
+}
+.lab-picture {
+  position: relative;
+  width: 100%;
+  border-radius: var(--la-radius-sm);
+  overflow: hidden;
+}
+.lab-picture img,
+.lab-picture svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Drawn on a render of a dark board, so the ring is the light on-dark ink. */
+.lab-mark {
+  fill: none;
+  stroke: var(--app-on-dark);
+  stroke-width: 10;
+}
+.lab-mark--under {
+  stroke: var(--la-charcoal);
+  stroke-width: 18;
+}
+/* A mark's name, in the ring's two inks: light letters on a dark halo, so it
+   reads on the board, a white connector or a black chip alike. */
+.lab-mark-label {
+  fill: var(--app-on-dark);
+  stroke: var(--la-charcoal);
+  stroke-width: 10;
+  paint-order: stroke;
+  font-size: 36px;
+  font-weight: 700;
+}
+/* Every row in the wizard is a control's height, one gap apart, so a line of
+   text sits level with the field beside it. Five rows hold the longest step,
+   Prepare: two board steps and three fields. */
+.lab-lines {
+  --lab-row: 30px;
+  min-height: calc(5 * var(--lab-row) + 4 * var(--la-space-1));
+  font-size: var(--la-size-md);
+}
+.lab-instructions {
+  display: grid;
+  gap: var(--la-space-1);
+  margin: 0;
+  padding-left: 1.4em;
+  line-height: var(--lab-row);
+}
+/* Above both columns, two lines tall on every step whether it holds text or
+   not, so the columns under it never move. */
+.lab-note {
+  --lab-note-line: 18px;
+  min-height: calc(2 * var(--lab-note-line));
+  margin: 0 0 var(--la-space-3);
+  line-height: var(--lab-note-line);
+  color: var(--la-ink-2);
+}
+.la-modal__card:has(.lab-stages) {
+  width: min(760px, 100%);
+}
+.la-modal__card:has(.lab-stages) .la-modal__actions .la-btn {
+  width: var(--app-wizard-btn-w);
+}
+.lab-prepare {
+  display: grid;
+  gap: var(--la-space-1);
+}
+/* The one thing the pilot does mid-way through, so it takes the step's
+   column rather than the state line, larger and in the caution color. */
+.lab-replug {
+  display: flex;
+  align-items: center;
+  gap: var(--la-space-3);
+  color: var(--la-warn);
+  font-size: var(--la-size-xl);
+  font-weight: 600;
+}
+.lab-replug p {
+  margin: 0;
+}
+.lab-replug svg {
+  flex: none;
+}
+.lab-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--la-space-3);
+  row-gap: var(--la-space-1);
+  margin: 0;
+  line-height: var(--lab-row);
+}
+.lab-fact {
+  display: contents;
+}
+.lab-fact dt {
+  color: var(--la-ink-2);
+}
+.lab-fact dd {
+  margin: 0;
+}
+.lab-fact--bad {
+  color: var(--la-bad);
+}
+/* Status, not an action: the setup's finished steps. Semibold, because the
+   light theme's green is pale on white. */
+.lab-fact--ok {
+  color: var(--la-ok);
+  font-weight: 600;
+}
+/* One grid for the three fields, so the controls share an edge and take the
+   width the labels leave; the version prompt is longer than a dialog control. */
+.lab-form {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--la-space-1) var(--la-space-3);
+}
+.lab-field {
+  display: contents;
+}
+/* The binding phrase with its show button at the field's right end. The
+   button is the field's height and square, and the text keeps clear of it on
+   both sides so it stays centered as every field's text is. */
+.lab-secret {
+  position: relative;
+  display: block;
+}
+.lab-secret > .la-input {
+  width: 100%;
+  padding-inline: var(--lab-row);
+}
+.lab-secret__toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--la-radius-sm);
+  background: none;
+  color: var(--la-ink-3);
+  cursor: pointer;
+}
+.lab-secret__toggle:hover:not(:disabled) {
+  color: var(--la-ink);
+}
+.lab-secret__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--la-ring);
+}
+.lab-secret__toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.lab-field > span {
+  color: var(--la-ink-2);
+}
+/* The state line inside a dialog starts at the dialog's edge, not after the
+   Firmware card's label column. */
+.la-modal__body .fw-state {
+  margin-left: 0;
+  max-width: none;
+  margin-top: var(--la-space-3);
 }
 
 /* The firmware slot. Not a gauge: it is fixed for the life of a connection, so

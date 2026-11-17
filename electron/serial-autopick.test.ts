@@ -125,6 +125,28 @@ describe('the phantom port a reboot leaves behind', () => {
     expect(pickBootloaderPort([a, b], new Set(), new Set(['a', 'b']))).toBeNull()
   })
 
+  it('after a reboot, never answers with the port the board was running on', () => {
+    // A LoftedAero-SRX: the running board and its bootloader share the generic
+    // ids, and Windows names the driver just "ArduPilot". The running port is
+    // still listed when the request after the reboot comes in.
+    const running = { portId: 'gyro', displayName: 'LoftedAero-SRX-gyro', driverName: 'ArduPilot' }
+    const bootloader = { portId: 'bl', displayName: 'LoftedAero-SRX-BL', driverName: 'ArduPilot' }
+    const ids = { vendorId: '4617', productId: '22337' }
+    const stale = new Set(['gyro', 'bt-1'])
+    expect(
+      pickBootloaderPort([...others, { ...running, ...ids }], stale, new Set(), stale),
+    ).toBeNull()
+    // The bootloader arriving answers the request.
+    expect(
+      pickBootloaderPort(
+        [...others, { ...running, ...ids }, { ...bootloader, ...ids }],
+        stale,
+        new Set(['bl']),
+        stale,
+      ),
+    ).toBe('bl')
+  })
+
   it('never answers with a running board’s interface just because it is new', () => {
     // The board has left its bootloader, and the port that appeared
     // mid-request is the firmware's SLCAN interface.

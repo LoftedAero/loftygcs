@@ -1076,6 +1076,120 @@ is ported from it (GPL-3.0, as this project is).
   fails. In the shell, `electron/main.ts` answers `select-usb-device` for `0483:DF11` and holds
   an empty request for 2.5 s while Chromium finishes enumerating.
 
+### Lofted Aero boards (`protocol/lofted-boards.ts`, `ui/tabs/firmware/LoftedBoardsCard.tsx`)
+
+Lofted Aero's own flight controllers have a card of their own on the Firmware screen. Its one
+button does what the board in front of it needs, and the board, not a question, decides which:
+a first flash gets the wizard (`BoardSetupWizard`), an update is flashed from the card.
+
+- **The catalog** is LoftedAero/ardupilot-builds (`main`): `index.json` lists release
+  folders, each `releases/<name>/boards.json` lists boards (board id, receiver wiring) and their
+  firmware options (StabRX, ArduPilot, later F-35B builds), every file with size and SHA-256.
+  An option is two images of one build: the `.apj`, and the build's `_with_bl.hex`. The card
+  draws the options as the Firmware card draws vehicles, one tile each, dimmed where a board
+  has no build. The tiles ship with the app (`lofted-products.tsx`) and are matched on the
+  option's `id` (`ardupilot`, `stabrx`, `f35b-70`, `f35b-90`); an id the app does not list is
+  not offered, so a new product needs an app release as well as a catalog one. It is read
+  from `raw.githubusercontent.com`, which sends CORS headers; GitHub's release downloads do
+  not, and the browser build could not fetch them. A board's facts come from the newest release
+  that lists it, so a board can be renamed by a release. It is a repository of its own, not a
+  branch of the ArduPilot source, so a clone of the source does not download every published
+  image. Its README describes the format for whoever publishes;
+  `lofted-catalog.live.test.ts` (`NET=1`) reads every published file and checks its hash, its
+  board id, and that each `.hex` starts at `0x08000000` and holds its `.apj`'s firmware.
+- **The press detects the board** (`detectBoard`) unless it is already recognized (connected,
+  or held in its bootloader by the Firmware card). Before the press the state line says to plug
+  the board in, in DFU mode for a first flash. A board in DFU opens the wizard at its questions;
+  one answering ArduPilot's bootloader (rebooted into it from its firmware) is updated; nothing
+  found opens the wizard's guide to DFU, since a blank board plugged in normally shows nothing
+  at all. The desktop app sees DFU and ArduPilot ports without asking, so it shows no chooser; a
+  browser shows the serial chooser, then the DFU chooser if no bootloader answered.
+- **A first flash** gets the wizard: the `_with_bl.hex` in one write over ROM DFU, the onboard
+  ELRS receiver, a check. Its first step holds everything the pilot does or answers (the board
+  steps, and the receiver's version, regulatory domain and binding phrase), so after "Erase and
+  install" it runs to the check without a press (in a browser, only the device choosers need
+  one). The version and domain are kept in Preferences (`elrs`) for the next board, since both
+  follow the pilot's transmitter; the phrase is never kept.
+- **An update** is flashed from the card with one press and no dialog: the `.apj` through the
+  ArduPilot bootloader and its board-id check, narrated on the card's state line. The board is
+  found and rebooted into its bootloader before the download, since a browser shows a chooser
+  only within a few seconds of the press; if nothing is written, it is started again.
+  The receiver is not touched or asked about; it is written only by the wizard.
+- **No step that runs by itself asks for a port.** Chromium refuses `requestPort()` without a
+  press in the last few seconds, and the refusal never reaches the desktop shell's chooser
+  (the `LOFTGCS_DEBUG_SERIAL` trace shows `armed` and no `select-serial-port`); the wizard
+  reached ArduPilot minutes after its press and failed there. Ports are polled with
+  `getPorts()` instead, which in the desktop app lists every serial port without a grant
+  (Bluetooth ones too, so "exactly one granted port" never holds there). A browser lists only
+  ports it was granted, so there a wait usually ends in a press on Continue.
+- A board leaving DFU runs ArduPilot's bootloader first, which waits 5 s for an uploader on a
+  port with the same USB ids as the firmware's, and MAVLink must not be sent to it.
+  `firmwarePort` takes the first port seen as the bootloader's, waits for it to go and takes
+  the port that follows; after an update it waits out the port the `.apj` went through.
+- The pictures and step text ship with the app, keyed on the board's catalog id
+  (`board-pictures.ts`), so nothing downloaded is put on screen as instructions.
+- A board picture is a `kicad-cli pcb render` of the top (`--quality high`, transparent
+  background, `--use-board-stackup-colors`) from a copy of the board file given a stackup with an
+  opaque blue mask (`#1C3F8EFF`). The board file has no stackup, and KiCad's default mask is
+  green and see-through, which shows the bottom side's parts as brown patches. Pixels below full
+  opacity are dropped, which removes the render's shadow, and the result is cropped to the board
+  and saved as WebP. Marks are in the picture's 1000-wide coordinates, so a new render needs them
+  measured again.
+- The desktop shell grants `0483:DF11` to `getDevices()`, so it sees the board arrive in DFU; a
+  browser sees only a chip it was granted before, and each new USB device (DFU, ArduPilot)
+  needs a press for its chooser. The wizard's buttons are those presses.
+- Both paths flash through the Firmware card's flash store; `board-setup-store`'s `busy` keeps
+  that card's state line, and the restore dialog, out of it.
+- The two cards stay apart until ArduPilot builds these boards: the Firmware card's second
+  question is a vehicle and its source ardupilot.org, this card's a product and its own catalog.
+  When the Firmware card detects, or is connected to, a catalog board that ArduPilot's manifest
+  has no build for, its state line points to this card. A board it holds in its bootloader
+  (`board-setup-store`'s `held`) is recognized here and updated from there without a second
+  reboot; clearing `held` afterwards tells the Firmware card the board has left its bootloader.
+  Once ArduPilot publishes a build for a board, the pointer stops and that card offers it.
+
+### ELRS receiver over the flight controller's USB (`protocol/elrs/`, `services/receiver-flash.ts`)
+
+The specification is LoftedAero-SRX's `docs/elrs_usb_flashing.md`; `usb-passthrough.ts` follows
+its step numbers. ArduPilot holds the ESP32's BOOT strap low and pulses EN through two relays,
+then forwards the USB port to the receiver's UART (`SERIAL_PASSn`), and esptool-js writes the
+receiver on the same port after MAVLink lets it go (`connectionService.releaseSerialPort`).
+
+- **Images** come from the files ExpressLRS publishes for its own web flasher
+  (`expresslrs.github.io/web-flasher/assets/firmware`), which sends CORS headers; the artifact
+  server ExpressLRS Configurator uses does not. That layout is the site's, not a published
+  interface. The binding phrase becomes the UID ExpressLRS derives (`uid.ts`: the first six bytes
+  of the MD5 of `-DMY_BINDING_PHRASE="<phrase>"`), and the options, identity and pin layout are
+  appended after the ESP image as ExpressLRS's `binary_configurator.py` does (`firmware.ts`).
+  The phrase is never stored. No version is preselected: it must match the transmitter's major
+  version.
+- `SERIALn_PROTOCOL` while writing is a protocol the build does not compile in, so nothing
+  touches the port; it comes from the catalog per firmware option. 23 (RCIN) reconfigures the
+  port about once a second and corrupts the write; -1 disconnects the pins at boot.
+- **The relays are always cleared afterwards**: a relay on EN that a switch, a mission item or a
+  GCS button can reach kills the receiver in flight. Another relay found on BOOT or EN is cleared
+  too.
+- A relay's `PIN` and `DEFAULT` are left out of the parameter list while its `FUNCTION` is 0, but
+  answer a read or write by name (checked on Copter and Plane SITL). So the saved values are read
+  by name (`readParam`), not from the download.
+- Stock ArduPilot keeps sending heartbeats after the passthrough ends but reads nothing until it
+  restarts. The wizard sees the relay command go unanswered, asks for a USB replug (in the step's
+  column, with a tone), waits for a new port and finishes the restore. One unanswered relay
+  command is the test: the command's own retries take about 7 s, and the three tries used
+  elsewhere kept the pilot waiting about 21 s for the prompt.
+- After a reboot the desktop shell's automatic chooser must not answer with a port the previous
+  request listed (`stale` in `serial-autopick.ts`): this board's running port and its bootloader
+  share the generic ids, its driver is named just "ArduPilot", and the running port stays listed
+  for a moment after the reboot command.
+- A write that stopped before its last step is recognized from the board's own parameters (a
+  relay on BOOT or EN, or the passthrough protocol on the receiver's port), so the restore dialog
+  (`ui/shell/ReceiverRestorePrompt.tsx`) opens on connection from any screen, whichever app or
+  computer started the write. The catalog is fetched for that only when a parameter looks like
+  a write's.
+- `usb-passthrough.integration.test.ts` checks the parameter names, the relay command, the
+  detection and the restore on SITL. The reboot and the passthrough itself can only be proven on
+  the board: the runner relaunches SITL with `-w`.
+
 ## SITL
 
 SITL (ArduPilot's software-in-the-loop simulator) is the acceptance target. Every protocol

@@ -56,6 +56,10 @@ export class ParamStreamClient {
       firstAttempt: boolean
     }
   >()
+  private pendingReads = new Map<
+    string,
+    { resolve: (r: ParamRecord) => void; timer: ReturnType<typeof setTimeout> }
+  >()
 
   constructor(
     private send: SendFn,
@@ -90,6 +94,12 @@ export class ParamStreamClient {
       clearTimeout(set.timer)
       if (set.firstAttempt) this.rtt?.sample(Date.now() - set.sentAt)
       set.resolve(record.value)
+    }
+    const read = this.pendingReads.get(record.name)
+    if (read) {
+      this.pendingReads.delete(record.name)
+      clearTimeout(read.timer)
+      read.resolve(record)
     }
 
     const a = this.active
@@ -245,9 +255,39 @@ export class ParamStreamClient {
     return attempt(SET_RETRIES)
   }
 
+  /**
+   * Read one parameter by name, fresh from the vehicle rather than from the
+   * last download. ArduPilot does not answer a name it does not have, so an
+   * absent parameter rejects after the retries.
+   */
+  readParam(name: string): Promise<ParamRecord> {
+    const t = this.target()
+    const attempt = (retriesLeft: number): Promise<ParamRecord> =>
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => {
+            this.pendingReads.delete(name)
+            if (retriesLeft > 0) attempt(retriesLeft - 1).then(resolve, reject)
+            else reject(new Error(`${name}: no reply from the vehicle`))
+          },
+          this.wait(SET_TIMEOUT_MS, SET_RETRIES - retriesLeft),
+        )
+        this.pendingReads.set(name, { resolve, timer })
+        this.send('PARAM_REQUEST_READ', {
+          targetSystem: t.sysid,
+          targetComponent: t.compid,
+          paramId: name,
+          paramIndex: -1,
+        })
+      })
+    return attempt(SET_RETRIES)
+  }
+
   abort(reason: string) {
     this.fail(new Error(reason))
     for (const [, s] of this.pendingSets) clearTimeout(s.timer)
     this.pendingSets.clear()
+    for (const [, r] of this.pendingReads) clearTimeout(r.timer)
+    this.pendingReads.clear()
   }
 }

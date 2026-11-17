@@ -162,6 +162,39 @@ to answer device choosers:
 - [ ] A board in DFU mode is adopted with no target prompt and the line reads
       "DFU mode · N KB flash".
 
+### Lofted Aero Flight Controllers card and setup wizard
+
+Most of this needs no board: the wizard opens with nothing plugged in, and
+`BoardSetupWizard`'s states can be reached with WebUSB and Web Serial stubbed in
+the page. The flashing itself is in
+[hardware-checklist.md](hardware-checklist.md#lofted-aero-boards-f405-srx).
+
+Card:
+
+- [ ] Rows are Board, Firmware, Release, on the ArduPilot Firmware card's edges;
+      a tile with no build for the board is dimmed, not missing.
+- [ ] The line reads "Pick the firmware." with no tile, then "Plug in the board
+      to proceed. For first-time flashing, connect in DFU mode."
+- [ ] The card is the ArduPilot Firmware card's height whatever the line says.
+
+Wizard:
+
+- [ ] Every step puts the picture, the state line and the buttons in the same
+      place; measure Prepare with and without a board already in DFU.
+- [ ] The DFU ring and label sit on the button in the picture, in both themes.
+- [ ] The version prompt, the domain and the binding phrase fit their boxes;
+      the eye shows and hides the phrase.
+- [ ] Cancel never moves: every button is one width, and Connect during the
+      replug is disabled, not hidden, for its first 15 s.
+
+Compact (Preferences, Compact, then 732×412):
+
+- [ ] The card's tiles wrap rather than run past the window, and every control
+      is at least 44px on its short side.
+- [ ] The wizard fits the window without scrolling the page: if the two columns
+      do not fit, the picture goes above the step rather than squeezing it.
+- [ ] The eye button, the replug prompt and the summary lines stay legible.
+
 ### Configuration
 
 - [ ] Connected

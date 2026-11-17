@@ -32,6 +32,7 @@ import InspectorTab from './ui/tabs/inspector/InspectorTab'
 import FlightTab from './ui/tabs/flight/FlightTab'
 import MissionTab from './ui/tabs/mission/MissionTab'
 import SimFieldPicker from './ui/shell/SimFieldPicker'
+import ReceiverRestorePrompt from './ui/shell/ReceiverRestorePrompt'
 import { startReading } from './services/joystick'
 import { announcer } from './services/voice/announcer'
 
@@ -135,6 +136,8 @@ export default function App() {
         <UnsavedChangesModal />
         {/* The single restart dialog for every screen; see RebootPrompt. */}
         <RebootPrompt />
+        {/* A Lofted Aero board left mid receiver write, on any screen. */}
+        <ReceiverRestorePrompt />
         {/* Last, so it sits over everything on first run. */}
         <PreviewNotice />
       </div>

@@ -53,6 +53,7 @@
     "@mdi/js": "^7.4.47",
     "@tanstack/react-virtual": "^3.14.10",
     "cesium": "^1.145.0",
+    "esptool-js": "0.7.1",
     "leaflet": "^1.9.4",
     "mavlink-mappings": "^1.0.22-20260311",
     "react": "^19.0.0",

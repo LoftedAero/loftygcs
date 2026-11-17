@@ -54,6 +54,18 @@ export interface Preferences {
    */
   serialBaud: number
   voice: VoicePrefs
+  /**
+   * The ExpressLRS version and regulatory domain last written to a Lofted Aero
+   * board's receiver, offered for the next board. Both must match the pilot's
+   * transmitter, which rarely changes. Empty version: none yet. The binding
+   * phrase is never kept.
+   */
+  elrs: ElrsPrefs
+}
+
+export interface ElrsPrefs {
+  version: string
+  region: 'FCC' | 'LBT'
 }
 
 /**
@@ -98,6 +110,7 @@ const DEFAULTS: Preferences = {
   // ArduPilot's default on every telemetry port, and a SiK radio's.
   serialBaud: 57600,
   voice: DEFAULT_VOICE,
+  elrs: { version: '', region: 'FCC' },
 }
 
 /** Reads the stored preferences, ignoring anything this build does not recognize. */
@@ -113,6 +126,7 @@ function load(): Preferences {
       layout?: string
       serialBaud?: number
       voice?: unknown
+      elrs?: { version?: unknown; region?: unknown }
     }
     if (typeof parsed !== 'object' || parsed === null) return DEFAULTS
     return {
@@ -137,6 +151,13 @@ function load(): Preferences {
         ? (parsed.serialBaud as number)
         : DEFAULTS.serialBaud,
       voice: loadVoice(parsed.voice),
+      elrs: {
+        version:
+          typeof parsed.elrs?.version === 'string' && /^\d+\.\d+\.\d+$/.test(parsed.elrs.version)
+            ? parsed.elrs.version
+            : DEFAULTS.elrs.version,
+        region: valid(parsed.elrs?.region, ['FCC', 'LBT'], DEFAULTS.elrs.region),
+      },
     }
   } catch {
     // Storage unavailable or unparseable: use the defaults.
@@ -205,6 +226,7 @@ interface PreferencesState extends Preferences {
   setUiScale(scale: number): void
   setLayout(layout: LayoutChoice): void
   setSerialBaud(baud: number): void
+  setElrs(elrs: ElrsPrefs): void
   setVoiceEnabled(enabled: boolean): void
   /** Sets one row's mode; the default is stored as no entry. */
   setCalloutMode(id: CalloutId, mode: CalloutMode): void
@@ -254,6 +276,11 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => ({
   setSerialBaud(baud) {
     if (!(SERIAL_BAUDS as readonly number[]).includes(baud)) return
     set({ serialBaud: baud })
+    save(get())
+  },
+
+  setElrs(elrs) {
+    set({ elrs: { ...elrs } })
     save(get())
   },
 

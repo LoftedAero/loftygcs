@@ -51,6 +51,22 @@ describe('preferences', () => {
     Storage.prototype.setItem = real
   })
 
+  it('remembers the ELRS version and domain, and drops values it cannot use', async () => {
+    expect(store().elrs).toEqual({ version: '', region: 'FCC' })
+    store().setElrs({ version: '3.6.3', region: 'LBT' })
+    vi.resetModules()
+    let fresh = await import('./preferences-store')
+    expect(fresh.usePreferencesStore.getState().elrs).toEqual({ version: '3.6.3', region: 'LBT' })
+
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ version: 1, elrs: { version: 'latest', region: 'EU' } }),
+    )
+    vi.resetModules()
+    fresh = await import('./preferences-store')
+    expect(fresh.usePreferencesStore.getState().elrs).toEqual({ version: '', region: 'FCC' })
+  })
+
   it('resets to the shipped defaults', () => {
     store().setDistanceUnit('ft')
     store().setSpeedUnit('mph')

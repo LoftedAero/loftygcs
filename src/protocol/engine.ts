@@ -8,7 +8,7 @@ import { messageToDeltas } from './telemetry'
 import { decodeAdsbVehicle, type AdsbTarget } from './adsb'
 import { MavFtpClient, type FtpDirEntry } from './ftp/mavftp'
 import { decodeParamPck } from './params/pck'
-import { ParamStreamClient } from './params/param-client'
+import { ParamStreamClient, type ParamRecord } from './params/param-client'
 import { CommandClient } from './commands'
 import { MissionClient } from './mission'
 import { LogTransferClient, type LogEntryInfo } from './log-transfer'
@@ -612,6 +612,10 @@ export class ProtocolEngine {
 
   setParam(name: string, value: number, mavType: number): Promise<number> {
     return this.paramStream.setParam(name, value, mavType)
+  }
+
+  readParam(name: string): Promise<ParamRecord> {
+    return this.paramStream.readParam(name)
   }
 
   runCommand(command: number, params: number[], timeoutMs?: number): Promise<number> {

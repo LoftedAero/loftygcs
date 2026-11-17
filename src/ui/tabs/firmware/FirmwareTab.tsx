@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { mdiFolderOpen, mdiOpenInNew } from '@mdi/js'
 import { LaButton, LaCard, LaModal, LaSelect } from '../../components/La'
 import { useFlashStore, type LoadedApj, type LoadedHex } from '../../../stores/flash-store'
+import { useBoardSetupStore } from '../../../stores/board-setup-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
 import PfdCard from './PfdCard'
+import Step from './FwStep'
+import LoftedBoardsCard from './LoftedBoardsCard'
 import {
   allPlatforms,
   describeBoard,
@@ -32,6 +35,8 @@ import {
   type DfuBoardInfo,
 } from '../../../services/flash'
 import { PortCancelledError } from '../../../transport/web-serial'
+import { boardForId, type BoardEntry } from '../../../protocol/lofted-boards'
+import { catalog } from '../../../services/lofted-catalog'
 import { isFailsafe, MAV_STATE } from '../flight/hud-draw'
 import type { BootloaderInfo } from '../../../protocol/bootloader/px-uploader'
 import { isElectron, openExternal } from '../../../env'
@@ -64,6 +69,7 @@ export default function FirmwareTab() {
   return (
     <div className="fw-tab">
       <FirmwareCard />
+      <LoftedBoardsCard />
       <PfdCard />
     </div>
   )
@@ -117,7 +123,23 @@ function FirmwareCard() {
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const armed = useVehicleStore((s) => s.armed)
   const systemStatus = useVehicleStore((s) => s.systemStatus)
+  const vehicleBoardId = useVehicleStore((s) => s.boardId)
   const busy = BUSY_PHASES.has(phase)
+
+  // Lofted Aero's boards have their firmware on the card below, not in
+  // ArduPilot's build list. The catalog is read once a session and shared
+  // with that card; without it this card behaves as it always did.
+  const [loftedBoards, setLoftedBoards] = useState<BoardEntry[]>([])
+  useEffect(() => {
+    let live = true
+    void catalog().then(
+      (list) => live && setLoftedBoards(list),
+      () => {},
+    )
+    return () => {
+      live = false
+    }
+  }, [])
 
   /**
    * Why this board must not be rebooted right now, or null. Detecting
@@ -178,6 +200,32 @@ function FirmwareCard() {
   const vehicles = useMemo(() => vehiclesIn(all), [all])
   const boardId = board?.mode === 'serial' ? board.info.boardId : null
   const boardName = board?.mode === 'serial' ? describeBoard(all, board.info.boardId) : null
+
+  // A Lofted Aero board ArduPilot publishes nothing for: detected here, or
+  // connected before anything is detected. Once ArduPilot builds for a board
+  // this stops applying to it and the card offers those builds.
+  const loftedId = board ? boardId : connected ? vehicleBoardId : null
+  const lofted =
+    loftedId && describeBoard(all, loftedId) === null ? boardForId(loftedBoards, loftedId) : null
+
+  // The Lofted Aero card can update a board held here in its bootloader. It
+  // clears `held` when it has, and the board is then no longer this card's.
+  const held = useBoardSetupStore((s) => s.held)
+  useEffect(() => {
+    useBoardSetupStore
+      .getState()
+      .setHeld(board?.mode === 'serial' ? { boardId: board.info.boardId, port: board.port } : null)
+  }, [board])
+  useEffect(() => () => useBoardSetupStore.getState().setHeld(null), [])
+  const heldPort = held?.port
+  useEffect(() => {
+    const b = boardRef.current
+    if (b?.mode !== 'serial' || heldPort === b.port) return
+    setBoard(null)
+    setVehicle(null)
+    setPlatform('')
+    setPinnedVersion(null)
+  }, [heldPort])
 
   // Only vehicles this board has a build for. Serial: by id, which is exact.
   // DFU: by the target the user named. Nothing until a board is known.
@@ -488,7 +536,7 @@ function FirmwareCard() {
   // ---- what the screen says ---------------------------------------------
   const boardLine =
     board?.mode === 'serial'
-      ? `${boardName ?? `Board id ${board.info.boardId}`} · id ${board.info.boardId} · bootloader rev ${board.info.blRev}`
+      ? `${boardName ?? lofted?.board.name ?? `Board id ${board.info.boardId}`} · id ${board.info.boardId} · bootloader rev ${board.info.blRev}`
       : board?.mode === 'dfu'
         ? [`DFU mode`, platform || `${Math.round(board.info.totalBytes / KB)} KB flash`].join(' · ')
         : undefined
@@ -509,25 +557,29 @@ function FirmwareCard() {
               ? {
                   text: `${image.label} — ${image.kind === 'hex' ? 'over DFU' : 'over the ArduPilot bootloader'}`,
                 }
-              : !manifestAvailable()
-                ? { text: 'The web version of this app can only flash firmware from a file.' }
-                : !options
-                  ? { text: 'Loading the build list…' }
-                  : !board
-                    ? {
-                        text: 'Detect a board to flash. A board without the ArduPilot bootloader must be in DFU mode.',
-                      }
-                    : vehicle && !isTunedFor(vehicle)
+              : lofted
+                ? {
+                    text: `${lofted.board.name} firmware is on the Lofted Aero Flight Controllers card.`,
+                  }
+                : !manifestAvailable()
+                  ? { text: 'The web version of this app can only flash firmware from a file.' }
+                  : !options
+                    ? { text: 'Loading the build list…' }
+                    : !board
                       ? {
-                          text: `This app is tested for Copter and Plane — some functions may not work properly for ${vehicleLabel}.`,
-                          tone: 'warn',
+                          text: 'Detect a board to flash. A board without the ArduPilot bootloader must be in DFU mode.',
                         }
-                      : { text: vehicle ? '' : 'Pick a vehicle type.' }
+                      : vehicle && !isTunedFor(vehicle)
+                        ? {
+                            text: `This app is tested for Copter and Plane — some functions may not work properly for ${vehicleLabel}.`,
+                            tone: 'warn',
+                          }
+                        : { text: vehicle ? '' : 'Pick a vehicle type.' }
 
   const canFlash = !!board && !busy && !step && (!!image || (!!vehicle && !!platform && !!selected))
 
   return (
-    <LaCard className="fw-card" title="Firmware">
+    <LaCard className="fw-card" title="ArduPilot Firmware">
       {/* Detect sits in the row it fills. */}
       <Step n={1} label="Board">
         {/* Not orange: the card's one primary action is the flash. */}
@@ -711,39 +763,6 @@ function FirmwareCard() {
 const FILE_CHOICE = 'file'
 
 /**
- * One numbered step and its controls. Numbered because each step depends on
- * the previous one. Controls share one width (`--fw-control-w`) so they line
- * up on a single left edge.
- */
-function Step({
-  n,
-  label,
-  htmlFor,
-  wide,
-  children,
-}: {
-  n: number
-  label: string
-  htmlFor?: string
-  /** The vehicle strip is a grid of its own and takes the whole column. */
-  wide?: boolean
-  children: ReactNode
-}) {
-  const Label = htmlFor ? 'label' : 'span'
-  return (
-    <div className="fw-step">
-      <Label className="fw-step__label" {...(htmlFor ? { htmlFor } : {})}>
-        <span className="fw-step__n" aria-hidden="true">
-          {n}
-        </span>
-        {label}
-      </Label>
-      <div className={`fw-step__body${wide ? ' fw-step__body--wide' : ''}`}>{children}</div>
-    </div>
-  )
-}
-
-/**
  * Asks which build target this board is, when its id fits several builds or
  * none, or over DFU where there is no id. A flat, searchable list of
  * ArduPilot's targets.
@@ -887,7 +906,10 @@ function StateLine({ status }: { status: Status }) {
   const phase = useFlashStore((s) => s.phase)
   const progress = useFlashStore((s) => s.progress)
   const error = useFlashStore((s) => s.error)
-  const mine = phase !== 'idle'
+  // The Lofted Aero card's flashes go through the same store and narrate
+  // themselves there.
+  const lofted = useBoardSetupStore((s) => s.busy)
+  const mine = phase !== 'idle' && !lofted
 
   if (mine) {
     return (

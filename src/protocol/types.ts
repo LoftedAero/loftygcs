@@ -267,6 +267,7 @@ export interface ParamDownloadResult {
 export type EngineRequest =
   | { op: 'downloadParams' }
   | { op: 'setParam'; name: string; value: number; mavType: number }
+  | { op: 'readParam'; name: string }
   | { op: 'command'; command: number; params: number[]; timeoutMs?: number }
   | { op: 'downloadMission'; missionType: number }
   | { op: 'uploadMission'; items: MissionItem[]; missionType: number }

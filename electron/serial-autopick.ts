@@ -71,12 +71,20 @@ function saysNotBootloader(p: PortLike): boolean {
  *
  * Each step needs exactly one match. Two candidates means two boards, and
  * picking either would erase a board nobody chose.
+ *
+ * `stale` is for a request made just after a reboot: the ports the previous
+ * request listed, which the reboot cannot have produced. A running board with
+ * the generic ids looks like a bootloader by them, and its port is still
+ * listed for a moment after the reboot command (seen on a LoftedAero-SRX,
+ * whose driver is named just "ArduPilot").
  */
 export function pickBootloaderPort(
-  portList: PortLike[],
+  allPorts: PortLike[],
   lastIds: ReadonlySet<string>,
   arrivedIds: ReadonlySet<string> = new Set(),
+  stale: ReadonlySet<string> = new Set(),
 ): string | null {
+  const portList = allPorts.filter((p) => !stale.has(p.portId))
   const bl = portList.filter(looksLikeBootloader)
   const arrivedBl = bl.filter((p) => arrivedIds.has(p.portId))
   if (arrivedBl.length === 1) return arrivedBl[0]!.portId

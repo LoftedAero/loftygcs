@@ -540,8 +540,12 @@ export async function bootBoard(port: SerialPort): Promise<void> {
   }
 }
 
-/** Flash a with-bootloader hex image over the STM32 ROM bootloader (DFU). */
-export async function flashDfu(segments: HexSegment[]): Promise<void> {
+/**
+ * Flash an image over the STM32 ROM bootloader (DFU): a with-bootloader hex,
+ * or a bootloader alone. `found` is a device already in hand (from
+ * `getDevices()`); without one, the chooser is raised.
+ */
+export async function flashDfu(segments: HexSegment[], found?: USBDevice): Promise<void> {
   const store = useFlashStore.getState()
   if (!('usb' in navigator)) {
     throw new Error('WebUSB is not available here. Use Chrome/Edge or the desktop app.')
@@ -549,13 +553,15 @@ export async function flashDfu(segments: HexSegment[]): Promise<void> {
   store.begin('dfu')
   let device: USBDevice | null = null
   try {
-    device = await navigator.usb
-      .requestDevice({ filters: [{ vendorId: DFU_VENDOR_ID, productId: DFU_PRODUCT_ID }] })
-      .catch(() => {
-        throw new Error(
-          'No DFU device selected. Hold BOOT0 (or bridge the DFU pads) while plugging USB in, then retry. On Windows the device also needs the WinUSB driver (Zadig).',
-        )
-      })
+    device =
+      found ??
+      (await navigator.usb
+        .requestDevice({ filters: [{ vendorId: DFU_VENDOR_ID, productId: DFU_PRODUCT_ID }] })
+        .catch(() => {
+          throw new Error(
+            'No DFU device selected. Hold BOOT0 (or bridge the DFU pads) while plugging USB in, then retry. On Windows the device also needs the WinUSB driver (Zadig).',
+          )
+        }))
     await device.open()
     if (device.configuration === null) await device.selectConfiguration(1)
     const iface = device.configuration?.interfaces[0]
