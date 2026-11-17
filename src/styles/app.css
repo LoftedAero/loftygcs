@@ -8499,6 +8499,18 @@ body.is-splitting .flight-map {
     width: min(var(--app-dialog-narrow-w), 100%);
     border-radius: var(--la-radius);
   }
+  /* The board setup wizard is taller than the window here, so its body
+     scrolls. Its state line narrates the flash, so it stays in view at the
+     foot of the body rather than scrolling away below the fields. */
+  & .la-modal__card:has(.lab-stages) .lab-stages {
+    margin-bottom: var(--la-space-3);
+  }
+  & .la-modal__card:has(.lab-stages) .la-modal__body > .fw-state {
+    position: sticky;
+    bottom: 0;
+    padding-top: var(--la-space-2);
+    background: var(--la-surface);
+  }
 }
 
 /* Compact Fly (FlightTab's CompactFlight): the map or the video fills the

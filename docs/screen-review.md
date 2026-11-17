@@ -191,8 +191,9 @@ Compact (Preferences, Compact, then 732×412):
 
 - [ ] The card's tiles wrap rather than run past the window, and every control
       is at least 44px on its short side.
-- [ ] The wizard fits the window without scrolling the page: if the two columns
-      do not fit, the picture goes above the step rather than squeezing it.
+- [ ] The page never scrolls. The wizard's body scrolls between its title and its
+      buttons, with the state line kept in view at its foot (checked
+      2026-11-16).
 - [ ] The eye button, the replug prompt and the summary lines stay legible.
 
 ### Configuration
