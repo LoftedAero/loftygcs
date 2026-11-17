@@ -124,13 +124,13 @@ describe('safeRelativePath', () => {
 })
 
 describe('boardsIn', () => {
-  it('takes a board facts from its newest release, whatever the index order', () => {
-    const older = parseRelease(
-      'old',
-      release({ date: '2026-11-01', version: '1' }, { name: 'LoftedAero-SRX' }),
+  it('takes a board facts from the first release in the index that lists it', () => {
+    const first = parseRelease('first', release({ date: '2026-11-01', version: '2' }))
+    const second = parseRelease(
+      'second',
+      release({ date: '2026-11-13', version: '1' }, { name: 'LoftedAero-SRX' }),
     )
-    const newer = parseRelease('new', release({ date: '2026-11-13', version: '2' }))
-    const [entry] = boardsIn([older, newer])
+    const [entry] = boardsIn([first, second])
     expect(entry!.board.name).toBe('F405-SRX')
     expect(entry!.releases.map((r) => r.release.version)).toEqual(['2', '1'])
     expect(boardForId([entry!], 5999)).toBe(entry)
@@ -139,63 +139,89 @@ describe('boardsIn', () => {
   })
 })
 
-describe('releases on the same day', () => {
-  // As published on 2026-11-16: index.json lists the newest first, and the
-  // two releases of 2026-11-14 share their date.
+describe('the index sets the release order, not the date', () => {
+  // A 4.7 build made after the 4.8 ones is listed last, and stays last.
   const index = parseCatalogIndex({
     format: 1,
-    releases: ['2026-11-16', '2026-11-14b', '2026-11-14', '2026-11-13'],
+    releases: ['2026-11-16', '2026-11-14', '2026-11-20'],
   })
-  const versions: Record<string, [string, string]> = {
-    '2026-11-16': ['2026-11-16', 'StabRX-2026-11-16 (262cde4d)'],
-    '2026-11-14b': ['2026-11-14', '4.8.0-dev 78b82326-dirty, menu v3'],
-    '2026-11-14': ['2026-11-14', '4.8.0-dev 78b82326-dirty'],
-    '2026-11-13': ['2026-11-13', '4.8.0-dev 78b82326-dirty'],
+  const versions: Record<string, string> = {
+    '2026-11-16': 'StabRX-4.8.0-dev (262cde4d)',
+    '2026-11-14': 'StabRX-4.8.0-dev (78b82326)',
+    '2026-11-20': 'StabRX-4.7.1 (0a1b2c3d)',
   }
-  const releases = index.map((name) => {
-    const [date, version] = versions[name]!
-    return parseRelease(name, release({ date, version }))
-  })
+  const releases = index.map((name) =>
+    parseRelease(name, release({ date: name, version: versions[name] })),
+  )
 
-  it('accepts a folder name with a letter after the date', () => {
-    expect(index).toContain('2026-11-14b')
-  })
-
-  it('keeps the index’s newest-first order for a shared date', () => {
-    // loadCatalog passes the releases in the index's order, which breaks the tie.
+  it('lists the releases in the index’s order', () => {
     const [entry] = boardsIn(releases)
     expect(entry!.releases.map((r) => r.release.name)).toEqual([
       '2026-11-16',
-      '2026-11-14b',
       '2026-11-14',
-      '2026-11-13',
+      '2026-11-20',
+    ])
+    expect(releaseLabels(entry!.releases.map((r) => r.release))).toEqual([
+      'StabRX-4.8.0-dev (262cde4d) · latest',
+      'StabRX-4.8.0-dev (78b82326)',
+      'StabRX-4.7.1 (0a1b2c3d)',
     ])
   })
 
+  it('takes an option’s current release from the first release that has it', () => {
+    // Only the last release has the ArduPilot option; the others have StabRX alone.
+    const stabOnly = (name: string) =>
+      parseRelease(
+        name,
+        release(
+          { date: name, version: versions[name] },
+          { firmware: [release().boards[0]!.firmware[0]] },
+        ),
+      )
+    const [entry] = boardsIn([stabOnly('2026-11-16'), stabOnly('2026-11-14'), releases[2]!])
+    const withOption = (id: string) =>
+      entry!.releases.filter((r) => r.board.firmware.some((f) => f.id === id))
+    expect(withOption('stabrx')[0]!.release.name).toBe('2026-11-16')
+    expect(withOption('ardupilot').map((r) => r.release.name)).toEqual(['2026-11-20'])
+  })
+
+  it('handles a catalog with no option for a known id', () => {
+    const [entry] = boardsIn([
+      parseRelease(
+        '2026-11-16',
+        release({ date: '2026-11-16' }, { firmware: [release().boards[0]!.firmware[0]] }),
+      ),
+    ])
+    expect(entry!.releases[0]!.board.firmware.map((f) => f.id)).toEqual(['stabrx'])
+  })
+})
+
+describe('release labels', () => {
   it('tells apart two releases whose versions read the same, and only those', () => {
-    const [entry] = boardsIn(releases)
-    expect(releaseLabels(entry!.releases.map((r) => r.release))).toEqual([
-      'StabRX-2026-11-16 (262cde4d) · latest',
-      '4.8.0-dev 78b82326-dirty, menu v3',
-      '4.8.0-dev 78b82326-dirty · 2026-11-14',
-      '4.8.0-dev 78b82326-dirty · 2026-11-13',
+    const r = (name: string, version: string) =>
+      parseRelease(name, release({ date: '2026-11-16', version }))
+    expect(
+      releaseLabels([
+        r('2026-11-16b', 'StabRX-4.8.0-dev (262cde4d)'),
+        r('2026-11-16', 'StabRX-4.8.0-dev (262cde4d)'),
+        r('2026-11-14', 'StabRX-4.8.0-dev (78b82326)'),
+      ]),
+    ).toEqual([
+      'StabRX-4.8.0-dev (262cde4d) · 2026-11-16b · latest',
+      'StabRX-4.8.0-dev (262cde4d) · 2026-11-16',
+      'StabRX-4.8.0-dev (78b82326)',
     ])
   })
 
   it('shortens a label too long for its box rather than clipping it', () => {
-    const tagged = parseRelease(
-      '2026-11-07',
-      release({ date: '2026-11-07', version: 'F405-SRX-ArduPilot-2026-11-07 (55eeb385)' }),
-    )
-    const old = parseRelease(
-      '2026-11-06',
-      release({ date: '2026-11-06', version: '4.8.0-dev 1234abcd-dirty, menu v4' }),
-    )
-    const fits = (label: string) => label.length <= 24
-    // The tag's product and date are on the tile and the folder; the hash stays.
-    expect(releaseLabels([tagged, old], fits)).toEqual([
-      '2026-11-07 (55eeb385) · latest',
-      '4.8.0-dev 1234abcd-dirt…',
+    const current = parseRelease('2026-11-16', release({ version: 'StabRX-4.8.0-dev (262cde4d)' }))
+    const other = parseRelease('2026-11-15', release({ version: 'F35B-70-4.8.0-dev (1234abcd)' }))
+    const fits = (label: string) => label.length <= 29
+    // The product is on the tile; the ArduPilot version and the hash stay.
+    expect(releaseLabels([current, other], fits, 'StabRX')).toEqual([
+      '4.8.0-dev (262cde4d) · latest',
+      'F35B-70-4.8.0-dev (1234abcd)',
     ])
+    expect(releaseLabels([current], (l) => l.length <= 12, 'StabRX')).toEqual(['4.8.0-dev (…'])
   })
 })

@@ -124,8 +124,9 @@ export default function LoftedBoardsCard() {
     return releaseLabels(
       releases.map((r) => r.release),
       fits,
+      releases[0]?.board.firmware.find((f) => f.id === option?.id)?.name,
     )
-  }, [releases, releaseRoom])
+  }, [releases, releaseRoom, option])
 
   if (!hasWebSerial()) return null
 

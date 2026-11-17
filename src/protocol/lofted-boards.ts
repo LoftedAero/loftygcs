@@ -1,7 +1,7 @@
 // The catalog of Lofted Aero flight controllers and their firmware, as
 // published in LoftedAero/ardupilot-builds:
 //
-//     index.json                      { "format": 1, "releases": ["2026-11-07", ...] }
+//     index.json                      { "format": 1, "releases": ["2026-11-16", ...] }
 //     releases/<release>/boards.json  one release: boards and their firmware options
 //     releases/<release>/<files>      the images boards.json names
 //
@@ -10,7 +10,8 @@
 // (the build's _with_bl.hex) for a blank board's ROM DFU.
 //
 // A board's facts (board id, receiver wiring) can change between
-// releases, so they are read from the newest release that lists the board.
+// releases, so they are read from the first release in the index that lists
+// the board.
 // Everything here comes from the network and is checked before use: a file
 // path must stay inside its release folder, and every image carries its size
 // and SHA-256.
@@ -164,7 +165,7 @@ function board(o: unknown, where: string): CatalogBoard {
   }
 }
 
-/** The list of releases, newest first as published. */
+/** The list of releases, in the publisher's order: current first. */
 export function parseCatalogIndex(json: unknown): string[] {
   if (!isObject(json)) return fail('index.json', 'is not an object')
   if (json.format !== CATALOG_FORMAT)
@@ -191,26 +192,23 @@ export function parseRelease(name: string, json: unknown): CatalogRelease {
   return { name, version: str(json, 'version', where), date: str(json, 'date', where), boards }
 }
 
-/** A board as the app offers it: its newest facts, and every release that has it. */
+/** A board as the app offers it: its current facts, and every release that has it. */
 export interface BoardEntry {
   board: CatalogBoard
-  /** Newest first; each with the board as that release describes it. */
+  /** In the index's order, current first; each with the board as that release describes it. */
   releases: { release: CatalogRelease; board: CatalogBoard }[]
 }
 
 /**
- * Group releases by board. Releases are ordered newest first by date, the
- * index's order breaking ties, so a misordered index cannot make an old
- * release look current, and two releases of one day ("2026-11-14" and
- * "2026-11-14b") keep the index's newest-first order.
+ * Group releases by board, in the index's order, which the publisher sets by
+ * the ArduPilot version a build is based on and then by build date. `date` is
+ * not the order: a 4.7 build made after a 4.8 one is still listed below it.
+ * The first release that lists a board gives its facts, and the first with an
+ * option is that option's current one.
  */
 export function boardsIn(releases: CatalogRelease[]): BoardEntry[] {
-  const ordered = releases
-    .map((r, i) => ({ r, i }))
-    .sort((a, b) => (a.r.date === b.r.date ? a.i - b.i : a.r.date < b.r.date ? 1 : -1))
-    .map(({ r }) => r)
   const byId = new Map<string, BoardEntry>()
-  for (const release of ordered) {
+  for (const release of releases) {
     for (const b of release.boards) {
       const entry = byId.get(b.id)
       if (entry) entry.releases.push({ release, board: b })
@@ -220,33 +218,36 @@ export function boardsIn(releases: CatalogRelease[]): BoardEntry[] {
   return [...byId.values()].sort((a, b) => a.board.name.localeCompare(b.board.name))
 }
 
-/** The new `version` format, from 2026-11-16: "<source tag> (<short commit hash>)". */
-const TAGGED_VERSION = /^(.+) \(([0-9a-f]{7,40})\)$/
-
 /**
- * What a release list shows for each release, newest first: its `version`,
- * with "latest" on the first. `version` is display text in two formats, "4.8.0-dev
- * 55eeb385" and, from 2026-11-16, "StabRX-2026-11-16 (262cde4d)"; nothing
- * compares it. Two releases whose versions read the same (built from the same
- * uncommitted source) are told apart by their folder names.
+ * What a release list shows for each release, in the index's order: its
+ * `version`, with "latest" on the first. `version` is display text, read as
+ * "StabRX-4.8.0-dev (262cde4d)" (product, ArduPilot version, the hash the
+ * firmware reports); nothing parses or compares it. Two releases whose
+ * versions read the same are told apart by their folder names.
  *
- * A label `fits` rejects is shortened, never clipped: the new format becomes
- * the folder name and the hash (the tag's product is the tile, its date the
- * folder's), and anything else loses its end to "…".
+ * A label `fits` rejects is shortened, never clipped: first by the product
+ * (`product`, the option's name, already on its tile), then by losing its end
+ * to "…", so the ArduPilot version, which sets the order, is what stays.
  */
 export function releaseLabels(
   releases: CatalogRelease[],
   fits: (label: string) => boolean = () => true,
+  product?: string,
 ): string[] {
   const count = new Map<string, number>()
   for (const r of releases) count.set(r.version, (count.get(r.version) ?? 0) + 1)
   return releases.map((r, i) => {
     const latest = i === 0 ? ' · latest' : ''
-    const full = (count.get(r.version)! > 1 ? `${r.version} · ${r.name}` : r.version) + latest
+    const named = (v: string) => (count.get(r.version)! > 1 ? `${v} · ${r.name}` : v) + latest
+    const full = named(r.version)
     if (fits(full)) return full
-    const tagged = TAGGED_VERSION.exec(r.version)
-    if (tagged) return `${r.name} (${tagged[2]})${latest}`
-    let cut = full
+    const prefix = product ? `${product}-` : null
+    const short =
+      prefix && r.version.startsWith(prefix) && r.version.length > prefix.length
+        ? named(r.version.slice(prefix.length))
+        : full
+    if (fits(short)) return short
+    let cut = short
     while (cut.length > 1 && !fits(`${cut}…`)) cut = cut.slice(0, -1)
     return `${cut.trimEnd()}…`
   })

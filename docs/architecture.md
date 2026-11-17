@@ -1092,26 +1092,29 @@ a first flash gets the wizard (`BoardSetupWizard`), an update is flashed from th
   option's `id` (`ardupilot`, `stabrx`, `f35b-70`, `f35b-90`); an id the app does not list is
   not offered, so a new product needs an app release as well as a catalog one. It is read
   from `raw.githubusercontent.com`, which sends CORS headers; GitHub's release downloads do
-  not, and the browser build could not fetch them. A board's facts come from the newest release
-  that lists it, so a board can be renamed by a release. It is a repository of its own, not a
+  not, and the browser build could not fetch them. A board's facts come from the first release
+  in the index that lists it, so a board can be renamed by a release. A known option that no
+  release has a build for is a dimmed tile like any other, so the catalog can drop one. It is a repository of its own, not a
   branch of the ArduPilot source, so a clone of the source does not download every published
   image. Its README describes the format for whoever publishes;
   `lofted-catalog.live.test.ts` (`NET=1`) reads every published file and checks its hash, its
   board id, and that each `.hex` starts at `0x08000000` and holds its `.apj`'s firmware.
-- **Releases.** A folder name is one path segment: a date, with a letter for a second build that
-  day (`2026-11-14b`). Releases sort by `date`, newest first; a shared date keeps the index's
-  order, which lists the newest first, so the loader must keep that order. Each release is built
-  from a tag on LoftedAero/ardupilot (StabRX's branch is `StabRX-master`; the catalog README's
-  Source table lists them).
-- **`version` is display text, never parsed.** From 2026-11-16 it reads `<source tag> (<short
-commit hash>)` (`StabRX-2026-11-16 (262cde4d)`), the hash the firmware reports in its version
-  and boot messages; older releases keep `4.8.0-dev 78b82326-dirty`. Two releases that read the
-  same (built from the same uncommitted source) are labeled with their folder names, and a label
-  too wide for its box is shortened rather than clipped (`releaseLabels`): a tagged one to its
-  folder and hash, since the tag's product is the tile and its date the folder's. The card links
-  to no source: the tag is not a field, and taking it out of `version` would miss every release
-  before 2026-11-16. A `source` field in `boards.json` would be a format change, agreed with the
-  firmware side first.
+- **Releases are in the index's order, never sorted.** The publisher orders `index.json` by
+  the ArduPilot version a build is based on, newest first, then by build date, so a 4.7 build
+  made after a 4.8 one is listed below it. The list shows that order; "latest", the default
+  and an update's release are the first release that has the board and the option, never the
+  newest `date`. A folder name is one path segment: a date, with a letter for a second build
+  that day (`2026-11-14b`). Releases are removed when nothing shipped from them, and nothing
+  is kept between sessions, so a missing release is just absent. Each release is built from a
+  tag on LoftedAero/ardupilot (StabRX's branch is `StabRX-master`; the catalog README's Source
+  table lists them).
+- **`version` is display text, never parsed.** It reads `<product>-<ArduPilot version> (<short
+commit hash>)` (`StabRX-4.8.0-dev (262cde4d)`), and the firmware reports the same version and
+  hash (`ArduPlane V4.8.0-dev (262cde4d)`). Two releases that read the same are labeled with
+  their folder names, and a label too wide for its box is shortened rather than clipped
+  (`releaseLabels`): first by the product, which is on the tile, then by its end. The card links
+  to no source: the tag is not a field, and a `source` field in `boards.json` would be a format
+  change, agreed with the firmware side first.
 - StabRX's messages start `StabRX:` (they were `Gyro:`). The app matches neither, so a StabRX
   PreArm reason is listed under Other in the Preflight pane. The app does not read the CRSF menu
   (device "Stabilization", layout version 3).
