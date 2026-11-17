@@ -247,11 +247,12 @@ export default function BoardSetupWizard({
       } else {
         port = await grantedArduPilotPort()
       }
-      // A browser sees only ports it was granted; its chooser needs a press.
+      // A browser sees only ports it was granted, and its chooser needs a press
+      // from the last few seconds; the flash took far longer than that.
       if (!port) {
         setRunning(false)
         setNeedPort(true)
-        setStatus({ text: 'Select the flight controller’s port.' })
+        setStatus({ text: 'Press Continue and select the flight controller’s port.' })
         return
       }
       step('Connecting…')

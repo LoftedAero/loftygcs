@@ -116,10 +116,11 @@ Desktop app:
 
 Chrome (`npm run dev`):
 
-- [ ] First flash: the press shows the serial chooser, then the DFU chooser
-      (cancel the first); "Select board" covers a board not yet granted.
+- [ ] First flash: with nothing granted, the press asks how the board is
+      connected, and "In DFU mode" opens only the DFU chooser; a board granted
+      before opens the wizard with no question.
 - [ ] After the DFU write, the wizard either connects to a granted port or
-      shows "Select the flight controller’s port." with Continue; Continue's
+      shows "Press Continue and select the flight controller’s port."; Continue's
       chooser lists the board and the flash goes on.
 - [ ] The receiver write runs over Web Serial: esptool opens the port, and the
       replug is found by itself or by Connect once it turns on after 15 s.
