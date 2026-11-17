@@ -125,26 +125,40 @@ describe('the phantom port a reboot leaves behind', () => {
     expect(pickBootloaderPort([a, b], new Set(), new Set(['a', 'b']))).toBeNull()
   })
 
-  it('after a reboot, never answers with the port the board was running on', () => {
-    // A LoftedAero-SRX: the running board and its bootloader share the generic
-    // ids, and Windows names the driver just "ArduPilot". The running port is
-    // still listed when the request after the reboot comes in.
-    const running = { portId: 'gyro', displayName: 'LoftedAero-SRX-gyro', driverName: 'ArduPilot' }
-    const bootloader = { portId: 'bl', displayName: 'LoftedAero-SRX-BL', driverName: 'ArduPilot' }
-    const ids = { vendorId: '4617', productId: '22337' }
-    const stale = new Set(['gyro', 'bt-1'])
-    expect(
-      pickBootloaderPort([...others, { ...running, ...ids }], stale, new Set(), stale),
-    ).toBeNull()
-    // The bootloader arriving answers the request.
-    expect(
-      pickBootloaderPort(
-        [...others, { ...running, ...ids }, { ...bootloader, ...ids }],
-        stale,
-        new Set(['bl']),
-        stale,
-      ),
-    ).toBe('bl')
+  // A LoftedAero-SRX: the running board and its bootloader share the generic
+  // ids, and Windows names the driver just "ArduPilot". The running port is
+  // still listed when the request after the reboot comes in. Its product
+  // string differs between builds; the bootloader's has stayed the same.
+  it.each(['LoftedAero-SRX', 'LoftedAero-SRX-gyro', 'Lofted Aero F405-SRX'])(
+    'after a reboot, never answers with the port the board was running on (%s)',
+    (product) => {
+      const running = { portId: 'gyro', displayName: product, driverName: 'ArduPilot' }
+      const bootloader = { portId: 'bl', displayName: 'LoftedAero-SRX-BL', driverName: 'ArduPilot' }
+      const ids = { vendorId: '4617', productId: '22337' }
+      const stale = new Set(['gyro', 'bt-1'])
+      expect(
+        pickBootloaderPort([...others, { ...running, ...ids }], stale, new Set(), stale),
+      ).toBeNull()
+      // The bootloader arriving answers the request.
+      expect(
+        pickBootloaderPort(
+          [...others, { ...running, ...ids }, { ...bootloader, ...ids }],
+          stale,
+          new Set(['bl']),
+          stale,
+        ),
+      ).toBe('bl')
+    },
+  )
+
+  it('knows a Lofted Aero bootloader by "-BL" or the generic ids, never by the board’s name', () => {
+    const ids = { vendorId: '4617', productId: '22337', driverName: 'ArduPilot' }
+    // By the generic ids alone it could be either; the name adds no "-BL".
+    expect(looksLikeBootloader({ portId: 'a', displayName: 'Lofted Aero F405-SRX', ...ids })).toBe(
+      true,
+    )
+    expect(looksLikeBootloader({ portId: 'a', displayName: 'Lofted Aero F405-SRX' })).toBe(false)
+    expect(looksLikeBootloader({ portId: 'b', displayName: 'LoftedAero-SRX-BL' })).toBe(true)
   })
 
   it('never answers with a running board’s interface just because it is new', () => {

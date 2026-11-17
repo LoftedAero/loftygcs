@@ -1205,6 +1205,11 @@ receiver on the same port after MAVLink lets it go (`connectionService.releaseSe
   request listed (`stale` in `serial-autopick.ts`): this board's running port and its bootloader
   share the generic ids, its driver is named just "ArduPilot", and the running port stays listed
   for a moment after the reboot command.
+- Nothing matches the running board's USB product string, which changes between builds
+  (`LoftedAero-SRX-gyro`, `Lofted Aero F405-SRX`) and which Web Serial does not expose. Ports are
+  found by the ids (`1209:5741`), a board in DFU by `0483:DF11`, and the board by its id (5999)
+  from the bootloader or AUTOPILOT_VERSION. The one string read is the bootloader's
+  `LoftedAero-SRX-BL`, by the desktop shell's automatic chooser; the chooser shows the strings.
 - A write that stopped before its last step is recognized from the board's own parameters (a
   relay on BOOT or EN, or the passthrough protocol on the receiver's port), so the restore dialog
   (`ui/shell/ReceiverRestorePrompt.tsx`) opens on connection from any screen, whichever app or
