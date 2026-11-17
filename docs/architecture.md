@@ -1120,8 +1120,11 @@ commit hash>)` (`StabRX-2026-11-16 (262cde4d)`), the hash the firmware reports i
   the board in, in DFU mode for a first flash. A board in DFU opens the wizard at its questions;
   one answering ArduPilot's bootloader (rebooted into it from its firmware) is updated; nothing
   found opens the wizard's guide to DFU, since a blank board plugged in normally shows nothing
-  at all. The desktop app sees DFU and ArduPilot ports without asking, so it shows no chooser; a
-  browser shows the serial chooser, then the DFU chooser if no bootloader answered.
+  at all. The desktop app sees DFU and ArduPilot ports without asking, so it shows no chooser. A
+  browser sees only devices it was granted before. With neither granted it asks "How is the
+  board connected?" (Normally, In DFU mode) and opens that one chooser: the serial chooser
+  cannot list a board in DFU, nor the USB chooser a running one, and opening the serial one
+  first left the pilot cancelling it.
 - **A first flash** gets the wizard: the `_with_bl.hex` in one write over ROM DFU, the onboard
   ELRS receiver, a check. Its first step holds everything the pilot does or answers (the board
   steps, and the receiver's version, regulatory domain and binding phrase), so after "Erase and

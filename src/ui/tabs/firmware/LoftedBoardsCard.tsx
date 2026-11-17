@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { LaButton, LaCard, LaSelect } from '../../components/La'
+import { LaButton, LaCard, LaModal, LaSelect } from '../../components/La'
 import { boardForId, releaseLabels, type BoardEntry } from '../../../protocol/lofted-boards'
-import { detectBoard, updateFirmware } from '../../../services/board-setup'
+import { chooseDfuDevice, detectBoard, updateFirmware } from '../../../services/board-setup'
 import { catalog } from '../../../services/lofted-catalog'
 import { PortCancelledError } from '../../../transport/web-serial'
 import { useBoardSetupStore, type HeldBoard } from '../../../stores/board-setup-store'
@@ -36,6 +36,8 @@ export default function LoftedBoardsCard() {
   /** The wizard is open; with the board when the press found it in DFU. */
   const [wizard, setWizard] = useState<{ dfu: USBDevice | null } | null>(null)
   const [updating, setUpdating] = useState(false)
+  /** A browser could not tell how the board is connected; asking opens the right chooser. */
+  const [ask, setAsk] = useState(false)
 
   const connected = useConnectionStore((s) => s.phase === 'connected')
   const boardId = useVehicleStore((s) => s.boardId)
@@ -167,6 +169,11 @@ export default function LoftedBoardsCard() {
       let found = false
       if (!attached) {
         const what = await detectBoard(step)
+        if (what.kind === 'ask') {
+          step('')
+          setAsk(true)
+          return
+        }
         if (what.kind !== 'bootloader') {
           step('')
           setWizard({ dfu: what.kind === 'dfu' ? what.device : null })
@@ -178,6 +185,32 @@ export default function LoftedBoardsCard() {
       const back = await updateFirmware(release.release, board, firmware, step, inBootloader, found)
       // The board has left its bootloader; the Firmware card lets go of it.
       if (inBootloader && !found) useBoardSetupStore.getState().setHeld(null)
+      if (back) confirm('Flashing complete.')
+      else setStatus({ text: 'Flashing complete. Connect to the board.' })
+    } catch (e) {
+      if (e instanceof PortCancelledError) setStatus({ text: '' })
+      else setStatus({ text: e instanceof Error ? e.message : String(e), tone: 'bad' })
+    } finally {
+      useFlashStore.getState().setPhase('idle')
+      useBoardSetupStore.getState().setBusy(false)
+      setUpdating(false)
+    }
+  }
+
+  // The answer is a press, so the chooser it opens is allowed.
+  const answer = async (how: 'dfu' | 'normal') => {
+    setAsk(false)
+    if (how === 'dfu') {
+      // A canceled chooser still opens the wizard, at its guide to DFU.
+      setWizard({ dfu: await chooseDfuDevice() })
+      return
+    }
+    if (!release || !firmware) return
+    setUpdating(true)
+    useBoardSetupStore.getState().setBusy(true)
+    const step = (text: string) => setStatus({ text })
+    try {
+      const back = await updateFirmware(release.release, release.board, firmware, step)
       if (back) confirm('Flashing complete.')
       else setStatus({ text: 'Flashing complete. Connect to the board.' })
     } catch (e) {
@@ -285,6 +318,24 @@ export default function LoftedBoardsCard() {
           </div>
         )}
       </div>
+
+      <LaModal
+        open={ask}
+        title="How is the board connected?"
+        actions={
+          <>
+            <LaButton variant="ghost" onClick={() => setAsk(false)}>
+              Cancel
+            </LaButton>
+            <LaButton variant="secondary" onClick={() => void answer('normal')}>
+              Normally
+            </LaButton>
+            <LaButton variant="secondary" onClick={() => void answer('dfu')}>
+              In DFU mode
+            </LaButton>
+          </>
+        }
+      />
 
       {wizard && entry && release && firmware && (
         <BoardSetupWizard

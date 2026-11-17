@@ -66,7 +66,11 @@ export function watchForDfu(onFound: (d: USBDevice) => void): () => void {
 
 /** What the Flash press found plugged in. */
 export type FoundBoard =
-  { kind: 'dfu'; device: USBDevice } | { kind: 'bootloader'; board: HeldBoard } | { kind: 'none' }
+  | { kind: 'dfu'; device: USBDevice }
+  | { kind: 'bootloader'; board: HeldBoard }
+  | { kind: 'none' }
+  /** A browser that was granted neither: the caller asks how the board is connected. */
+  | { kind: 'ask' }
 
 /**
  * Find the board a Flash press is for, with as few choosers as the platform
@@ -74,23 +78,24 @@ export type FoundBoard =
  * bootloader (rebooted into it from its firmware) is an update. The desktop app
  * sees both without asking, so it asks nothing, and finds nothing when neither
  * is plugged in, which is also how a blank board plugged in normally looks. A
- * browser sees only what it was granted before, so it shows the serial
- * chooser, then the DFU chooser if no bootloader answered.
+ * browser sees only what it was granted before. With neither granted it cannot
+ * tell which chooser the board is in, and opening the wrong one first left the
+ * pilot cancelling a chooser that could not list it, so it asks instead.
  */
 export async function detectBoard(onStep: (step: string) => void): Promise<FoundBoard> {
   onStep('Looking for the board…')
   const dfu = await grantedDfuDevice()
   if (dfu) return { kind: 'dfu', device: dfu }
-  if (isElectron() && !(await grantedSerialPorts()).some(isArduPilotPort)) return { kind: 'none' }
+  if (!(await grantedSerialPorts()).some(isArduPilotPort)) {
+    return isElectron() ? { kind: 'none' } : { kind: 'ask' }
+  }
   try {
     return { kind: 'bootloader', board: await identifyBoard({ reboot: true, onStep }) }
   } catch (e) {
     // The desktop app saw an ArduPilot port, so one that does not answer is
-    // worth reporting. In a browser it is usually a canceled chooser, or a
-    // blank board, which has no serial port.
+    // worth reporting. A browser's granted port may be another board's.
     if (isElectron()) throw e
-    const device = await chooseDfuDevice()
-    return device ? { kind: 'dfu', device } : { kind: 'none' }
+    return { kind: 'ask' }
   }
 }
 

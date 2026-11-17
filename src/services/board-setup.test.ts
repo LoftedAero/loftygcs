@@ -94,15 +94,28 @@ describe('detectBoard', () => {
   })
 
   describe('in a browser', () => {
-    it('offers the DFU chooser when no bootloader answered on the serial one', async () => {
-      flash.identifyBoard.mockRejectedValue(new Error('canceled'))
-      usbChosen = DFU
+    it('asks how the board is connected when it was granted neither, opening no chooser', async () => {
+      // Which chooser to open depends on the answer: the serial one cannot
+      // list a board in DFU, and the USB one cannot list a running board.
+      expect(await detectBoard(step)).toEqual({ kind: 'ask' })
+      expect(flash.identifyBoard).not.toHaveBeenCalled()
+    })
+
+    it('takes a board in DFU it was granted before, with no question', async () => {
+      usbDevices = [DFU]
       expect(await detectBoard(step)).toEqual({ kind: 'dfu', device: DFU })
     })
 
-    it('finds nothing when both choosers are canceled', async () => {
-      flash.identifyBoard.mockRejectedValue(new Error('canceled'))
-      expect(await detectBoard(step)).toEqual({ kind: 'none' })
+    it('updates a running board whose port it was granted before', async () => {
+      serialPorts = [ardupilotPort]
+      flash.identifyBoard.mockResolvedValue(inBootloader)
+      expect(await detectBoard(step)).toEqual({ kind: 'bootloader', board: inBootloader })
+    })
+
+    it('asks when the granted port does not answer, since it may be another board', async () => {
+      serialPorts = [ardupilotPort]
+      flash.identifyBoard.mockRejectedValue(new Error('no bootloader'))
+      expect(await detectBoard(step)).toEqual({ kind: 'ask' })
     })
   })
 })

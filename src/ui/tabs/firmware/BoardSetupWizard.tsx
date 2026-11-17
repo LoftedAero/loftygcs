@@ -404,7 +404,13 @@ export default function BoardSetupWizard({
           : []
 
   const flashing = stage === 'firmware' && running && flashPhase in FLASH_LABEL
-  const stateText = flashing ? FLASH_LABEL[flashPhase]! : status.text
+  // Erase and install waits for the version; a tooltip alone went unseen.
+  const needVersion = stage === 'prepare' && !!dfu && !!board.receiver && !version
+  const stateText = flashing
+    ? FLASH_LABEL[flashPhase]!
+    : needVersion
+      ? 'Found the board in DFU mode. Select the ExpressLRS version.'
+      : status.text
   const stateTone = flashing ? undefined : status.tone
   const stateProgress = flashing ? flashProgress : progress
 
