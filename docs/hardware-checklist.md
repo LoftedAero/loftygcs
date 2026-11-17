@@ -82,6 +82,17 @@ DFU:
 - [ ] The "Which board is this?" prompt makes clear that DFU has no board id
       to read, so a wrong target cannot be caught.
 
+## Lofty PFD on a radio's SD card
+
+Copy the card first: an install removes whatever Lofty PFD's folders hold that the
+release does not list.
+
+- [ ] Desktop app: Install on radio onto a card without Lofty PFD, then again onto
+      the same card (an update). The radio starts Lofty PFD.
+- [ ] Chrome: the same, through the browser's folder picker.
+- [ ] A card for the other radio family (EdgeTX or Ethos) is detected by its own
+      layout, and a folder named like one in the layout is refused.
+
 ## Lofted Aero boards (F405-SRX)
 
 Run with the desktop app and with Chrome, the trace on for the desktop app
