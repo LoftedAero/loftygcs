@@ -537,6 +537,27 @@ is that project's; its `docs/architecture.md` ("Map tiles") is the other half.
 - A failed write stops the copy and says the card could not be written: a full or read-only
   card fails every tile the same way. A stopped copy still indexes the tiles it wrote.
 
+### Installing Lofty PFD (`services/pfd-install.ts`)
+
+The Firmware screen's Lofty PFD card installs or updates Lofty PFD on a radio's card from its
+latest GitHub release, by the release's `manifest.json` (Lofty PFD's `docs/architecture.md`,
+"Installing from Lofty GCS"). It shares the picker, the remembered card and the dialog with the
+maps copy above, and needs no vehicle.
+
+- The tag comes from `releases/latest` and the manifest from `raw.githubusercontent.com` at that
+  tag; both send CORS headers, so plain `fetch` works in Chrome too. The manifest must be format
+  1 and carry the tag's version. The check runs once a session, since GitHub limits
+  unauthenticated calls per address (403 when spent).
+- Every `to` path is checked to stay inside the picked folder: the manifest is from the network.
+- The radio is the one whose Lofty PFD folder is on the card, else the one whose signs are, else
+  the pilot's answer. A picked folder named like any folder in the layout (`WIDGETS`,
+  `loftypfd`) is refused, since installing there nests Lofty PFD where the radio never looks.
+- Every file is downloaded and checked (size, SHA-256) before the card is touched. Then
+  `remove` globs, then whatever an owned folder holds that the release does not list, then the
+  writes. Globs and paths compare without case, as FAT does. A `**` glob lists everything
+  below Lofty PFD's folder, maps included.
+- `pfd-install.live.test.ts` (`NET=1`) downloads and checks every file of the real release.
+
 ### Terrain (`services/terrain.ts`, `services/mission-terrain.ts`)
 
 Elevation comes from Terrarium tiles (PNG, RGB encodes height) from AWS's keyless

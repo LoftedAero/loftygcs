@@ -4,6 +4,7 @@ import { LaButton, LaCard, LaModal, LaSelect } from '../../components/La'
 import { useFlashStore, type LoadedApj, type LoadedHex } from '../../../stores/flash-store'
 import { useConnectionStore } from '../../../stores/connection-store'
 import { useVehicleStore } from '../../../stores/vehicle-store'
+import PfdCard from './PfdCard'
 import {
   allPlatforms,
   describeBoard,
@@ -63,6 +64,7 @@ export default function FirmwareTab() {
   return (
     <div className="fw-tab">
       <FirmwareCard />
+      <PfdCard />
     </div>
   )
 }

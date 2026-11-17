@@ -210,7 +210,11 @@ export function tilePath(layerId: string, t: TileCoord): string[] {
   return ['maps', layerId, String(t.z), String(t.x), `${t.y}.jpg`]
 }
 
-async function writeFile(root: FileSystemDirectoryHandle, path: string[], data: Blob | string) {
+export async function writeFile(
+  root: FileSystemDirectoryHandle,
+  path: string[],
+  data: Blob | string | ArrayBuffer,
+) {
   let dir = root
   for (const name of path.slice(0, -1)) {
     dir = await dir.getDirectoryHandle(name, { create: true })

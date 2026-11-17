@@ -7418,11 +7418,14 @@ body.is-splitting .flight-map {
   color: var(--la-blue-deep);
 }
 
-/* One card, the width of the screen, since it holds a ten-tile strip and two
-   sections. */
+/* The firmware card, the width of the screen since it holds a ten-tile strip,
+   with Lofty PFD's card under it. */
 .fw-tab {
   grid-column: 1 / -1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--la-space-4);
 }
 .fw-card {
   display: flex;
